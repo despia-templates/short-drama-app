@@ -28,3 +28,4 @@ retracted in the ledger instead of filed).
 - `21-press-release-event.md` — input: no press-release event → https://github.com/despia-native/despia-framework/issues/236
 - `22-linelimit-inert-web.md` — web: lineLimit is inert → https://github.com/despia-native/despia-framework/issues/237
 - `23-justifycontent-missing.md` — layout: justifyContent missing → https://github.com/despia-native/despia-framework/issues/238
+- `24-sibling-inputs-scope-leak.md` — sibling-with-inputs corrupts the caller's next binding → https://github.com/despia-native/despia-framework/issues/242

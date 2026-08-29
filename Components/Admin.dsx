@@ -6,6 +6,8 @@
      admin document serves at /mcp: one declaration, UI + AI + HTTP. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
+    <!-- the router publishes nav.canPop / nav.depth; back reads it -->
+    <expects variable="nav"/>
     <api as="session" url="/dev-session.json" ssr="false"/>
     <api as="stats" url="/internal/admin/stats" method="POST" auto="true" body="dsx.variable.empty" ssr="false" needs="session" headers="dsx.variable.opHeaders"/>
     <api as="shows" url="/internal/admin/listshows" method="POST" auto="true" body="dsx.variable.empty" ssr="false" needs="session" headers="dsx.variable.opHeaders"/>
@@ -50,6 +52,13 @@
       return 'width: 100%; max-width: ' + 1100 + 'px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
 
+    <!-- The canonical back (writing-an-app.md §5): POP when there is history, REPLACE
+         when the screen was deep-linked, so a dismiss never teleports home and never
+         stacks a second copy of where you came from. Back is never href — href pushes. -->
+    <action as="goBack">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/profile' }) }
+    </action>
     <action as="createShow">
       if (dsx.variable.nTitle == '') { dsx.variable.toast = 'A show needs a title'; return }
       const r = await upsertShow.send({ title: dsx.variable.nTitle, synopsis: dsx.variable.nSynopsis, genre: dsx.variable.nGenre, poster: '/posters/placeholder-poster.svg', hero: '/posters/placeholder-hero.svg', state: 'draft', freeUntil: 3, featured: false })
@@ -123,7 +132,7 @@
           <text value="Manage" class="h1"/>
           <text value="Operator surface — Manage View bridge" class="sub"/>
         </vstack>
-        <hstack class="backChip" on:tap="dsx.module.route.pop()" a11yGroup="true" a11yTrait="button" a11yLabel="Back">
+        <hstack class="backChip" on:tap="dsx.action.goBack()" a11yGroup="true" a11yTrait="button" a11yLabel="Back">
           <image icon="chevron.left" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
           <text value="App" class="backChipLabel"/>
         </hstack>

@@ -10,6 +10,8 @@
      (upstream #215: its web facet). -->
 <vstack background="#000000" alignItems="stretch" style="min-height: {{ dsx.screen.height }}px">
   <head>
+    <!-- the router publishes nav.canPop / nav.depth; back reads it -->
+    <expects variable="nav"/>
     <!-- route /watch/:show/:idx — params arrive as vars.show / vars.idx -->
     <api as="detail" url="/catalog/show/{{ vars.show }}"/>
     <api as="session" url="/dev-session.json" ssr="false"/>
@@ -95,6 +97,13 @@
       return !wallet.data.unlocked.includes(epid)
     </formula>
 
+    <!-- The canonical back (writing-an-app.md §5): POP when there is history, REPLACE
+         when the screen was deep-linked, so a dismiss never teleports home and never
+         stacks a second copy of where you came from. Back is never href — href pushes. -->
+    <action as="goBack">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/' }) }
+    </action>
     <action as="boot" show="vars.show" idx="vars.idx">
       dsx.variable.showId = show;
       dsx.variable.cur = Number(idx)
@@ -181,7 +190,7 @@
     <style as="topMeta" spacing="1"/>
     <style as="showTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
     <style as="epLine" fontSize="12" color="rgba(255,255,255,0.66)"/>
-    <style as="chip" background="rgba(255,255,255,0.16)" radius="14" paddingH="10" paddingV="6" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="chip" background="rgba(255,255,255,0.16)" radius="17" paddingH="13" paddingV="10" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
     <style as="bottomBar" paddingLeading="14" paddingTrailing="14" paddingBottom="16" spacing="10" alignItems="stretch"/>
     <style as="bottomRow" alignItems="flex-end" spacing="12"/>
     <style as="bottomCol" spacing="4"/>
@@ -191,11 +200,12 @@
     <style as="lockBlock" spacing="14" alignItems="center" paddingH="26"/>
     <style as="lockHead" fontSize="17" fontWeight="bold" color="#FFFFFF" textAlign="center" lineSpacing="4"/>
     <style as="unlockBtn" background="#E52E2E" radius="24" paddingV="13" paddingH="30" spacing="8" alignItems="center"/>
-    <style as="earnBtn" background="rgba(255,255,255,0.1)" radius="24" paddingV="12" paddingH="26" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="earnBtn" background="rgba(255,255,255,0.1)" radius="24" paddingV="14" paddingH="20" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="lockDoors" spacing="10" alignItems="center"/>
     <style as="lockMeta" fontSize="13" color="#F7C948"/>
     <style as="unlockLabel" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="lockMetaRow" spacing="6" alignItems="center"/>
-    <style as="chipIcon" background="rgba(255,255,255,0.16)" radius="16" paddingH="10" paddingV="9" alignItems="center"/>
+    <style as="chipIcon" background="rgba(255,255,255,0.16)" radius="19" paddingH="12" paddingV="11" alignItems="center"/>
     <style as="gridAllRow" spacing="4" alignItems="center"/>
     <style as="autoRow" spacing="9" alignItems="center" paddingTop="2"/>
     <style as="checkBox" width="18" height="18" radius="5" alignItems="center"/>
@@ -296,7 +306,7 @@
       <vstack class="chromeLayer" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
         <hstack class="topBar" style="pointer-events: auto">
           <image icon="xmark" iconSize="20" color="#FFFFFF" class="back"
-                 on:tap="dsx.module.route.pop()" a11yLabel="Close player" a11yTrait="button"/>
+                 on:tap="dsx.action.goBack()" a11yLabel="Close player" a11yTrait="button"/>
           <vstack class="topMeta" style="flex: 1">
             <text value="{{ detail.data == null ? '' : detail.data.show.title }}" class="showTitle"/>
             <text value="EP {{ dsx.variable.cur }}{{ detail.data == null ? '' : ' / ' + detail.data.episodes.length }}" class="epLine"/>
@@ -347,8 +357,12 @@ Please unlock to watch." class="lockHead"/>
                    visible-if="dsx.variable.unlocking == false"/>
             <text value="{{ dsx.variable.unlockLabel }}" class="unlockLabel"/>
           </hstack>
-          <button label="Earn Free Coins in Rewards" class="earnBtn"
-                  on:tap="dsx.module.route.push({ path: '/rewards' })"/>
+          <hstack class="lockDoors">
+            <button label="Get coins" class="earnBtn" style="flex: 1"
+                    on:tap="dsx.module.route.push({ path: '/store' })"/>
+            <button label="Earn free" class="earnBtn" style="flex: 1"
+                    on:tap="dsx.module.route.push({ path: '/rewards' })"/>
+          </hstack>
           <hstack class="lockMetaRow" a11yGroup="true"
                   a11yLabel="Price {{ dsx.variable.episode == null ? '' : dsx.variable.episode.price }} coins, balance {{ dsx.variable.balance }} coins">
             <text value="Price:" class="lockMeta"/>

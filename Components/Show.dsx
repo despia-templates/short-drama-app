@@ -14,6 +14,8 @@
      detail on a 375pt screen is a desktop layout in a phone's clothes. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
+    <!-- the router publishes nav.canPop / nav.depth; back reads it -->
+    <expects variable="nav"/>
     <api as="detail" url="/catalog/show/{{ vars.id }}"/>
     <api as="session" url="/dev-session.json" ssr="false"/>
     <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
@@ -83,6 +85,13 @@
       return !wallet.data.unlocked.includes(epid)
     </formula>
 
+    <!-- The canonical back (writing-an-app.md §5): POP when there is history, REPLACE
+         when the screen was deep-linked, so a dismiss never teleports home and never
+         stacks a second copy of where you came from. Back is never href — href pushes. -->
+    <action as="goBack">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/' }) }
+    </action>
     <action as="toggleFav">
       const r = await fav.send({ show: vars.id })
       if (r.ok) { dsx.variable.favTouched = r.data.favorite ? 'y' : 'n' }

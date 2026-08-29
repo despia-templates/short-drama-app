@@ -20,6 +20,13 @@
       "motion": "none"
     },
     {
+      "path": "/store",
+      "component": "shortdrama.Store",
+      "meta": {
+        "title": "Store \u2014 Short Drama"
+      }
+    },
+    {
       "path": "/rewards",
       "component": "shortdrama.Rewards",
       "meta": {
@@ -68,5 +75,11 @@
   "router": {
     "transition": "ios",
     "swipeBack": true
-  }
+  },
+  "packages": [
+    "/Users/yacinenedjar/despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Payments/Stripe"
+  ],
+  "modules": [
+    "stripe"
+  ]
 }

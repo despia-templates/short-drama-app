@@ -1,0 +1,161 @@
+<!-- store.dsx — the SELL lane, for real. Stripe objects are server-created (the module's
+     law): the client never sees a secret key, only the publishable key and the one
+     client_secret for its own intent. Coins and VIP are granted HERE, after the intent is
+     confirmed with Stripe — never on the client's say-so, which is the same trust shape as
+     episode unlocking.
+
+     Cross-platform by construction: this backend serves the SAME order to
+     `dsx.module.stripe` on web, iOS and Android. The native lanes may also settle through
+     the store modules (RevenueCat / StoreKit / Play Billing); either way the grant runs
+     through `grantOrder`, so entitlement has exactly one writer. -->
+<server>
+  <head>
+    <secret as="STRIPE_KEY" env="STRIPE_KEY"/>
+    <secret as="STRIPE_PUBLISHABLE" env="STRIPE_PUBLISHABLE"/>
+    <egress host="api.stripe.com"/>
+
+    <entity as="order" ownership="owner">
+      <field as="sku" type="text"/>
+      <field as="kind" type="text"/>          <!-- vip | coins -->
+      <field as="amount_cents" type="integer"/>
+      <field as="coins" type="integer"/>      <!-- coins granted (0 for vip) -->
+      <field as="bonus" type="integer"/>
+      <field as="days" type="integer"/>       <!-- vip days (0 for coins) -->
+      <field as="status" type="text"/>        <!-- created | paid | failed -->
+      <field as="intent" type="text"/>
+      <index on="intent"/>
+    </entity>
+
+    <!-- ONE price table, server-side. An operator changes price without a build, and the
+         client can never invent one: checkout is looked up by sku, never by posted amount. -->
+    <action as="storeCatalog">
+      return {
+        vip: [
+          { id: 'vip_weekly',  label: 'Weekly VIP',  price: '$11.99',  cents: 1199,  days: 7,   note: 'then $14.99/week',           badge: '21% OFF', best: false },
+          { id: 'vip_monthly', label: 'Monthly VIP', price: '$49.99',  cents: 4999,  days: 30,  note: 'Auto-renew. Cancel anytime.', badge: '',        best: true  },
+          { id: 'vip_yearly',  label: 'Yearly VIP',  price: '$199.99', cents: 19999, days: 365, note: 'Auto-renew. Cancel anytime.', badge: 'BEST VALUE', best: false }
+        ],
+        packs: [
+          { id: 'coins_500',   coins: 500,   free: 25,    cents: 499,  price: '$4.99',  bonus: '+5%' },
+          { id: 'coins_1000',  coins: 1000,  free: 100,   cents: 999,  price: '$9.99',  bonus: '+10%' },
+          { id: 'coins_2000',  coins: 2000,  free: 400,   cents: 1999, price: '$19.99', bonus: '+20%' },
+          { id: 'coins_3000',  coins: 3000,  free: 900,   cents: 2999, price: '$29.99', bonus: '+30%' },
+          { id: 'coins_5000',  coins: 5000,  free: 2500,  cents: 4999, price: '$49.99', bonus: '+50%' },
+          { id: 'coins_10000', coins: 10000, free: 10000, cents: 9999, price: '$99.99', bonus: '+100%' }
+        ]
+      }
+    </action>
+
+    <!-- Open ONE checkout: a Stripe PaymentIntent created here, plus the order row that
+         will be granted when it settles. The client gets the publishable key and its own
+         client_secret — nothing else. -->
+    <action as="createCheckout" inputs="sku">
+      // The price table is inlined here on purpose: this lookup decides what the customer
+      // is charged, and it must not depend on a cross-action hop.
+      // NOTE the local is `picked`, never `item`: `item` is the reserved ROW-SCOPE name,
+      // and a local `let item` in an action is silently shadowed — reads return the whole
+      // scope object, so `item == null` is false for a null (upstream #242).
+      const VIP = [
+        { id: 'vip_weekly',  cents: 1199,  days: 7,   label: 'Weekly VIP' },
+        { id: 'vip_monthly', cents: 4999,  days: 30,  label: 'Monthly VIP' },
+        { id: 'vip_yearly',  cents: 19999, days: 365, label: 'Yearly VIP' }
+      ]
+      const PACKS = [
+        { id: 'coins_500',   coins: 500,   free: 25,    cents: 499,  label: '500 coins' },
+        { id: 'coins_1000',  coins: 1000,  free: 100,   cents: 999,  label: '1000 coins' },
+        { id: 'coins_2000',  coins: 2000,  free: 400,   cents: 1999, label: '2000 coins' },
+        { id: 'coins_3000',  coins: 3000,  free: 900,   cents: 2999, label: '3000 coins' },
+        { id: 'coins_5000',  coins: 5000,  free: 2500,  cents: 4999, label: '5000 coins' },
+        { id: 'coins_10000', coins: 10000, free: 10000, cents: 9999, label: '10000 coins' }
+      ]
+      let picked = null
+      for (const v of VIP) {
+        if (v.id === sku) { picked = { kind: 'vip', cents: v.cents, coins: 0, bonus: 0, days: v.days, label: v.label } }
+      }
+      for (const p of PACKS) {
+        if (p.id === sku) { picked = { kind: 'coins', cents: p.cents, coins: p.coins, bonus: p.free, days: 0, label: p.label } }
+      }
+      if (picked == null) { throw { reason: 'invalid', message: 'unknown item' } }
+
+      const key = await dsx.module.secret.read({ name: 'STRIPE_KEY' })
+      const pub = await dsx.module.secret.read({ name: 'STRIPE_PUBLISHABLE' })
+      if (!key.ok || key.data == null || key.data === '') {
+        throw { reason: 'unavailable', message: 'Payments are not configured on this deployment — set STRIPE_KEY and STRIPE_PUBLISHABLE.' }
+      }
+
+      const body = 'amount=' + picked.cents + '&currency=usd&automatic_payment_methods[enabled]=true'
+        + '&metadata[sku]=' + sku
+      const res = await fetch('https://api.stripe.com/v1/payment_intents', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer ' + key.data,
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: body
+      })
+      if (!res.ok || res.data == null || res.data.client_secret == null) {
+        throw { reason: 'upstream', message: 'the payment provider refused the checkout' }
+      }
+
+      const row = await dsx.module.data.order.create({
+        sku: sku, kind: picked.kind, amount_cents: picked.cents,
+        coins: picked.coins, bonus: picked.bonus, days: picked.days,
+        status: 'created', intent: res.data.id
+      })
+      if (!row.ok) { throw { reason: 'conflict', message: 'could not open the order' } }
+
+      return {
+        order: row.data.id,
+        label: picked.label,
+        amount_cents: picked.cents,
+        publishable_key: pub.ok ? pub.data : '',
+        client_secret: res.data.client_secret
+      }
+    </action>
+
+    <!-- Settle: ask STRIPE what happened, never the client. The grant is idempotent — a
+         replayed settle finds status 'paid' and returns without granting twice. -->
+    <action as="settleOrder" inputs="order">
+      const row = await dsx.module.data.order.get({ id: order })
+      if (!row.ok) { throw { reason: 'not_found', message: 'no such order' } }
+      if (row.data.status === 'paid') { return { granted: false, already: true } }
+
+      const key = await dsx.module.secret.read({ name: 'STRIPE_KEY' })
+      if (!key.ok) { throw { reason: 'unavailable', message: 'payments are not configured' } }
+      const res = await fetch('https://api.stripe.com/v1/payment_intents/' + row.data.intent, {
+        method: 'GET',
+        headers: { authorization: 'Bearer ' + key.data }
+      })
+      if (!res.ok || res.data == null) { throw { reason: 'upstream', message: 'could not verify the payment' } }
+      if (res.data.status !== 'succeeded') {
+        await dsx.module.data.order.update({ id: order, values: { status: 'failed' } })
+        throw { reason: 'conflict', message: 'the payment did not complete' }
+      }
+
+      await dsx.module.data.order.update({ id: order, values: { status: 'paid' } })
+
+      // the grant, inlined for the same reason as the price table (#242)
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      if (!mine.ok || mine.data.length === 0) { throw { reason: 'conflict', message: 'no wallet' } }
+      const w = mine.data[0]
+      const o = row.data
+      if (o.kind === 'coins') {
+        await dsx.module.data.wallet.update({ id: w.id, values: { coins: w.coins + o.coins, bonus: w.bonus + o.bonus } })
+        await dsx.module.data.ledger.create({ kind: 'coin', amount: o.coins, source: 'pack', ref: o.sku })
+        if (o.bonus > 0) {
+          await dsx.module.data.ledger.create({ kind: 'bonus', amount: o.bonus, source: 'pack', ref: o.sku })
+        }
+        return { granted: true, coins: o.coins, bonus: o.bonus }
+      }
+      const until = new Date(Date.now() + o.days * 86400000).toISOString()
+      await dsx.module.data.wallet.update({ id: w.id, values: { vip_until: until } })
+      await dsx.module.data.ledger.create({ kind: 'coin', amount: 0, source: 'vip', ref: o.sku })
+      return { granted: true, vipUntil: until, days: o.days }
+    </action>
+
+  </head>
+
+  <route method="GET"  path="/store/catalog"  action="storeCatalog"   auth="none"/>
+  <route method="POST" path="/store/checkout" action="createCheckout" auth="required"/>
+  <route method="POST" path="/store/settle"   action="settleOrder"    auth="required"/>
+</server>

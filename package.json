@@ -24,6 +24,6 @@
     "pg": "^8.13.1"
   },
   "devDependencies": {
-    "@despia/cli": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/cli"
+    "@despia-native/cli": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/cli"
   }
 }

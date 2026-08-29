@@ -97,9 +97,6 @@
       if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins · ' + r.data.left + ' left today'; state.refresh(); wallet.refresh() }
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'No ad available' }
     </action>
-    <action as="buy">
-      dsx.variable.toast = 'Purchases run in the iOS and Android apps (RevenueCat). Web checkout is on the roadmap — earn below meanwhile.'
-    </action>
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
@@ -112,24 +109,14 @@
     <style as="balanceNum" fontSize="14" fontWeight="semibold" color="#F6B63D"/>
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
     <style as="sectionTitle" fontSize="24" fontWeight="bold" color="rgba(255,255,255,0.8)" tracking="-0.3"/>
+    <style as="sellCard" background="#141419" radius="14" paddingH="18" paddingV="18" spacing="12" alignItems="center"/>
+    <style as="sellTitle" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
+    <style as="sellNote" fontSize="13" color="rgba(255,255,255,0.5)"/>
     <style as="sectionNote" fontSize="13" color="rgba(255,255,255,0.45)"/>
 
     <!-- VIP -->
-    <style as="vipCard" radius="14" paddingH="18" paddingV="18" spacing="8" alignItems="flex-start"/>
-    <style as="vipName" fontSize="15" fontWeight="semibold" color="#3A2A08"/>
-    <style as="vipPrice" fontSize="24" fontWeight="bold" color="#2A1D04"/>
-    <style as="vipNote" fontSize="12" color="rgba(42,29,4,0.7)"/>
-    <style as="vipPerk" spacing="6" alignItems="center"/>
-    <style as="vipPerkText" fontSize="12" fontWeight="medium" color="#2A1D04"/>
-    <style as="vipBadge" background="#E52E2E" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
 
     <!-- coin packs -->
-    <style as="packCard" background="#141419" radius="12" paddingH="14" paddingV="16" spacing="7" alignItems="flex-start"/>
-    <style as="packCoins" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
-    <style as="packLine" fontSize="12" color="rgba(255,255,255,0.5)"/>
-    <style as="packPrice" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="packBonus" background="#E52E2E" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
-    <style as="coinRow" spacing="6" alignItems="center"/>
 
     <!-- earn -->
     <style as="card" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="13" alignItems="stretch"/>
@@ -140,15 +127,15 @@
     <style as="dayCell" spacing="3" alignItems="center" paddingV="9" radius="9"/>
     <style as="dayAmt" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
     <style as="dayNum" fontSize="11" color="rgba(255,255,255,0.5)"/>
-    <style as="cta" radius="22" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="ctaWide" radius="22" paddingV="12" paddingH="22" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="cta" radius="24" paddingV="14" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="ctaWide" radius="24" paddingV="14" paddingH="24" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
     <style as="wheelWrap" alignItems="center" spacing="12"/>
     <style as="wheelLabel" fontSize="15" fontWeight="bold" color="#FFFFFF" background="rgba(0,0,0,0.8)" paddingH="11" paddingV="6" radius="14"/>
     <style as="taskRow" alignItems="center" spacing="12"/>
     <style as="taskCol" spacing="2"/>
     <style as="taskTitle" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
     <style as="taskMeta" fontSize="12" color="rgba(255,255,255,0.5)"/>
-    <style as="claimBtn" radius="15" paddingH="15" paddingV="7" fontSize="13" fontWeight="semibold"/>
+    <style as="claimBtn" radius="18" paddingH="18" paddingV="11" fontSize="13" fontWeight="semibold"/>
     <style as="note" fontSize="12" color="rgba(255,255,255,0.42)" lineSpacing="3"/>
   </head>
 
@@ -158,7 +145,7 @@
 
       <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" paddingTop="14">
         <hstack class="head">
-          <text value="Store &amp; Rewards" class="h1"/>
+          <text value="Rewards" class="h1"/>
           <spacer/>
           <hstack class="balancePill" visible-if="wallet.data != null">
             <image icon="dollarsign.circle.fill" iconSize="15" color="#F6B63D" a11yHidden="true"/>
@@ -168,59 +155,17 @@
         <text value="{{ dsx.variable.toast }}" class="toastLine" visible-if="dsx.variable.toast != ''" paddingTop="10"/>
       </vstack>
 
-      <!-- ═══ LANE 1 — VIP: unlimited viewing ═══ -->
+      <!-- the SELL lane lives on /store; this screen is EARN only -->
       <vstack class="section">
-        <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
-          <text value="VIP — unlock every series" class="sectionTitle"/>
-          <text value="Unlimited viewing while your plan is active. Auto-renews, cancel anytime." class="sectionNote"/>
-        </vstack>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <grid bind="state.data.vipTiers" key="id" columns="{{ dsx.variable.vipCols }}" spacing="14" scroll="false">
-            <vstack class="vipCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
-                    a11yLabel="{{ item.label }}, {{ item.price }}"
-                    style="background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid {{ item.best ? '#E52E2E' : 'rgba(0,0,0,0)' }}">
-              <hstack spacing="8" alignItems="center" style="width: 100%">
-                <text value="{{ item.label }}" class="vipName"/>
-                <spacer/>
-                <text value="{{ item.badge }}" class="vipBadge" visible-if="item.badge != ''"/>
-              </hstack>
-              <text value="{{ item.price }}" class="vipPrice"/>
-              <text value="{{ item.note }}" class="vipNote"/>
-              <hstack class="vipPerk">
-                <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
-                <text value="Unlimited viewing" class="vipPerkText"/>
-              </hstack>
-              <hstack class="vipPerk">
-                <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
-                <text value="1080p, no ads" class="vipPerkText"/>
-              </hstack>
+          <hstack class="sellCard" on:tap="dsx.module.route.push({ path: '/store' })"
+                  a11yGroup="true" a11yTrait="button" a11yLabel="Open the store to buy coins or VIP">
+            <vstack spacing="4" style="flex: 1; min-width: 0">
+              <text value="Get coins or go VIP" class="sellTitle"/>
+              <text value="Buy a coin pack, or unlock every series with VIP." class="sellNote"/>
             </vstack>
-          </grid>
-        </vstack>
-      </vstack>
-
-      <!-- ═══ LANE 2 — coin packs ═══ -->
-      <vstack class="section">
-        <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
-          <text value="Top up coins" class="sectionTitle"/>
-          <text value="Coins unlock individual episodes. Bonus coins are spent first and expire in 7 days." class="sectionNote"/>
-        </vstack>
-        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <grid bind="state.data.coinPacks" key="id" columns="{{ dsx.variable.packCols }}" spacing="12" scroll="false">
-            <vstack class="packCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
-                    a11yLabel="{{ item.coins }} coins plus {{ item.free }} bonus for {{ item.price }}">
-              <hstack spacing="8" alignItems="center" style="width: 100%">
-                <hstack class="coinRow">
-                  <image icon="dollarsign.circle.fill" iconSize="17" color="#F6B63D" a11yHidden="true"/>
-                  <text value="{{ item.coins + item.free }}" class="packCoins"/>
-                </hstack>
-                <spacer/>
-                <text value="{{ item.bonus }}" class="packBonus"/>
-              </hstack>
-              <text value="{{ item.coins }} coins + {{ item.free }} bonus" class="packLine"/>
-              <text value="{{ item.price }}" class="packPrice"/>
-            </vstack>
-          </grid>
+            <image icon="chevron.right" iconSize="14" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
+          </hstack>
         </vstack>
       </vstack>
 

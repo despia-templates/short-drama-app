@@ -37,8 +37,18 @@ and generated barrel are read once at boot). Schema change → re-apply
   nothing; write back `byKey[k] = (byKey[k] == null ? [] : byKey[k]).concat([v])`.
   Literal paths (`obj.list.push(v)`) work.
 - **Never pass `field: null` in `data.create` values** — omit the key.
+- **Never name a local `item`** in a server action or an action body. `item` is the reserved
+  ROW-SCOPE identifier; a local `let item` is SILENTLY shadowed and every read returns the
+  whole scope object, so `item == null` is false for a null and the rejection branch is
+  skipped. Cost a live payment guard. Use `picked`/`row`/`match` (upstream #242).
+- **A sibling action answers the module envelope** `{ ok, data }` — read `.data`.
 - **Return value copies per collection** from server actions (`{ ...row }`) — the wire
   serializer elides repeated references.
+- **A sibling action answers the MODULE ENVELOPE**: `dsx.action.other()` resolves
+  `{ ok, data }`, not the raw return — read `.data` exactly as for `dsx.module.data.*` and
+  `fetch`. (Probed 2026-08-30; an earlier note here claimed siblings return void, which is
+  false and cost a silent auth bug: `null` came back as `{ok:true,data:null}`, so an
+  `x == null` guard never fired.)
 - **`api.send(payload)`** — the payload is the body; do not wrap in `{ body: … }`.
 - **Never ship an emoji as an icon.** An emoji is a font-dependent glyph with no
   per-platform twin, no tint, and no a11y story; every icon comes from the shared catalog

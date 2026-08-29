@@ -17,27 +17,27 @@
     <style as="cap" fontSize="11" fontWeight="medium"/>
   </head>
 
-  <vstack class="item" href="/" a11yLabel="Home">
+  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/' })" a11yTrait="button" a11yLabel="Home">
     <image icon="house.fill" iconSize="20" color="{{ dsx.attribute.active == 'home' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
     <text value="Home" class="cap" color="{{ dsx.attribute.active == 'home' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>
 
-  <vstack class="item" href="/discover" a11yLabel="Discover">
+  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/discover' })" a11yTrait="button" a11yLabel="Discover">
     <image icon="play.rectangle.fill" iconSize="20" color="{{ dsx.attribute.active == 'discover' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
     <text value="Discover" class="cap" color="{{ dsx.attribute.active == 'discover' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>
 
-  <vstack class="item" href="/rewards" a11yLabel="Rewards">
+  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/rewards' })" a11yTrait="button" a11yLabel="Rewards">
     <image icon="gift.fill" iconSize="20" color="{{ dsx.attribute.active == 'rewards' ? '#F7C948' : dsx.variable.off }}" a11yHidden="true"/>
     <text value="Rewards" class="cap" color="{{ dsx.attribute.active == 'rewards' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>
 
-  <vstack class="item" href="/list" a11yLabel="My List">
+  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/list' })" a11yTrait="button" a11yLabel="My List">
     <image icon="heart.fill" iconSize="20" color="{{ dsx.attribute.active == 'list' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
     <text value="My List" class="cap" color="{{ dsx.attribute.active == 'list' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>
 
-  <vstack class="item" href="/profile" a11yLabel="Profile">
+  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/profile' })" a11yTrait="button" a11yLabel="Profile">
     <image icon="person.crop.circle" iconSize="20" color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
     <text value="Me" class="cap" color="{{ dsx.attribute.active == 'profile' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>

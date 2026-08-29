@@ -1,0 +1,238 @@
+<!-- Store — the SELL lane, on its own route so it is a destination a CTA can point at
+     (and a modal the player can raise mid-paywall), separate from /rewards which is the
+     EARN lane. Two lanes, two surfaces: this is how the category ships it.
+
+     Checkout is REAL and cross-platform: the server creates the Stripe PaymentIntent
+     (/store/checkout), `dsx.module.stripe` opens ONE session over it, and the same
+     session settles on web, iOS and Android. Entitlement is granted server-side after
+     Stripe confirms — never on the client's word.
+
+     When the deployment has no Stripe keys the server refuses with a real reason and this
+     screen shows that reason verbatim. It never fakes a purchase. -->
+<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <expects variable="nav"/>
+
+    <api as="session" url="/dev-session.json" ssr="false"/>
+    <api as="catalog" url="/store/catalog"/>
+    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <api as="checkoutCall" url="/store/checkout" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+    <api as="settleCall" url="/store/settle" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+
+    <variable as="toast">return ''</variable>
+    <variable as="busy">return false</variable>
+    <variable as="paying">return false</variable>
+    <variable as="order">return ''</variable>
+    <variable as="orderLabel">return ''</variable>
+
+    <variable as="authHeaders" computed="true">
+      if (session.data == null) { return {} }
+      return { authorization: 'Bearer ' + session.data.viewer.token }
+    </variable>
+    <variable as="bp" computed="true">
+      const w = dsx.screen.width
+      if (w >= 1120) { return 'desktop' }
+      if (w >= 768) { return 'tablet' }
+      return 'phone'
+    </variable>
+    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="gutter" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
+      return 16
+    </variable>
+    <variable as="vipCols" computed="true">return dsx.variable.bp == 'phone' ? 1 : 3</variable>
+    <variable as="packCols" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 3 }
+      if (dsx.variable.bp == 'tablet') { return 3 }
+      return 2
+    </variable>
+    <variable as="shell" computed="true">
+      const g = dsx.variable.gutter
+      return 'width: 100%; max-width: 1100px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+    </variable>
+    <variable as="balance" computed="true">
+      if (wallet.data == null) { return 0 }
+      return wallet.data.coins + wallet.data.bonus
+    </variable>
+    <variable as="isVip" computed="true">
+      if (wallet.data == null) { return false }
+      return wallet.data.vip === true
+    </variable>
+
+    <action as="goBack">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/' }) }
+    </action>
+
+    <!-- ONE checkout path for every sku and every platform. -->
+    <action as="buy" sku="item.id" label="item.label">
+      if (dsx.variable.busy) { return }
+      dsx.variable.busy = true
+      dsx.variable.toast = ''
+      const r = await checkoutCall.send({ sku: sku })
+      dsx.variable.busy = false
+      if (!r.ok) {
+        dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Checkout is unavailable right now.'
+        return
+      }
+      dsx.variable.order = r.data.order
+      dsx.variable.orderLabel = r.data.label
+      const opened = await dsx.module.stripe.session({
+        publishable_key: r.data.publishable_key,
+        payment_intent_client_secret: r.data.client_secret
+      })
+      if (opened == null || opened.ok === false) {
+        dsx.variable.toast = 'The payment sheet could not open on this platform.'
+        return
+      }
+      dsx.variable.paying = true
+      const paid = await dsx.module.stripe.payment({ session: dsx.module.stripe.context.session })
+      dsx.variable.paying = false
+      if (paid == null || paid.status !== 'succeeded') {
+        dsx.variable.toast = 'Payment was not completed.'
+        return
+      }
+      await dsx.action.settle()
+    </action>
+
+    <action as="settle">
+      const s = await settleCall.send({ order: dsx.variable.order })
+      if (s.ok) {
+        wallet.refresh()
+        dsx.variable.toast = s.data.granted
+          ? (s.data.coins != null ? 'Added ' + s.data.coins + ' coins' : 'VIP is active for ' + s.data.days + ' days')
+          : 'This order was already applied.'
+      } else {
+        dsx.variable.toast = s.data != null && s.data.message != null ? s.data.message : 'Could not confirm the payment.'
+      }
+    </action>
+
+    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="scroller" alignItems="stretch"/>
+    <style as="page" spacing="0" paddingTop="14" paddingBottom="34" alignItems="stretch"/>
+    <style as="section" spacing="14" alignItems="stretch" paddingTop="30"/>
+
+    <style as="head" alignItems="center" spacing="12"/>
+    <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
+    <style as="balancePill" background="rgba(255,255,255,0.08)" radius="16" paddingH="12" paddingV="7" spacing="6" alignItems="center"/>
+    <style as="balanceNum" fontSize="14" fontWeight="semibold" color="#F6B63D"/>
+    <style as="vipChip" background="#F6B63D" radius="10" paddingH="9" paddingV="4" fontSize="11" fontWeight="bold" color="#2A1D04"/>
+    <style as="toastLine" fontSize="14" fontWeight="medium" color="#F6B63D" lineSpacing="4"/>
+    <style as="sectionTitle" fontSize="24" fontWeight="bold" color="rgba(255,255,255,0.8)" tracking="-0.3"/>
+    <style as="sectionNote" fontSize="13" color="rgba(255,255,255,0.45)"/>
+
+    <style as="vipCard" radius="14" paddingH="18" paddingV="18" spacing="8" alignItems="flex-start"/>
+    <style as="vipName" fontSize="15" fontWeight="semibold" color="#3A2A08"/>
+    <style as="vipPrice" fontSize="24" fontWeight="bold" color="#2A1D04"/>
+    <style as="vipNote" fontSize="12" color="rgba(42,29,4,0.7)"/>
+    <style as="vipPerk" spacing="6" alignItems="center"/>
+    <style as="vipPerkText" fontSize="12" fontWeight="medium" color="#2A1D04"/>
+    <style as="vipBadge" background="#E52E2E" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+
+    <style as="packCard" background="#141419" radius="12" paddingH="14" paddingV="16" spacing="7" alignItems="flex-start"/>
+    <style as="packCoins" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
+    <style as="packLine" fontSize="12" color="rgba(255,255,255,0.5)"/>
+    <style as="packPrice" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="packBonus" background="#E52E2E" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+    <style as="coinRow" spacing="6" alignItems="center"/>
+
+    <style as="earnCard" background="#141419" radius="14" paddingH="18" paddingV="18" spacing="12" alignItems="stretch"/>
+    <style as="earnTitle" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
+    <style as="earnNote" fontSize="13" color="rgba(255,255,255,0.5)" lineSpacing="3"/>
+    <style as="earnCta" background="rgba(255,255,255,0.1)" radius="24" paddingV="14" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="payingNote" fontSize="13" color="rgba(255,255,255,0.6)" textAlign="center" paddingV="10"/>
+  </head>
+
+  <scroll class="scroller" style="flex: 1; min-height: 0">
+    <vstack class="page">
+      <TopNav active="store" visible-if="dsx.variable.wide"/>
+
+      <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" paddingTop="12">
+        <hstack class="head">
+          <image icon="chevron.left" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
+                 a11yLabel="Back" a11yTrait="button" visible-if="dsx.variable.wide == false"/>
+          <text value="Store" class="h1"/>
+          <text value="VIP" class="vipChip" visible-if="dsx.variable.isVip"/>
+          <spacer/>
+          <hstack class="balancePill" visible-if="wallet.data != null">
+            <image icon="dollarsign.circle.fill" iconSize="15" color="#F6B63D" a11yHidden="true"/>
+            <text value="{{ dsx.variable.balance }}" class="balanceNum"/>
+          </hstack>
+        </hstack>
+        <text value="{{ dsx.variable.toast }}" class="toastLine" visible-if="dsx.variable.toast != ''" paddingTop="12"/>
+        <text value="Opening the payment sheet…" class="payingNote" visible-if="dsx.variable.paying"/>
+      </vstack>
+
+      <!-- VIP -->
+      <vstack class="section">
+        <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
+          <text value="VIP — unlock every series" class="sectionTitle"/>
+          <text value="Unlimited viewing while your plan is active. Cancel anytime." class="sectionNote"/>
+        </vstack>
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <grid bind="catalog.data.vip" key="id" columns="{{ dsx.variable.vipCols }}" spacing="14" scroll="false">
+            <vstack class="vipCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
+                    a11yLabel="Buy {{ item.label }} for {{ item.price }}"
+                    style="background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid {{ item.best ? '#E52E2E' : 'rgba(0,0,0,0)' }}">
+              <hstack spacing="8" alignItems="center" style="width: 100%">
+                <text value="{{ item.label }}" class="vipName"/>
+                <spacer/>
+                <text value="{{ item.badge }}" class="vipBadge" visible-if="item.badge != ''"/>
+              </hstack>
+              <text value="{{ item.price }}" class="vipPrice"/>
+              <text value="{{ item.note }}" class="vipNote"/>
+              <hstack class="vipPerk">
+                <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
+                <text value="Unlimited viewing" class="vipPerkText"/>
+              </hstack>
+              <hstack class="vipPerk">
+                <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
+                <text value="1080p, no ads" class="vipPerkText"/>
+              </hstack>
+            </vstack>
+          </grid>
+        </vstack>
+      </vstack>
+
+      <!-- coin packs -->
+      <vstack class="section">
+        <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
+          <text value="Top up coins" class="sectionTitle"/>
+          <text value="Coins unlock individual episodes. Bonus coins are spent first." class="sectionNote"/>
+        </vstack>
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <grid bind="catalog.data.packs" key="id" columns="{{ dsx.variable.packCols }}" spacing="12" scroll="false">
+            <vstack class="packCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
+                    a11yLabel="Buy {{ item.coins }} coins plus {{ item.free }} bonus for {{ item.price }}">
+              <hstack spacing="8" alignItems="center" style="width: 100%">
+                <hstack class="coinRow">
+                  <image icon="dollarsign.circle.fill" iconSize="17" color="#F6B63D" a11yHidden="true"/>
+                  <text value="{{ item.coins + item.free }}" class="packCoins"/>
+                </hstack>
+                <spacer/>
+                <text value="{{ item.bonus }}" class="packBonus"/>
+              </hstack>
+              <text value="{{ item.coins }} coins + {{ item.free }} bonus" class="packLine"/>
+              <text value="{{ item.price }}" class="packPrice"/>
+            </vstack>
+          </grid>
+        </vstack>
+      </vstack>
+
+      <!-- the door to the EARN lane, which lives on its own screen -->
+      <vstack class="section">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <vstack class="earnCard">
+            <text value="Don't want to pay?" class="earnTitle"/>
+            <text value="Check in daily, spin the wheel, watch a short ad or finish tasks — every one of them pays in coins." class="earnNote"/>
+            <button label="Earn free coins" class="earnCta"
+                    on:tap="dsx.module.route.push({ path: '/rewards' })"/>
+          </vstack>
+        </vstack>
+      </vstack>
+
+    </vstack>
+  </scroll>
+  <TabBar active="rewards" visible-if="dsx.variable.wide == false"/>
+</vstack>

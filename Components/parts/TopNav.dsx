@@ -28,7 +28,7 @@
   </head>
 
   <hstack class="inner" style="width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto">
-    <hstack class="brand" href="/" a11yGroup="true" a11yLabel="Short Drama — home">
+    <hstack class="brand" on:tap="dsx.module.route.reset({ path: '/' })" a11yGroup="true" a11yTrait="button" a11yLabel="Short Drama — home">
       <vstack class="logoBox" style="justify-content: center">
         <image icon="play.fill" iconSize="15" color="#FFFFFF" a11yHidden="true"/>
       </vstack>
@@ -36,13 +36,13 @@
     </hstack>
 
     <hstack class="links">
-      <text value="Home" class="link" href="/"
+      <text value="Home" class="link" on:tap="dsx.module.route.reset({ path: '/' })" a11yTrait="button"
             color="{{ dsx.attribute.active == 'home' ? dsx.variable.on : dsx.variable.off }}"/>
-      <text value="Discover" class="link" href="/discover"
+      <text value="Discover" class="link" on:tap="dsx.module.route.reset({ path: '/discover' })" a11yTrait="button"
             color="{{ dsx.attribute.active == 'discover' ? dsx.variable.on : dsx.variable.off }}"/>
-      <text value="Rewards" class="link" href="/rewards"
+      <text value="Rewards" class="link" on:tap="dsx.module.route.reset({ path: '/rewards' })" a11yTrait="button"
             color="{{ dsx.attribute.active == 'rewards' ? dsx.variable.on : dsx.variable.off }}"/>
-      <text value="My List" class="link" href="/list"
+      <text value="My List" class="link" on:tap="dsx.module.route.reset({ path: '/list' })" a11yTrait="button"
             color="{{ dsx.attribute.active == 'list' ? dsx.variable.on : dsx.variable.off }}"/>
     </hstack>
 
@@ -50,11 +50,11 @@
 
     <hstack class="tools">
       <SearchOverlay size="21"/>
-      <image icon="clock.fill" iconSize="20" href="/list" a11yLabel="Watch history"
+      <image icon="clock.fill" iconSize="20" on:tap="dsx.module.route.reset({ path: '/list' })" a11yTrait="button" a11yLabel="Watch history"
              color="rgba(255,255,255,0.95)"/>
-      <image icon="person.crop.circle" iconSize="23" href="/profile" a11yLabel="Profile"
+      <image icon="person.crop.circle" iconSize="23" on:tap="dsx.module.route.reset({ path: '/profile' })" a11yTrait="button" a11yLabel="Profile"
              color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}"/>
     </hstack>
-    <text value="Get Coins" class="cta" href="/rewards" a11yLabel="Get coins — open Rewards"/>
+    <text value="Get Coins" class="cta" on:tap="dsx.module.route.push({ path: '/store' })" a11yTrait="button" a11yLabel="Get coins — open the store"/>
   </hstack>
 </hstack>
