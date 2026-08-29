@@ -10,8 +10,12 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+// the sibling convention (scripts/preflight.mjs) or DSX_FRAMEWORK_DIR; DSX_STYLE_CATALOG
+// still overrides the exact file for unusual layouts
+const FRAMEWORK = process.env.DSX_FRAMEWORK_DIR
+  ?? new URL("../../despia_dsx/despia-framework", import.meta.url).pathname;
 const CATALOG = process.env.DSX_STYLE_CATALOG
-  ?? `${process.env.HOME}/despia_dsx/despia-framework/OpenSource/Documentation/reference/stack-style-properties.json`;
+  ?? `${FRAMEWORK}/OpenSource/Documentation/reference/stack-style-properties.json`;
 
 const valid = new Set(["as", "class"]);
 for (const g of JSON.parse(readFileSync(CATALOG, "utf8")).groups) {

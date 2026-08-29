@@ -92,7 +92,7 @@
     "swipeBack": true
   },
   "packages": [
-    "/Users/yacinenedjar/despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Payments/Stripe"
+    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Payments/Stripe"
   ],
   "modules": [
     "stripe"

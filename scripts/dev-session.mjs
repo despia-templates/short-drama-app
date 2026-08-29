@@ -7,7 +7,16 @@
 //  to pick up; both paths are gitignored.
 //
 import { createHmac } from "node:crypto";
-import { writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
+
+// the same .env.local fold serve.mjs does — the README's step order relies on it
+// (measured: the documented sequence exited 1 here, because only serve loaded the file)
+if (existsSync(".env.local")) {
+  for (const line of readFileSync(".env.local", "utf8").split("\n")) {
+    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2];
+  }
+}
 
 const secret = process.env.DSX_JWT_SECRET;
 if (!secret) { console.error("DSX_JWT_SECRET is required"); process.exit(1); }

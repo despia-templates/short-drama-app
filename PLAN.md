@@ -1,8 +1,11 @@
 # short-drama-app — the founding plan
 
-> **Status: PLANNING.** Not one line of DSX exists yet, deliberately. This file is the spine;
-> every document under `docs/` hangs off it. When a decision here conflicts with the framework,
-> the framework wins and this file gets a correction — never the other way around.
+> **Status: BUILT — production-shaped local slice.** Sixteen components, seven server
+> documents, 29 routes, 14 entities; Stripe web checkout, the coin economy, the earn loop
+> and the Manage surface all run against real Postgres with real RLS. This file is the
+> spine; every document under `docs/` hangs off it, and §6 below is the measured upstream
+> ledger. When a decision here conflicts with the framework, the framework wins and this
+> file gets a correction — never the other way around.
 >
 > Source of truth for the framework: `despia-native/despia-framework` **dev branch**
 > (locally `~/despia_dsx/despia-framework`, verified at `92b844b0`, 2026-08-29). The public

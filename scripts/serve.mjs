@@ -7,16 +7,17 @@
 //
 import { createServer } from "node:http";
 import pg from "pg";
-import { createHost, installEntities } from "@despia/server/host";
-import { installPostgresPool } from "@despia/server/postgres";
-import { createIdentityResolver } from "@despia/server/identity";
-import { createSiteHandler } from "@despia/server";
+import { createHost, installEntities } from "@despia-native/server/host";
+import { installPostgresPool } from "@despia-native/server/postgres";
+import { createIdentityResolver } from "@despia-native/server/identity";
+import { createSiteHandler } from "@despia-native/server";
 // UPSTREAM GAP (PLAN.md §6.15): `despia build` emits `mcpTools` into the standalone
-// barrel, but @despia/server's export map has no "./mcp-face", and bootloader-node's
+// barrel, but @despia-native/server's export map has no "./mcp-face", and bootloader-node's
 // serve() consumes the MONOREPO artifact shape rather than this barrel — so a standalone
-// project can declare <tool> rows it has no supported way to serve. Reached by built path
-// here, deliberately loud, and it dies the day the export lands.
-import { createMcpFace } from "/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/server/dist/mcp-face.js";
+// project can declare <tool> rows it has no supported way to serve. Reached by FILE PATH
+// beside the package's own entry (portable on any machine: the path is derived from where
+// @despia-native/server actually resolved, never hardcoded), deliberately loud, and it
+// dies the day the export lands.
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { entities, routes, handlers, spendBudgets, mcpTools } from "../server/generated/index.ts";
@@ -25,9 +26,11 @@ import { entities, routes, handlers, spendBudgets, mcpTools } from "../server/ge
 // handlers on INTERNAL routes (reach: []) — the host itself refuses any caller that is not
 // service-role (or the internal key) with a 404 indistinguishable from an absent route.
 // serviceRepo is deliberately unexported from the package (the "cannot be obtained from a
-// HostContext" law), so the local lane reaches it by file path — a thing only the person
+// HostContext" law), so the local lane reaches it by file path — a thing only someone
 // holding the framework checkout can do, which is the right shape for a side-door.
-import { serviceRepo } from "/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/server/dist/repo.js";
+const serverDist = new URL("./", import.meta.resolve("@despia-native/server"));
+const { serviceRepo } = await import(new URL("repo.js", serverDist));
+const { createMcpFace } = await import(new URL("mcp-face.js", serverDist));
 
 // dev nicety: fold .env.local into the environment (never committed; hosted lanes use real secrets)
 import { existsSync } from "node:fs";

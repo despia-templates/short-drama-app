@@ -2,6 +2,20 @@
   "name": "short-drama-app",
   "private": true,
   "version": "0.1.0",
+  "description": "The Despia flagship short-drama template: a ReelShort-class vertical-drama storefront \u2014 coin wallet, episode paywall, VIP, Stripe web checkout, rewarded-ads lane, comments, and an operator Manage surface \u2014 from one set of DSX sources.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/despia-templates/short-drama-app"
+  },
+  "keywords": [
+    "despia",
+    "dsx",
+    "template",
+    "short-drama",
+    "streaming",
+    "stripe"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22.18"
@@ -14,16 +28,19 @@
     "check:styles": "node scripts/check-styles.mjs",
     "serve": "DSX_DEV_NO_SW=1 node scripts/serve.mjs",
     "seed": "node scripts/seed.mjs",
-    "session": "node scripts/dev-session.mjs"
+    "session": "node scripts/dev-session.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "preinstall": "node scripts/preflight.mjs",
+    "deploy": "despia deploy cloudflare"
   },
   "dependencies": {
-    "@despia/compiler": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/compiler",
-    "@despia/dom": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/dom",
-    "@despia/kernel": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/kernel",
-    "@despia/server": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/server",
+    "@despia-native/compiler": "file:../despia_dsx/despia-framework/OpenSource/Web/packages/compiler",
+    "@despia-native/dom": "file:../despia_dsx/despia-framework/OpenSource/Web/packages/dom",
+    "@despia-native/kernel": "file:../despia_dsx/despia-framework/OpenSource/Web/packages/kernel",
+    "@despia-native/server": "file:../despia_dsx/despia-framework/OpenSource/Web/packages/server",
     "pg": "^8.13.1"
   },
   "devDependencies": {
-    "@despia-native/cli": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/cli"
+    "@despia-native/cli": "file:../despia_dsx/despia-framework/OpenSource/Web/packages/cli"
   }
 }
