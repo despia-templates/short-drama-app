@@ -260,7 +260,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     ramp. Sibling of §6.16 — one `design: { palette, typeRamp }` declaration closes both.
     Bridge: `scripts/review.mjs` waives only declared-ramp sizes; anything else still fails.
 
-19. **A horizontal `<list>`'s rows SHRINK instead of scrolling** — FIXED UPSTREAM in this
+19. **A horizontal `<list>`'s rows SHRINK instead of scrolling** → filed: https://github.com/despia-native/despia-framework/issues/249 — FIXED UPSTREAM in this
     pass (found 2026-08-30, seeding the demo catalogue to 14 shows). `.dsx-list` had a rule
     making a VERTICAL collection stretch its cross axis, with a comment explaining that a
     horizontal collection is deliberately untouched — but nothing governed the horizontal
@@ -274,7 +274,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     Template-side sibling: a rail TRACK is `width: max-content`, never the page shell's
     `width: 100%` (which caps it at the scroller and makes the rows eat the difference).
 
-20. **`list` clamps `limit` to 100 silently — no truncation flag, no cursor, no count**
+20. **`list` clamps `limit` to 100 silently — no truncation flag, no cursor, no count** → filed: https://github.com/despia-native/despia-framework/issues/250 —
     (measured 2026-08-30 with 14 shows / 352 episodes). `repo.ts` `LIST_LIMIT = 100` is
     correct policy — the comment "an unbounded list is a data-exfiltration primitive and a
     DoS" is right — but `Math.min(LIST_LIMIT, want)` is the whole of it: a caller asking for
@@ -287,7 +287,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     or offset; (c) a `count` op. Template-side: every read is now per-show and inside the
     ceiling, and the Manage screen renders "100+" rather than a confident lie.
 
-21. **A column stack nested in a column stack is given `align-self: stretch`, which
+21. → filed: https://github.com/despia-native/despia-framework/issues/251 — **A column stack nested in a column stack is given `align-self: stretch`, which
     silently defeats the parent's `align-items`** (measured 2026-08-30, five separate
     instances in this template). `globals.ts` ("a form is a block") stretches
     `.dsx-stack:not(.dsx-hstack):not(.dsx-zstack)` children of a column, and its comment
@@ -301,7 +301,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     parent's `align-items` keeps governing a child that has its own size. Third case of the
     same family as #238 (the alignment vocabulary misleading authors).
 
-22. **`<sheet inset>` is declared and ignored by the web renderer** (measured 2026-08-30).
+22. **`<sheet inset>` is declared and ignored by the web renderer** → filed: https://github.com/despia-native/despia-framework/issues/252 — (measured 2026-08-30).
     `stack-elements.json` declares `inset` on `<sheet>` (number, default 14);
     `.dsx-sheet-content` keeps `padding: 12px 16px 16px` regardless and no sheet-inset custom
     property is emitted. A full-bleed cover sheet — a rewarded ad, a lightbox, a media viewer
@@ -309,7 +309,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     declared `inset="0"` STAYS on the tag and the layer cancels the pad, so the bridge is a
     no-op the day the renderer honours it.
 
-23. **A `<video>` inside a `<sheet>` is paused by the overlay portal, and a two-way
+23. → filed: https://github.com/despia-native/despia-framework/issues/253 — **A `<video>` inside a `<sheet>` is paused by the overlay portal, and a two-way
     `paused=` binding latches that pause forever** (measured 2026-08-30). The sheet
     re-parents its content into an overlay portal; moving a `<video>` in the DOM pauses it in
     every browser. `media-surfaces.ts` treats any non-internal `pause` as authored and writes
@@ -320,7 +320,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     product rule ("a rewarded ad is not pausable") through a bounded `<watch>`, with a
     tap-to-play fallback when the browser is genuinely refusing autoplay.
 
-24. **Core/AdMob has no declared REWARDED face** (found 2026-08-30 building the ads lane).
+24. **Core/AdMob has no declared REWARDED face** → filed: https://github.com/despia-native/despia-framework/issues/254 — (found 2026-08-30 building the ads lane).
     The banner face is fully declared — `dsx.module.admob.banner`, `<admob.Banner/>`,
     `<admob.Native/>`, `Conformance/inline-surfaces/admob.json` — but rewarded video is still
     only the legacy registry alias `displayrewardedad`
@@ -330,7 +330,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     single place the real call lands, the card says out loud that the lane is unavailable,
     and the house creative runs meanwhile.
 
-25. **The ownership vocabulary has no word for ALL-READ / OWN-WRITE** (measured
+25. → filed: https://github.com/despia-native/despia-framework/issues/255 — **The ownership vocabulary has no word for ALL-READ / OWN-WRITE** (measured
     2026-08-30 when the first real comment refused to post). `owner` is own-read/own-write,
     `public-read` is all-read/SERVICE-write (deliberate, and right for the catalogue —
     with an owner-write policy any signed-in viewer could insert a `state='live'` show
