@@ -26,3 +26,5 @@ retracted in the ledger instead of filed).
 - `19-persistent-chrome.md` — router/layout: no persistent chrome slot → https://github.com/despia-native/despia-framework/issues/234
 - `20-coin-icon.md` — icons: no currency-neutral coin glyph → https://github.com/despia-native/despia-framework/issues/235
 - `21-press-release-event.md` — input: no press-release event → https://github.com/despia-native/despia-framework/issues/236
+- `22-linelimit-inert-web.md` — web: lineLimit is inert → https://github.com/despia-native/despia-framework/issues/237
+- `23-justifycontent-missing.md` — layout: justifyContent missing → https://github.com/despia-native/despia-framework/issues/238
