@@ -7,10 +7,13 @@
 
      Geometry measured off the category reference at 1440×900: a fully-rounded bar over
      a dark panel, the ranked "Hot Movie" list two-up on desktop. -->
-<hstack alignItems="center">
+<hstack alignItems="center" style="{{ dsx.attribute.pill ? 'flex: 1; min-width: 0' : '' }}">
   <head>
     <attribute as="size" default="21"/>
     <attribute as="color" default="'rgba(255,255,255,0.95)'"/>
+    <!-- pill mode: the trigger is a full search FIELD look (the phone home's category
+         standard), not just the glass icon; both open the same overlay -->
+    <attribute as="pill" default="false"/>
 
     <!-- lazy: the overlay is mounted on every screen, so the catalogue is
          fetched when it OPENS, never on page load -->
@@ -99,10 +102,18 @@
     <style as="cardTitle" fontSize="14" color="rgba(255,255,255,0.8)" lineLimit="1"/>
     <style as="cardMeta" fontSize="14" color="rgba(255,255,255,0.9)" lineLimit="1"/>
     <style as="status" fontSize="14" color="rgba(255,255,255,0.55)" textAlign="center" paddingV="14"/>
+    <style as="pillTrigger" background="rgba(255,255,255,0.1)" radius="18" paddingH="14" paddingV="9" spacing="8" alignItems="center"/>
+    <style as="pillHint" fontSize="14" color="rgba(255,255,255,0.45)"/>
   </head>
 
   <image icon="magnifyingglass" iconSize="{{ dsx.attribute.size }}" color="{{ dsx.attribute.color }}"
+         visible-if="dsx.attribute.pill == false"
          on:tap="dsx.action.openSearch()" a11yLabel="Search" a11yTrait="button"/>
+  <hstack class="pillTrigger" visible-if="dsx.attribute.pill" style="flex: 1; min-width: 0"
+          on:tap="dsx.action.openSearch()" a11yGroup="true" a11yTrait="button" a11yLabel="Search">
+    <image icon="magnifyingglass" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
+    <text value="Search dramas" class="pillHint"/>
+  </hstack>
 
   <sheet present="dsx.variable.open" mode="cover" background="#000000"
          on:dismiss="dsx.action.closeSearch()">

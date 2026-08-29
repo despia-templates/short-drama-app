@@ -20,6 +20,9 @@
 
     <variable as="heroPage">return 0</variable>
     <variable as="hovId">return ''</variable>   <!-- the card under the pointer -->
+    <!-- the phone home's tab row (Popular · New · Ranking) — the category's own top-level
+         switch. Wide viewports keep the measured desktop layout and never see it. -->
+    <variable as="homeTab">return 'popular'</variable>
 
     <!-- ONE breakpoint vocabulary from the LIVE screen fact (dsx.screen.width is
          reactive — a computed variable re-derives as the window changes). -->
@@ -132,7 +135,16 @@
     <style as="page" spacing="0" paddingBottom="0" alignItems="stretch" grow="width"/>
     <style as="section" spacing="14" alignItems="stretch" paddingTop="44" grow="width"/>
 
-    <style as="phoneBar" paddingV="12" alignItems="center" spacing="10"/>
+    <style as="phoneBar" paddingV="12" alignItems="center" spacing="12"/>
+    <style as="tabRow" spacing="22" alignItems="flex-end" paddingBottom="4"/>
+    <style as="tabCol" spacing="5" alignItems="center"/>
+    <style as="tabTxt" fontSize="16" fontWeight="bold" tracking="-0.2"/>
+    <style as="tabDash" width="18" height="3" radius="2"/>
+    <style as="rankRow" spacing="12" alignItems="center" paddingV="10"/>
+    <style as="rankBig" fontWeight="heavy" fontSize="24" width="34" textAlign="center"/>
+    <style as="rankTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="rankMeta" fontSize="12" color="rgba(255,255,255,0.5)"/>
+    <style as="rankPlay" background="rgba(255,44,85,0.14)" radius="16" paddingH="14" paddingV="8" fontSize="12" fontWeight="semibold" color="#FF2C55"/>
     <style as="logoBox" background="#FF2C55" radius="8" alignItems="center" width="29" height="29"/>
     <style as="wordmark" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
 
@@ -193,10 +205,29 @@
         <vstack class="logoBox" style="justify-content: center">
           <image icon="play.fill" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
         </vstack>
-        <text value="ShortDrama" class="wordmark"/>
+        <SearchOverlay pill="true"/>
+        <image icon="person.crop.circle" iconSize="23" color="#FFFFFF" a11yLabel="Profile" a11yTrait="button"
+               on:tap="dsx.module.route.reset({ path: '/profile' })"/>
+      </hstack>
+
+      <!-- the tab row: text tabs with a brand-red dash under the active one -->
+      <hstack class="tabRow" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.wide == false">
+        <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'popular'" a11yTrait="button" a11yLabel="Popular">
+          <text value="Popular" class="tabTxt"
+                color="{{ dsx.variable.homeTab == 'popular' ? '#FFFFFF' : 'rgba(255,255,255,0.5)' }}"/>
+          <stack class="tabDash" background="{{ dsx.variable.homeTab == 'popular' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
+        </vstack>
+        <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'new'" a11yTrait="button" a11yLabel="New">
+          <text value="New" class="tabTxt"
+                color="{{ dsx.variable.homeTab == 'new' ? '#FFFFFF' : 'rgba(255,255,255,0.5)' }}"/>
+          <stack class="tabDash" background="{{ dsx.variable.homeTab == 'new' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
+        </vstack>
+        <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'ranking'" a11yTrait="button" a11yLabel="Ranking">
+          <text value="Ranking" class="tabTxt"
+                color="{{ dsx.variable.homeTab == 'ranking' ? '#FFFFFF' : 'rgba(255,255,255,0.5)' }}"/>
+          <stack class="tabDash" background="{{ dsx.variable.homeTab == 'ranking' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
+        </vstack>
         <spacer/>
-        <SearchOverlay size="21" color="'#FFFFFF'"/>
-        <image icon="person.crop.circle" iconSize="23" color="#FFFFFF" href="/profile" a11yLabel="Profile"/>
       </hstack>
 
       <!-- ============ HERO · wide ============ -->
@@ -240,7 +271,7 @@
       </vstack>
 
       <!-- ============ HERO · phone ============ -->
-      <vstack visible-if="dsx.variable.wide == false && heroShow != null" style="width: 100%" alignItems="stretch">
+      <vstack visible-if="dsx.variable.wide == false && dsx.variable.homeTab == 'popular' && heroShow != null" style="width: 100%" alignItems="stretch">
         <zstack>
           <!-- the PHONE hero reads the tall asset: this frame is 0.75:1 and the wide one is
                3:1, so `cover` on a single 16:9 file either loses the sides here or magnifies
@@ -273,7 +304,7 @@
       </vstack>
 
       <!-- ============ Continue Watching ============ -->
-      <vstack class="section" visible-if="continue.data != null && continue.data.items.length > 0">
+      <vstack class="section" visible-if="(dsx.variable.wide || dsx.variable.homeTab == 'popular') && continue.data != null && continue.data.items.length > 0">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="Continue Watching" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
         </hstack>
@@ -306,7 +337,7 @@
       </vstack>
 
       <!-- ============ New Release ============ -->
-      <vstack class="section">
+      <vstack class="section" visible-if="dsx.variable.wide || dsx.variable.homeTab == 'popular'">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="New Release" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           <spacer/>
@@ -348,7 +379,7 @@
       </vstack>
 
       <!-- ============ TOP · ranked numerals ============ -->
-      <vstack class="section">
+      <vstack class="section" visible-if="dsx.variable.wide || dsx.variable.homeTab == 'popular'">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="TOP" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           <spacer/>
@@ -382,7 +413,8 @@
       </vstack>
 
       <!-- ============ genre shelves ============ -->
-      <list bind="home.data.shelves" key="genre" scroll="false" spacing="0">
+      <list bind="home.data.shelves" key="genre" scroll="false" spacing="0"
+            visible-if="dsx.variable.wide || dsx.variable.homeTab == 'popular'">
         <vstack class="section">
           <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
             <text value="{{ item.genre }}" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
@@ -414,6 +446,51 @@
           </vstack>
         </vstack>
       </list>
+
+      <!-- ============ NEW · phone tab ============ -->
+      <vstack class="section" visible-if="dsx.variable.wide == false && dsx.variable.homeTab == 'new'">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <grid bind="home.data.latest" key="id" columns="3" spacing="12" scroll="false">
+            <vstack class="card" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="{{ item.title }}">
+              <zstack>
+                <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                       style="width: 100%; aspect-ratio: 3/4; border-radius: 10px; object-fit: cover"/>
+                <vstack class="badgeWrap" style="width: 100%; height: 100%; pointer-events: none">
+                  <text value="New" class="badge" visible-if="item.rank <= 4"/>
+                </vstack>
+              </zstack>
+              <vstack spacing="2" alignItems="stretch">
+                <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                <text value="EP {{ item.episodes }}" class="cardMeta"/>
+              </vstack>
+            </vstack>
+          </grid>
+        </vstack>
+      </vstack>
+
+      <!-- ============ RANKING · phone tab: the ranked list ============ -->
+      <vstack class="section" visible-if="dsx.variable.wide == false && dsx.variable.homeTab == 'ranking'">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <list bind="home.data.trending" key="id" scroll="false" spacing="0">
+            <hstack class="rankRow" href="/show/{{ item.id }}" a11yGroup="true"
+                    a11yLabel="Number {{ item.rank }}, {{ item.title }}"
+                    style="border-bottom: 1px solid rgba(255,255,255,0.05)">
+              <text value="{{ item.rank }}" class="rankBig" color="{{ rankColor }}"/>
+              <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                     style="width: 62px; height: 83px; border-radius: 8px; object-fit: cover"/>
+              <vstack spacing="4" alignItems="stretch" style="flex: 1; min-width: 0">
+                <text value="{{ item.title }}" class="rankTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                <text value="{{ metaLine }}" class="rankMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                <hstack spacing="6" alignItems="center" visible-if="item.rank <= 3">
+                  <image icon="flame.fill" iconSize="11" color="#F6B63D" a11yHidden="true"/>
+                  <text value="Trending now" class="rankMeta" color="#F6B63D"/>
+                </hstack>
+              </vstack>
+              <text value="Watch" class="rankPlay"/>
+            </hstack>
+          </list>
+        </vstack>
+      </vstack>
 
       <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="home.error != null">
         <vstack class="errCard">
