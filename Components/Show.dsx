@@ -146,7 +146,7 @@
         <vstack class="stageCol" style="flex: 1; min-width: 0">
           <zstack>
             <image src="{{ show == null ? '' : show.poster }}" contentFit="cover" a11yHidden="true"
-                   shared="poster-{{ vars.id }}" style="{{ dsx.variable.stageBox }}"/>
+                   shared="poster-{{ vars.id }}" sharedMode="clip" style="{{ dsx.variable.stageBox }}"/>
             <vstack style="{{ dsx.variable.stageOverlayBox }}">
               <vstack class="stageCap">
                 <text value="EP 1 — {{ detail.data == null ? '' : detail.data.episodes.length }} episodes" class="stageEp"/>

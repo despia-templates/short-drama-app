@@ -42,6 +42,9 @@
       const g = dsx.variable.gutter
       return 'width: 100%; max-width: 1100px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
+    <variable as="mastheadBox" computed="true">
+      return dsx.variable.shell + '; background: linear-gradient(180deg, rgba(246,182,61,0.16) 0%, rgba(0,0,0,0) 100%)'
+    </variable>
     <variable as="isVip" computed="true">
       if (wallet.data == null) { return false }
       return wallet.data.vip === true
@@ -88,7 +91,7 @@
     <vstack class="page">
       <TopNav active="vip" visible-if="dsx.variable.wide"/>
 
-      <vstack class="masthead" style="{{ dsx.variable.shell }}; background: linear-gradient(180deg, rgba(246,182,61,0.16) 0%, rgba(0,0,0,0) 100%)">
+      <vstack class="masthead" style="{{ dsx.variable.mastheadBox }}">
         <image src="/assets/coin.svg" a11yHidden="true" style="width: 54px; height: 54px"/>
         <text value="Enjoy Your VIP Access and Privileges" class="mastheadTitle"/>
         <hstack class="statusPill" visible-if="dsx.variable.isVip">
