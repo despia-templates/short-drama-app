@@ -2,7 +2,7 @@
   <defs><linearGradient id="sky" x1="0.08" y1="0" x2="0.92" y2="1">
       <stop offset="0" stop-color="#241033"/><stop offset="0.52" stop-color="#9A3FB4"/><stop offset="1" stop-color="#241033"/>
     </linearGradient>
-    <radialGradient id="rim" cx="0.5" cy="0.36" r="0.72">
+    <radialGradient id="rim" cx="0.64" cy="0.36" r="0.72">
       <stop offset="0" stop-color="#E3A0FF" stop-opacity="0.62"/>
       <stop offset="0.55" stop-color="#E3A0FF" stop-opacity="0.16"/>
       <stop offset="1" stop-color="#E3A0FF" stop-opacity="0"/>
@@ -25,30 +25,30 @@
     </filter></defs>
   <rect width="1600" height="900" fill="url(#sky)"/>
     <g filter="url(#soft)" opacity="0.9">
-      <ellipse cx="926.0" cy="288.0" rx="270.0" ry="234.0" fill="#E3A0FF" opacity="0.30"/>
-      <ellipse cx="602.0" cy="576.0" rx="216.0" ry="189.0" fill="#4A1560" opacity="0.24"/>
+      <ellipse cx="1150.0" cy="288.0" rx="270.0" ry="234.0" fill="#E3A0FF" opacity="0.30"/>
+      <ellipse cx="826.0" cy="576.0" rx="216.0" ry="189.0" fill="#4A1560" opacity="0.24"/>
     </g>
     <rect width="1600" height="900" fill="url(#rim)"/>
     <g opacity="0.85" fill="#100518">
-      <ellipse cx="696.5" cy="427.5" rx="63.0" ry="73.1"/>
-      <path d="M 501.2 963.0
-               C 501.2 571.8
-                 607.0 505.6
-                 696.5 505.6
-               C 786.0 505.6
-                 891.8 571.8
-                 891.8 963.0
+      <ellipse cx="920.5" cy="427.5" rx="63.0" ry="73.1"/>
+      <path d="M 725.2 963.0
+               C 725.2 571.8
+                 831.0 505.6
+                 920.5 505.6
+               C 1010.0 505.6
+                 1115.8 571.8
+                 1115.8 963.0
                Z"/>
     </g>
     <g opacity="0.92" fill="#100518">
-      <ellipse cx="912.5" cy="388.8" rx="70.6" ry="81.8"/>
-      <path d="M 693.8 970.6
-               C 693.8 550.4
-                 812.3 476.3
-                 912.5 476.3
-               C 1012.7 476.3
-                 1131.2 550.4
-                 1131.2 970.6
+      <ellipse cx="1136.5" cy="388.8" rx="70.6" ry="81.8"/>
+      <path d="M 917.8 970.6
+               C 917.8 550.4
+                 1036.3 476.3
+                 1136.5 476.3
+               C 1236.7 476.3
+                 1355.2 550.4
+                 1355.2 970.6
                Z"/>
     </g>
     <rect width="1600" height="900" fill="url(#sweep)"/>

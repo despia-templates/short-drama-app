@@ -187,7 +187,10 @@ const poster = (show) => {
 const heroWide = (show) => {
   const W = 1600, H = 900;
   const rand = rng(seedOf(`${show.slug}-hero`));
-  const L = artLayers(W, H, show.palette, rand, { x: 0.5, y: 0.42 });
+  // subject RIGHT of centre: the desktop band lays its title block over the LEFT third
+  // (a 90deg scrim), and figures under type is the one composition the reference never
+  // ships. 0.64 keeps both heads inside the 3:1 crop at 1440x480.
+  const L = artLayers(W, H, show.palette, rand, { x: 0.64, y: 0.42 });
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(show.title)}">
   <defs>${L.defs}</defs>
   ${L.body}

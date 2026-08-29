@@ -164,6 +164,13 @@
       if (wallet.data == null) { return true }
       return !wallet.data.unlocked.includes(epid)
     </formula>
+    <!-- the whole style is ONE formula (a {{ }} hole spanning a ';' inside a compound
+         style is shredded by the pre-interpolation split — PLAN.md §6.17): locked pages
+         frost their art, unlocked pages show it plain until the clip covers it -->
+    <formula as="stageArtFx" locked="gridLocked">
+      const frost = locked ? '; filter: blur(16px) brightness(0.4)' : ''
+      return 'width: 100%; height: ' + dsx.variable.stageH + 'px; object-fit: cover' + frost
+    </formula>
 
     <action as="boot" show="vars.show" idx="vars.idx">
       dsx.variable.showId = show;
@@ -347,17 +354,21 @@
                height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                style="width: 100%; margin-left: auto; margin-right: auto">
           <zstack>
+            <!-- the KEY ART is every page's first paint — an episode that boots onto black
+                 and pops a bright frame reads as a glitch; booting onto the show's art
+                 reads as a curtain. Locked pages keep the art frosted; unlocked pages let
+                 the clip (z-index 1, still under the z=2 chrome) cover it as frames land. -->
+            <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                   height="{{ dsx.variable.stageH }}" style="{{ stageArtFx }}"/>
             <!-- a locked page never mounts a source: entitlement is the server's word -->
             <video visible-if="gridLocked == false"
                    src="{{ item.video }}" active="{{ item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false }}"
                    muted="{{ dsx.variable.wMuted }}" paused="dsx.variable.paused"
                    bind="dsx.variable.pos" time="dsx.variable.time" duration="dsx.variable.duration"
                    speed="{{ dsx.variable.speed }}" gravity="fill" audio="playback" loop="false"
-                   height="{{ dsx.variable.stageH }}" style="width: 100%"
+                   height="{{ dsx.variable.stageH }}" style="width: 100%; z-index: 1"
                    on:ready="dsx.variable.paused = false" on:ended="dsx.action.onEnded()"
                    on:appear="dsx.action.boot()"/>
-            <image visible-if="gridLocked" src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                   height="{{ dsx.variable.stageH }}" style="width: 100%; filter: blur(16px) brightness(0.4)"/>
           </zstack>
         </pager>
 
