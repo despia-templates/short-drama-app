@@ -1,0 +1,127 @@
+<!-- engage.dsx — the rewards loop: daily check-in streak, spin the wheel, daily tasks.
+     Numbers follow docs/product/spec.md and are deliberately visible here: the curve,
+     the prize table and the caps are server facts an admin surface can render, never
+     client constants. Grants write the ledger + wallet fold directly (sibling actions
+     return void, so the fold is inlined, same as wallet.dsx). -->
+<server>
+  <head>
+    <entity as="checkin" ownership="owner">
+      <field as="day" type="text"/>       <!-- YYYY-MM-DD -->
+      <field as="streak" type="integer"/>
+      <index on="day"/>
+    </entity>
+
+    <entity as="spin" ownership="owner">
+      <field as="day" type="text"/>
+      <field as="prize" type="integer"/>
+    </entity>
+
+    <entity as="taskclaim" ownership="owner">
+      <field as="day" type="text"/>
+      <field as="task" type="text"/>
+    </entity>
+
+    <action as="rewardsState">
+      const today = new Date().toISOString().slice(0, 10)
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+      const checks = await dsx.module.data.checkin.list({ limit: 60 })
+      const rows = (checks.ok ? checks.data : []).sort((a, b) => (a.day < b.day ? 1 : -1))
+      const last = rows[0] || null
+      const checkedToday = last !== null && last.day === today
+      const streak = last === null ? 0 : (last.day === today || last.day === yesterday ? last.streak : 0)
+      const curve = [5, 10, 15, 20, 25, 30, 60]
+      const nextReward = curve[streak % 7]
+
+      const spins = await dsx.module.data.spin.list({ filters: { day: today }, limit: 5 })
+      const spinsToday = spins.ok ? spins.data.length : 0
+
+      const claims = await dsx.module.data.taskclaim.list({ filters: { day: today }, limit: 20 })
+      const claimed = (claims.ok ? claims.data : []).map(c => c.task)
+      const watched = await dsx.module.data.progress.list({ filters: { day: today }, limit: 50 })
+      const watchedCount = watched.ok ? watched.data.length : 0
+
+      const days = []
+      for (let i = 0; i < curve.length; i++) {
+        days.push({ id: 'd' + i, i: i, reward: curve[i] })
+      }
+      return {
+        today: today, checkedToday: checkedToday, streak: streak, curve: curve, days: days, nextReward: nextReward,
+        freeSpinLeft: spinsToday === 0,
+        tasks: [
+          { id: 'watch3', title: 'Watch 3 episodes today', reward: 15, progress: Math.min(watchedCount, 3), target: 3, claimed: claimed.includes('watch3') },
+          { id: 'firstFavorite', title: 'Add a show to My List', reward: 10, progress: 0, target: 1, claimed: claimed.includes('firstFavorite') }
+        ]
+      }
+    </action>
+
+    <action as="checkinNow">
+      const today = new Date().toISOString().slice(0, 10)
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+      const dup = await dsx.module.data.checkin.list({ filters: { day: today }, limit: 1 })
+      if (dup.ok && dup.data.length > 0) { throw { reason: 'conflict', message: 'already checked in today' } }
+      const checks = await dsx.module.data.checkin.list({ limit: 60 })
+      const rows = (checks.ok ? checks.data : []).sort((a, b) => (a.day < b.day ? 1 : -1))
+      const last = rows[0] || null
+      const streak = (last !== null && last.day === yesterday ? last.streak : 0) + 1
+      const curve = [5, 10, 15, 20, 25, 30, 60]
+      const reward = curve[(streak - 1) % 7]
+      await dsx.module.data.checkin.create({ day: today, streak: streak })
+
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) { const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 }); w = made.data }
+      const expires = new Date(Date.now() + 7 * 86400000).toISOString()
+      await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'checkin', ref: today, expires: expires })
+      await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
+      return { streak: streak, reward: reward }
+    </action>
+
+    <action as="spinWheel">
+      const today = new Date().toISOString().slice(0, 10)
+      const spins = await dsx.module.data.spin.list({ filters: { day: today }, limit: 5 })
+      if (spins.ok && spins.data.length > 0) { throw { reason: 'conflict', message: 'no free spin left today' } }
+      const prizes = [10, 15, 20, 25, 40, 60, 80, 100]
+      const prize = prizes[Math.floor(Math.random() * prizes.length)]
+      await dsx.module.data.spin.create({ day: today, prize: prize })
+
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) { const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 }); w = made.data }
+      const expires = new Date(Date.now() + 7 * 86400000).toISOString()
+      await dsx.module.data.ledger.create({ kind: 'bonus', amount: prize, source: 'spin', ref: today, expires: expires })
+      await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + prize } })
+      return { prize: prize, prizes: prizes }
+    </action>
+
+    <action as="claimTask" inputs="task">
+      const today = new Date().toISOString().slice(0, 10)
+      const rewards = { watch3: 15, firstFavorite: 10 }
+      if (rewards[task] == null) { throw { reason: 'invalid', message: 'unknown task' } }
+      const dup = await dsx.module.data.taskclaim.list({ filters: { day: today, task: task }, limit: 1 })
+      if (dup.ok && dup.data.length > 0) { throw { reason: 'conflict', message: 'already claimed today' } }
+      if (task === 'watch3') {
+        const watched = await dsx.module.data.progress.list({ filters: { day: today }, limit: 50 })
+        if (!watched.ok || watched.data.length < 3) { throw { reason: 'conflict', message: 'watch 3 episodes first' } }
+      }
+      if (task === 'firstFavorite') {
+        const favs = await dsx.module.data.favorite.list({ limit: 1 })
+        if (!favs.ok || favs.data.length < 1) { throw { reason: 'conflict', message: 'add a favorite first' } }
+      }
+      await dsx.module.data.taskclaim.create({ day: today, task: task })
+      const reward = rewards[task]
+
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) { const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 }); w = made.data }
+      const expires = new Date(Date.now() + 7 * 86400000).toISOString()
+      await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'task', ref: task, expires: expires })
+      await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
+      return { claimed: task, reward: reward }
+    </action>
+  </head>
+
+  <route method="GET"  path="/rewards/state"   action="rewardsState" auth="required"/>
+  <route method="POST" path="/rewards/checkin" action="checkinNow"   auth="required"/>
+  <route method="POST" path="/rewards/spin"    action="spinWheel"    auth="required"/>
+  <route method="POST" path="/rewards/task"    action="claimTask"    auth="required"/>
+</server>

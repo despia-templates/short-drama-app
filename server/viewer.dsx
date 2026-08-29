@@ -1,0 +1,84 @@
+<!-- viewer.dsx — the signed-in viewer's own rows: watch progress and favorites.
+     ownership="owner" means Postgres RLS scopes every read and write to the caller;
+     the routes below are the generated CRUD, already caller-scoped. -->
+<server>
+  <head>
+    <entity as="progress" ownership="owner">
+      <field as="episode" type="uuid"/>
+      <field as="show" type="uuid"/>
+      <field as="idx" type="integer"/>
+      <field as="position" type="real"/>   <!-- seconds into the episode -->
+      <field as="day" type="text"/>        <!-- YYYY-MM-DD of the last watch, for daily tasks -->
+      <index on="show"/>
+    </entity>
+
+    <entity as="favorite" ownership="owner">
+      <field as="show" type="uuid"/>
+    </entity>
+
+    <action as="saveProgress" inputs="episode, show, idx, position">
+      if (episode == null || episode === '' || show == null || show === '') { throw { reason: 'invalid', message: 'episode and show are required' } }
+      const day = new Date().toISOString().slice(0, 10)
+      const mine = await dsx.module.data.progress.list({ filters: { episode: episode }, limit: 1 })
+      if (mine.ok && mine.data.length > 0) {
+        await dsx.module.data.progress.update({ id: mine.data[0].id, values: { position: position, day: day, idx: idx } })
+        return { updated: true }
+      }
+      await dsx.module.data.progress.create({ episode: episode, show: show, idx: idx, position: position, day: day })
+      return { created: true }
+    </action>
+
+    <action as="continueWatching">
+      const rows = await dsx.module.data.progress.list({ limit: 100 })
+      if (!rows.ok) { return { items: [] } }
+      const byShow = {}
+      for (const r of rows.data) {
+        const cur = byShow[r.show]
+        if (cur == null || r.created_at > cur.created_at) { byShow[r.show] = r }
+      }
+      const picks = Object.values(byShow)
+      const items = []
+      for (const p of picks.slice(0, 12)) {
+        const s = await dsx.module.data.show.get({ id: p.show })
+        const e = await dsx.module.data.episode.get({ id: p.episode })
+        if (s.ok) {
+          // pct drives the resume bar on the card — the one affordance a
+          // continue-watching rail lives or dies on
+          const dur = e.ok && e.data.duration > 0 ? e.data.duration : 75
+          const pct = Math.min(100, Math.round((p.position / dur) * 100))
+          items.push({
+            show: p.show, title: s.data.title, poster: s.data.poster,
+            episode: p.episode, idx: p.idx, position: p.position, pct: pct
+          })
+        }
+      }
+      return { items: items }
+    </action>
+
+    <action as="toggleFavorite" inputs="show">
+      if (show == null || show === '') { throw { reason: 'invalid', message: 'show is required' } }
+      const mine = await dsx.module.data.favorite.list({ filters: { show: show }, limit: 1 })
+      if (mine.ok && mine.data.length > 0) {
+        await dsx.module.data.favorite.delete({ id: mine.data[0].id })
+        return { favorite: false }
+      }
+      await dsx.module.data.favorite.create({ show: show })
+      return { favorite: true }
+    </action>
+
+    <action as="myList">
+      const favs = await dsx.module.data.favorite.list({ limit: 100 })
+      const items = []
+      for (const f of (favs.ok ? favs.data : [])) {
+        const s = await dsx.module.data.show.get({ id: f.show })
+        if (s.ok) { items.push({ show: f.show, title: s.data.title, poster: s.data.poster, genre: s.data.genre }) }
+      }
+      return { items: items }
+    </action>
+  </head>
+
+  <route method="POST" path="/viewer/progress"  action="saveProgress"     auth="required"/>
+  <route method="GET"  path="/viewer/continue"  action="continueWatching" auth="required"/>
+  <route method="POST" path="/viewer/favorite"  action="toggleFavorite"   auth="required"/>
+  <route method="GET"  path="/viewer/list"      action="myList"           auth="required"/>
+</server>

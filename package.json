@@ -1,0 +1,29 @@
+{
+  "name": "short-drama-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "despia build",
+    "dev": "despia dev",
+    "lint": "despia lint --strict",
+    "review": "despia review --strict",
+    "check:styles": "node scripts/check-styles.mjs",
+    "serve": "DSX_DEV_NO_SW=1 node scripts/serve.mjs",
+    "seed": "node scripts/seed.mjs",
+    "session": "node scripts/dev-session.mjs"
+  },
+  "dependencies": {
+    "@despia/compiler": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/compiler",
+    "@despia/dom": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/dom",
+    "@despia/kernel": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/kernel",
+    "@despia/server": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/server",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@despia/cli": "file:/Users/yacinenedjar/despia_dsx/despia-framework/OpenSource/Web/packages/cli"
+  }
+}

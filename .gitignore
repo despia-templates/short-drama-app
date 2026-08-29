@@ -1,0 +1,8 @@
+node_modules/
+dist/
+deploy/
+server/generated/
+.env.local
+public/dev-session.json
+.agents/
+.claude/skills/

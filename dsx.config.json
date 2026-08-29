@@ -1,0 +1,66 @@
+{
+  "name": "Short Drama",
+  "entry": "App",
+  "outDir": "dist",
+  "routes": [
+    {
+      "path": "/",
+      "component": "shortdrama.App",
+      "meta": {
+        "title": "Short Drama \u2014 binge-worthy vertical series"
+      }
+    },
+    {
+      "path": "/discover",
+      "component": "shortdrama.Discover",
+      "meta": {
+        "title": "Discover \u2014 Short Drama"
+      }
+    },
+    {
+      "path": "/rewards",
+      "component": "shortdrama.Rewards",
+      "meta": {
+        "title": "Rewards \u2014 Short Drama"
+      }
+    },
+    {
+      "path": "/list",
+      "component": "shortdrama.MyList",
+      "meta": {
+        "title": "My List \u2014 Short Drama"
+      }
+    },
+    {
+      "path": "/profile",
+      "component": "shortdrama.Profile",
+      "meta": {
+        "title": "Profile \u2014 Short Drama"
+      }
+    },
+    {
+      "path": "/show/:id",
+      "component": "shortdrama.Show",
+      "meta": {
+        "title": "Show \u2014 Short Drama"
+      }
+    },
+    {
+      "path": "/watch/:show/:idx",
+      "component": "shortdrama.Watch",
+      "meta": {
+        "title": "Watch \u2014 Short Drama"
+      }
+    },
+    {
+      "path": "/admin",
+      "component": "shortdrama.Admin",
+      "meta": {
+        "title": "Manage \u2014 Short Drama"
+      }
+    }
+  ],
+  "router": {
+    "transition": "dsx"
+  }
+}

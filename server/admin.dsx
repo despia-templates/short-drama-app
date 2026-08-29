@@ -1,0 +1,124 @@
+<!-- admin.dsx — the Manage View's backend: operator verbs over the catalogue, stats and
+     the notice board, each also served as an MCP tool (the <tool> rows), so the same
+     declared action answers the bridge UI, ChatGPT/Claude, and curl.
+     AUTHORITY: the platform's own model, nothing custom. show/episode/notice are
+     ownership="public-read", whose write policies admit only the service scope — so these
+     routes are auth="required" and succeed only for a caller whose JWT carries a
+     service role claim (the Supabase shape). A viewer token passes the door and is then
+     refused at the seam by RLS: fail-closed at the seam, never at the dialog.
+     When role-scoped auth (auth="role:operator") lands upstream (PLAN.md §6.2), these
+     rows change one attribute and a finer-than-service operator role becomes possible. -->
+<server>
+  <head>
+    <entity as="notice" ownership="public-read">
+      <field as="title" type="text"/>
+      <field as="message" type="text"/>
+      <field as="segment" type="text"/>   <!-- all | vip | lapsed — the push audience -->
+      <field as="kind" type="text"/>      <!-- push | banner -->
+    </entity>
+
+    <action as="adminStats">
+      const shows = await dsx.module.data.show.list({ limit: 500 })
+      const eps = await dsx.module.data.episode.list({ limit: 1000 })
+      const notices = await dsx.module.data.notice.list({ limit: 100 })
+      const all = shows.ok ? shows.data : []
+      return {
+        shows: all.length,
+        live: all.filter(s => s.state === 'live').length,
+        drafts: all.filter(s => s.state === 'draft').length,
+        episodes: eps.ok ? eps.data.length : 0,
+        notices: notices.ok ? notices.data.length : 0
+      }
+    </action>
+
+    <action as="adminListShows">
+      const shows = await dsx.module.data.show.list({ limit: 500 })
+      const eps = await dsx.module.data.episode.list({ limit: 2000 })
+      const counts = {}
+      for (const e of (eps.ok ? eps.data : [])) { counts[e.show] = (counts[e.show] == null ? 0 : counts[e.show]) + 1 }
+      const rows = (shows.ok ? shows.data : [])
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+        .map(s => ({ id: s.id, title: s.title, genre: s.genre, state: s.state, featured: s.featured === true, freeUntil: s.free_until, episodes: counts[s.id] == null ? 0 : counts[s.id], poster: s.poster }))
+      return { rows: rows }
+    </action>
+
+    <action as="adminUpsertShow" inputs="id, title, synopsis, genre, poster, hero, state, freeUntil, featured">
+      if (title == null || title === '') { throw { reason: 'invalid', message: 'title is required' } }
+      const values = {
+        title: title,
+        synopsis: synopsis == null ? '' : synopsis,
+        genre: genre == null || genre === '' ? 'Drama' : genre,
+        poster: poster == null ? '' : poster,
+        hero: hero == null ? '' : hero,
+        state: state == null || state === '' ? 'draft' : state,
+        free_until: freeUntil == null ? 8 : freeUntil,
+        featured: featured === true
+      }
+      if (id) {
+        const done = await dsx.module.data.show.update({ id: id, values: values })
+        if (!done.ok) { throw { reason: 'forbidden', message: 'operator authority required' } }
+        return { id: id, updated: true }
+      }
+      const made = await dsx.module.data.show.create(values)
+      if (!made.ok) { throw { reason: 'forbidden', message: 'operator authority required' } }
+      return { id: made.data.id, created: true }
+    </action>
+
+    <action as="adminUpsertEpisode" inputs="id, show, idx, title, videoUrl, poster, duration, price, state">
+      if (show == null || show === '') { throw { reason: 'invalid', message: 'show is required' } }
+      const order = idx == null ? 1 : idx
+      const values = {
+        show: show, idx: order,
+        title: title == null || title === '' ? ('Episode ' + order) : title,
+        video_url: videoUrl == null ? '' : videoUrl,
+        poster: poster == null ? '' : poster,
+        duration: duration == null ? 75 : duration,
+        price: price == null ? 60 : price,
+        state: state == null || state === '' ? 'live' : state
+      }
+      if (id) {
+        const done = await dsx.module.data.episode.update({ id: id, values: values })
+        if (!done.ok) { throw { reason: 'forbidden', message: 'operator authority required' } }
+        return { id: id, updated: true }
+      }
+      const made = await dsx.module.data.episode.create(values)
+      if (!made.ok) { throw { reason: 'forbidden', message: 'operator authority required' } }
+      return { id: made.data.id, created: true }
+    </action>
+
+    <action as="adminPublish" inputs="show, state">
+      if (state !== 'live' && state !== 'draft') { throw { reason: 'invalid', message: 'state must be live or draft' } }
+      const done = await dsx.module.data.show.update({ id: show, values: { state: state } })
+      if (!done.ok) { throw { reason: 'forbidden', message: 'operator authority required' } }
+      return { show: show, state: state }
+    </action>
+
+    <action as="adminFeature" inputs="show, featured">
+      const done = await dsx.module.data.show.update({ id: show, values: { featured: featured === true } })
+      if (!done.ok) { throw { reason: 'forbidden', message: 'operator authority required' } }
+      return { show: show, featured: featured === true }
+    </action>
+
+    <action as="adminNotice" inputs="title, message, segment, kind">
+      if (title == null || title === '') { throw { reason: 'invalid', message: 'title is required' } }
+      const made = await dsx.module.data.notice.create({ title: title, message: message == null ? '' : message, segment: segment == null || segment === '' ? 'all' : segment, kind: kind == null || kind === '' ? 'push' : kind })
+      if (!made.ok) { throw { reason: 'forbidden', message: 'operator authority required' } }
+      return { id: made.data.id, queued: true }
+    </action>
+  </head>
+
+  <route method="POST" path="/admin/stats"    action="adminStats"         auth="required"/>
+  <route method="POST" path="/admin/shows"    action="adminListShows"     auth="required"/>
+  <route method="POST" path="/admin/show"     action="adminUpsertShow"    auth="required"/>
+  <route method="POST" path="/admin/episode"  action="adminUpsertEpisode" auth="required"/>
+  <route method="POST" path="/admin/publish"  action="adminPublish"       auth="required"/>
+  <route method="POST" path="/admin/feature"  action="adminFeature"       auth="required"/>
+  <route method="POST" path="/admin/notice"   action="adminNotice"        auth="required"/>
+
+  <tool action="adminStats"         description="Catalogue and operations counters for this deployment." auth="required"/>
+  <tool action="adminListShows"     description="List every show with state, episode count and pricing window." auth="required"/>
+  <tool action="adminUpsertShow"    description="Create or update a show (title, synopsis, genre, posters, free window, featured)." auth="required" mutates="show"/>
+  <tool action="adminUpsertEpisode" description="Create or update an episode (video URL, order, price, state)." auth="required" mutates="episode"/>
+  <tool action="adminPublish"       description="Publish or unpublish a show (state live|draft)." auth="required" mutates="show"/>
+  <tool action="adminNotice"        description="Send a notice: a push-style announcement to a viewer segment." auth="required" mutates="notice"/>
+</server>

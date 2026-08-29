@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="324" height="486" viewBox="0 0 324 486">
+  <defs><linearGradient id="g" x1="0.1" y1="0" x2="0.9" y2="1">
+    <stop offset="0" stop-color="#171622"/><stop offset="1" stop-color="#2A2838"/></linearGradient></defs>
+  <rect width="324" height="486" fill="url(#g)"/>
+  <circle cx="162" cy="205" r="46" fill="none" stroke="#5B5870" stroke-width="2"/>
+  <path d="M148 185 L188 205 L148 225 Z" fill="#5B5870"/>
+  <text x="162" y="300" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" letter-spacing="2" fill="#6E6B85">NO KEY ART</text>
+</svg>

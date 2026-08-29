@@ -1,0 +1,144 @@
+<!-- Show — the series page: key-art backdrop, the metadata line every drama app carries
+     (episode count · free window · genre), Play / My List, synopsis, then the episode
+     grid with lock badges.
+
+     Entitlement is ALWAYS the server's opinion: `epLocked` reads /wallet/state, so a lock
+     badge is never a client guess. -->
+<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <api as="detail" url="/catalog/show/{{ vars.id }}"/>
+    <api as="session" url="/dev-session.json" ssr="false"/>
+    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <api as="fav" url="/viewer/favorite" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+
+    <variable as="favorite">return false</variable>
+    <variable as="authHeaders" computed="true">
+      if (session.data == null) { return {} }
+      return { authorization: 'Bearer ' + session.data.viewer.token }
+    </variable>
+    <variable as="show" computed="true">
+      if (detail.data == null) { return null }
+      return detail.data.show
+    </variable>
+
+    <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
+    <variable as="bp" computed="true">
+      const w = dsx.screen.width
+      if (w >= 1120) { return 'desktop' }
+      if (w >= 768) { return 'tablet' }
+      return 'phone'
+    </variable>
+    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="artH" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 420 }
+      if (dsx.variable.bp == 'tablet') { return 340 }
+      return 250
+    </variable>
+    <variable as="epCols" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 10 }
+      if (dsx.variable.bp == 'tablet') { return 8 }
+      return 5
+    </variable>
+    <variable as="gutter" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 32 }
+      if (dsx.variable.bp == 'tablet') { return 24 }
+      return 16
+    </variable>
+    <variable as="shell" computed="true">
+      const g = dsx.variable.gutter
+      return 'width: 100%; max-width: ' + 900 + 'px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+    </variable>
+
+    <formula as="epLocked" free="item.free" epid="item.id">
+      if (free) { return false }
+      if (wallet.data == null) { return true }
+      return !wallet.data.unlocked.includes(epid)
+    </formula>
+
+    <action as="toggleFav">
+      const r = await fav.send({ show: vars.id })
+      if (r.ok) { dsx.variable.favorite = r.data.favorite }
+    </action>
+
+    <style as="screen" background="#08070C" alignItems="stretch"/>
+    <style as="scroller" alignItems="stretch"/>
+    <style as="page" spacing="18" paddingBottom="20" alignItems="stretch"/>
+
+    <style as="artScrim" paddingBottom="16" paddingTop="12" spacing="8" alignItems="flex-start"/>
+    <style as="backBtn" background="rgba(8,7,12,0.55)" radius="16" paddingH="11" paddingV="6" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="genre" fontSize="11" fontWeight="semibold" color="#F7C948" tracking="0.8" textCase="uppercase"/>
+    <style as="title" fontSize="24" fontWeight="bold" color="#FFFFFF" lineLimit="3" tracking="-0.4"/>
+    <style as="meta" fontSize="12" color="rgba(255,255,255,0.62)"/>
+
+    <style as="gutter" alignItems="stretch"/>
+    <style as="section" spacing="10" alignItems="stretch"/>
+    <style as="titleBlock" spacing="6" alignItems="flex-start"/>
+    <style as="ctaRow" spacing="10" alignItems="center"/>
+    <style as="playBtn" background="#FF2D55" radius="24" paddingV="13" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="favBtn" background="rgba(255,255,255,0.10)" radius="24" paddingH="18" paddingV="13" fontSize="17"/>
+    <style as="synopsis" fontSize="13" color="rgba(255,255,255,0.66)" lineSpacing="3"/>
+
+    <style as="epHead" alignItems="center" paddingTop="4"/>
+    <style as="epTitle" fontSize="17" fontWeight="bold" color="#FFFFFF" tracking="-0.2"/>
+    <style as="epFree" fontSize="11" fontWeight="semibold" color="#F7C948"/>
+    <style as="epGrid" alignItems="stretch"/>
+    <style as="epCell" background="#1B1926" radius="9" spacing="3" alignItems="center" paddingV="11"/>
+    <style as="epNum" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="skeleton" background="#15141C" radius="12"/>
+  </head>
+
+  <TopNav active="home" visible-if="dsx.variable.wide"/>
+  <scroll class="scroller" style="flex: 1; min-height: 0">
+    <vstack class="page">
+
+      <!-- key art + title block -->
+      <zstack>
+        <image src="{{ show == null ? '' : show.hero }}" contentFit="cover" a11yHidden="true"
+               style="width: 100%; height: {{ dsx.variable.artH }}px"/>
+        <vstack class="artScrim"
+                style="{{ dsx.variable.shell }}; height: {{ dsx.variable.artH }}px; justify-content: space-between; background: linear-gradient(180deg, rgba(8,7,12,0.55) 0%, rgba(8,7,12,0) 28%, rgba(8,7,12,0.97) 100%)">
+          <text value="‹ Back" class="backBtn" href="/" a11yLabel="Back to home"/>
+          <vstack class="titleBlock">
+            <text value="{{ show == null ? '' : show.genre }}" class="genre"/>
+            <text value="{{ show == null ? '' : show.title }}" class="title"/>
+            <text value="{{ detail.data == null ? '' : detail.data.episodes.length }} episodes · EP 1–{{ show == null ? '' : show.free_until }} free · then 60 coins" class="meta"/>
+          </vstack>
+        </vstack>
+      </zstack>
+
+      <!-- primary actions -->
+      <hstack class="ctaRow" style="{{ dsx.variable.shell }}">
+        <button label="▶  Play EP 1" class="playBtn" style="flex: 1"
+                on:tap="dsx.module.route.push({ path: '/watch/' + vars.id + '/1' })"/>
+        <button label="{{ dsx.variable.favorite ? '♥' : '♡' }}" class="favBtn"
+                color="{{ dsx.variable.favorite ? '#FF2D55' : '#FFFFFF' }}"
+                on:tap="dsx.action.toggleFav()" a11yLabel="Add to My List"/>
+      </hstack>
+
+      <vstack class="gutter" style="{{ dsx.variable.shell }}">
+        <text value="{{ show == null ? '' : show.synopsis }}" class="synopsis"/>
+      </vstack>
+
+      <!-- episodes -->
+      <vstack class="section">
+        <hstack class="epHead" style="{{ dsx.variable.shell }}">
+          <text value="Episodes" class="epTitle"/>
+          <spacer/>
+          <text value="EP 1–{{ show == null ? '' : show.free_until }} FREE" class="epFree"/>
+        </hstack>
+        <stack class="skeleton" visible-if="detail.loading" style="height: 120px; margin: 0 16px"/>
+        <vstack class="epGrid" style="{{ dsx.variable.shell }}">
+          <grid bind="detail.data.episodes" key="id" columns="{{ dsx.variable.epCols }}" spacing="9" scroll="false">
+            <vstack class="epCell" href="/watch/{{ vars.id }}/{{ item.idx }}"
+                    a11yLabel="Episode {{ item.idx }}{{ epLocked ? ', locked' : '' }}">
+              <text value="{{ item.idx }}" class="epNum"/>
+              <image icon="lock.fill" iconSize="9" color="rgba(255,255,255,0.5)" visible-if="epLocked" a11yHidden="true"/>
+            </vstack>
+          </grid>
+        </vstack>
+      </vstack>
+
+    </vstack>
+  </scroll>
+  <TabBar active="home" visible-if="dsx.variable.wide == false"/>
+</vstack>

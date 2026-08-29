@@ -1,0 +1,48 @@
+<!-- TopNav — the wide-viewport navigation. Phones get the bottom <TabBar>; tablets and
+     desktops get this horizontal bar, because a thumb-reach bottom bar on a 1280px window
+     is a phone layout wearing a desktop's clothes.
+
+     One nav MODEL, two presentations: the same five destinations, the same active word,
+     the same icon names (Boxicons on web, SF Symbols on iOS, Material Symbols on Android).
+     Screens mount whichever fits via visible-if on the shared breakpoint. -->
+<hstack class="nav" style="width: 100%; border-bottom: 1px solid rgba(255,255,255,0.07)">
+  <head>
+    <attribute as="active" default="'home'"/>
+    <attribute as="wide" default="false"/>   <!-- desktop = roomier rail + labels -->
+
+    <variable as="on" computed="true">'#FFFFFF'</variable>
+    <variable as="off" computed="true">'rgba(255,255,255,0.55)'</variable>
+
+    <style as="nav" background="#0E0D13" paddingV="12" alignItems="center"/>
+    <style as="inner" alignItems="center" spacing="26" paddingLeading="24" paddingTrailing="24"/>
+    <style as="wordmark" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
+    <style as="links" spacing="22" alignItems="center"/>
+    <style as="link" fontSize="15" fontWeight="medium"/>
+    <style as="coins" background="rgba(255,255,255,0.08)" radius="15" paddingH="12" paddingV="7" spacing="6" alignItems="center"/>
+    <style as="coinsNum" fontSize="13" fontWeight="semibold" color="#F7C948"/>
+  </head>
+
+  <hstack class="inner" style="width: 100%; max-width: 1240px; margin-left: auto; margin-right: auto">
+    <text value="Short Drama" class="wordmark" href="/" a11yLabel="Short Drama — home"/>
+
+    <hstack class="links">
+      <text value="Home" class="link" href="/"
+            color="{{ dsx.attribute.active == 'home' ? dsx.variable.on : dsx.variable.off }}"/>
+      <text value="Discover" class="link" href="/discover"
+            color="{{ dsx.attribute.active == 'discover' ? dsx.variable.on : dsx.variable.off }}"/>
+      <text value="Rewards" class="link" href="/rewards"
+            color="{{ dsx.attribute.active == 'rewards' ? dsx.variable.on : dsx.variable.off }}"/>
+      <text value="My List" class="link" href="/list"
+            color="{{ dsx.attribute.active == 'list' ? dsx.variable.on : dsx.variable.off }}"/>
+    </hstack>
+
+    <spacer/>
+
+    <hstack class="coins" href="/rewards" a11yLabel="Your coins — open Rewards">
+      <image icon="bitcoinsign.circle.fill" iconSize="14" color="#F7C948" a11yHidden="true"/>
+      <text value="Earn" class="coinsNum"/>
+    </hstack>
+    <image icon="person.crop.circle" iconSize="24" href="/profile" a11yLabel="Profile"
+           color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}"/>
+  </hstack>
+</hstack>

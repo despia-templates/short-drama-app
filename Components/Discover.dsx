@@ -1,0 +1,97 @@
+<!-- Discover — the For-You feed: full-screen vertical swipe over trailers (EP 1 of each
+     live show), muted autoplay, one tap to the full episode. The pager carries only the
+     VIDEO pages; the caption overlay lives OUTSIDE, bound to the resting page — the same
+     shape as the home hero: a caption bound to the resting index stays still while the
+     art moves. Only the resting page's video is active, so a fling never plays three
+     soundtracks at once. -->
+<vstack background="#000000" alignItems="center" style="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <api as="feed" url="/catalog/discover"/>
+
+    <variable as="page">return 0</variable>
+    <variable as="activeShow">return ''</variable>
+    <variable as="muted">return true</variable>
+    <!-- a 9:16 feed stretched across a desktop window is a phone layout in a big frame;
+         wide viewports get a centered column at the height's own aspect instead -->
+    <variable as="bp" computed="true">
+      const w = dsx.screen.width
+      if (w >= 1120) { return 'desktop' }
+      if (w >= 768) { return 'tablet' }
+      return 'phone'
+    </variable>
+    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <!-- The stage is ONE interpolated number fed to the catalog's maxWidth, not a CSS
+         chunk spliced into style= — a dynamic multi-property style string applies only
+         sometimes, which left the caption full-bleed while the video centred. -->
+    <variable as="stageMax" computed="true">
+      if (dsx.variable.bp == 'phone') { return 4096 }
+      return Math.round(Math.min(460, dsx.screen.height * 0.52))
+    </variable>
+
+    <variable as="card" computed="true">
+      if (feed.data == null) { return null }
+      const p = Number(dsx.variable.page)
+      if (p < 0 || p >= feed.data.cards.length) { return null }
+      return feed.data.cards[p]
+    </variable>
+
+
+    <action as="rest">
+      const c = dsx.variable.card
+      if (c == null) { return }
+      dsx.variable.activeShow = c.show
+    </action>
+
+    <style as="caption" paddingLeading="16" paddingTrailing="16" paddingBottom="84" spacing="8" alignItems="flex-start"/>
+    <style as="capGenre" fontSize="11" fontWeight="semibold" color="#F7C948" tracking="0.8" textCase="uppercase"/>
+    <style as="capTitle" fontSize="22" fontWeight="bold" color="#FFFFFF" lineLimit="2" tracking="-0.3"/>
+    <style as="capSyn" fontSize="13" color="rgba(255,255,255,0.72)" lineLimit="2" lineSpacing="2"/>
+    <style as="capCta" spacing="10" alignItems="center" paddingTop="2"/>
+    <style as="watchBtn" background="#FF2D55" radius="22" paddingH="18" paddingV="11" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="soundBtn" background="rgba(255,255,255,0.16)" radius="20" paddingH="13" paddingV="10" fontSize="16" color="#FFFFFF"/>
+    <style as="statusWrap" alignItems="center" paddingV="40" spacing="10"/>
+  </head>
+
+  <TopNav active="discover" visible-if="dsx.variable.wide"/>
+
+  <zstack>
+    <!-- WIDTH IS THE VIEWPORT'S, NOT A CAPTURED FACT. `dsx.screen.width` is read once at
+         mount, so sizing a full-bleed layer from it pins the feed to whatever the window
+         was then — on a desktop pane the video ran 959px while the pager stayed 697px.
+         Widths are percentages; only the page HEIGHT needs a real number. -->
+    <pager axis="vertical" ignoreSafeArea="true" bind="feed.data.cards" key="show"
+           value="dsx.variable.page" dots="false" on:change="dsx.action.rest()"
+           height="{{ dsx.screen.height }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto">
+      <video src="{{ item.video }}" active="{{ item.show == dsx.variable.activeShow }}"
+             muted="{{ dsx.variable.muted }}" loop="true" gravity="fill"
+             height="{{ dsx.screen.height }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto"
+             on:appear="dsx.action.rest()"/>
+    </pager>
+
+    <vstack height="{{ dsx.screen.height }}"
+            maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; justify-content: flex-end; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0) 52%, rgba(0,0,0,0.86) 100%)">
+      <spacer/>
+      <vstack class="caption" visible-if="card != null">
+        <text value="{{ card == null ? '' : card.genre }}" class="capGenre"/>
+        <text value="{{ card == null ? '' : card.title }}" class="capTitle"/>
+        <text value="{{ card == null ? '' : card.synopsis }}" class="capSyn"/>
+        <hstack class="capCta" style="pointer-events: auto">
+          <button label="▶  Watch full episode" class="watchBtn"
+                  on:tap="dsx.module.route.push({ path: '/watch/' + (card == null ? '' : card.show) + '/1' })"/>
+          <button label="{{ dsx.variable.muted ? '🔇' : '🔊' }}" class="soundBtn"
+                  on:tap="dsx.variable.muted = !dsx.variable.muted" a11yLabel="Toggle sound"/>
+        </hstack>
+      </vstack>
+      <vstack class="statusWrap" visible-if="feed.loading">
+        <text value="Loading the feed…" fontSize="13" color="rgba(255,255,255,0.6)"/>
+      </vstack>
+      <vstack class="statusWrap" visible-if="feed.error != null" style="pointer-events: auto">
+        <text value="The feed is unavailable." fontSize="13" color="#FFFFFF"/>
+        <button label="Retry" class="watchBtn" on:tap="feed.refresh()"/>
+      </vstack>
+      <stack alignItems="stretch" style="width: 100%; pointer-events: auto" visible-if="dsx.variable.wide == false">
+        <TabBar active="discover"/>
+      </stack>
+    </vstack>
+  </zstack>
+</vstack>

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "designing-dsx-apps": {
+      "source": "despia-native/skills",
+      "sourceType": "github",
+      "skillPath": "designing-dsx-apps/SKILL.md",
+      "computedHash": "18eef49115614ba16966ede27daad5e7ad79bfcb6faaab80e0c5219ce210fd9e"
+    },
+    "thinking-in-dsx": {
+      "source": "despia-native/skills",
+      "sourceType": "github",
+      "skillPath": "thinking-in-dsx/SKILL.md",
+      "computedHash": "770df1398db8a1f8564235d4e3d1ad1102e907bc5f8ba31963118d1cf36c5db5"
+    },
+    "writing-dsx-apps": {
+      "source": "despia-native/skills",
+      "sourceType": "github",
+      "skillPath": "writing-dsx-apps/SKILL.md",
+      "computedHash": "2a9ceee39016e48e2ab3277035eff1442169ade306e2b8796a1c7a4f076bb64a"
+    }
+  }
+}

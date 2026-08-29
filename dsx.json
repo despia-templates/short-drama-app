@@ -1,0 +1,64 @@
+{
+  "name": "short-drama-app",
+  "scheme": "shortdrama",
+  "version": "0.1.0",
+  "platforms": [
+    "phone",
+    "desktop"
+  ],
+  "template": {
+    "templateApi": 1,
+    "title": "Short Drama",
+    "summary": "ReelShort-class vertical drama: SSR web storefront, coin paywall player, rewards loop, Manage View operator surface, declared backend with MCP tools.",
+    "category": "media",
+    "surfaces": [
+      "web",
+      "server"
+    ],
+    "_surfaces_note": "ios/android join when the native lane lands (VerticalPlayerStack consumption \u2014 PLAN.md \u00a75 Phase 3)",
+    "services": {
+      "required": [
+        "postgres"
+      ],
+      "optional": [
+        "admob",
+        "revenuecat",
+        "onesignal",
+        "cloudflare"
+      ]
+    },
+    "secrets": [
+      "DSX_JWT_SECRET",
+      "DSX_INTERNAL_KEY"
+    ],
+    "setup": [
+      {
+        "step": "deploy",
+        "doc": "README.md \u2014 build, migrate, serve"
+      },
+      {
+        "step": "seed",
+        "doc": "scripts/seed.mjs \u2014 3 demo shows through the admin routes"
+      },
+      {
+        "step": "connect",
+        "service": "admob",
+        "doc": "docs/product/spec.md \u00a73 \u2014 native lane"
+      },
+      {
+        "step": "connect",
+        "service": "revenuecat",
+        "doc": "docs/product/spec.md \u00a73 \u2014 native lane"
+      },
+      {
+        "step": "connect",
+        "service": "onesignal",
+        "doc": "docs/product/spec.md \u00a74 \u2014 hosted lane"
+      }
+    ],
+    "demo": {
+      "seeded": true,
+      "resettable": true
+    }
+  }
+}

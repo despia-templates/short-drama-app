@@ -1,0 +1,109 @@
+<!-- catalog.dsx — the public catalogue: shows and episodes, and the shaped reads the
+     screens consume (home shelves, discover feed, show detail). Reads are auth="none"
+     (a drama storefront is public); every WRITE goes through admin.dsx behind the
+     operator key. No CRUD write route exists on this document on purpose. -->
+<server>
+  <head>
+    <entity as="show" ownership="public-read">
+      <field as="title" type="text"/>
+      <field as="synopsis" type="text"/>
+      <field as="genre" type="text"/>
+      <field as="poster" type="text"/>
+      <field as="hero" type="text"/>
+      <field as="state" type="text"/>          <!-- draft | live -->
+      <field as="free_until" type="integer"/>  <!-- episodes 1..N are free -->
+      <field as="featured" type="boolean"/>
+      <index on="state"/>
+    </entity>
+
+    <entity as="episode" ownership="public-read">
+      <field as="show" type="uuid"/>
+      <field as="idx" type="integer"/>
+      <field as="title" type="text"/>
+      <field as="video_url" type="text"/>
+      <field as="poster" type="text"/>
+      <field as="duration" type="integer"/>    <!-- seconds -->
+      <field as="price" type="integer"/>       <!-- coins; 0 = free regardless of index -->
+      <field as="state" type="text"/>          <!-- draft | live -->
+      <index on="show"/>
+    </entity>
+
+    <action as="homeShelves">
+      const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 100 })
+      if (!shows.ok) { throw { reason: 'unavailable', message: 'catalogue unavailable' } }
+      // episode counts feed the "EP 8" badge every drama app puts on a poster
+      const allEps = await dsx.module.data.episode.list({ filters: { state: 'live' }, limit: 1000 })
+      const counts = {}
+      for (const e of (allEps.ok ? allEps.data : [])) {
+        counts[e.show] = (counts[e.show] == null ? 0 : counts[e.show]) + 1
+      }
+      const card = (s, i) => ({
+        id: s.id, title: s.title, genre: s.genre, poster: s.poster, hero: s.hero,
+        synopsis: s.synopsis, free_until: s.free_until, featured: s.featured === true,
+        episodes: counts[s.id] == null ? 0 : counts[s.id],
+        rank: i + 1
+      })
+      // Each row may appear on several rails; the wire serializer elides a dict it has
+      // already written (identity cycle-guard — upstream ledger), so every rail carries
+      // value COPIES, never shared references.
+      const rows = shows.data
+      const featured = rows.filter(s => s.featured === true).slice(0, 5).map((s, i) => card(s, i))
+      // JSE collections are value-typed (the Swift model): reading byGenre[g] hands back a
+      // copy, so mutate-in-place is a silent no-op — group by WRITE-BACK instead.
+      const byGenre = {}
+      for (const s of rows) {
+        const g = s.genre == null || s.genre === '' ? 'Drama' : s.genre
+        byGenre[g] = (byGenre[g] == null ? [] : byGenre[g]).concat([card(s, 0)])
+      }
+      const shelves = Object.entries(byGenre).map(([genre, items]) => ({ genre: genre, items: items }))
+      const trending = rows.filter(s => s.featured === true).concat(rows.filter(s => s.featured !== true))
+      return {
+        hero: featured,
+        latest: rows.slice(0, 12).map((s, i) => card(s, i)),
+        trending: trending.slice(0, 10).map((s, i) => card(s, i)),
+        shelves: shelves
+      }
+    </action>
+
+    <action as="discoverFeed">
+      const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 50 })
+      if (!shows.ok) { throw { reason: 'unavailable', message: 'catalogue unavailable' } }
+      const eps = await dsx.module.data.episode.list({ filters: { state: 'live' }, limit: 500 })
+      const byShow = {}
+      for (const e of (eps.ok ? eps.data : [])) {
+        const cur = byShow[e.show]
+        if (cur == null || e.idx < cur.idx) { byShow[e.show] = e }
+      }
+      const cards = shows.data
+        .map(s => ({ show: s, first: byShow[s.id] == null ? null : byShow[s.id] }))
+        .filter(c => c.first !== null)
+        .map(c => ({
+          show: c.show.id, title: c.show.title, synopsis: c.show.synopsis,
+          genre: c.show.genre, poster: c.show.poster, hero: c.show.hero,
+          video: c.first.video_url, featured: c.show.featured === true
+        }))
+      const front = cards.filter(c => c.featured)
+      const rest = cards.filter(c => c.featured !== true)
+      return { cards: front.concat(rest) }
+    </action>
+
+    <action as="showDetail" inputs="id">
+      if (id == null || id === '') { throw { reason: 'invalid', message: 'id is required' } }
+      const s = await dsx.module.data.show.get({ id: id })
+      if (!s.ok) { throw { reason: 'not_found', message: 'no such show' } }
+      const eps = await dsx.module.data.episode.list({ filters: { show: id, state: 'live' }, limit: 200 })
+      const list = (eps.ok ? eps.data : []).sort((a, b) => a.idx - b.idx)
+      const episodes = list.map(e => ({
+        id: e.id, idx: e.idx, title: e.title, poster: e.poster, duration: e.duration,
+        video: e.video_url,
+        free: e.price === 0 || e.idx <= s.data.free_until,
+        price: e.price
+      }))
+      return { show: s.data, episodes: episodes }
+    </action>
+  </head>
+
+  <route method="GET" path="/catalog/home"     action="homeShelves"  auth="none"/>
+  <route method="GET" path="/catalog/discover" action="discoverFeed" auth="none"/>
+  <route method="GET" path="/catalog/show/:id" action="showDetail"   auth="none"/>
+</server>

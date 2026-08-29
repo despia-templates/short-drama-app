@@ -1,0 +1,44 @@
+<!-- TabBar — the app's own bottom navigation (custom UI, deliberately not the native tab
+     chrome: the drama category is a fully custom surface, and this template is the proof
+     it renders unified everywhere).
+
+     Icons come from the shared catalog (Conformance/icons/sf-map.json), so ONE name
+     resolves per renderer: Boxicons paths on web, SF Symbols on iOS, Material Symbols on
+     Android. Never a per-platform icon fork. -->
+<hstack class="bar" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.07); justify-content: space-evenly">
+  <head>
+    <attribute as="active" default="'home'"/>   <!-- home | discover | rewards | list | profile -->
+
+    <variable as="on" computed="true">'#FF2D55'</variable>
+    <variable as="off" computed="true">'rgba(255,255,255,0.42)'</variable>
+
+    <style as="bar" background="#0E0D13" paddingTop="8" paddingBottom="8" alignItems="center"/>
+    <style as="item" spacing="3" alignItems="center" paddingV="2" paddingH="6"/>
+    <style as="cap" fontSize="11" fontWeight="medium"/>
+  </head>
+
+  <vstack class="item" href="/" a11yLabel="Home">
+    <image icon="house.fill" iconSize="20" color="{{ dsx.attribute.active == 'home' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    <text value="Home" class="cap" color="{{ dsx.attribute.active == 'home' ? '#FFFFFF' : dsx.variable.off }}"/>
+  </vstack>
+
+  <vstack class="item" href="/discover" a11yLabel="Discover">
+    <image icon="play.rectangle.fill" iconSize="20" color="{{ dsx.attribute.active == 'discover' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    <text value="Discover" class="cap" color="{{ dsx.attribute.active == 'discover' ? '#FFFFFF' : dsx.variable.off }}"/>
+  </vstack>
+
+  <vstack class="item" href="/rewards" a11yLabel="Rewards">
+    <image icon="gift.fill" iconSize="20" color="{{ dsx.attribute.active == 'rewards' ? '#F7C948' : dsx.variable.off }}" a11yHidden="true"/>
+    <text value="Rewards" class="cap" color="{{ dsx.attribute.active == 'rewards' ? '#FFFFFF' : dsx.variable.off }}"/>
+  </vstack>
+
+  <vstack class="item" href="/list" a11yLabel="My List">
+    <image icon="heart.fill" iconSize="20" color="{{ dsx.attribute.active == 'list' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    <text value="My List" class="cap" color="{{ dsx.attribute.active == 'list' ? '#FFFFFF' : dsx.variable.off }}"/>
+  </vstack>
+
+  <vstack class="item" href="/profile" a11yLabel="Profile">
+    <image icon="person.crop.circle" iconSize="20" color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    <text value="Me" class="cap" color="{{ dsx.attribute.active == 'profile' ? '#FFFFFF' : dsx.variable.off }}"/>
+  </vstack>
+</hstack>

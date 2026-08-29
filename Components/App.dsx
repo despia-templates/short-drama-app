@@ -1,0 +1,239 @@
+<!-- Home — the storefront. The shape every short-drama app converged on: a swipeable
+     featured hero, then horizontal poster rails (Continue Watching · Top 10 · New
+     Releases · genre shelves), over a fixed bottom bar.
+
+     Rails are gutter-inset on the LEADING edge only, so the last poster peeks off the
+     right — the affordance that says "this scrolls" without a scrollbar.
+
+     Hero text lives OUTSIDE the pager, bound to the resting page: a caption that restyles
+     itself on every swipe is a caption that flickers, and binding the resting index keeps
+     the type still while the art moves. -->
+<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <api as="home" url="/catalog/home"/>
+    <api as="session" url="/dev-session.json" ssr="false"/>
+    <api as="continue" url="/viewer/continue" ssr="false" needs="session"
+         headers="dsx.variable.authHeaders"/>
+
+    <variable as="heroPage">return 0</variable>
+    <!-- ONE breakpoint vocabulary, derived from the LIVE screen fact (dsx.screen.width is
+         reactive — a computed variable re-derives as the window changes). Every responsive
+         number on this screen comes from here, so phone / tablet / desktop is one decision
+         made once rather than a guess repeated per element. -->
+    <variable as="bp" computed="true">
+      const w = dsx.screen.width
+      if (w >= 1120) { return 'desktop' }
+      if (w >= 768) { return 'tablet' }
+      return 'phone'
+    </variable>
+    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="gutter" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 32 }
+      if (dsx.variable.bp == 'tablet') { return 24 }
+      return 16
+    </variable>
+    <variable as="posterW" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 152 }
+      if (dsx.variable.bp == 'tablet') { return 132 }
+      return 108
+    </variable>
+    <variable as="posterH" computed="true">return Math.round(dsx.variable.posterW * 1.5)</variable>
+    <variable as="heroH" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 400 }
+      if (dsx.variable.bp == 'tablet') { return 300 }
+      return 196
+    </variable>
+    <variable as="heroTitleSize" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 34 }
+      if (dsx.variable.bp == 'tablet') { return 28 }
+      return 22
+    </variable>
+    <variable as="shell" computed="true">
+      const g = dsx.variable.gutter
+      return 'width: 100%; max-width: 1240px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+    </variable>
+    <variable as="railShell" computed="true">
+      const g = dsx.variable.gutter
+      return 'width: 100%; max-width: 1240px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px'
+    </variable>
+    <variable as="posterStyle" computed="true">
+      return 'width: ' + dsx.variable.posterW + 'px; height: ' + dsx.variable.posterH + 'px; border-radius: 10px'
+    </variable>
+    <variable as="posterBox" computed="true">
+      return 'width: ' + dsx.variable.posterW + 'px; height: ' + dsx.variable.posterH + 'px; justify-content: flex-end'
+    </variable>
+    <variable as="authHeaders" computed="true">
+      if (session.data == null) { return {} }
+      return { authorization: 'Bearer ' + session.data.viewer.token }
+    </variable>
+    <variable as="heroShow" computed="true">
+      if (home.data == null) { return null }
+      const p = Number(dsx.variable.heroPage)
+      if (p < 0 || p >= home.data.hero.length) { return null }
+      return home.data.hero[p]
+    </variable>
+
+    <style as="screen" background="#08070C" alignItems="stretch"/>
+    <style as="scroller" alignItems="stretch"/>
+    <style as="page" spacing="22" paddingTop="4" paddingBottom="16" alignItems="stretch" grow="width"/>
+    
+    <style as="head" paddingBottom="2" alignItems="center"/>
+    <style as="wordmark" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
+    <style as="coins" background="rgba(255,255,255,0.08)" radius="14" paddingH="10" paddingV="5" spacing="5" alignItems="center"/>
+    <style as="coinsNum" fontSize="12" fontWeight="semibold" color="#F7C948"/>
+
+    <style as="heroWrap" paddingLeading="16" paddingTrailing="16" alignItems="stretch" grow="width"/>
+    <style as="heroCard" radius="14" alignItems="stretch"/>
+    <style as="heroScrim" paddingLeading="16" paddingTrailing="16" paddingBottom="14" spacing="6" alignItems="flex-start"/>
+    <style as="heroGenre" fontSize="11" fontWeight="semibold" color="#F7C948" tracking="0.8" textCase="uppercase"/>
+    <style as="heroTitle" fontWeight="bold" color="#FFFFFF" lineLimit="2" tracking="-0.4"/>
+    <style as="heroMeta" fontSize="12" color="rgba(255,255,255,0.62)"/>
+    <style as="heroCta" spacing="10" alignItems="center"/>
+    <style as="dots" alignItems="center"/>
+    <style as="dot" radius="3"/>
+    <style as="playBtn" background="#FF2D55" radius="20" paddingH="18" paddingV="10" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+
+    <style as="section" spacing="10" alignItems="stretch" grow="width"/>
+    <style as="sectionHead" alignItems="center"/>
+    <style as="sectionTitle" fontSize="17" fontWeight="bold" color="#FFFFFF" tracking="-0.2"/>
+    <style as="rail" spacing="11" alignItems="flex-start" paddingTrailing="16"/>
+
+    <style as="card" spacing="7" alignItems="stretch"/>
+    <style as="cardTitle" fontSize="12" fontWeight="medium" color="rgba(255,255,255,0.88)" lineLimit="2" lineSpacing="1"/>
+    <style as="badge" background="rgba(8,7,12,0.82)" radius="5" paddingH="6" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="badgeWrap" paddingLeading="6" paddingBottom="8" alignItems="flex-start"/>
+    <style as="rank" fontSize="34" fontWeight="heavy" color="#FFFFFF"/>
+    <style as="rankWrap" paddingLeading="7" paddingBottom="2" alignItems="flex-start"/>
+
+    <style as="resumeTrack" background="rgba(255,255,255,0.22)" radius="2"/>
+    <style as="resumeFill" background="#FF2D55" radius="2"/>
+
+    <style as="errCard" background="#1C1119" radius="14" spacing="9" paddingH="16" paddingV="18" alignItems="center"/>
+  </head>
+
+  <TopNav active="home" visible-if="dsx.variable.wide"/>
+  <scroll class="scroller" style="flex: 1; min-height: 0">
+    <vstack class="page">
+
+      <!-- header -->
+      <!-- the page header is the PHONE title bar; wide viewports get <TopNav> instead -->
+      <hstack class="head" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.wide == false">
+        <text value="Short Drama" class="wordmark"/>
+        <spacer/>
+        <hstack class="coins" href="/rewards" a11yLabel="Your coins — open Rewards">
+          <image icon="bitcoinsign.circle.fill" iconSize="13" color="#F7C948" a11yHidden="true"/>
+          <text value="Earn" class="coinsNum"/>
+        </hstack>
+      </hstack>
+
+      <!-- hero: art in the pager, type bound to the resting page -->
+      <vstack class="heroWrap" style="{{ dsx.variable.shell }}" visible-if="heroShow != null">
+        <zstack class="heroCard">
+          <!-- dots="false": the pager's own dot row grows the cell taller than the art and
+               pushes the CTA past the card edge, so the indicator is drawn inside the scrim
+               where the rest of the hero type lives. -->
+          <pager bind="home.data.hero" key="id" height="{{ dsx.variable.heroH }}" dots="false" value="dsx.variable.heroPage">
+            <image src="{{ item.hero }}" contentFit="cover" a11yLabel="{{ item.title }}"
+                   style="width: 100%; height: {{ dsx.variable.heroH }}px; border-radius: 14px"/>
+          </pager>
+          <vstack class="heroScrim"
+                  style="width: 100%; height: {{ dsx.variable.heroH }}px; align-self: flex-start; justify-content: flex-end; pointer-events: none; border-radius: 14px; background: linear-gradient(180deg, rgba(8,7,12,0) 42%, rgba(8,7,12,0.92) 100%)">
+            <text value="{{ heroShow == null ? '' : heroShow.genre }}" class="heroGenre"/>
+            <text value="{{ heroShow == null ? '' : heroShow.title }}" class="heroTitle" fontSize="{{ dsx.variable.heroTitleSize }}"/>
+            <hstack class="heroCta" style="pointer-events: auto">
+              <button label="▶  Play" class="playBtn"
+                      on:tap="dsx.module.route.push({ path: '/show/' + (heroShow == null ? '' : heroShow.id) })"/>
+              <text value="EP 1–{{ heroShow == null ? '' : heroShow.free_until }} free" class="heroMeta"/>
+            </hstack>
+          </vstack>
+        </zstack>
+      </vstack>
+
+      <!-- continue watching, with the resume bar that makes the rail worth having -->
+      <vstack class="section" visible-if="continue.data != null && continue.data.items.length > 0">
+        <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
+          <text value="Continue Watching" class="sectionTitle"/>
+        </hstack>
+        <scroll axis="horizontal" indicators="false">
+          <hstack class="rail" style="{{ dsx.variable.railShell }}">
+            <list bind="continue.data.items" key="episode" axis="horizontal" scroll="false" spacing="11">
+              <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/watch/{{ item.show }}/{{ item.idx }}" a11yGroup="true" a11yLabel="Continue {{ item.title }}, episode {{ item.idx }}">
+                <zstack>
+                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                         style="{{ dsx.variable.posterStyle }}"/>
+                  <vstack class="badgeWrap" style="{{ dsx.variable.posterBox }}">
+                    <text value="EP {{ item.idx }}" class="badge"/>
+                  </vstack>
+                  <vstack style="{{ dsx.variable.posterBox }}">
+                    <stack class="resumeTrack" style="width: {{ dsx.variable.posterW }}px; height: 3px; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px">
+                      <stack class="resumeFill" style="width: {{ item.pct }}%; height: 3px"/>
+                    </stack>
+                  </vstack>
+                </zstack>
+                <text value="{{ item.title }}" class="cardTitle"/>
+              </vstack>
+            </list>
+          </hstack>
+        </scroll>
+      </vstack>
+
+      <!-- top 10: the ranked numeral rail every drama app ships -->
+      <vstack class="section">
+        <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
+          <text value="Top 10 Today" class="sectionTitle"/>
+          <spacer/>
+          <image icon="flame.fill" iconSize="14" color="#FF2D55" a11yHidden="true"/>
+        </hstack>
+        <scroll axis="horizontal" indicators="false">
+          <hstack class="rail" style="{{ dsx.variable.railShell }}">
+            <list bind="home.data.trending" key="id" axis="horizontal" scroll="false" spacing="11">
+              <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="Number {{ item.rank }}, {{ item.title }}">
+                <zstack>
+                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                         style="{{ dsx.variable.posterStyle }}"/>
+                  <vstack class="rankWrap" style="{{ dsx.variable.posterBox }}">
+                    <text value="{{ item.rank }}" class="rank"
+                          style="-webkit-text-stroke: 2px #FF2D55; text-shadow: 0 2px 10px rgba(0,0,0,0.7); line-height: 0.85"/>
+                  </vstack>
+                </zstack>
+                <text value="{{ item.title }}" class="cardTitle"/>
+              </vstack>
+            </list>
+          </hstack>
+        </scroll>
+      </vstack>
+
+      <!-- new releases -->
+      <vstack class="section">
+        <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
+          <text value="New Releases" class="sectionTitle"/>
+        </hstack>
+        <scroll axis="horizontal" indicators="false">
+          <hstack class="rail" style="{{ dsx.variable.railShell }}">
+            <list bind="home.data.latest" key="id" axis="horizontal" scroll="false" spacing="11">
+              <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="{{ item.title }}, {{ item.episodes }} episodes">
+                <zstack>
+                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                         style="{{ dsx.variable.posterStyle }}"/>
+                  <vstack class="badgeWrap" style="{{ dsx.variable.posterBox }}">
+                    <text value="EP {{ item.episodes }}" class="badge" visible-if="item.episodes > 0"/>
+                  </vstack>
+                </zstack>
+                <text value="{{ item.title }}" class="cardTitle"/>
+              </vstack>
+            </list>
+          </hstack>
+        </scroll>
+      </vstack>
+
+      <vstack style="{{ dsx.variable.shell }}" visible-if="home.error != null">
+        <vstack class="errCard">
+          <text value="The catalogue is unavailable." fontSize="13" color="#FFFFFF"/>
+          <button label="Retry" class="playBtn" on:tap="home.refresh()"/>
+        </vstack>
+      </vstack>
+
+    </vstack>
+  </scroll>
+  <TabBar active="home" visible-if="dsx.variable.wide == false"/>
+</vstack>
