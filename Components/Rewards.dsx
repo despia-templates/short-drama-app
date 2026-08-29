@@ -113,11 +113,19 @@
       else { dsx.module.route.replace({ path: '/' }) }
     </action>
 
-    <!-- disabled means DISABLED: the guard is in the action, the grey is just its face -->
+    <!-- disabled means DISABLED: the guard is in the action, the grey is just its face.
+         (When the native lane lands, the two celebration beats — check-in and the wheel —
+         take `if (has('haptic')) { dsx.module.haptic.success() }` once Core/Haptics is a
+         configured package; this web+server build has no module to claim the scheme, so
+         the calls would be dead branches and lint rightly refuses them.) -->
     <action as="checkin">
       if (dsx.variable.canCheckin == false) { return }
       const r = await checkinCall.send({})
-      if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins — day ' + r.data.streak; state.refresh(); wallet.refresh() }
+      if (r.ok) {
+        dsx.variable.toast = '+' + r.data.reward + ' bonus coins — day ' + r.data.streak
+        state.refresh()
+        wallet.refresh()
+      }
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Check-in failed' }
     </action>
 

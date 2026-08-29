@@ -480,7 +480,8 @@ Please unlock to watch." class="lockHead"/>
           <image src="{{ detail.data == null ? '' : detail.data.show.poster }}" contentFit="cover" a11yHidden="true"
                  style="width: 52px; height: 69px; border-radius: 8px; object-fit: cover"/>
           <vstack spacing="4" style="flex: 1; min-width: 0">
-            <text value="{{ detail.data == null ? '' : detail.data.show.title }}" class="drawerTitle"/>
+            <text value="{{ detail.data == null ? '' : detail.data.show.title }}" class="drawerTitle"
+                  style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
             <text value="All {{ dsx.variable.total }} Episodes" class="drawerSub"/>
           </vstack>
           <button label="{{ dsx.variable.favOn ? 'Following' : 'Follow' }}" class="followBtn"

@@ -171,8 +171,8 @@
               <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
                      style="width: 100%; aspect-ratio: 3/4; border-radius: 16px; object-fit: cover"/>
               <vstack spacing="4" alignItems="stretch">
-                <text value="{{ item.title }}" class="cardTitle"/>
-                <text value="{{ item.genre }}  |  Series" class="cardMeta"/>
+                <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                <text value="{{ item.genre }}  |  Series" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
               </vstack>
             </vstack>
           </grid>
