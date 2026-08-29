@@ -8,9 +8,18 @@
     <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
     <api as="continue" url="/viewer/continue" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
 
+    <variable as="hovId">return ''</variable>
+
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
+    </variable>
+    <!-- signed-out is its own state: the personal reads never resolve without a session,
+         and an empty-guard on data != null hides the empty copy in exactly that case —
+         two headings over void, indistinguishable from a bug -->
+    <variable as="signedOut" computed="true">return session.error != null</variable>
+    <variable as="listLoading" computed="true">
+      return dsx.variable.signedOut == false && (favs.data == null || continue.data == null)
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
@@ -44,6 +53,15 @@
       return 'width: max-content; padding-left: ' + lead + 'px; padding-right: ' + lead + 'px'
     </variable>
 
+    <formula as="histFx" ep="item.episode">
+      const on = dsx.variable.hovId == ('h-' + ep)
+      return 'width: 132px; height: 198px; border-radius: 8px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.04 : 1) + ')'
+    </formula>
+    <formula as="favFx" id="item.show">
+      const on = dsx.variable.hovId == ('f-' + id)
+      return 'width: 100%; aspect-ratio: 3/4; border-radius: 8px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.03 : 1) + ')'
+    </formula>
+
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="22" paddingTop="20" paddingBottom="24" alignItems="stretch"/>
@@ -67,6 +85,8 @@
     <style as="badgeWrap" paddingLeading="7" paddingBottom="9" alignItems="flex-start"/>
     <style as="resumeTrack" background="rgba(255,255,255,0.22)"/>
     <style as="resumeFill" background="#FF2C55"/>
+    <style as="signCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="24" alignItems="center"/>
+    <style as="signBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
   <TopNav active="list" visible-if="dsx.variable.wide"/>
@@ -74,7 +94,8 @@
     <vstack class="page" style="{{ dsx.variable.shell }}">
 
       <hstack class="crumbRow" visible-if="dsx.variable.wide">
-        <text value="Personal Center" class="crumb" href="/profile"/>
+        <text value="Personal Center" class="crumb" a11yTrait="button"
+              on:tap="dsx.module.route.reset({ path: '/profile' })"/>
         <text value="/" class="crumb"/>
         <text value="My list" class="crumbOn"/>
       </hstack>
@@ -85,18 +106,34 @@
         <vstack class="content" style="flex: 1; min-width: 0">
           <text value="My List" class="h1" visible-if="dsx.variable.wide == false"/>
 
+          <vstack class="signCard" visible-if="dsx.variable.signedOut">
+            <image icon="person.crop.circle" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+            <text value="Your list lives on your account" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+            <text value="Sign in and everything you save or start watching lands here." class="empty" textAlign="center"/>
+            <button label="Reload" class="signBtn" on:tap="session.refresh()"/>
+          </vstack>
+
+          <vstack spacing="20" alignItems="stretch" visible-if="dsx.variable.listLoading">
+            <Skeleton height="20" radius="6"/>
+            <Skeleton height="198" radius="8"/>
+            <Skeleton height="20" radius="6"/>
+            <Skeleton height="160" radius="8"/>
+          </vstack>
+
           <!-- history / continue watching -->
-          <vstack class="section">
+          <vstack class="section" visible-if="dsx.variable.signedOut == false && dsx.variable.listLoading == false">
             <text value="History" class="sectionTitle"/>
             <text class="empty" visible-if="continue.data != null && continue.data.items.length == 0"
                   value="Nothing in progress yet — start a show from Home."/>
             <scroll axis="horizontal" indicators="false">
               <hstack class="rail" style="{{ dsx.variable.railShell }}">
                 <list bind="continue.data.items" key="episode" axis="horizontal" scroll="false" spacing="12">
-                  <vstack class="card" style="width: 132px" href="/watch/{{ item.show }}/{{ item.idx }}" a11yGroup="true" a11yLabel="Continue {{ item.title }}, episode {{ item.idx }}">
+                  <vstack class="card" style="width: 132px" href="/watch/{{ item.show }}/{{ item.idx }}"
+                          on:hoverStart="dsx.variable.hovId = 'h-' + item.episode" on:hoverEnd="dsx.variable.hovId = ''"
+                          a11yGroup="true" a11yLabel="Continue {{ item.title }}, episode {{ item.idx }}">
                     <zstack>
                       <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                             style="width: 132px; height: 198px; border-radius: 8px"/>
+                             style="{{ histFx }}"/>
                       <!-- top-left: the key art keeps that corner clear and carries its own
                            title at the foot of the poster -->
                       <vstack class="badgeWrap" style="width: 132px; height: 198px; pointer-events: none">
@@ -119,14 +156,16 @@
           </vstack>
 
           <!-- favorites -->
-          <vstack class="section">
+          <vstack class="section" visible-if="dsx.variable.signedOut == false && dsx.variable.listLoading == false">
             <text value="My list" class="sectionTitle"/>
             <text class="empty" visible-if="favs.data != null && favs.data.items.length == 0"
                   value="Tap My List on any show to keep it here."/>
             <grid bind="favs.data.items" key="show" columns="{{ dsx.variable.cols }}" spacing="14" scroll="false">
-              <vstack class="card" href="/show/{{ item.show }}" a11yGroup="true" a11yLabel="{{ item.title }}">
+              <vstack class="card" href="/show/{{ item.show }}"
+                      on:hoverStart="dsx.variable.hovId = 'f-' + item.show" on:hoverEnd="dsx.variable.hovId = ''"
+                      a11yGroup="true" a11yLabel="{{ item.title }}">
                 <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                       style="width: 100%; aspect-ratio: 2/3; border-radius: 8px; object-fit: cover"/>
+                       style="{{ favFx }}"/>
                 <vstack spacing="2" alignItems="stretch">
                   <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                   <text value="{{ item.genre }}  |  Series" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>

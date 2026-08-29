@@ -7,8 +7,13 @@
      session settles on web, iOS and Android. Entitlement is granted server-side after
      Stripe confirms — never on the client's word.
 
-     When the deployment has no Stripe keys the server refuses with a real reason and this
-     screen shows that reason verbatim. It never fakes a purchase. -->
+     MONEY GETS EVERY STATE. A buy card renders its own in-flight state the moment it is
+     tapped (a $9.99 tap that does nothing for a network round trip reads as broken and
+     produces double-taps); a payment that Stripe confirmed but the settle call lost keeps
+     the order id on screen with a Confirm button until it lands (the settle route is
+     idempotent, so retrying is always safe); a signed-out viewer is told to sign in, not
+     that checkout is "unavailable". When the deployment has no Stripe keys the server
+     refuses with a real reason and this screen shows that reason verbatim. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
@@ -20,15 +25,17 @@
     <api as="settleCall" url="/store/settle" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
 
     <variable as="toast">return ''</variable>
-    <variable as="busy">return false</variable>
-    <variable as="paying">return false</variable>
+    <variable as="buying">return ''</variable>       <!-- the sku currently in checkout -->
+    <variable as="paying">return false</variable>    <!-- the Stripe sheet is open -->
     <variable as="order">return ''</variable>
-    <variable as="orderLabel">return ''</variable>
+    <variable as="settleFailed">return false</variable>
+    <variable as="hovId">return ''</variable>
 
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
     </variable>
+    <variable as="signedIn" computed="true">return session.data != null</variable>
     <variable as="bp" computed="true">
       const w = dsx.screen.width
       if (w >= 1120) { return 'desktop' }
@@ -59,6 +66,30 @@
       if (wallet.data == null) { return false }
       return wallet.data.vip === true
     </variable>
+    <!-- one phase per data source: the catalogue is the screen's content -->
+    <variable as="phase" computed="true">
+      if (catalog.error != null) { return 'error' }
+      if (catalog.data == null) { return 'loading' }
+      return 'content'
+    </variable>
+
+    <!-- the card's whole look is ONE computed string (a bare {{ }} fragment beside other
+         declarations is discarded — AGENTS.md); hover lift and in-flight dim live here so
+         a tapped card responds on the SAME FRAME as the tap -->
+    <formula as="vipCardFx" id="item.id" best="item.best">
+      const lift = dsx.variable.hovId == id ? 'translateY(-2px)' : 'none'
+      const dim = dsx.variable.buying == id ? 0.55 : 1
+      return 'background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid ' + (best ? '#FF2C55' : 'rgba(0,0,0,0)') + '; opacity: ' + dim + '; transform: ' + lift + '; transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease; box-shadow: ' + (dsx.variable.hovId == id ? '0 10px 30px rgba(230,190,110,0.25)' : 'none')
+    </formula>
+    <formula as="packCardFx" id="item.id">
+      const lift = dsx.variable.hovId == ('p-' + id) ? 'translateY(-2px)' : 'none'
+      const dim = dsx.variable.buying == id ? 0.55 : 1
+      return 'opacity: ' + dim + '; transform: ' + lift + '; transition: transform 0.18s ease, opacity 0.18s ease'
+    </formula>
+    <formula as="cardBusyLabel" id="item.id">
+      if (dsx.variable.buying != id) { return '' }
+      return dsx.variable.paying ? 'Complete the payment…' : 'Contacting Stripe…'
+    </formula>
 
     <action as="goBack">
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
@@ -67,22 +98,27 @@
 
     <!-- ONE checkout path for every sku and every platform. -->
     <action as="buy" sku="item.id" label="item.label">
-      if (dsx.variable.busy) { return }
-      dsx.variable.busy = true
+      if (dsx.variable.buying != '') { return }
+      if (dsx.variable.signedIn == false) {
+        dsx.variable.toast = 'Sign in first — coins and VIP belong to an account, and this session has none.'
+        return
+      }
+      dsx.variable.buying = sku
       dsx.variable.toast = ''
+      dsx.variable.settleFailed = false
       const r = await checkoutCall.send({ sku: sku })
-      dsx.variable.busy = false
       if (!r.ok) {
+        dsx.variable.buying = ''
         dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Checkout is unavailable right now.'
         return
       }
       dsx.variable.order = r.data.order
-      dsx.variable.orderLabel = r.data.label
       const opened = await dsx.module.stripe.session({
         publishable_key: r.data.publishable_key,
         payment_intent_client_secret: r.data.client_secret
       })
       if (opened == null || opened.ok === false) {
+        dsx.variable.buying = ''
         dsx.variable.toast = 'The payment sheet could not open on this platform.'
         return
       }
@@ -90,58 +126,75 @@
       const paid = await dsx.module.stripe.payment({ session: dsx.module.stripe.context.session })
       dsx.variable.paying = false
       if (paid == null || paid.status !== 'succeeded') {
-        dsx.variable.toast = 'Payment was not completed.'
+        dsx.variable.buying = ''
+        dsx.variable.toast = 'Payment was not completed. Nothing was charged.'
         return
       }
       await dsx.action.settle()
+      dsx.variable.buying = ''
     </action>
 
+    <!-- Settle is IDEMPOTENT server-side (the order row is the lock), so this action is
+         safe to call any number of times — which is exactly why the retry card below can
+         exist. Money confirmed by Stripe but not yet granted is never a dead end. -->
     <action as="settle">
       const s = await settleCall.send({ order: dsx.variable.order })
       if (s.ok) {
+        dsx.variable.settleFailed = false
+        dsx.variable.order = ''
         wallet.refresh()
         dsx.variable.toast = s.data.granted
           ? (s.data.coins != null ? 'Added ' + s.data.coins + ' coins' : 'VIP is active for ' + s.data.days + ' days')
           : 'This order was already applied.'
       } else {
-        dsx.variable.toast = s.data != null && s.data.message != null ? s.data.message : 'Could not confirm the payment.'
+        dsx.variable.settleFailed = true
+        dsx.variable.toast = ''
       }
     </action>
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
-    <style as="page" spacing="0" paddingTop="14" paddingBottom="34" alignItems="stretch"/>
-    <style as="section" spacing="14" alignItems="stretch" paddingTop="30"/>
+    <style as="page" spacing="0" paddingTop="16" paddingBottom="32" alignItems="stretch"/>
+    <style as="section" spacing="14" alignItems="stretch" paddingTop="32"/>
 
     <style as="head" alignItems="center" spacing="12"/>
     <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
-    <style as="balancePill" background="rgba(255,255,255,0.08)" radius="16" paddingH="12" paddingV="7" spacing="6" alignItems="center"/>
+    <style as="balancePill" background="rgba(255,255,255,0.08)" radius="16" paddingH="12" paddingV="8" spacing="6" alignItems="center"/>
     <style as="balanceNum" fontSize="14" fontWeight="semibold" color="#F6B63D"/>
-    <style as="vipChip" background="#F6B63D" radius="10" paddingH="9" paddingV="4" fontSize="11" fontWeight="bold" color="#2A1D04"/>
+    <style as="vipChip" background="#F6B63D" radius="10" paddingH="8" paddingV="4" fontSize="11" fontWeight="bold" color="#2A1D04"/>
+    <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
     <style as="toastLine" fontSize="14" fontWeight="medium" color="#F6B63D" lineSpacing="4"/>
     <style as="sectionTitle" fontSize="24" fontWeight="bold" color="rgba(255,255,255,0.8)" tracking="-0.3"/>
     <style as="sectionNote" fontSize="13" color="rgba(255,255,255,0.45)"/>
 
-    <style as="vipCard" radius="14" paddingH="18" paddingV="18" spacing="8" alignItems="flex-start"/>
+    <style as="vipCard" radius="14" paddingH="16" paddingV="16" spacing="8" alignItems="flex-start"/>
     <style as="vipName" fontSize="15" fontWeight="semibold" color="#3A2A08"/>
     <style as="vipPrice" fontSize="24" fontWeight="bold" color="#2A1D04"/>
     <style as="vipNote" fontSize="12" color="rgba(42,29,4,0.7)"/>
     <style as="vipPerk" spacing="6" alignItems="center"/>
     <style as="vipPerkText" fontSize="12" fontWeight="medium" color="#2A1D04"/>
-    <style as="vipBadge" background="#FF2C55" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+    <style as="vipBadge" background="#FF2C55" radius="4" paddingH="8" paddingV="4" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+    <style as="busyLine" fontSize="12" fontWeight="semibold" color="#2A1D04"/>
+    <style as="busyLineDark" fontSize="12" fontWeight="semibold" color="#F6B63D"/>
 
-    <style as="packCard" background="#141419" radius="12" paddingH="14" paddingV="16" spacing="7" alignItems="flex-start"/>
+    <style as="packCard" background="#141419" radius="12" paddingH="16" paddingV="16" spacing="8" alignItems="flex-start"/>
     <style as="packCoins" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
     <style as="packLine" fontSize="12" color="rgba(255,255,255,0.5)"/>
     <style as="packPrice" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="packBonus" background="#FF2C55" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
     <style as="coinRow" spacing="6" alignItems="center"/>
 
-    <style as="earnCard" background="#141419" radius="14" paddingH="18" paddingV="18" spacing="12" alignItems="stretch"/>
+    <style as="retryCard" background="#1E1830" radius="14" paddingH="16" paddingV="16" spacing="10" alignItems="flex-start"/>
+    <style as="retryTitle" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
+    <style as="retryBody" fontSize="13" color="rgba(255,255,255,0.65)" lineSpacing="4"/>
+    <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+
+    <style as="errCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="20" alignItems="center"/>
+
+    <style as="earnCard" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="12" alignItems="stretch"/>
     <style as="earnTitle" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
     <style as="earnNote" fontSize="13" color="rgba(255,255,255,0.5)" lineSpacing="3"/>
     <style as="earnCta" background="rgba(255,255,255,0.1)" radius="24" paddingV="14" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="payingNote" fontSize="13" color="rgba(255,255,255,0.6)" textAlign="center" paddingV="10"/>
   </head>
 
   <scroll class="scroller" style="flex: 1; min-height: 0">
@@ -150,8 +203,11 @@
 
       <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" paddingTop="12">
         <hstack class="head">
+          <!-- /store is a PUSHED route on every width (motion: ios), so the back control
+               exists on every width too — a desktop viewer mid-paywall deserves the same
+               way out as a phone -->
           <image icon="chevron.left" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
-                 a11yLabel="Back" a11yTrait="button" visible-if="dsx.variable.wide == false"/>
+                 a11yLabel="Back" a11yTrait="button"/>
           <text value="Store" class="h1"/>
           <text value="VIP" class="vipChip" visible-if="dsx.variable.isVip"/>
           <spacer/>
@@ -160,12 +216,46 @@
             <text value="{{ dsx.variable.balance }}" class="balanceNum"/>
           </hstack>
         </hstack>
-        <text value="{{ dsx.variable.toast }}" class="toastLine" visible-if="dsx.variable.toast != ''" paddingTop="12"/>
-        <text value="Opening the payment sheet…" class="payingNote" visible-if="dsx.variable.paying"/>
+
+        <!-- a toast the viewer can dismiss; a new action overwrites it -->
+        <hstack class="toastRow" visible-if="dsx.variable.toast != ''" style="margin-top: 12px">
+          <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
+          <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+                 a11yLabel="Dismiss message" a11yTrait="button"/>
+        </hstack>
+
+        <!-- THE RECOVERY CARD. Stripe confirmed the charge, the settle call failed
+             (network blip, server restart): the order id is still here, settle is
+             idempotent, and this card stays until the grant lands. Money is never
+             a toast that scrolls away. -->
+        <vstack class="retryCard" visible-if="dsx.variable.settleFailed" style="margin-top: 12px; border: 1px solid rgba(199,155,255,0.35)">
+          <text value="Payment received — one step left" class="retryTitle"/>
+          <text value="Stripe confirmed your payment, but applying it to your wallet did not go through. Nothing is lost: confirm below and it lands. Order {{ dsx.variable.order }}." class="retryBody"/>
+          <button label="Confirm payment" class="retryBtn" on:tap="dsx.action.settle()"/>
+        </vstack>
+      </vstack>
+
+      <!-- loading: the shapes the content will land in, so arrival is a repaint -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'loading'">
+        <vstack style="{{ dsx.variable.shell }}" spacing="14" alignItems="stretch">
+          <Skeleton height="28" radius="8"/>
+          <Skeleton height="132" radius="14"/>
+          <Skeleton height="132" radius="14"/>
+        </vstack>
+      </vstack>
+
+      <vstack class="section" visible-if="dsx.variable.phase == 'error'">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <vstack class="errCard">
+            <text value="The store is unavailable." fontSize="14" color="#FFFFFF"/>
+            <text value="Your coins and VIP are safe — this is only the price list failing to load." class="sectionNote" textAlign="center"/>
+            <button label="Retry" class="retryBtn" on:tap="catalog.refresh()"/>
+          </vstack>
+        </vstack>
       </vstack>
 
       <!-- VIP -->
-      <vstack class="section">
+      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
           <text value="VIP — unlock every series" class="sectionTitle"/>
           <text value="Unlimited viewing while your plan is active. Cancel anytime." class="sectionNote"/>
@@ -173,8 +263,9 @@
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <grid bind="catalog.data.vip" key="id" columns="{{ dsx.variable.vipCols }}" spacing="14" scroll="false">
             <vstack class="vipCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
+                    on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
                     a11yLabel="Buy {{ item.label }} for {{ item.price }}"
-                    style="background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid {{ item.best ? '#FF2C55' : 'rgba(0,0,0,0)' }}">
+                    style="{{ vipCardFx }}">
               <hstack spacing="8" alignItems="center" style="width: 100%">
                 <text value="{{ item.label }}" class="vipName"/>
                 <spacer/>
@@ -190,13 +281,14 @@
                 <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
                 <text value="1080p, no ads" class="vipPerkText"/>
               </hstack>
+              <text value="{{ cardBusyLabel }}" class="busyLine" visible-if="cardBusyLabel != ''"/>
             </vstack>
           </grid>
         </vstack>
       </vstack>
 
       <!-- coin packs -->
-      <vstack class="section">
+      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
           <text value="Top up coins" class="sectionTitle"/>
           <text value="Coins unlock individual episodes. Bonus coins are spent first." class="sectionNote"/>
@@ -204,7 +296,9 @@
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <grid bind="catalog.data.packs" key="id" columns="{{ dsx.variable.packCols }}" spacing="12" scroll="false">
             <vstack class="packCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
-                    a11yLabel="Buy {{ item.coins }} coins plus {{ item.free }} bonus for {{ item.price }}">
+                    on:hoverStart="dsx.variable.hovId = 'p-' + item.id" on:hoverEnd="dsx.variable.hovId = ''"
+                    a11yLabel="Buy {{ item.coins }} coins plus {{ item.free }} bonus for {{ item.price }}"
+                    style="{{ packCardFx }}">
               <hstack spacing="8" alignItems="center" style="width: 100%">
                 <hstack class="coinRow">
                   <image icon="dollarsign.circle.fill" iconSize="17" color="#F6B63D" a11yHidden="true"/>
@@ -215,13 +309,14 @@
               </hstack>
               <text value="{{ item.coins }} coins + {{ item.free }} bonus" class="packLine"/>
               <text value="{{ item.price }}" class="packPrice"/>
+              <text value="{{ cardBusyLabel }}" class="busyLineDark" visible-if="cardBusyLabel != ''"/>
             </vstack>
           </grid>
         </vstack>
       </vstack>
 
       <!-- the door to the EARN lane, which lives on its own screen -->
-      <vstack class="section">
+      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <vstack class="earnCard">
             <text value="Don't want to pay?" class="earnTitle"/>
@@ -234,5 +329,8 @@
 
     </vstack>
   </scroll>
-  <TabBar active="vip" visible-if="dsx.variable.wide == false"/>
+  <!-- a pushed utility screen lights NO tab: the tab bar stays for orientation, but
+       claiming the viewer is "on" VIP while they are in the Store is a lie two taps
+       deep (tapping the lit tab resets to a different screen) -->
+  <TabBar active="" visible-if="dsx.variable.wide == false"/>
 </vstack>

@@ -3,18 +3,43 @@
      18px/700 links with the active one in brand red, then the utility cluster and the
      red CTA pill. Phones get <TabBar>; same destinations either way.
 
-     Search is an OVERLAY (<SearchOverlay/> owns its trigger and its cover sheet), never
-     a route — the storefront stays mounted behind it.
+     EVERY WIDE ROUTE HAS A HOME HERE. The link row mirrors the phone tab bar (Home ·
+     For You · VIP · My List) plus Rewards, so `active=` always has something to light —
+     a route whose nav never highlights reads as "you are nowhere". The Store is not a
+     link: it is a pushed destination the CTA pill owns, and it lights nothing on purpose.
 
-     Icons resolve per renderer from the shared catalog (Boxicons on web, SF Symbols on
-     iOS, Material Symbols on Android). No emoji anywhere: an emoji is a font-dependent
-     glyph, not an icon, and it cannot carry a per-platform twin. -->
+     Get Coins = BUY = /store, everywhere in the app. Earning is /rewards and is named
+     "Rewards". Two verbs, two destinations, never crossed.
+
+     A pointer device gets pointer affordances: links and tools carry a hover state
+     (color shift via the hov pattern) beside the framework's universal pressed dim.
+
+     Search is an OVERLAY (<SearchOverlay/> owns its trigger and its cover sheet), never
+     a route — the storefront stays mounted behind it. Icons resolve per renderer from
+     the shared catalog; no emoji anywhere. -->
 <hstack class="nav" style="width: 100%; position: sticky; top: 0; z-index: 50">
   <head>
     <attribute as="active" default="'home'"/>
 
+    <variable as="hov">return ''</variable>
     <variable as="on" computed="true">'#FF2C55'</variable>
     <variable as="off" computed="true">'rgba(255,255,255,0.95)'</variable>
+    <variable as="links" computed="true">
+      return [
+        { key: 'home',     label: 'Home',    path: '/' },
+        { key: 'discover', label: 'For You', path: '/discover' },
+        { key: 'vip',      label: 'VIP',     path: '/vip' },
+        { key: 'rewards',  label: 'Rewards', path: '/rewards' },
+        { key: 'list',     label: 'My List', path: '/list' }
+      ]
+    </variable>
+
+    <!-- one formula answers every link's color: active wins, then hover, then rest -->
+    <formula as="linkTint" key="item.key">
+      if (dsx.attribute.active == key) { return dsx.variable.on }
+      if (dsx.variable.hov == key) { return '#FF8FA8' }
+      return dsx.variable.off
+    </formula>
 
     <style as="nav" background="rgba(0,0,0,0)" height="80" alignItems="center"/>
     <style as="inner" alignItems="center" spacing="30" paddingLeading="86" paddingTrailing="86"/>
@@ -36,25 +61,23 @@
     </hstack>
 
     <hstack class="links">
-      <text value="Home" class="link" on:tap="dsx.module.route.reset({ path: '/' })" a11yTrait="button"
-            color="{{ dsx.attribute.active == 'home' ? dsx.variable.on : dsx.variable.off }}"/>
-      <text value="Discover" class="link" on:tap="dsx.module.route.reset({ path: '/discover' })" a11yTrait="button"
-            color="{{ dsx.attribute.active == 'discover' ? dsx.variable.on : dsx.variable.off }}"/>
-      <text value="Rewards" class="link" on:tap="dsx.module.route.reset({ path: '/rewards' })" a11yTrait="button"
-            color="{{ dsx.attribute.active == 'rewards' ? dsx.variable.on : dsx.variable.off }}"/>
-      <text value="My List" class="link" on:tap="dsx.module.route.reset({ path: '/list' })" a11yTrait="button"
-            color="{{ dsx.attribute.active == 'list' ? dsx.variable.on : dsx.variable.off }}"/>
+      <list bind="dsx.variable.links" key="key" axis="horizontal" scroll="false" spacing="30">
+        <text value="{{ item.label }}" class="link" a11yTrait="button"
+              on:tap="dsx.module.route.reset({ path: item.path })"
+              on:hoverStart="dsx.variable.hov = item.key" on:hoverEnd="dsx.variable.hov = ''"
+              color="{{ linkTint }}"
+              style="transition: color 0.15s ease"/>
+      </list>
     </hstack>
 
     <spacer/>
 
     <hstack class="tools">
       <SearchOverlay size="21"/>
-      <image icon="clock.fill" iconSize="20" on:tap="dsx.module.route.reset({ path: '/list' })" a11yTrait="button" a11yLabel="Watch history"
-             color="rgba(255,255,255,0.95)"/>
       <image icon="person.crop.circle" iconSize="23" on:tap="dsx.module.route.reset({ path: '/profile' })" a11yTrait="button" a11yLabel="Profile"
              color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}"/>
+      <!-- the CTA lives inside the tools cluster so the 22px rhythm owns its gap too -->
+      <text value="Get Coins" class="cta" on:tap="dsx.module.route.push({ path: '/store' })" a11yTrait="button" a11yLabel="Get coins — open the store"/>
     </hstack>
-    <text value="Get Coins" class="cta" on:tap="dsx.module.route.push({ path: '/store' })" a11yTrait="button" a11yLabel="Get coins — open the store"/>
   </hstack>
 </hstack>

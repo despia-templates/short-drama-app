@@ -332,7 +332,7 @@
     <style as="cSend" background="#FF2C55" radius="18" paddingH="16" paddingV="9" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
-  <TopNav active="home" visible-if="dsx.variable.wide"/>
+  <TopNav active="" visible-if="dsx.variable.wide"/>
   <hstack alignItems="stretch" style="flex: 1; min-height: 0; width: 100%">
     <vstack alignItems="stretch" style="flex: 1; min-width: 0">
       <zstack>

@@ -1,31 +1,53 @@
 <!-- PersonalNav — the personal-center sidebar (wide viewports): identity card, account
      balance with the red Get Coins CTA, then the section menu — Wallet · My List ·
-     History — with the active row tinted brand red. Mounted by Profile and MyList so
-     the two pages read as ONE center. -->
+     Rewards — with the active row tinted brand red. Mounted by Profile and MyList so
+     the two pages read as ONE center.
+
+     DATA COMES DOWN AS ATTRIBUTES. The first version fetched its own session and wallet,
+     so every wide Profile render fired /dev-session.json and /wallet/state twice — once
+     for the page, once for its own sidebar. A part renders what its owner already knows;
+     it does not shop for its own facts. (A component attribute whose whole value is one
+     {{ }} carries the VALUE, so numbers arrive as numbers.)
+
+     Lateral moves inside the center REPLACE: Wallet → My list → Wallet through href
+     would stack three entries and turn the back gesture into a tour of the sidebar. -->
 <vstack class="side" style="width: 300px; min-width: 300px">
   <head>
-    <attribute as="active" default="'wallet'"/>   <!-- wallet | list | history -->
+    <attribute as="active" default="'wallet'"/>   <!-- wallet | list | rewards -->
+    <attribute as="uid" default="''"/>
+    <attribute as="coins" default="null"/>        <!-- null = still loading: render an em dash, never a fake 0 -->
+    <attribute as="bonus" default="null"/>
+    <attribute as="vip" default="false"/>
 
-    <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <variable as="hovRow">return ''</variable>
+    <variable as="menu" computed="true">
+      return [
+        { key: 'wallet',  label: 'Wallet',  icon: 'dollarsign.circle.fill', path: '/profile' },
+        { key: 'list',    label: 'My list', icon: 'play.rectangle.fill',    path: '/list' },
+        { key: 'rewards', label: 'Rewards', icon: 'gift.fill',              path: '/rewards' }
+      ]
+    </variable>
 
-    <variable as="authHeaders" computed="true">
-      if (session.data == null) { return {} }
-      return { authorization: 'Bearer ' + session.data.viewer.token }
-    </variable>
-    <variable as="uid" computed="true">
-      if (session.data == null) { return '' }
-      return session.data.viewer.sub.slice(0, 8)
-    </variable>
+    <formula as="rowBg" key="item.key">
+      if (dsx.attribute.active == key) { return '#1F1F26' }
+      if (dsx.variable.hovRow == key) { return 'rgba(255,255,255,0.05)' }
+      return 'rgba(0,0,0,0)'
+    </formula>
+    <formula as="rowTint" key="item.key">
+      return dsx.attribute.active == key ? '#FF2C55' : 'rgba(255,255,255,0.6)'
+    </formula>
+    <formula as="rowInk" key="item.key">
+      return dsx.attribute.active == key ? '#FF2C55' : '#FFFFFF'
+    </formula>
 
     <style as="side" spacing="14" alignItems="stretch"/>
-    <style as="card" background="#141419" radius="12" paddingH="18" paddingV="18" spacing="14" alignItems="stretch"/>
+    <style as="card" background="#141419" radius="12" paddingH="16" paddingV="16" spacing="14" alignItems="stretch"/>
     <style as="idRow" spacing="12" alignItems="center"/>
     <style as="avatar" background="#232329" radius="24" width="48" height="48" alignItems="center"/>
-    <style as="who" spacing="3"/>
+    <style as="who" spacing="4"/>
     <style as="whoName" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
     <style as="whoNote" fontSize="12" color="rgba(255,255,255,0.45)"/>
-    <style as="devPill" background="rgba(255,255,255,0.08)" radius="12" paddingH="10" paddingV="5" fontSize="11" fontWeight="medium" color="rgba(255,255,255,0.6)"/>
+    <style as="vipChip" background="#F6B63D" radius="10" paddingH="8" paddingV="4" fontSize="11" fontWeight="bold" color="#2A1D04"/>
 
     <style as="balCap" fontSize="12" color="rgba(255,255,255,0.5)"/>
     <style as="balRow" alignItems="center"/>
@@ -46,11 +68,11 @@
       <vstack class="avatar" style="justify-content: center">
         <image icon="person.crop.circle" iconSize="26" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
       </vstack>
-      <vstack class="who" style="flex: 1">
+      <vstack class="who" style="flex: 1; min-width: 0">
         <text value="Viewer" class="whoName"/>
-        <text value="UID {{ dsx.variable.uid }}" class="whoNote"/>
+        <text value="{{ dsx.attribute.uid == '' ? 'Signed out' : 'UID ' + dsx.attribute.uid }}" class="whoNote"/>
       </vstack>
-      <text value="Local session" class="devPill"/>
+      <text value="VIP" class="vipChip" visible-if="dsx.attribute.vip"/>
     </hstack>
   </vstack>
 
@@ -61,7 +83,7 @@
       <vstack class="balCol">
         <hstack spacing="6" alignItems="center">
           <image icon="dollarsign.circle.fill" iconSize="16" color="#F7C948" a11yHidden="true"/>
-          <text value="{{ wallet.data == null ? 0 : wallet.data.coins }}" class="balNum"/>
+          <text value="{{ dsx.attribute.coins == null ? '—' : dsx.attribute.coins }}" class="balNum"/>
         </hstack>
         <text value="Coins" class="balSub"/>
       </vstack>
@@ -69,37 +91,25 @@
       <vstack class="balCol">
         <hstack spacing="6" alignItems="center">
           <image icon="dollarsign.circle.fill" iconSize="16" color="#F7C948" a11yHidden="true"/>
-          <text value="{{ wallet.data == null ? 0 : wallet.data.bonus }}" class="balNum"/>
+          <text value="{{ dsx.attribute.bonus == null ? '—' : dsx.attribute.bonus }}" class="balNum"/>
         </hstack>
         <text value="Bonus" class="balSub"/>
       </vstack>
     </hstack>
     <button label="Get Coins" class="topupBtn"
-            on:tap="dsx.module.route.push({ path: '/rewards' })" a11yLabel="Get coins in Rewards"/>
+            on:tap="dsx.module.route.push({ path: '/store' })" a11yLabel="Get coins — open the store"/>
   </vstack>
 
   <!-- section menu -->
   <vstack class="menu">
-    <hstack class="menuRow" href="/profile" a11yLabel="Wallet"
-            background="{{ dsx.attribute.active == 'wallet' ? '#1F1F26' : 'rgba(0,0,0,0)' }}">
-      <image icon="dollarsign.circle.fill" iconSize="18"
-             color="{{ dsx.attribute.active == 'wallet' ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
-      <text value="Wallet" class="menuLabel"
-            color="{{ dsx.attribute.active == 'wallet' ? '#FF2C55' : '#FFFFFF' }}"/>
-    </hstack>
-    <hstack class="menuRow" href="/list" a11yLabel="My list"
-            background="{{ dsx.attribute.active == 'list' ? '#1F1F26' : 'rgba(0,0,0,0)' }}">
-      <image icon="play.rectangle.fill" iconSize="18"
-             color="{{ dsx.attribute.active == 'list' ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
-      <text value="My list" class="menuLabel"
-            color="{{ dsx.attribute.active == 'list' ? '#FF2C55' : '#FFFFFF' }}"/>
-    </hstack>
-    <hstack class="menuRow" href="/list" a11yLabel="History"
-            background="{{ dsx.attribute.active == 'history' ? '#1F1F26' : 'rgba(0,0,0,0)' }}">
-      <image icon="clock.fill" iconSize="18"
-             color="{{ dsx.attribute.active == 'history' ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
-      <text value="History" class="menuLabel"
-            color="{{ dsx.attribute.active == 'history' ? '#FF2C55' : '#FFFFFF' }}"/>
-    </hstack>
+    <list bind="dsx.variable.menu" key="key" scroll="false" spacing="2">
+      <hstack class="menuRow" a11yTrait="button" a11yGroup="true" a11yLabel="{{ item.label }}"
+              on:tap="dsx.module.route.replace({ path: item.path })"
+              on:hoverStart="dsx.variable.hovRow = item.key" on:hoverEnd="dsx.variable.hovRow = ''"
+              background="{{ rowBg }}" style="transition: background-color 0.15s ease">
+        <image icon="{{ item.icon }}" iconSize="18" color="{{ rowTint }}" a11yHidden="true"/>
+        <text value="{{ item.label }}" class="menuLabel" color="{{ rowInk }}"/>
+      </hstack>
+    </list>
   </vstack>
 </vstack>

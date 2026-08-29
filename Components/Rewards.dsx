@@ -246,5 +246,5 @@
 
     </vstack>
   </scroll>
-  <TabBar active="vip" visible-if="dsx.variable.wide == false"/>
+  <TabBar active="" visible-if="dsx.variable.wide == false"/>
 </vstack>

@@ -32,8 +32,8 @@
       return {
         vip: [
           { id: 'vip_weekly',  label: 'Weekly VIP',  price: '$11.99',  cents: 1199,  days: 7,   note: 'then $14.99/week',           badge: '21% OFF', best: false },
-          { id: 'vip_monthly', label: 'Monthly VIP', price: '$49.99',  cents: 4999,  days: 30,  note: 'Auto-renew. Cancel anytime.', badge: '',        best: true  },
-          { id: 'vip_yearly',  label: 'Yearly VIP',  price: '$199.99', cents: 19999, days: 365, note: 'Auto-renew. Cancel anytime.', badge: 'BEST VALUE', best: false }
+          { id: 'vip_monthly', label: 'Monthly VIP', price: '$49.99',  cents: 4999,  days: 30,  note: 'Auto-renew. Cancel anytime.', badge: 'POPULAR', best: false },
+          { id: 'vip_yearly',  label: 'Yearly VIP',  price: '$199.99', cents: 19999, days: 365, note: 'Auto-renew. Cancel anytime.', badge: 'BEST VALUE', best: true  }
         ],
         packs: [
           { id: 'coins_500',   coins: 500,   free: 25,    cents: 499,  price: '$4.99',  bonus: '+5%' },

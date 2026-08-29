@@ -22,6 +22,9 @@
 import { execSync } from "node:child_process";
 
 const PALETTE = new Set([
+  // the VIP gold ramp (masthead gradients, the one gold surface per screen) and the
+  // settle-recovery card's violet — deliberate brand moments, declared as such
+  "#f7e3ae", "#e8c77a", "#ddb35e", "#1e1830",
   "#000000", "#111111",                                     // stage · ink-on-white
   "#0a0a0e", "#141419", "#17171c", "#1c1c22", "#1e1e24",    // the dark surface ramp
   "#232329", "#26262c", "#3a3a42", "#43434d",
@@ -54,6 +57,15 @@ for (const line of lines) {
     }
     console.error(`${line}\n  ^ off-palette: ${offPalette.join(" ")} — add to the palette deliberately or use a token`);
     failures++;
+    continue;
+  }
+  // §5's "no conditional branch" heuristic keys on bind= — but a nav bar's bound array
+  // is a CONSTANT (the link table), not data that can load, fail or be empty. Waived for
+  // the two static-chrome parts only; every data screen still owes its four states.
+  const statesRule = /(TopNav|TabBar)\.dsx:1: notice: a data-bound screen with no conditional branch/.exec(line);
+  if (statesRule) {
+    waived++;
+    console.log(`WAIVED (static chrome, constant bind): ${line.replace(/ — screens with data.*$/, "")}`);
     continue;
   }
   const typeRule = /fontSize="(\d+)">: off the type scale/.exec(line);

@@ -1,7 +1,15 @@
-<!-- Profile — the personal center's Wallet page: the two-column center on wide
-     viewports (sidebar + balance strip + Transaction History), stacked cards on the
-     phone. Honest about its lanes: auth is the local dev session (a provider in
-     production); coin packs and VIP ride the native apps' store lane. -->
+<!-- Profile — the personal center. Wide viewports get the two-column center (sidebar +
+     balance strip + Transaction History); phones get the reference stack: identity ·
+     ONE gold VIP surface · wallet card · grouped menu · ledger.
+
+     FUNNEL ROLE: this screen is where the viewer checks what they own and is offered the
+     one upgrade that ends coin math forever. Exactly one gold surface (the VIP card) —
+     gold everywhere is gold nowhere. Buying is /store, earning is /rewards, and both are
+     one tap from here because the wallet is the reason people open this screen.
+
+     Honest numbers: a wallet that has not answered renders an em dash, never a zero — a
+     '0' on a screen about money is a claim, and while loading it is a false one. Signed
+     out, the screen says so and offers the reload; it never renders headings over void. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="session" url="/dev-session.json" ssr="false"/>
@@ -11,6 +19,37 @@
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
+    </variable>
+    <variable as="signedOut" computed="true">return session.error != null</variable>
+    <variable as="uid" computed="true">
+      if (session.data == null) { return '' }
+      return session.data.viewer.sub.slice(0, 8)
+    </variable>
+    <variable as="coins" computed="true">
+      return wallet.data == null ? null : wallet.data.coins
+    </variable>
+    <variable as="bonus" computed="true">
+      return wallet.data == null ? null : wallet.data.bonus
+    </variable>
+    <variable as="isVip" computed="true">
+      if (wallet.data == null) { return false }
+      return wallet.data.vip === true
+    </variable>
+    <variable as="vipUntil" computed="true">
+      if (wallet.data == null || wallet.data.vipUntil == null) { return '' }
+      return String(wallet.data.vipUntil).slice(0, 10)
+    </variable>
+    <variable as="vipLine" computed="true">
+      if (dsx.variable.isVip == false) { return 'Every episode, no coin math, no ads.' }
+      if (dsx.variable.vipUntil == '') { return 'Every episode unlocked.' }
+      return 'Every episode unlocked until ' + dsx.variable.vipUntil + '.'
+    </variable>
+    <variable as="ledgerPhase" computed="true">
+      if (dsx.variable.signedOut) { return 'signedout' }
+      if (ledger.error != null) { return 'error' }
+      if (ledger.data == null) { return 'loading' }
+      if (ledger.data.rows.length == 0) { return 'empty' }
+      return 'content'
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
@@ -39,8 +78,10 @@
       if (src == 'checkin') { return 'Daily check-in' }
       if (src == 'spin') { return 'Spin the wheel' }
       if (src == 'task') { return 'Task reward' }
+      if (src == 'ad') { return 'Rewarded ad' }
       if (src == 'unlock') { return 'Episode unlocked' }
       if (src == 'pack') { return 'Coin pack' }
+      if (src == 'vip') { return 'VIP bonus' }
       return src
     </formula>
 
@@ -55,26 +96,33 @@
     <style as="crumbRow" spacing="7" alignItems="center"/>
     <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
 
-    <style as="card" background="#141419" radius="12" paddingH="18" paddingV="18" spacing="14" alignItems="stretch"/>
-    <style as="cardTight" background="#141419" radius="12" paddingH="18" paddingV="14" spacing="4" alignItems="stretch"/>
-    <style as="cardFlush" background="#141419" radius="12" paddingH="18" paddingV="2" spacing="0" alignItems="stretch"/>
+    <style as="card" background="#141419" radius="12" paddingH="16" paddingV="16" spacing="14" alignItems="stretch"/>
+    <style as="cardTight" background="#141419" radius="12" paddingH="16" paddingV="12" spacing="4" alignItems="stretch"/>
+    <style as="cardFlush" background="#141419" radius="12" paddingH="16" paddingV="4" spacing="0" alignItems="stretch"/>
 
     <style as="stripRow" alignItems="center" spacing="16"/>
     <style as="stripCap" fontSize="13" color="rgba(255,255,255,0.55)"/>
     <style as="stripNum" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
-    <style as="histLink" fontSize="13" color="rgba(255,255,255,0.55)"/>
-    <style as="histRow" spacing="4" alignItems="center"/>
 
     <style as="idRow" alignItems="center" spacing="12"/>
     <style as="avatar" background="#232329" radius="22" width="44" height="44" alignItems="center"/>
-    <style as="who" spacing="2"/>
+    <style as="who" spacing="4"/>
     <style as="whoName" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="whoNote" fontSize="11" color="rgba(255,255,255,0.42)" lineSpacing="1"/>
-    <style as="stats" spacing="10" alignItems="stretch"/>
-    <style as="stat" background="#1E1E24" radius="10" paddingV="13" spacing="3" alignItems="center"/>
+    <style as="whoNote" fontSize="11" color="rgba(255,255,255,0.42)" lineSpacing="2"/>
+    <style as="vipChip" background="#F6B63D" radius="10" paddingH="8" paddingV="4" fontSize="11" fontWeight="bold" color="#2A1D04"/>
+
+    <!-- the one gold surface -->
+    <style as="vipCard" radius="14" paddingH="16" paddingV="16" spacing="4" alignItems="flex-start"/>
+    <style as="vipTitle" fontSize="16" fontWeight="bold" color="#2A1D04"/>
+    <style as="vipSub" fontSize="12" color="rgba(42,29,4,0.75)"/>
+    <style as="vipGo" background="#2A1D04" radius="18" paddingH="16" paddingV="8" fontSize="13" fontWeight="semibold" color="#F7E3AE"/>
+
+    <style as="stats" spacing="12" alignItems="stretch"/>
+    <style as="stat" background="#1E1E24" radius="10" paddingV="12" spacing="4" alignItems="center"/>
     <style as="statNum" fontSize="22" fontWeight="bold"/>
     <style as="statCap" fontSize="11" color="rgba(255,255,255,0.5)"/>
     <style as="topupBtn" background="#FF2C55" radius="21" paddingV="12" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="earnBtn" background="rgba(255,255,255,0.1)" radius="21" paddingV="12" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="note" fontSize="11" color="rgba(255,255,255,0.4)" lineSpacing="2"/>
 
     <style as="h2" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
@@ -84,10 +132,12 @@
     <style as="ledgerMeta" fontSize="11" color="rgba(255,255,255,0.42)"/>
     <style as="amount" fontSize="13" fontWeight="semibold"/>
     <style as="empty" fontSize="13" color="rgba(255,255,255,0.45)"/>
+    <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="signCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="24" alignItems="center"/>
 
-    <style as="settingRow" alignItems="center" paddingV="13"/>
-    <style as="settingLabel" fontSize="13" color="#FFFFFF"/>
-    <style as="settingValue" fontSize="12" color="rgba(255,255,255,0.42)"/>
+    <style as="menuRow" alignItems="center" paddingV="12" spacing="11"/>
+    <style as="menuLabel" fontSize="13" color="#FFFFFF"/>
+    <style as="menuValue" fontSize="12" color="rgba(255,255,255,0.42)"/>
   </head>
 
   <TopNav active="profile" visible-if="dsx.variable.wide"/>
@@ -101,66 +151,107 @@
       </hstack>
 
       <hstack class="split">
-        <PersonalNav active="wallet" visible-if="dsx.variable.wide"/>
+        <PersonalNav active="wallet" visible-if="dsx.variable.wide"
+                     uid="{{ dsx.variable.uid }}" coins="{{ dsx.variable.coins }}"
+                     bonus="{{ dsx.variable.bonus }}" vip="{{ dsx.variable.isVip }}"/>
 
         <vstack class="content" style="flex: 1; min-width: 0">
           <text value="Profile" class="h1" visible-if="dsx.variable.wide == false"/>
 
-          <!-- phone identity card (the sidebar carries this on wide) -->
-          <vstack class="card" visible-if="dsx.variable.wide == false">
+          <!-- signed out: the state has words and a way forward -->
+          <vstack class="signCard" visible-if="dsx.variable.signedOut">
+            <image icon="person.crop.circle" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+            <text value="You're not signed in" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+            <text value="Coins, VIP and your history live on your account. The catalogue is open either way." class="empty" textAlign="center"/>
+            <button label="Reload session" class="retryBtn" on:tap="session.refresh()"/>
+          </vstack>
+
+          <!-- phone identity (the sidebar carries this on wide) -->
+          <vstack class="card" visible-if="dsx.variable.wide == false && dsx.variable.signedOut == false">
             <hstack class="idRow">
               <vstack class="avatar" style="justify-content: center">
                 <image icon="person.crop.circle" iconSize="22" color="rgba(255,255,255,0.62)" a11yHidden="true"/>
               </vstack>
-              <vstack class="who" style="flex: 1">
+              <vstack class="who" style="flex: 1; min-width: 0">
                 <text value="Viewer" class="whoName"/>
-                <text value="Local dev session — production signs in through your identity provider" class="whoNote"/>
+                <text value="{{ dsx.variable.uid == '' ? 'Local session' : 'UID ' + dsx.variable.uid }}" class="whoNote"/>
               </vstack>
+              <text value="VIP" class="vipChip" visible-if="dsx.variable.isVip"/>
             </hstack>
+          </vstack>
+
+          <!-- THE gold surface: VIP status when it is real, the upgrade door when not -->
+          <vstack class="vipCard" visible-if="dsx.variable.signedOut == false"
+                  on:tap="dsx.module.route.push({ path: '/vip' })" a11yGroup="true" a11yTrait="button"
+                  a11yLabel="{{ dsx.variable.isVip ? 'Your VIP membership' : 'Go VIP' }}"
+                  style="background: linear-gradient(150deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); transition: transform 0.18s ease">
+            <hstack spacing="10" alignItems="center" style="width: 100%">
+              <image icon="crown.fill" iconSize="20" color="#2A1D04" a11yHidden="true"/>
+              <vstack spacing="2" style="flex: 1; min-width: 0">
+                <text value="{{ dsx.variable.isVip ? 'VIP is active' : 'Go VIP' }}" class="vipTitle"/>
+                <text value="{{ dsx.variable.vipLine }}" class="vipSub"/>
+              </vstack>
+              <text value="{{ dsx.variable.isVip ? 'Manage' : 'See plans' }}" class="vipGo"/>
+            </hstack>
+          </vstack>
+
+          <!-- wallet: phone card (wide gets the strip below) -->
+          <vstack class="card" visible-if="dsx.variable.wide == false && dsx.variable.signedOut == false">
             <hstack class="stats">
               <vstack class="stat" style="flex: 1">
-                <text value="{{ wallet.data == null ? '—' : wallet.data.coins }}" class="statNum" color="#F7C948"/>
+                <text value="{{ dsx.variable.coins == null ? '—' : dsx.variable.coins }}" class="statNum" color="#F7C948"/>
                 <text value="Coins" class="statCap"/>
               </vstack>
               <vstack class="stat" style="flex: 1">
-                <text value="{{ wallet.data == null ? '—' : wallet.data.bonus }}" class="statNum" color="#FFFFFF"/>
+                <text value="{{ dsx.variable.bonus == null ? '—' : dsx.variable.bonus }}" class="statNum" color="#FFFFFF"/>
                 <text value="Bonus · 7-day" class="statCap"/>
               </vstack>
             </hstack>
-            <button label="Get Coins" class="topupBtn"
-                    on:tap="dsx.module.route.push({ path: '/rewards' })" a11yLabel="Get coins in Rewards"/>
+            <hstack spacing="10" alignItems="stretch">
+              <button label="Get Coins" class="topupBtn" style="flex: 1"
+                      on:tap="dsx.module.route.push({ path: '/store' })" a11yLabel="Get coins — open the store"/>
+              <button label="Earn free" class="earnBtn" style="flex: 1"
+                      on:tap="dsx.module.route.push({ path: '/rewards' })" a11yLabel="Earn free coins in Rewards"/>
+            </hstack>
           </vstack>
 
-          <!-- balance strip (wide) — Coins · Bonus · Transaction History -->
-          <vstack class="cardTight" visible-if="dsx.variable.wide">
+          <!-- balance strip (wide) -->
+          <vstack class="cardTight" visible-if="dsx.variable.wide && dsx.variable.signedOut == false">
             <hstack class="stripRow">
               <hstack spacing="7" alignItems="center">
                 <text value="Coins:" class="stripCap"/>
                 <image icon="dollarsign.circle.fill" iconSize="15" color="#F7C948" a11yHidden="true"/>
-                <text value="{{ wallet.data == null ? 0 : wallet.data.coins }}" class="stripNum"/>
+                <text value="{{ dsx.variable.coins == null ? '—' : dsx.variable.coins }}" class="stripNum"/>
               </hstack>
               <text value="|" class="stripCap"/>
               <hstack spacing="7" alignItems="center">
                 <text value="Bonus:" class="stripCap"/>
                 <image icon="dollarsign.circle.fill" iconSize="15" color="#F7C948" a11yHidden="true"/>
-                <text value="{{ wallet.data == null ? 0 : wallet.data.bonus }}" class="stripNum"/>
+                <text value="{{ dsx.variable.bonus == null ? '—' : dsx.variable.bonus }}" class="stripNum"/>
               </hstack>
               <spacer/>
-              <hstack class="histRow" a11yGroup="true" a11yLabel="Transaction history">
-                <text value="Transaction History" class="histLink"/>
-                <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.55)" a11yHidden="true"/>
-              </hstack>
+              <text value="Bonus coins expire 7 days after they land" class="note"/>
             </hstack>
           </vstack>
 
-          <!-- ledger -->
-          <vstack class="cardTight">
-            <text value="Transaction History" class="h2" paddingV="6"/>
-            <text class="empty" visible-if="ledger.data != null && ledger.data.rows.length == 0" value="No activity yet."/>
-            <list bind="ledger.data.rows" key="id" scroll="false" spacing="0">
+          <!-- ledger, with all five states -->
+          <vstack class="cardTight" visible-if="dsx.variable.signedOut == false">
+            <text value="Transaction History" class="h2" paddingV="8"/>
+            <vstack spacing="10" alignItems="stretch" visible-if="dsx.variable.ledgerPhase == 'loading'" paddingV="8">
+              <Skeleton height="18" radius="6"/>
+              <Skeleton height="18" radius="6"/>
+              <Skeleton height="18" radius="6"/>
+            </vstack>
+            <text class="empty" visible-if="dsx.variable.ledgerPhase == 'empty'" paddingV="8"
+                  value="No activity yet — your first check-in, unlock or purchase lands here."/>
+            <vstack spacing="10" alignItems="flex-start" visible-if="dsx.variable.ledgerPhase == 'error'" paddingV="8">
+              <text class="empty" value="The ledger could not be loaded."/>
+              <button label="Retry" class="retryBtn" on:tap="ledger.refresh()"/>
+            </vstack>
+            <list bind="ledger.data.rows" key="id" scroll="false" spacing="0" visible-if="dsx.variable.ledgerPhase == 'content'">
               <hstack class="ledgerRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
-                <vstack class="ledgerCol" style="flex: 1">
-                  <text value="{{ rowLabel }}" class="ledgerTitle"/>
+                <vstack class="ledgerCol" style="flex: 1; min-width: 0">
+                  <text value="{{ rowLabel }}" class="ledgerTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                   <text value="{{ item.kind == 'bonus' ? 'Bonus coins' : 'Coins' }}{{ item.expires == null ? '' : ' · expires in 7 days' }}" class="ledgerMeta"/>
                 </vstack>
                 <text value="{{ rowSign }}" class="amount" color="{{ item.amount > 0 ? '#F7C948' : '#FF2C55' }}"/>
@@ -168,22 +259,27 @@
             </list>
           </vstack>
 
-          <!-- lanes + settings -->
-          <vstack class="cardTight">
-            <text value="Coin packs and VIP are purchased in the iOS and Android apps through RevenueCat; web checkout is on the template roadmap. On the web, earn through Rewards." class="note" paddingV="6"/>
+          <!-- lanes note + settings -->
+          <vstack class="cardTight" visible-if="dsx.variable.signedOut == false">
+            <text value="Purchases ride Stripe on the web and the RevenueCat store lane in the iOS and Android apps — one wallet either way. Signing in rides your identity provider in production; this build mints a local session." class="note" paddingV="8"/>
           </vstack>
-          <vstack class="cardFlush">
-            <hstack class="settingRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
-              <text value="Notifications" class="settingLabel" style="flex: 1"/>
-              <text value="native apps" class="settingValue"/>
+          <vstack class="cardFlush" visible-if="dsx.variable.signedOut == false">
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)" href="/list"
+                    a11yGroup="true" a11yLabel="My list and history">
+              <image icon="bookmark.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+              <text value="My List &amp; History" class="menuLabel" style="flex: 1"/>
+              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
-            <hstack class="settingRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
-              <text value="Content language" class="settingLabel" style="flex: 1"/>
-              <text value="English" class="settingValue"/>
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
+                    on:tap="dsx.module.route.push({ path: '/rewards' })" a11yGroup="true" a11yTrait="button" a11yLabel="Rewards">
+              <image icon="gift.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+              <text value="Rewards" class="menuLabel" style="flex: 1"/>
+              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
-            <hstack class="settingRow" href="/admin" a11yLabel="Manage this app — operator surface">
-              <text value="Manage this app" class="settingLabel" style="flex: 1"/>
-              <text value="operator" class="settingValue" color="#F7C948"/>
+            <hstack class="menuRow" href="/admin" a11yGroup="true" a11yLabel="Manage this app — operator surface">
+              <image icon="gearshape" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+              <text value="Manage this app" class="menuLabel" style="flex: 1"/>
+              <text value="operator" class="menuValue" color="#F7C948"/>
               <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
           </vstack>
