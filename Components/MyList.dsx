@@ -1,6 +1,7 @@
-<!-- My List — resume and favorites. Both lists ship their empty states, because an empty
-     rail with no words is a bug report waiting to happen (design bar: empty/loading/error
-     are part of the list, not an afterthought). -->
+<!-- My List — the personal center's library page. Wide viewports get the two-column
+     center (sidebar + content grid, the ReelShort-class shape); phones get the stacked
+     rails over the tab bar. Empty states ship with the lists — an empty rail with no
+     words is a bug report waiting to happen. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="session" url="/dev-session.json" ssr="false"/>
@@ -20,14 +21,10 @@
       return 'phone'
     </variable>
     <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
-    <variable as="favCols" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 7 }
-      if (dsx.variable.bp == 'tablet') { return 5 }
+    <variable as="cols" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 5 }
+      if (dsx.variable.bp == 'tablet') { return 4 }
       return 3
-    </variable>
-    <variable as="railShell" computed="true">
-      const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1240px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px'
     </variable>
     <variable as="gutter" computed="true">
       if (dsx.variable.bp == 'desktop') { return 32 }
@@ -36,82 +33,99 @@
     </variable>
     <variable as="shell" computed="true">
       const g = dsx.variable.gutter
-      return 'width: 100%; max-width: ' + 1240 + 'px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+      return 'width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
 
-    <style as="screen" background="#08070C" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
-    <style as="page" spacing="22" paddingTop="4" paddingBottom="20" alignItems="stretch"/>
+    <style as="page" spacing="22" paddingTop="20" paddingBottom="24" alignItems="stretch"/>
+    <style as="split" spacing="26" alignItems="flex-start"/>
+    <style as="content" spacing="20" alignItems="stretch"/>
 
-    <style as="head" alignItems="center"/>
+    <style as="crumb" fontSize="13" color="rgba(255,255,255,0.5)"/>
+    <style as="crumbOn" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
+    <style as="crumbRow" spacing="7" alignItems="center"/>
+
     <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
-    <style as="section" spacing="10" alignItems="stretch"/>
-    <style as="sectionHead" alignItems="center"/>
+    <style as="section" spacing="12" alignItems="stretch"/>
     <style as="sectionTitle" fontSize="17" fontWeight="bold" color="#FFFFFF" tracking="-0.2"/>
     <style as="empty" fontSize="13" color="rgba(255,255,255,0.45)"/>
 
-    <style as="rail" spacing="11" alignItems="flex-start" paddingTrailing="16"/>
-    <style as="card" spacing="7" width="108" alignItems="stretch"/>
-    <style as="cardTitle" fontSize="12" fontWeight="medium" color="rgba(255,255,255,0.88)" lineLimit="2" lineSpacing="1"/>
-    <style as="badge" background="rgba(8,7,12,0.82)" radius="5" paddingH="6" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="badgeWrap" paddingLeading="6" paddingBottom="8" alignItems="flex-start"/>
+    <style as="rail" spacing="12" alignItems="flex-start" paddingTrailing="16"/>
+    <style as="card" spacing="7" alignItems="stretch"/>
+    <style as="cardTitle" fontSize="15" fontWeight="medium" color="rgba(255,255,255,0.95)" lineLimit="1"/>
+    <style as="cardMeta" fontSize="12" color="rgba(255,255,255,0.5)"/>
+    <style as="badgeDark" background="rgba(0,0,0,0.72)" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="badgeWrap" paddingLeading="7" paddingBottom="9" alignItems="flex-start"/>
     <style as="resumeTrack" background="rgba(255,255,255,0.22)"/>
     <style as="resumeFill" background="#FF2D55"/>
-    <style as="grid" alignItems="stretch"/>
   </head>
 
   <TopNav active="list" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
-    <vstack class="page">
-      <hstack class="head" style="{{ dsx.variable.shell }}">
-        <text value="My List" class="h1"/>
+    <vstack class="page" style="{{ dsx.variable.shell }}">
+
+      <hstack class="crumbRow" visible-if="dsx.variable.wide">
+        <text value="Personal Center" class="crumb" href="/profile"/>
+        <text value="/" class="crumb"/>
+        <text value="My list" class="crumbOn"/>
       </hstack>
 
-      <vstack class="section">
-        <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
-          <text value="Continue Watching" class="sectionTitle"/>
-        </hstack>
-        <text class="empty" style="{{ dsx.variable.shell }}" visible-if="continue.data != null && continue.data.items.length == 0"
-              value="Nothing in progress yet — start a show from Home."/>
-        <scroll axis="horizontal" indicators="false">
-          <hstack class="rail" style="{{ dsx.variable.railShell }}">
-            <list bind="continue.data.items" key="episode" axis="horizontal" scroll="false" spacing="11">
-              <vstack class="card" href="/watch/{{ item.show }}/{{ item.idx }}" a11yGroup="true" a11yLabel="Continue {{ item.title }}, episode {{ item.idx }}">
-                <zstack>
-                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                         style="width: 108px; height: 162px; border-radius: 10px"/>
-                  <vstack class="badgeWrap" style="width: 108px; height: 162px; justify-content: flex-end">
-                    <text value="EP {{ item.idx }}" class="badge"/>
-                  </vstack>
-                  <vstack style="width: 108px; height: 162px; justify-content: flex-end">
-                    <stack class="resumeTrack" style="width: 108px; height: 3px; border-radius: 0 0 10px 10px">
-                      <stack class="resumeFill" style="width: {{ item.pct }}%; height: 3px"/>
-                    </stack>
-                  </vstack>
-                </zstack>
-                <text value="{{ item.title }}" class="cardTitle"/>
-              </vstack>
-            </list>
-          </hstack>
-        </scroll>
-      </vstack>
+      <hstack class="split">
+        <PersonalNav active="list" visible-if="dsx.variable.wide"/>
 
-      <vstack class="section">
-        <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
-          <text value="Favorites" class="sectionTitle"/>
-        </hstack>
-        <text class="empty" style="{{ dsx.variable.shell }}" visible-if="favs.data != null && favs.data.items.length == 0"
-              value="Tap ♡ on any show to keep it here."/>
-        <vstack class="grid" style="{{ dsx.variable.shell }}">
-          <grid bind="favs.data.items" key="show" columns="{{ dsx.variable.favCols }}" spacing="11" scroll="false">
-            <vstack class="card" style="width: auto" href="/show/{{ item.show }}" a11yGroup="true" a11yLabel="{{ item.title }}">
-              <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                     style="width: 100%; height: 163px; border-radius: 10px"/>
-              <text value="{{ item.title }}" class="cardTitle"/>
-            </vstack>
-          </grid>
+        <vstack class="content" style="flex: 1; min-width: 0">
+          <text value="My List" class="h1" visible-if="dsx.variable.wide == false"/>
+
+          <!-- history / continue watching -->
+          <vstack class="section">
+            <text value="History" class="sectionTitle"/>
+            <text class="empty" visible-if="continue.data != null && continue.data.items.length == 0"
+                  value="Nothing in progress yet — start a show from Home."/>
+            <scroll axis="horizontal" indicators="false">
+              <hstack class="rail">
+                <list bind="continue.data.items" key="episode" axis="horizontal" scroll="false" spacing="12">
+                  <vstack class="card" style="width: 132px" href="/watch/{{ item.show }}/{{ item.idx }}" a11yGroup="true" a11yLabel="Continue {{ item.title }}, episode {{ item.idx }}">
+                    <zstack>
+                      <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                             style="width: 132px; height: 198px; border-radius: 8px"/>
+                      <vstack class="badgeWrap" style="width: 132px; height: 198px; justify-content: flex-end">
+                        <text value="EP {{ item.idx }}" class="badgeDark"/>
+                      </vstack>
+                      <vstack style="width: 132px; height: 198px; justify-content: flex-end">
+                        <stack class="resumeTrack" style="width: 132px; height: 3px; border-radius: 0 0 8px 8px">
+                          <stack class="resumeFill" style="width: {{ item.pct }}%; height: 3px"/>
+                        </stack>
+                      </vstack>
+                    </zstack>
+                    <vstack spacing="2" alignItems="stretch">
+                      <text value="{{ item.title }}" class="cardTitle"/>
+                      <text value="EP.{{ item.idx }} / EP.{{ item.eps }}" class="cardMeta"/>
+                    </vstack>
+                  </vstack>
+                </list>
+              </hstack>
+            </scroll>
+          </vstack>
+
+          <!-- favorites -->
+          <vstack class="section">
+            <text value="My list" class="sectionTitle"/>
+            <text class="empty" visible-if="favs.data != null && favs.data.items.length == 0"
+                  value="Tap My List on any show to keep it here."/>
+            <grid bind="favs.data.items" key="show" columns="{{ dsx.variable.cols }}" spacing="14" scroll="false">
+              <vstack class="card" href="/show/{{ item.show }}" a11yGroup="true" a11yLabel="{{ item.title }}">
+                <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                       style="width: 100%; aspect-ratio: 2/3; border-radius: 8px; object-fit: cover"/>
+                <vstack spacing="2" alignItems="stretch">
+                  <text value="{{ item.title }}" class="cardTitle"/>
+                  <text value="{{ item.genre }}  |  Series" class="cardMeta"/>
+                </vstack>
+              </vstack>
+            </grid>
+          </vstack>
         </vstack>
-      </vstack>
+      </hstack>
     </vstack>
   </scroll>
   <TabBar active="list" visible-if="dsx.variable.wide == false"/>

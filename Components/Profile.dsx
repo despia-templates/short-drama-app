@@ -1,7 +1,7 @@
-<!-- Profile — wallet, VIP state, the ledger, and the seams that are honest about their
-     lane: auth is the local dev session (a provider in production), purchases and push
-     ride the native apps. The operator's door to Manage lives at the bottom.
- -->
+<!-- Profile — the personal center's Wallet page: the two-column center on wide
+     viewports (sidebar + balance strip + Transaction History), stacked cards on the
+     phone. Honest about its lanes: auth is the local dev session (a provider in
+     production); coin packs and VIP ride the native apps' store lane. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="session" url="/dev-session.json" ssr="false"/>
@@ -28,7 +28,7 @@
     </variable>
     <variable as="shell" computed="true">
       const g = dsx.variable.gutter
-      return 'width: 100%; max-width: ' + 720 + 'px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+      return 'width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
 
     <formula as="rowSign" amt="item.amount">
@@ -44,31 +44,40 @@
       return src
     </formula>
 
-    <style as="screen" background="#08070C" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
-    <style as="page" spacing="14" paddingTop="4" paddingBottom="20" alignItems="stretch"/>
+    <style as="page" spacing="22" paddingTop="20" paddingBottom="24" alignItems="stretch"/>
+    <style as="split" spacing="26" alignItems="flex-start"/>
+    <style as="content" spacing="14" alignItems="stretch"/>
 
-    <style as="head" alignItems="center" paddingBottom="2"/>
+    <style as="crumb" fontSize="13" color="rgba(255,255,255,0.5)"/>
+    <style as="crumbOn" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
+    <style as="crumbRow" spacing="7" alignItems="center"/>
     <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
 
-    <style as="card" background="#15141C" radius="16" paddingH="16" paddingV="16" spacing="14" alignItems="stretch"/>
-    <style as="cardTight" background="#15141C" radius="16" paddingH="16" paddingV="14" spacing="4" alignItems="stretch"/>
-    <style as="cardFlush" background="#15141C" radius="16" paddingH="16" paddingV="2" spacing="0" alignItems="stretch"/>
+    <style as="card" background="#141419" radius="12" paddingH="18" paddingV="18" spacing="14" alignItems="stretch"/>
+    <style as="cardTight" background="#141419" radius="12" paddingH="18" paddingV="14" spacing="4" alignItems="stretch"/>
+    <style as="cardFlush" background="#141419" radius="12" paddingH="18" paddingV="2" spacing="0" alignItems="stretch"/>
+
+    <style as="stripRow" alignItems="center" spacing="16"/>
+    <style as="stripCap" fontSize="13" color="rgba(255,255,255,0.55)"/>
+    <style as="stripNum" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
+    <style as="histLink" fontSize="13" color="rgba(255,255,255,0.55)"/>
+
     <style as="idRow" alignItems="center" spacing="12"/>
-    <style as="avatar" background="#221F2B" radius="21" alignItems="center" paddingV="10" paddingH="10"/>
+    <style as="avatar" background="#232329" radius="22" width="44" height="44" alignItems="center"/>
     <style as="who" spacing="2"/>
     <style as="whoName" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="whoNote" fontSize="11" color="rgba(255,255,255,0.42)" lineSpacing="1"/>
-    <style as="tier" fontSize="11" fontWeight="bold" radius="9" paddingH="9" paddingV="4"/>
-
     <style as="stats" spacing="10" alignItems="stretch"/>
-    <style as="stat" background="#1B1926" radius="12" paddingV="12" spacing="3" alignItems="center"/>
+    <style as="stat" background="#1E1E24" radius="10" paddingV="13" spacing="3" alignItems="center"/>
     <style as="statNum" fontSize="22" fontWeight="bold"/>
     <style as="statCap" fontSize="11" color="rgba(255,255,255,0.5)"/>
+    <style as="topupBtn" background="#FF2D55" radius="21" paddingV="12" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="note" fontSize="11" color="rgba(255,255,255,0.4)" lineSpacing="2"/>
 
     <style as="h2" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
-    <style as="ledgerRow" alignItems="center" paddingV="11"/>
+    <style as="ledgerRow" alignItems="center" paddingV="12"/>
     <style as="ledgerCol" spacing="2"/>
     <style as="ledgerTitle" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
     <style as="ledgerMeta" fontSize="11" color="rgba(255,255,255,0.42)"/>
@@ -83,74 +92,99 @@
   <TopNav active="profile" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page" style="{{ dsx.variable.shell }}">
-      <hstack class="head">
-        <text value="Profile" class="h1"/>
+
+      <hstack class="crumbRow" visible-if="dsx.variable.wide">
+        <text value="Personal Center" class="crumb"/>
+        <text value="/" class="crumb"/>
+        <text value="Wallet" class="crumbOn"/>
       </hstack>
 
-      <!-- identity + wallet -->
-      <vstack class="card">
-        <hstack class="idRow">
-          <vstack class="avatar">
-            <image icon="person.crop.circle" iconSize="22" color="rgba(255,255,255,0.62)" a11yHidden="true"/>
-          </vstack>
-          <vstack class="who" style="flex: 1">
-            <text value="Guest viewer" class="whoName"/>
-            <text value="Local dev session — production signs in through your identity provider" class="whoNote"/>
-          </vstack>
-          <text value="{{ wallet.data != null && wallet.data.vip ? 'VIP' : 'FREE' }}" class="tier"
-                color="{{ wallet.data != null && wallet.data.vip ? '#08070C' : 'rgba(255,255,255,0.75)' }}"
-                background="{{ wallet.data != null && wallet.data.vip ? '#F7C948' : '#221F2B' }}"/>
-        </hstack>
+      <hstack class="split">
+        <PersonalNav active="wallet" visible-if="dsx.variable.wide"/>
 
-        <hstack class="stats">
-          <vstack class="stat" style="flex: 1">
-            <text value="{{ wallet.data == null ? '—' : wallet.data.coins }}" class="statNum" color="#F7C948"/>
-            <text value="Coins" class="statCap"/>
-          </vstack>
-          <vstack class="stat" style="flex: 1">
-            <text value="{{ wallet.data == null ? '—' : wallet.data.bonus }}" class="statNum" color="#FFFFFF"/>
-            <text value="Bonus · 7-day" class="statCap"/>
-          </vstack>
-          <vstack class="stat" style="flex: 1" href="/rewards" a11yLabel="Open Rewards to earn coins">
-            <image icon="gift.fill" iconSize="19" color="#FF2D55" a11yHidden="true"/>
-            <text value="Earn more" class="statCap"/>
-          </vstack>
-        </hstack>
+        <vstack class="content" style="flex: 1; min-width: 0">
+          <text value="Profile" class="h1" visible-if="dsx.variable.wide == false"/>
 
-        <text value="Coin packs and VIP are purchased in the iOS and Android apps through RevenueCat; web checkout is on the template roadmap." class="note"/>
-      </vstack>
+          <!-- phone identity card (the sidebar carries this on wide) -->
+          <vstack class="card" visible-if="dsx.variable.wide == false">
+            <hstack class="idRow">
+              <vstack class="avatar" style="justify-content: center">
+                <image icon="person.crop.circle" iconSize="22" color="rgba(255,255,255,0.62)" a11yHidden="true"/>
+              </vstack>
+              <vstack class="who" style="flex: 1">
+                <text value="Viewer" class="whoName"/>
+                <text value="Local dev session — production signs in through your identity provider" class="whoNote"/>
+              </vstack>
+            </hstack>
+            <hstack class="stats">
+              <vstack class="stat" style="flex: 1">
+                <text value="{{ wallet.data == null ? '—' : wallet.data.coins }}" class="statNum" color="#F7C948"/>
+                <text value="Coins" class="statCap"/>
+              </vstack>
+              <vstack class="stat" style="flex: 1">
+                <text value="{{ wallet.data == null ? '—' : wallet.data.bonus }}" class="statNum" color="#FFFFFF"/>
+                <text value="Bonus · 7-day" class="statCap"/>
+              </vstack>
+            </hstack>
+            <button label="Get Coins" class="topupBtn"
+                    on:tap="dsx.module.route.push({ path: '/rewards' })" a11yLabel="Get coins in Rewards"/>
+          </vstack>
 
-      <!-- ledger -->
-      <vstack class="cardTight">
-        <text value="Recent activity" class="h2"/>
-        <text class="empty" visible-if="ledger.data != null && ledger.data.rows.length == 0" value="No activity yet."/>
-        <list bind="ledger.data.rows" key="id" scroll="false" spacing="0">
-          <hstack class="ledgerRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
-            <vstack class="ledgerCol" style="flex: 1">
-              <text value="{{ rowLabel }}" class="ledgerTitle"/>
-              <text value="{{ item.kind == 'bonus' ? 'Bonus coins' : 'Coins' }}{{ item.expires == null ? '' : ' · expires in 7 days' }}" class="ledgerMeta"/>
-            </vstack>
-            <text value="{{ rowSign }}" class="amount" color="{{ item.amount > 0 ? '#F7C948' : '#FF2D55' }}"/>
-          </hstack>
-        </list>
-      </vstack>
+          <!-- balance strip (wide) — Coins · Bonus · Transaction History -->
+          <vstack class="cardTight" visible-if="dsx.variable.wide">
+            <hstack class="stripRow">
+              <hstack spacing="7" alignItems="center">
+                <text value="Coins:" class="stripCap"/>
+                <image icon="bitcoinsign.circle.fill" iconSize="15" color="#F7C948" a11yHidden="true"/>
+                <text value="{{ wallet.data == null ? 0 : wallet.data.coins }}" class="stripNum"/>
+              </hstack>
+              <text value="|" class="stripCap"/>
+              <hstack spacing="7" alignItems="center">
+                <text value="Bonus:" class="stripCap"/>
+                <image icon="bitcoinsign.circle.fill" iconSize="15" color="#F7C948" a11yHidden="true"/>
+                <text value="{{ wallet.data == null ? 0 : wallet.data.bonus }}" class="stripNum"/>
+              </hstack>
+              <spacer/>
+              <text value="Transaction History ›" class="histLink"/>
+            </hstack>
+          </vstack>
 
-      <!-- settings -->
-      <vstack class="cardFlush">
-        <hstack class="settingRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
-          <text value="Notifications" class="settingLabel" style="flex: 1"/>
-          <text value="native apps" class="settingValue"/>
-        </hstack>
-        <hstack class="settingRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
-          <text value="Content language" class="settingLabel" style="flex: 1"/>
-          <text value="English" class="settingValue"/>
-        </hstack>
-        <hstack class="settingRow" href="/admin" a11yLabel="Manage this app — operator surface">
-          <text value="Manage this app" class="settingLabel" style="flex: 1"/>
-          <text value="operator" class="settingValue" color="#F7C948"/>
-          <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
-        </hstack>
-      </vstack>
+          <!-- ledger -->
+          <vstack class="cardTight">
+            <text value="Transaction History" class="h2" paddingV="6"/>
+            <text class="empty" visible-if="ledger.data != null && ledger.data.rows.length == 0" value="No activity yet."/>
+            <list bind="ledger.data.rows" key="id" scroll="false" spacing="0">
+              <hstack class="ledgerRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
+                <vstack class="ledgerCol" style="flex: 1">
+                  <text value="{{ rowLabel }}" class="ledgerTitle"/>
+                  <text value="{{ item.kind == 'bonus' ? 'Bonus coins' : 'Coins' }}{{ item.expires == null ? '' : ' · expires in 7 days' }}" class="ledgerMeta"/>
+                </vstack>
+                <text value="{{ rowSign }}" class="amount" color="{{ item.amount > 0 ? '#F7C948' : '#FF2D55' }}"/>
+              </hstack>
+            </list>
+          </vstack>
+
+          <!-- lanes + settings -->
+          <vstack class="cardTight">
+            <text value="Coin packs and VIP are purchased in the iOS and Android apps through RevenueCat; web checkout is on the template roadmap. On the web, earn through Rewards." class="note" paddingV="6"/>
+          </vstack>
+          <vstack class="cardFlush">
+            <hstack class="settingRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
+              <text value="Notifications" class="settingLabel" style="flex: 1"/>
+              <text value="native apps" class="settingValue"/>
+            </hstack>
+            <hstack class="settingRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
+              <text value="Content language" class="settingLabel" style="flex: 1"/>
+              <text value="English" class="settingValue"/>
+            </hstack>
+            <hstack class="settingRow" href="/admin" a11yLabel="Manage this app — operator surface">
+              <text value="Manage this app" class="settingLabel" style="flex: 1"/>
+              <text value="operator" class="settingValue" color="#F7C948"/>
+              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+            </hstack>
+          </vstack>
+        </vstack>
+      </hstack>
     </vstack>
   </scroll>
   <TabBar active="profile" visible-if="dsx.variable.wide == false"/>

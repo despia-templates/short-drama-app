@@ -18,6 +18,13 @@
       }
     },
     {
+      "path": "/search",
+      "component": "shortdrama.Search",
+      "meta": {
+        "title": "Search \u2014 Short Drama"
+      }
+    },
+    {
       "path": "/rewards",
       "component": "shortdrama.Rewards",
       "meta": {

@@ -48,7 +48,7 @@
     <formula as="dayColor" st="dayState">
       if (st == 'done') { return 'rgba(255,45,85,0.22)' }
       if (st == 'next') { return '#FF2D55' }
-      return '#1B1926'
+      return '#1E1E24'
     </formula>
     <formula as="checkinLabel">
       if (state.data == null) { return 'Check in' }
@@ -59,22 +59,22 @@
     <action as="checkin">
       const r = await checkinCall.send({})
       if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins — day ' + r.data.streak; state.refresh(); wallet.refresh() }
-      else { dsx.variable.toast = r.error == null ? 'Check-in failed' : r.error.message }
+      else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Check-in failed' }
     </action>
     <action as="spin">
       dsx.variable.spinning = true
       const r = await spinCall.send({})
       dsx.variable.spinning = false
       if (r.ok) { dsx.variable.toast = 'The wheel lands on ' + r.data.prize + ' bonus coins!'; state.refresh(); wallet.refresh() }
-      else { dsx.variable.toast = r.error == null ? 'No spin left' : r.error.message }
+      else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'No spin left' }
     </action>
     <action as="claim" task="item.id">
       const r = await claimCall.send({ task: task })
       if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins'; state.refresh(); wallet.refresh() }
-      else { dsx.variable.toast = r.error == null ? 'Not yet' : r.error.message }
+      else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Not yet' }
     </action>
 
-    <style as="screen" background="#08070C" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="14" paddingTop="4" paddingBottom="20" alignItems="stretch"/>
 
@@ -85,8 +85,8 @@
     <style as="balanceSub" fontSize="12" color="rgba(255,255,255,0.55)"/>
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F7C948"/>
 
-    <style as="card" background="#15141C" radius="16" paddingH="16" paddingV="16" spacing="13" alignItems="stretch"/>
-    <style as="cardTight" background="#15141C" radius="16" paddingH="16" paddingV="16" spacing="7" alignItems="stretch"/>
+    <style as="card" background="#141419" radius="16" paddingH="16" paddingV="16" spacing="13" alignItems="stretch"/>
+    <style as="cardTight" background="#141419" radius="16" paddingH="16" paddingV="16" spacing="7" alignItems="stretch"/>
     <style as="cardHead" alignItems="center"/>
     <style as="h2" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
     <style as="streakPill" fontSize="12" fontWeight="semibold" color="#F7C948"/>
@@ -98,7 +98,7 @@
     <style as="cta" radius="22" paddingV="12" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
     <style as="ctaWide" radius="22" paddingV="12" paddingH="22" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
     <style as="wheelWrap" alignItems="center" spacing="12"/>
-    <style as="wheelLabel" fontSize="15" fontWeight="bold" color="#FFFFFF" background="rgba(8,7,12,0.8)" paddingH="11" paddingV="6" radius="14"/>
+    <style as="wheelLabel" fontSize="15" fontWeight="bold" color="#FFFFFF" background="rgba(0,0,0,0.8)" paddingH="11" paddingV="6" radius="14"/>
 
     <style as="taskRow" alignItems="center" spacing="12"/>
     <style as="taskCol" spacing="2"/>
@@ -138,7 +138,7 @@
           </vstack>
         </grid>
         <button label="{{ checkinLabel }}" class="cta"
-                background="{{ state.data != null && state.data.checkedToday ? '#221F2B' : '#FF2D55' }}"
+                background="{{ state.data != null && state.data.checkedToday ? '#26262C' : '#FF2D55' }}"
                 on:tap="dsx.action.checkin()"/>
       </vstack>
 
@@ -147,14 +147,14 @@
         <vstack class="wheelWrap">
           <text value="Spin the wheel" class="h2"/>
           <zstack>
-            <stack style="width: 132px; height: 132px; border-radius: 66px; background: conic-gradient(#FF2D55 0deg 45deg, #1B1926 45deg 90deg, #F7C948 90deg 135deg, #1B1926 135deg 180deg, #FF2D55 180deg 225deg, #1B1926 225deg 270deg, #F7C948 270deg 315deg, #1B1926 315deg 360deg)"/>
+            <stack style="width: 132px; height: 132px; border-radius: 66px; background: conic-gradient(#FF2D55 0deg 45deg, #1E1E24 45deg 90deg, #F7C948 90deg 135deg, #1E1E24 135deg 180deg, #FF2D55 180deg 225deg, #1E1E24 225deg 270deg, #F7C948 270deg 315deg, #1E1E24 315deg 360deg)"/>
             <vstack style="width: 132px; height: 132px; align-items: center; justify-content: center">
               <text value="10–100" class="wheelLabel"/>
             </vstack>
           </zstack>
           <button label="{{ state.data != null && state.data.freeSpinLeft ? 'Spin — 1 free today' : 'No spin left today' }}"
                   class="ctaWide"
-                  background="{{ state.data != null && state.data.freeSpinLeft ? '#FF2D55' : '#221F2B' }}"
+                  background="{{ state.data != null && state.data.freeSpinLeft ? '#FF2D55' : '#26262C' }}"
                   on:tap="dsx.action.spin()"/>
         </vstack>
       </vstack>
@@ -170,7 +170,7 @@
             </vstack>
             <button label="{{ item.claimed ? 'Claimed' : 'Claim' }}" class="claimBtn"
                     color="{{ item.claimed ? 'rgba(255,255,255,0.4)' : '#FFFFFF' }}"
-                    background="{{ item.claimed ? '#221F2B' : '#FF2D55' }}"
+                    background="{{ item.claimed ? '#26262C' : '#FF2D55' }}"
                     on:tap="dsx.action.claim()"/>
           </hstack>
         </list>

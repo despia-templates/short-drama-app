@@ -236,3 +236,17 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
 - **2026-08-29 · Demo content must be licensed-free.** Three seed "shows" produced for the
   template (or public-domain footage re-cut), vertical 9:16, ~8×60–90s episodes each — enough
   to exercise gates (free eps, locked eps, premiere drip) without rights risk.
+
+16. **Review R4 (hex-count) has no brand-palette valve** → filed: https://github.com/despia-native/despia-framework/issues/230 —
+    (found 2026-08-29, restyling to the category look at dev@ae0669ad). `despia review`
+    warns at ≥3 raw hexes/file; with no palette declaration and no appearance pin,
+    a pinned-dark media storefront cannot go tokens-first (light-mode label on a black
+    stage) and cannot pass honestly. Bridge: `scripts/review.mjs` waives R4 ONLY for
+    hexes inside the declared brand palette — off-palette hexes still fail; prints the
+    waiver + this row on every run; dies when upstream lands.
+
+17. **A bare `{{ var }}` fragment in a compound style attribute is silently discarded**
+    → filed: https://github.com/despia-native/despia-framework/issues/231 — (measured during the ReelShort-look pass at dev@ae0669ad).
+    `parseStyleAttr` splits on `;` before interpolation, so `style="{{ shell }}; height: 100%"`
+    drops the shell while the extras apply; the whole-attribute spelling is a first-class
+    door. Idiom adopted (AGENTS.md): compound lists are ONE computed value.

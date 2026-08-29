@@ -82,30 +82,30 @@
       else { dsx.variable.toast = r.error == null ? 'Notice failed' : r.error.message }
     </action>
 
-    <style as="screen" background="#08070C" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="13" paddingTop="4" paddingBottom="20" alignItems="stretch"/>
     <style as="head" alignItems="center" paddingBottom="2"/>
     <style as="headCol" spacing="1"/>
     <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
     <style as="sub" fontSize="11" color="rgba(255,255,255,0.42)"/>
-    <style as="backChip" background="#221F2B" radius="15" paddingH="12" paddingV="7" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="backChip" background="#26262C" radius="15" paddingH="12" paddingV="7" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F7C948"/>
 
     <style as="statRow" spacing="9" alignItems="stretch"/>
-    <style as="statCard" background="#15141C" radius="14" paddingV="14" spacing="3" alignItems="center"/>
+    <style as="statCard" background="#141419" radius="14" paddingV="14" spacing="3" alignItems="center"/>
     <style as="statNum" fontSize="22" fontWeight="bold" color="#FFFFFF"/>
     <style as="statCap" fontSize="11" color="rgba(255,255,255,0.5)"/>
 
-    <style as="card" background="#15141C" radius="16" paddingH="16" paddingV="16" spacing="12" alignItems="stretch"/>
+    <style as="card" background="#141419" radius="16" paddingH="16" paddingV="16" spacing="12" alignItems="stretch"/>
     <style as="h2" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
     <style as="showRow" spacing="11" alignItems="center" paddingV="9"/>
     <style as="showCol" spacing="2"/>
     <style as="showTitle" fontSize="13" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
     <style as="showMeta" fontSize="11" color="rgba(255,255,255,0.45)"/>
-    <style as="miniBtn" background="#221F2B" radius="11" paddingH="9" paddingV="6" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="miniBtn" background="#26262C" radius="11" paddingH="9" paddingV="6" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
     <style as="stateChip" fontSize="11" fontWeight="bold" radius="9" paddingH="9" paddingV="5"/>
-    <style as="field" background="#221F2B" radius="11" paddingH="13" paddingV="12" fontSize="13" color="#FFFFFF"/>
+    <style as="field" background="#26262C" radius="11" paddingH="13" paddingV="12" fontSize="13" color="#FFFFFF"/>
     <style as="chipRow" spacing="8" alignItems="center"/>
     <style as="chip" radius="15" paddingH="13" paddingV="8" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
     <style as="cta" fontSize="13" fontWeight="semibold" color="#FFFFFF" paddingV="12" radius="20"/>
@@ -161,7 +161,7 @@
           <text value="{{ item.featured ? '★' : '☆' }}" fontSize="16" color="#F7C948" on:tap="dsx.action.toggleFeature()" a11yLabel="Feature on the home hero" a11yTrait="button"/>
           <text value="+ EP" class="miniBtn" on:tap="dsx.action.pickForEpisode()" a11yTrait="button"/>
             <text value="{{ item.state == 'live' ? 'LIVE' : 'DRAFT' }}" class="stateChip"
-                  color="{{ item.state == 'live' ? '#08070C' : 'rgba(255,255,255,0.8)' }}"
+                  color="{{ item.state == 'live' ? '#000000' : 'rgba(255,255,255,0.8)' }}"
                   background="{{ item.state == 'live' ? '#5FD08A' : '#3A3547' }}"
                   on:tap="dsx.action.togglePublish()" a11yLabel="Toggle publish" a11yTrait="button"/>
           </hstack>
@@ -174,9 +174,9 @@
         <textfield class="field" bind="dsx.variable.nTitle" placeholder="Title"/>
         <textfield class="field" bind="dsx.variable.nSynopsis" placeholder="Synopsis"/>
         <hstack class="chipRow">
-          <text value="Romance" class="chip" background="{{ dsx.variable.nGenre == 'Romance' ? '#FF2D55' : '#221F2B' }}" on:tap="dsx.variable.nGenre = 'Romance'" a11yTrait="button"/>
-          <text value="Fantasy" class="chip" background="{{ dsx.variable.nGenre == 'Fantasy' ? '#FF2D55' : '#221F2B' }}" on:tap="dsx.variable.nGenre = 'Fantasy'" a11yTrait="button"/>
-          <text value="Revenge" class="chip" background="{{ dsx.variable.nGenre == 'Revenge' ? '#FF2D55' : '#221F2B' }}" on:tap="dsx.variable.nGenre = 'Revenge'" a11yTrait="button"/>
+          <text value="Romance" class="chip" background="{{ dsx.variable.nGenre == 'Romance' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.nGenre = 'Romance'" a11yTrait="button"/>
+          <text value="Fantasy" class="chip" background="{{ dsx.variable.nGenre == 'Fantasy' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.nGenre = 'Fantasy'" a11yTrait="button"/>
+          <text value="Revenge" class="chip" background="{{ dsx.variable.nGenre == 'Revenge' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.nGenre = 'Revenge'" a11yTrait="button"/>
         </hstack>
         <button label="Create draft" class="cta" background="#FF2D55" on:tap="dsx.action.createShow()"/>
       </vstack>
@@ -195,9 +195,9 @@
         <textfield class="field" bind="dsx.variable.pTitle" placeholder="Title — e.g. EP 41–45 drop tonight 8PM"/>
         <textfield class="field" bind="dsx.variable.pMessage" placeholder="Message"/>
         <hstack class="chipRow">
-          <text value="All" class="chip" background="{{ dsx.variable.pSegment == 'all' ? '#FF2D55' : '#221F2B' }}" on:tap="dsx.variable.pSegment = 'all'" a11yTrait="button"/>
-          <text value="VIP" class="chip" background="{{ dsx.variable.pSegment == 'vip' ? '#FF2D55' : '#221F2B' }}" on:tap="dsx.variable.pSegment = 'vip'" a11yTrait="button"/>
-          <text value="Lapsed" class="chip" background="{{ dsx.variable.pSegment == 'lapsed' ? '#FF2D55' : '#221F2B' }}" on:tap="dsx.variable.pSegment = 'lapsed'" a11yTrait="button"/>
+          <text value="All" class="chip" background="{{ dsx.variable.pSegment == 'all' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.pSegment = 'all'" a11yTrait="button"/>
+          <text value="VIP" class="chip" background="{{ dsx.variable.pSegment == 'vip' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.pSegment = 'vip'" a11yTrait="button"/>
+          <text value="Lapsed" class="chip" background="{{ dsx.variable.pSegment == 'lapsed' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.pSegment = 'lapsed'" a11yTrait="button"/>
         </hstack>
         <button label="Queue notice" class="cta" background="#FF2D55" on:tap="dsx.action.sendNotice()"/>
       </vstack>

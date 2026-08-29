@@ -19,3 +19,5 @@ retracted in the ledger instead of filed).
 - `12-tool-emit-omits-inputs.md` — cli/mcp: the standalone <tool> emit omits inputs — every tool advertises an empty schema and drops its arguments → https://github.com/despia-native/despia-framework/issues/226
 - `13-standalone-mcp-serve-path.md` — packaging/mcp: a standalone project has no supported way to SERVE its emitted mcpTools → https://github.com/despia-native/despia-framework/issues/227
 - `14-dev-lane-trust.md` — dx/dev-lane: two ways the local lane silently misleads (precaching SW; static shell ignores the deep-linked path) → https://github.com/despia-native/despia-framework/issues/228
+- `15-review-brand-palette.md` — review: R4 hex-count has no brand-palette valve → https://github.com/despia-native/despia-framework/issues/230
+- `16-style-fragment-silent-drop.md` — lint/web: style fragment silently discarded → https://github.com/despia-native/despia-framework/issues/231

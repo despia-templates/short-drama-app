@@ -5,14 +5,14 @@
      Icons come from the shared catalog (Conformance/icons/sf-map.json), so ONE name
      resolves per renderer: Boxicons paths on web, SF Symbols on iOS, Material Symbols on
      Android. Never a per-platform icon fork. -->
-<hstack class="bar" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.07); justify-content: space-evenly">
+<hstack class="bar" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.08); justify-content: space-evenly">
   <head>
     <attribute as="active" default="'home'"/>   <!-- home | discover | rewards | list | profile -->
 
     <variable as="on" computed="true">'#FF2D55'</variable>
     <variable as="off" computed="true">'rgba(255,255,255,0.42)'</variable>
 
-    <style as="bar" background="#0E0D13" paddingTop="8" paddingBottom="8" alignItems="center"/>
+    <style as="bar" background="#0A0A0E" paddingTop="8" paddingBottom="8" alignItems="center"/>
     <style as="item" spacing="3" alignItems="center" paddingV="2" paddingH="6"/>
     <style as="cap" fontSize="11" fontWeight="medium"/>
   </head>

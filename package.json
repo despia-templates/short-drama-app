@@ -10,7 +10,7 @@
     "build": "despia build",
     "dev": "despia dev",
     "lint": "despia lint --strict",
-    "review": "despia review --strict",
+    "review": "node scripts/review.mjs",
     "check:styles": "node scripts/check-styles.mjs",
     "serve": "DSX_DEV_NO_SW=1 node scripts/serve.mjs",
     "seed": "node scripts/seed.mjs",

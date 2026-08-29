@@ -1,0 +1,105 @@
+<!-- PersonalNav — the personal-center sidebar (wide viewports): identity card, account
+     balance with the red Get Coins CTA, then the section menu — Wallet · My List ·
+     History — with the active row tinted brand red. Mounted by Profile and MyList so
+     the two pages read as ONE center. -->
+<vstack class="side" style="width: 300px; min-width: 300px">
+  <head>
+    <attribute as="active" default="'wallet'"/>   <!-- wallet | list | history -->
+
+    <api as="session" url="/dev-session.json" ssr="false"/>
+    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+
+    <variable as="authHeaders" computed="true">
+      if (session.data == null) { return {} }
+      return { authorization: 'Bearer ' + session.data.viewer.token }
+    </variable>
+    <variable as="uid" computed="true">
+      if (session.data == null) { return '' }
+      return session.data.viewer.sub.slice(0, 8)
+    </variable>
+
+    <style as="side" spacing="14" alignItems="stretch"/>
+    <style as="card" background="#141419" radius="12" paddingH="18" paddingV="18" spacing="14" alignItems="stretch"/>
+    <style as="idRow" spacing="12" alignItems="center"/>
+    <style as="avatar" background="#232329" radius="24" width="48" height="48" alignItems="center"/>
+    <style as="who" spacing="3"/>
+    <style as="whoName" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
+    <style as="whoNote" fontSize="12" color="rgba(255,255,255,0.45)"/>
+    <style as="devPill" background="rgba(255,255,255,0.08)" radius="12" paddingH="10" paddingV="5" fontSize="11" fontWeight="medium" color="rgba(255,255,255,0.6)"/>
+
+    <style as="balCap" fontSize="12" color="rgba(255,255,255,0.5)"/>
+    <style as="balRow" alignItems="center"/>
+    <style as="balCol" spacing="4" alignItems="center"/>
+    <style as="balNum" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
+    <style as="balSub" fontSize="12" color="rgba(255,255,255,0.5)"/>
+    <style as="balDiv" background="rgba(255,255,255,0.1)" width="1" height="34"/>
+    <style as="topupBtn" background="#FF2D55" radius="21" paddingV="12" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+
+    <style as="menu" background="#141419" radius="12" paddingH="8" paddingV="8" spacing="2" alignItems="stretch"/>
+    <style as="menuRow" radius="9" paddingH="12" paddingV="12" spacing="11" alignItems="center"/>
+    <style as="menuLabel" fontSize="15" fontWeight="medium"/>
+  </head>
+
+  <!-- identity -->
+  <vstack class="card">
+    <hstack class="idRow">
+      <vstack class="avatar" style="justify-content: center">
+        <image icon="person.crop.circle" iconSize="26" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+      </vstack>
+      <vstack class="who" style="flex: 1">
+        <text value="Viewer" class="whoName"/>
+        <text value="UID {{ dsx.variable.uid }}" class="whoNote"/>
+      </vstack>
+      <text value="Local session" class="devPill"/>
+    </hstack>
+  </vstack>
+
+  <!-- account balance -->
+  <vstack class="card">
+    <text value="Account Balance" class="balCap"/>
+    <hstack class="balRow" style="justify-content: space-evenly">
+      <vstack class="balCol">
+        <hstack spacing="6" alignItems="center">
+          <image icon="bitcoinsign.circle.fill" iconSize="16" color="#F7C948" a11yHidden="true"/>
+          <text value="{{ wallet.data == null ? 0 : wallet.data.coins }}" class="balNum"/>
+        </hstack>
+        <text value="Coins" class="balSub"/>
+      </vstack>
+      <stack class="balDiv"/>
+      <vstack class="balCol">
+        <hstack spacing="6" alignItems="center">
+          <image icon="bitcoinsign.circle.fill" iconSize="16" color="#F7C948" a11yHidden="true"/>
+          <text value="{{ wallet.data == null ? 0 : wallet.data.bonus }}" class="balNum"/>
+        </hstack>
+        <text value="Bonus" class="balSub"/>
+      </vstack>
+    </hstack>
+    <button label="Get Coins" class="topupBtn"
+            on:tap="dsx.module.route.push({ path: '/rewards' })" a11yLabel="Get coins in Rewards"/>
+  </vstack>
+
+  <!-- section menu -->
+  <vstack class="menu">
+    <hstack class="menuRow" href="/profile" a11yLabel="Wallet"
+            background="{{ dsx.attribute.active == 'wallet' ? '#1F1F26' : 'rgba(0,0,0,0)' }}">
+      <image icon="bitcoinsign.circle.fill" iconSize="18"
+             color="{{ dsx.attribute.active == 'wallet' ? '#FF2D55' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
+      <text value="Wallet" class="menuLabel"
+            color="{{ dsx.attribute.active == 'wallet' ? '#FF2D55' : '#FFFFFF' }}"/>
+    </hstack>
+    <hstack class="menuRow" href="/list" a11yLabel="My list"
+            background="{{ dsx.attribute.active == 'list' ? '#1F1F26' : 'rgba(0,0,0,0)' }}">
+      <image icon="play.rectangle.fill" iconSize="18"
+             color="{{ dsx.attribute.active == 'list' ? '#FF2D55' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
+      <text value="My list" class="menuLabel"
+            color="{{ dsx.attribute.active == 'list' ? '#FF2D55' : '#FFFFFF' }}"/>
+    </hstack>
+    <hstack class="menuRow" href="/list" a11yLabel="History"
+            background="{{ dsx.attribute.active == 'history' ? '#1F1F26' : 'rgba(0,0,0,0)' }}">
+      <image icon="clock.fill" iconSize="18"
+             color="{{ dsx.attribute.active == 'history' ? '#FF2D55' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
+      <text value="History" class="menuLabel"
+            color="{{ dsx.attribute.active == 'history' ? '#FF2D55' : '#FFFFFF' }}"/>
+    </hstack>
+  </vstack>
+</vstack>

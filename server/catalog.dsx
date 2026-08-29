@@ -101,9 +101,33 @@
       }))
       return { show: s.data, episodes: episodes }
     </action>
+
+    <action as="searchShows" inputs="q">
+      const term = (q == null ? '' : String(q)).trim().toLowerCase()
+      const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 200 })
+      if (!shows.ok) { throw { reason: 'unavailable', message: 'catalogue unavailable' } }
+      const eps = await dsx.module.data.episode.list({ filters: { state: 'live' }, limit: 1000 })
+      const counts = {}
+      for (const e of (eps.ok ? eps.data : [])) {
+        counts[e.show] = (counts[e.show] == null ? 0 : counts[e.show]) + 1
+      }
+      const hit = (s) => {
+        if (term === '') { return true }
+        const t = (s.title == null ? '' : s.title).toLowerCase()
+        const g = (s.genre == null ? '' : s.genre).toLowerCase()
+        const y = (s.synopsis == null ? '' : s.synopsis).toLowerCase()
+        return t.includes(term) || g.includes(term) || y.includes(term)
+      }
+      const items = shows.data.filter(hit).slice(0, 24).map((s, i) => ({
+        id: s.id, title: s.title, genre: s.genre, poster: s.poster,
+        synopsis: s.synopsis, episodes: counts[s.id] == null ? 0 : counts[s.id], rank: i + 1
+      }))
+      return { q: term, items: items }
+    </action>
   </head>
 
   <route method="GET" path="/catalog/home"     action="homeShelves"  auth="none"/>
   <route method="GET" path="/catalog/discover" action="discoverFeed" auth="none"/>
   <route method="GET" path="/catalog/show/:id" action="showDetail"   auth="none"/>
+  <route method="POST" path="/catalog/search"   action="searchShows"  auth="none"/>
 </server>

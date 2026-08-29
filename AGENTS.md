@@ -47,8 +47,24 @@ and generated barrel are read once at boot). Schema change → re-apply
   pager captions remains good design (a caption bound to the resting index doesn't move),
   but it is a choice, not a workaround.
 - **Full-bleed = screen facts**: `width="{{ dsx.screen.width }}" height="{{ dsx.screen.height }}"`
-  per layer. The style vocabulary has no `vh`/`position`; one unknown property drops the
-  whole `style=""`.
+  per layer (width via `style="width: 100%"`, never a captured screen fact).
+- **Compound style lists are ONE computed value used as the WHOLE attribute.**
+  `style="{{ chunk }}; extras"` silently DROPS the chunk — the parser splits on `;`
+  first and discards the colon-less `{{ var }}` fragment; only the whole-attribute
+  spelling (`style="{{ oneComputedList }}"`) gets the declaration-list door. Single-value
+  holes inside one declaration (`maxWidth: {{ n }}px`) are fine. (Measured; upstream lint ask filed.)
+- **On web, `style=""` has NO property whitelist** (`mapStyleValue` passes unmapped
+  properties through) — transforms, shadows, borders, transitions all work as
+  progressive enhancement. Native drops unknown declarations per-declaration, so
+  anything load-bearing still needs an attr/class fallback.
+- **A transformed or filtered sibling paints ABOVE later plain siblings** (CSS stacking
+  contexts): any overlay layered over a poster that carries `transform:`/`filter:` needs
+  explicit `zIndex` on its style class (the badgeWrap/chromeLayer pattern).
+- **`<grid>` sizes its DIRECT children** — wrap a cell in a `zstack` and the column
+  width is lost. Keep the cell as the direct child; overlay inside it via
+  `position: absolute` (web enhancement, flow fallback native).
+- **A declared rejection reaches `api` results as `{ ok:false, status, data:{reason,message} }`**
+  — read `r.data.message` for the toast; `r.error` is transport-only (timeout/network/parse).
 - **Fixed-size `<image>` needs style px** (`style="width: 120px; height: 180px"`) beside the
   attrs; `<video>` honors its attrs.
 - **Route params** are `vars.id` — in markup AND in action bodies (both verified).
