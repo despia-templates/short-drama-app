@@ -17,32 +17,45 @@
       <field as="kind" type="text"/>      <!-- push | banner -->
     </entity>
 
+    <!-- THERE IS NO COUNT OP, AND `limit` IS CLAMPED TO 100. `list` takes a page size and
+         silently caps it (repo.ts LIST_LIMIT — a deliberate anti-exfiltration ceiling), so a
+         dashboard that asks for 1000 rows and reports `.length` reports 100 no matter how
+         many exist. The numbers here are therefore PAGE counts, and each carries whether the
+         page was full, so the Manage screen can render "100+" instead of a confident lie.
+         Upstream: an entity needs `count` (and `list` needs to admit truncation) — PLAN.md §6. -->
     <action as="adminStats">
-      const shows = await dsx.module.data.show.list({ limit: 500 })
-      const eps = await dsx.module.data.episode.list({ limit: 1000 })
+      const shows = await dsx.module.data.show.list({ limit: 100 })
+      const eps = await dsx.module.data.episode.list({ limit: 100 })
       const notices = await dsx.module.data.notice.list({ limit: 100 })
       const all = shows.ok ? shows.data : []
+      const epRows = eps.ok ? eps.data : []
+      const noticeRows = notices.ok ? notices.data : []
       return {
         shows: all.length,
         live: all.filter(s => s.state === 'live').length,
         drafts: all.filter(s => s.state === 'draft').length,
-        episodes: eps.ok ? eps.data.length : 0,
-        notices: notices.ok ? notices.data.length : 0
+        episodes: epRows.length,
+        notices: noticeRows.length,
+        capped: all.length >= 100 || epRows.length >= 100 || noticeRows.length >= 100
       }
     </action>
 
     <action as="adminListShows">
-      const shows = await dsx.module.data.show.list({ limit: 500 })
-      const eps = await dsx.module.data.episode.list({ limit: 2000 })
+      const shows = await dsx.module.data.show.list({ limit: 100 })
+      // one bounded read per show: a catalogue-wide episode list stops at the 100-row
+      // ceiling without saying so, and every show past it would report 0 episodes here
       const counts = {}
-      for (const e of (eps.ok ? eps.data : [])) { counts[e.show] = (counts[e.show] == null ? 0 : counts[e.show]) + 1 }
+      for (const s of (shows.ok ? shows.data : [])) {
+        const mine = await dsx.module.data.episode.list({ filters: { show: s.id }, limit: 100 })
+        counts[s.id] = mine.ok ? mine.data.length : 0
+      }
       const rows = (shows.ok ? shows.data : [])
         .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
         .map(s => ({ id: s.id, title: s.title, genre: s.genre, state: s.state, featured: s.featured === true, freeUntil: s.free_until, episodes: counts[s.id] == null ? 0 : counts[s.id], poster: s.poster }))
       return { rows: rows }
     </action>
 
-    <action as="adminUpsertShow" inputs="id, title, synopsis, genre, poster, hero, state, freeUntil, featured">
+    <action as="adminUpsertShow" inputs="id, title, synopsis, genre, poster, hero, heroTall, state, freeUntil, featured">
       if (title == null || title === '') { throw { reason: 'invalid', message: 'title is required' } }
       const values = {
         title: title,
@@ -50,6 +63,7 @@
         genre: genre == null || genre === '' ? 'Drama' : genre,
         poster: poster == null ? '' : poster,
         hero: hero == null ? '' : hero,
+        hero_tall: heroTall == null ? '' : heroTall,
         state: state == null || state === '' ? 'draft' : state,
         free_until: freeUntil == null ? 8 : freeUntil,
         featured: featured === true

@@ -1,0 +1,287 @@
+<!-- AdGate — one rewarded-ad button, three implementations, chosen at RUNTIME.
+
+     Rewarded video is the earn lane every app in this category runs, and it is the one
+     feature whose implementation genuinely differs per platform: iOS and Android call a
+     mediation SDK compiled into the build; the web has no such SDK to compile in. Shipping
+     one and pretending the other exists is how a template teaches a lie, so the lane is
+     PICKED, in JSE, from the two facts DSX publishes about where it is running:
+
+       has('scheme')  — is that module in THIS build?   (the capability plane)
+       os             — which renderer is running?      (ios · android · web · macos · …)
+
+     The order matters: capability first, platform second. `has()` answers "can I", `os`
+     answers "which words" — a build that ships AdMob on web (the module has a `js` site)
+     should take the AdMob lane there too, and asking `os == 'web'` first would have sent it
+     down the fallback for no reason.
+
+     THE THREE LANES
+
+       admob    · `has('admob')`    — Core/AdMob, the mediation lane
+       metaads  · `has('metaads')`  — Core/MetaAudienceNetwork, the same shape
+       house    · everywhere else   — a REAL rewarded video served by this app: a full-screen
+                                      creative, a watch requirement the viewer cannot skip
+                                      past, and an impression the server records. It sells
+                                      the app's own VIP offer, which is exactly what a
+                                      publisher shows at zero fill. Nothing here pretends to
+                                      be a third-party network, and the card names the lane.
+
+     The house lane is a real `<video>`, not a fake timer. DSX has no timer primitive and
+     needs none here: `time=` is a STATE KEY the player writes its own clock into, and
+     `on:ended` fires when the clip runs out — so the reward is gated on footage that
+     actually played, and a countdown that could be faked by a variable never exists.
+
+     UPSTREAM, NAMED RATHER THAN FAKED (PLAN.md §6.24): the AdMob package publishes a BANNER
+     face (`dsx.module.admob.banner`, `<admob.Banner/>`, `<admob.Native/>` — all three
+     declared in Conformance/inline-surfaces/admob.json) but its REWARDED face is still a
+     legacy registry alias (`displayrewardedad`, listed in
+     architecture/proposals/legacy-package.md as pending declaration). There is no declared
+     action to call, so this file does not invent one: when the module is present it says so
+     and runs the house creative, and `dsx.action.playNetwork` is the single place the real
+     call lands the day the face is declared. A guessed module call would compile, do
+     nothing, and grant a coin anyway — which is worse than a named gap.
+
+     The server is the only thing that grants. Every lane ends at the same POST, and the
+     daily cap lives there; the client only reports which creative it managed to show. -->
+<vstack alignItems="stretch">
+  <head>
+    <attribute as="left" default="0"/>          <!-- ad views remaining today (a server fact) -->
+    <attribute as="today" default="0"/>
+    <attribute as="cap" default="10"/>
+    <attribute as="reward" default="15"/>
+    <attribute as="headers" default="{}"/>      <!-- the caller's auth headers -->
+    <attribute as="creative" default="'/media/heiress.mp4'"/>
+
+    <event as="granted" payload="reward left"/>
+    <event as="failed" payload="message"/>
+
+    <api as="adCall" url="/rewards/ad" method="POST" auto="false" headers="dsx.attribute.headers"/>
+
+    <variable as="playing">return false</variable>
+    <variable as="watched">return 0</variable>     <!-- the clip's own clock, written by `time=` -->
+    <variable as="ended">return false</variable>
+    <!-- A REWARDED AD IS NOT PAUSABLE. That is the product rule, and on web it is also what
+         makes the clip run at all: a `<sheet>` re-parents its content into an overlay portal,
+         and moving a `<video>` in the DOM pauses it. Measured: play → playing → pause within
+         the same frame at t=1.43, every time the sheet opened. With `paused=` bound two-way
+         the renderer writes that pause back into this variable and the clip is latched off
+         forever; without the binding nothing ever retries and it stalls at t=0.16.
+         So the binding stays, and the watch below re-asserts the rule. `resumes` bounds it:
+         if the browser is REFUSING autoplay rather than the portal interrupting it, three
+         attempts is enough to know, and the viewer gets a tap-to-play instead of a loop. -->
+    <variable as="paused">return true</variable>
+    <variable as="resumes">return 0</variable>
+
+    <!-- THE LANE PICK. Capability first, platform second (see the header). -->
+    <variable as="lane" computed="true">
+      if (has('admob')) { return 'admob' }
+      if (has('metaads')) { return 'metaads' }
+      return 'house'
+    </variable>
+    <!-- ...and, separately, whether that lane can actually show a network creative today.
+         Split from the pick so the card can say "AdMob is in this build, its rewarded face
+         is not declared yet" instead of silently looking like the house lane. -->
+    <variable as="networkReady" computed="true">return false</variable>
+
+    <variable as="laneLabel" computed="true">
+      if (dsx.variable.lane == 'admob') { return 'AdMob rewarded' }
+      if (dsx.variable.lane == 'metaads') { return 'Meta Audience Network' }
+      return 'Sponsored · house ad'
+    </variable>
+    <variable as="laneNote" computed="true">
+      if (dsx.variable.lane != 'house' && dsx.variable.networkReady == false) {
+        return dsx.variable.laneLabel + ' is in this build, but its rewarded face is still a legacy registry alias with no declared action (PLAN.md §6.24) — this app plays its own creative rather than guessing a module call. The cap and the ledger are unaffected.'
+      }
+      if (os == 'web') {
+        return 'The web has no rewarded-video SDK to compile in, so this placement is served by the app itself: a real clip, a watch requirement, and a server-recorded impression. Native builds take the mediation lane instead.'
+      }
+      return 'Served by ' + dsx.variable.laneLabel + '. The server verifies the view before a coin is granted.'
+    </variable>
+
+    <variable as="canPlay" computed="true">
+      return Number(dsx.attribute.left) > 0 && dsx.variable.playing == false
+    </variable>
+    <variable as="btnLabel" computed="true">
+      if (Number(dsx.attribute.left) <= 0) { return 'Daily ad limit reached' }
+      return 'Watch an ad  ·  +' + dsx.attribute.reward
+    </variable>
+    <!-- 15s is the category's rewarded length; a shorter clip completes on `on:ended` -->
+    <variable as="secsLeft" computed="true">
+      const n = 15 - Math.floor(Number(dsx.variable.watched))
+      return n < 0 ? 0 : n
+    </variable>
+    <!-- complete when the clip has played the category's 15s rewarded length, or when it
+         ended first — a creative shorter than the requirement still counts as watched -->
+    <variable as="complete" computed="true">
+      return dsx.variable.ended || Number(dsx.variable.watched) >= 15
+    </variable>
+    <!-- the browser refused autoplay and we have stopped asking: the viewer's own tap is the
+         only thing left that can start it, so say so instead of showing a frozen countdown -->
+    <variable as="stalled" computed="true">
+      return dsx.variable.playing && dsx.variable.paused && Number(dsx.variable.resumes) >= 3
+    </variable>
+    <variable as="ctaLabel" computed="true">
+      if (dsx.variable.complete) { return 'Claim +' + dsx.attribute.reward }
+      return 'Reward in ' + dsx.variable.secsLeft + 's'
+    </variable>
+
+    <!-- ── the lanes ───────────────────────────────────────────────────────────────── -->
+
+    <action as="play">
+      if (dsx.variable.canPlay == false) { return }
+      if (dsx.variable.lane != 'house' && dsx.variable.networkReady) { dsx.action.playNetwork() }
+      else { dsx.action.playHouse() }
+    </action>
+
+    <!-- THE MEDIATION LANE. One place, deliberately empty, so the day Core/AdMob declares a
+         rewarded action this is a one-line change and nothing else in the app moves. It is
+         unreachable today because `networkReady` is false — a fact the card states out loud
+         rather than a branch that quietly never runs. -->
+    <action as="playNetwork">
+      dsx.event('failed', { message: dsx.variable.laneLabel + ' has no declared rewarded action yet' })
+    </action>
+
+    <!-- THE HOUSE LANE. A real placement: the creative covers the screen and the reward
+         button does not exist until the clip has actually played. -->
+    <action as="playHouse">
+      dsx.variable.watched = 0
+      dsx.variable.ended = false
+      dsx.variable.resumes = 0
+      dsx.variable.paused = false
+      dsx.variable.playing = true
+    </action>
+
+    <action as="finished">
+      dsx.variable.ended = true
+    </action>
+
+    <!-- "an ad cannot be paused", enforced. Bounded, so a browser that is refusing autoplay
+         outright is not fought in a loop — after three tries the viewer gets a tap target,
+         which is a real user gesture and always satisfies the policy. -->
+    <action as="resume">
+      if (dsx.variable.playing == false) { return }
+      if (dsx.variable.complete) { return }
+      if (dsx.variable.paused == false) { return }
+      if (Number(dsx.variable.resumes) >= 3) { return }
+      dsx.variable.resumes = Number(dsx.variable.resumes) + 1
+      dsx.variable.paused = false
+    </action>
+    <action as="tapPlay">
+      dsx.variable.resumes = 0
+      dsx.variable.paused = false
+    </action>
+    <!-- a creative that will not load must never hold the viewer hostage: the impression
+         failed, so it is reported as a failure and the sheet closes -->
+    <action as="broke">
+      dsx.variable.paused = true
+      dsx.variable.playing = false
+      dsx.event('failed', { message: 'The ad failed to load — no reward, and it did not count against your cap' })
+    </action>
+
+    <action as="close">
+      const done = dsx.variable.complete
+      dsx.variable.paused = true
+      dsx.variable.playing = false
+      if (done) { dsx.action.grant() }
+      else { dsx.event('failed', { message: 'Ad closed early — no reward' }) }
+    </action>
+
+    <!-- Every lane ends here. The client reports that an impression completed; the SERVER
+         owns the cap, the ledger and the grant, and a rejection comes back as a declared
+         reason (`r.data.message`), never as a transport error. -->
+    <action as="grant">
+      const r = await adCall.send({ lane: dsx.variable.lane })
+      if (r.ok) { dsx.event('granted', { reward: r.data.reward, left: r.data.left }) }
+      else { dsx.event('failed', { message: r.data != null && r.data.message != null ? r.data.message : 'No ad available' }) }
+    </action>
+
+    <watch value="dsx.variable.paused" on:change="dsx.action.resume()"/>
+
+    <style as="card" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="12" alignItems="stretch"/>
+    <style as="cardHead" alignItems="center"/>
+    <style as="h2" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
+    <style as="meta" fontSize="12" color="rgba(255,255,255,0.5)"/>
+    <style as="lanePill" background="rgba(255,255,255,0.08)" radius="10" paddingH="9" paddingV="4" fontSize="11" fontWeight="semibold" color="rgba(255,255,255,0.72)"/>
+    <style as="cta" radius="24" paddingV="14" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="note" fontSize="12" color="rgba(255,255,255,0.45)" lineSpacing="3"/>
+
+    <style as="adTag" background="rgba(0,0,0,0.6)" radius="4" paddingH="7" paddingV="2" fontSize="11" fontWeight="bold" color="rgba(255,255,255,0.85)" tracking="1"/>
+    <style as="countPill" background="rgba(0,0,0,0.6)" radius="12" paddingH="10" paddingV="5" fontSize="12" fontWeight="semibold" color="rgba(255,255,255,0.9)"/>
+    <style as="closeBtn" width="32" height="32" radius="16" background="rgba(0,0,0,0.6)" alignItems="center"/>
+    <style as="pitch" spacing="10" alignItems="center" paddingH="26" paddingBottom="22"/>
+    <style as="kicker" fontSize="11" fontWeight="bold" color="#FFE9A8" tracking="3"/>
+    <style as="pitchTitle" fontSize="24" fontWeight="bold" color="#FFFFFF" textAlign="center"/>
+    <style as="pitchBody" fontSize="13" color="rgba(255,255,255,0.75)" textAlign="center" lineSpacing="3"/>
+    <style as="claimBtn" background="#FF2C55" radius="24" paddingH="32" paddingV="13" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
+    <style as="waitBtn" background="rgba(255,255,255,0.14)" radius="24" paddingH="32" paddingV="13" fontSize="15" fontWeight="semibold" color="rgba(255,255,255,0.55)"/>
+  </head>
+
+  <vstack class="card">
+    <hstack class="cardHead">
+      <text value="Watch ads, earn coins" class="h2"/>
+      <spacer/>
+      <text value="{{ dsx.attribute.today }}/{{ dsx.attribute.cap }} today" class="meta"/>
+    </hstack>
+
+    <hstack spacing="8" alignItems="center">
+      <text value="{{ dsx.variable.laneLabel }}" class="lanePill"/>
+      <spacer/>
+    </hstack>
+
+    <button label="{{ dsx.variable.btnLabel }}" class="cta"
+            background="{{ dsx.variable.canPlay ? '#FF2C55' : '#26262C' }}"
+            on:tap="dsx.action.play()"/>
+
+    <text value="{{ dsx.variable.laneNote }}" class="note"/>
+  </vstack>
+
+  <!-- the creative. `mode="cover"` is a full-screen modal on every renderer, which is what a
+       rewarded placement is on all three.
+
+       BRIDGED, LOUDLY (upstream PLAN.md §6.22): `inset` is a declared `<sheet>` attribute
+       (stack-elements.json: number, default 14) and the WEB renderer ignores it — measured,
+       `.dsx-sheet-content` keeps `padding: 12px 16px 16px` and no sheet-inset custom
+       property is emitted at all, so the creative rendered in a 343x812 box inside a 375pt screen with black
+       rails down both sides and its own overflow covering the pitch copy. A rewarded
+       placement is edge to edge on every network there is, so the layer cancels the pad
+       here — and `inset="0"` STAYS on the tag, so this becomes a no-op the day the renderer
+       honours it rather than a hack nobody can find again. -->
+  <sheet present="dsx.variable.playing" mode="cover" background="#000000" inset="0">
+    <zstack style="margin: -12px -16px -16px; width: calc(100% + 32px)">
+      <video src="{{ dsx.attribute.creative }}" active="{{ dsx.variable.playing }}"
+             muted="true" loop="false" gravity="fill" audio="ambient"
+             paused="dsx.variable.paused" time="dsx.variable.watched"
+             on:ended="dsx.action.finished()" on:error="dsx.action.broke()"
+             a11yLabel="Sponsored message for ShortDrama VIP"
+             height="{{ dsx.screen.height }}" style="width: 100%"/>
+
+      <!-- explicit zIndex: a `<video>` establishes its own stacking context, so a later plain
+           sibling does NOT reliably paint over it (the same law as a transformed sibling —
+           AGENTS.md). Without this the clip covered the pitch copy. -->
+      <vstack style="z-index: 2; width: 100%; height: {{ dsx.screen.height }}px; justify-content: space-between; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0.35) 58%, rgba(0,0,0,0.92) 100%)">
+        <hstack style="padding: 16px; align-items: center; pointer-events: auto">
+          <text value="AD" class="adTag"/>
+          <spacer/>
+          <text value="{{ dsx.variable.secsLeft }}s" class="countPill" visible-if="dsx.variable.complete == false"
+                a11yLabel="{{ dsx.variable.secsLeft }} seconds before the reward"/>
+          <vstack class="closeBtn" style="justify-content: center" visible-if="dsx.variable.complete"
+                  on:tap="dsx.action.close()" a11yTrait="button" a11yLabel="Close ad">
+            <image icon="xmark" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
+          </vstack>
+        </hstack>
+
+        <vstack class="pitch" style="pointer-events: auto">
+          <text value="SHORTDRAMA VIP" class="kicker"/>
+          <text value="Every episode. No coins." class="pitchTitle"/>
+          <text value="VIP unlocks the whole catalogue, skips these ads, and drops bonus coins into your wallet every week." class="pitchBody" style="max-width: 330px"/>
+          <text value="{{ dsx.variable.ctaLabel }}" class="claimBtn" visible-if="dsx.variable.complete"
+                a11yTrait="button" on:tap="dsx.action.close()"/>
+          <text value="{{ dsx.variable.ctaLabel }}" class="waitBtn"
+                visible-if="dsx.variable.complete == false && dsx.variable.stalled == false"/>
+          <text value="Tap to play the ad" class="claimBtn"
+                visible-if="dsx.variable.stalled" a11yTrait="button" on:tap="dsx.action.tapPlay()"/>
+          <text value="See VIP plans" class="lanePill" href="/vip"/>
+        </vstack>
+      </vstack>
+    </zstack>
+  </sheet>
+</vstack>

@@ -55,6 +55,11 @@
     <!-- The canonical back (writing-an-app.md §5): POP when there is history, REPLACE
          when the screen was deep-linked, so a dismiss never teleports home and never
          stacks a second copy of where you came from. Back is never href — href pushes. -->
+    <variable as="episodeCount" computed="true">
+      if (stats.data == null) { return '—' }
+      return stats.data.episodes >= 100 ? '100+' : String(stats.data.episodes)
+    </variable>
+
     <action as="goBack">
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
       else { dsx.module.route.replace({ path: '/profile' }) }
@@ -136,6 +141,12 @@
           <image icon="chevron.left" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
           <text value="App" class="backChipLabel"/>
         </hstack>
+
+      <!-- The platform has no count op and clamps `list` to 100 rows without saying so
+           (PLAN.md §6.20), so these are PAGE counts. A dashboard that prints "100" for a
+           352-episode catalogue is worse than one that admits the ceiling. -->
+      <text value="Counts are read a page at a time — the data layer caps a list at 100 rows and offers no count, so a full page shows as 100+ until that lands upstream (PLAN.md §6.20)."
+            class="note" visible-if="stats.data != null &amp;&amp; stats.data.capped" paddingTop="8"/>
       </hstack>
 
       <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
@@ -151,7 +162,7 @@
           <text value="Drafts" class="statCap"/>
         </vstack>
         <vstack class="statCard" style="flex: 1">
-          <text value="{{ stats.data == null ? '—' : stats.data.episodes }}" class="statNum"/>
+          <text value="{{ dsx.variable.episodeCount }}" class="statNum"/>
           <text value="Episodes" class="statCap"/>
         </vstack>
         <vstack class="statCard" style="flex: 1">

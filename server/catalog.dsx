@@ -10,6 +10,7 @@
       <field as="genre" type="text"/>
       <field as="poster" type="text"/>
       <field as="hero" type="text"/>
+      <field as="hero_tall" type="text"/>  <!-- the phone frame is 0.75:1, the desktop band 3:1 -->
       <field as="state" type="text"/>          <!-- draft | live -->
       <field as="free_until" type="integer"/>  <!-- episodes 1..N are free -->
       <field as="featured" type="boolean"/>
@@ -31,14 +32,20 @@
     <action as="homeShelves">
       const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 100 })
       if (!shows.ok) { throw { reason: 'unavailable', message: 'catalogue unavailable' } }
-      // episode counts feed the "EP 8" badge every drama app puts on a poster
-      const allEps = await dsx.module.data.episode.list({ filters: { state: 'live' }, limit: 1000 })
+      // EPISODE COUNTS, ONE BOUNDED READ PER SHOW. This used to be a single
+      // `episode.list({ limit: 1000 })` — and `limit` is CLAMPED to 100 (repo.ts LIST_LIMIT,
+      // a deliberate anti-exfiltration ceiling) with no truncation flag, no offset and no
+      // count op, so the read stopped at row 100 and every show past it rendered "EP 0" on a
+      // shipped storefront. Nothing failed; the number was just wrong. A per-show read is
+      // inside the contract for any show under the ceiling, which is what a show is.
+      // Upstream: `list` needs to say when it truncated, and needs a way to page (PLAN.md §6).
       const counts = {}
-      for (const e of (allEps.ok ? allEps.data : [])) {
-        counts[e.show] = (counts[e.show] == null ? 0 : counts[e.show]) + 1
+      for (const s of shows.data) {
+        const mine = await dsx.module.data.episode.list({ filters: { show: s.id, state: 'live' }, limit: 100 })
+        counts[s.id] = mine.ok ? mine.data.length : 0
       }
       const card = (s, i) => ({
-        id: s.id, title: s.title, genre: s.genre, poster: s.poster, hero: s.hero,
+        id: s.id, title: s.title, genre: s.genre, poster: s.poster, hero: s.hero, hero_tall: s.hero_tall,
         synopsis: s.synopsis, free_until: s.free_until, featured: s.featured === true,
         episodes: counts[s.id] == null ? 0 : counts[s.id],
         rank: i + 1
@@ -68,18 +75,22 @@
     <action as="discoverFeed">
       const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 50 })
       if (!shows.ok) { throw { reason: 'unavailable', message: 'catalogue unavailable' } }
-      const eps = await dsx.module.data.episode.list({ filters: { state: 'live' }, limit: 500 })
+      // one bounded read per show, for the same reason homeShelves does it: a catalogue-wide
+      // episode list silently stops at the 100-row ceiling and the shows past it vanish
       const byShow = {}
-      for (const e of (eps.ok ? eps.data : [])) {
-        const cur = byShow[e.show]
-        if (cur == null || e.idx < cur.idx) { byShow[e.show] = e }
+      for (const s of shows.data) {
+        const mine = await dsx.module.data.episode.list({ filters: { show: s.id, state: 'live' }, limit: 100 })
+        for (const e of (mine.ok ? mine.data : [])) {
+          const cur = byShow[e.show]
+          if (cur == null || e.idx < cur.idx) { byShow[e.show] = e }
+        }
       }
       const cards = shows.data
         .map(s => ({ show: s, first: byShow[s.id] == null ? null : byShow[s.id] }))
         .filter(c => c.first !== null)
         .map(c => ({
           show: c.show.id, title: c.show.title, synopsis: c.show.synopsis,
-          genre: c.show.genre, poster: c.show.poster, hero: c.show.hero,
+          genre: c.show.genre, poster: c.show.poster, hero: c.show.hero, hero_tall: c.show.hero_tall,
           video: c.first.video_url, featured: c.show.featured === true
         }))
       const front = cards.filter(c => c.featured)
@@ -91,7 +102,9 @@
       if (id == null || id === '') { throw { reason: 'invalid', message: 'id is required' } }
       const s = await dsx.module.data.show.get({ id: id })
       if (!s.ok) { throw { reason: 'not_found', message: 'no such show' } }
-      const eps = await dsx.module.data.episode.list({ filters: { show: id, state: 'live' }, limit: 200 })
+      // 100 is the platform ceiling (repo.ts LIST_LIMIT); asking for more is silently
+      // clamped, so the number written here is the real one
+      const eps = await dsx.module.data.episode.list({ filters: { show: id, state: 'live' }, limit: 100 })
       const list = (eps.ok ? eps.data : []).sort((a, b) => a.idx - b.idx)
       const episodes = list.map(e => ({
         id: e.id, idx: e.idx, title: e.title, poster: e.poster, duration: e.duration,
@@ -104,13 +117,8 @@
 
     <action as="searchShows" inputs="q">
       const term = (q == null ? '' : String(q)).trim().toLowerCase()
-      const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 200 })
+      const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 100 })
       if (!shows.ok) { throw { reason: 'unavailable', message: 'catalogue unavailable' } }
-      const eps = await dsx.module.data.episode.list({ filters: { state: 'live' }, limit: 1000 })
-      const counts = {}
-      for (const e of (eps.ok ? eps.data : [])) {
-        counts[e.show] = (counts[e.show] == null ? 0 : counts[e.show]) + 1
-      }
       const hit = (s) => {
         if (term === '') { return true }
         const t = (s.title == null ? '' : s.title).toLowerCase()
@@ -118,10 +126,17 @@
         const y = (s.synopsis == null ? '' : s.synopsis).toLowerCase()
         return t.includes(term) || g.includes(term) || y.includes(term)
       }
-      const items = shows.data.filter(hit).slice(0, 24).map((s, i) => ({
-        id: s.id, title: s.title, genre: s.genre, poster: s.poster,
-        synopsis: s.synopsis, episodes: counts[s.id] == null ? 0 : counts[s.id], rank: i + 1
-      }))
+      // count only the rows that are actually returned — one bounded read each, and never
+      // a catalogue-wide list, which the 100-row ceiling would truncate without saying so
+      const picked = shows.data.filter(hit).slice(0, 24)
+      let items = []
+      for (const s of picked) {
+        const mine = await dsx.module.data.episode.list({ filters: { show: s.id, state: 'live' }, limit: 100 })
+        items = items.concat([{
+          id: s.id, title: s.title, genre: s.genre, poster: s.poster,
+          synopsis: s.synopsis, episodes: mine.ok ? mine.data.length : 0, rank: items.length + 1
+        }])
+      }
       return { q: term, items: items }
     </action>
   </head>

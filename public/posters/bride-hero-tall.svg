@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200" role="img" aria-label="The Billionaire&#39;s Contract Bride">
+  <defs><linearGradient id="sky" x1="0.08" y1="0" x2="0.92" y2="1">
+      <stop offset="0" stop-color="#2A0B16"/><stop offset="0.52" stop-color="#B8213F"/><stop offset="1" stop-color="#2A0B16"/>
+    </linearGradient>
+    <radialGradient id="rim" cx="0.5" cy="0.28" r="0.72">
+      <stop offset="0" stop-color="#FF8FA8" stop-opacity="0.62"/>
+      <stop offset="0.55" stop-color="#FF8FA8" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FF8FA8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.46" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="0.58" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.44" r="0.78">
+      <stop offset="0.45" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.62"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="81" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.16"/></feComponentTransfer>
+    </filter><filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="41"/>
+    </filter></defs>
+  <rect width="900" height="1200" fill="url(#sky)"/>
+    <g filter="url(#soft)" opacity="0.9">
+      <ellipse cx="576.0" cy="318.0" rx="270.0" ry="234.0" fill="#FF8FA8" opacity="0.30"/>
+      <ellipse cx="252.0" cy="606.0" rx="216.0" ry="189.0" fill="#5B1030" opacity="0.24"/>
+    </g>
+    <rect width="900" height="1200" fill="url(#rim)"/>
+    <g opacity="0.85" fill="#180510">
+      <ellipse cx="346.5" cy="457.5" rx="63.0" ry="73.1"/>
+      <path d="M 151.2 1263.0
+               C 151.2 601.8
+                 257.0 535.6
+                 346.5 535.6
+               C 436.0 535.6
+                 541.8 601.8
+                 541.8 1263.0
+               Z"/>
+    </g>
+    <g opacity="0.92" fill="#180510">
+      <ellipse cx="562.5" cy="418.8" rx="70.6" ry="81.8"/>
+      <path d="M 343.8 1270.6
+               C 343.8 580.4
+                 462.3 506.3
+                 562.5 506.3
+               C 662.7 506.3
+                 781.2 580.4
+                 781.2 1270.6
+               Z"/>
+    </g>
+    <rect width="900" height="1200" fill="url(#sweep)"/>
+    <circle cx="248.1" cy="227.7" r="2.0" fill="#FFD9E2" opacity="0.62"/><circle cx="273.8" cy="955.0" r="2.0" fill="#FFD9E2" opacity="0.27"/><circle cx="-3.4" cy="925.5" r="0.9" fill="#FFD9E2" opacity="0.58"/><circle cx="404.5" cy="421.6" r="1.5" fill="#FFD9E2" opacity="0.55"/><circle cx="9.1" cy="401.9" r="2.2" fill="#FFD9E2" opacity="0.40"/><circle cx="172.0" cy="257.7" r="1.8" fill="#FFD9E2" opacity="0.44"/><circle cx="4.9" cy="829.9" r="1.6" fill="#FFD9E2" opacity="0.66"/><circle cx="570.1" cy="959.5" r="1.7" fill="#FFD9E2" opacity="0.38"/><circle cx="612.9" cy="366.5" r="1.0" fill="#FFD9E2" opacity="0.28"/><circle cx="730.7" cy="469.8" r="2.0" fill="#FFD9E2" opacity="0.47"/><circle cx="186.6" cy="303.2" r="2.3" fill="#FFD9E2" opacity="0.66"/><circle cx="564.4" cy="162.5" r="1.6" fill="#FFD9E2" opacity="0.67"/><circle cx="774.6" cy="833.9" r="0.7" fill="#FFD9E2" opacity="0.41"/><circle cx="244.3" cy="854.1" r="0.9" fill="#FFD9E2" opacity="0.38"/><circle cx="225.5" cy="49.9" r="1.1" fill="#FFD9E2" opacity="0.32"/><circle cx="285.4" cy="536.1" r="2.1" fill="#FFD9E2" opacity="0.50"/><circle cx="785.5" cy="869.0" r="1.8" fill="#FFD9E2" opacity="0.28"/><circle cx="644.2" cy="829.1" r="1.5" fill="#FFD9E2" opacity="0.35"/><circle cx="172.6" cy="828.7" r="2.0" fill="#FFD9E2" opacity="0.28"/><circle cx="665.2" cy="840.2" r="1.9" fill="#FFD9E2" opacity="0.43"/><circle cx="526.7" cy="828.1" r="1.2" fill="#FFD9E2" opacity="0.24"/><circle cx="351.4" cy="816.2" r="1.5" fill="#FFD9E2" opacity="0.32"/><circle cx="845.7" cy="660.2" r="2.4" fill="#FFD9E2" opacity="0.31"/><circle cx="598.9" cy="742.4" r="2.4" fill="#FFD9E2" opacity="0.64"/><circle cx="738.2" cy="701.6" r="1.8" fill="#FFD9E2" opacity="0.52"/><circle cx="143.0" cy="142.5" r="1.9" fill="#FFD9E2" opacity="0.50"/>
+    <rect width="900" height="1200" fill="url(#vig)"/>
+    <rect width="900" height="1200" filter="url(#grain)" opacity="0.5"/>
+</svg>

@@ -110,6 +110,38 @@ and generated barrel are read once at boot). Schema change → re-apply
   `width="{{ dsx.screen.width }}"` pins it to whatever the window was at mount — a desktop
   pane then renders the video at 959px inside a 697px pager. Widths are `style="width: 100%"`;
   reach for a screen fact only where a real pixel HEIGHT is needed.
+- **A horizontal rail's TRACK is `width: max-content`**, never the page shell's `width: 100%`.
+  The shell recipe caps the track at the scroller and the rows eat the difference: measured,
+  150px posters rendered at 72.25px and every badge wrapped one letter per line. The gutter
+  is the track's padding, both sides. (The framework half of this — horizontal collection
+  rows are `flex: none` — landed in `theme.ts` this pass; PLAN.md §6.19.)
+- **`list` clamps `limit` to 100 and says nothing.** `repo.ts LIST_LIMIT` is deliberate
+  policy, but there is no truncation flag, no cursor and no `count` op, so a read past 100
+  rows is unreachable and a caller cannot tell a full page from a complete set. NEVER write
+  `limit: 1000`. Read per-parent (one bounded query per show), and where a total is genuinely
+  wanted, render "100+" and say why. Cost a shipped storefront where every show past the
+  100th episode row displayed "EP 0" (PLAN.md §6.20).
+- **A nested column stack is `align-self: stretch`, which silently defeats the parent's
+  `alignItems`.** The web sheet stretches a column stack inside a column stack ("a form is a
+  block"), and CSS makes a stretch with a DEFINITE cross size behave as `flex-start` — so a
+  fixed-size child lands at the leading edge while its siblings stay centred. Five instances
+  in this template, all invisible from source. When a sized box must sit where its parent
+  says, write `align-self: center` on it (PLAN.md §6.21).
+- **A `<video>` establishes its own stacking context**, so a later plain sibling does not
+  reliably paint over it — the same law as a transformed sibling. Any chrome over a clip
+  needs an explicit `zIndex`.
+- **A `<sheet>` re-parents its content into an overlay portal**, which pauses any `<video>`
+  inside it; a two-way `paused=` binding then latches that pause forever. Re-assert the
+  intent (a `<watch>` on `paused`), bound the retries, and give the viewer a tap target when
+  the browser is genuinely refusing autoplay (PLAN.md §6.23). `<sheet inset>` is declared and
+  ignored on web, so a full-bleed sheet still needs a named bridge (PLAN.md §6.22).
+- **Ask the CAPABILITY plane before the platform.** `has('scheme')` answers "can I",
+  `os` answers "which words" (`ios · android · web · macos · windows · linux`), `env` answers
+  "which channel". A lane picked by `os == 'web'` first sends a build that DOES have the
+  module down the fallback for no reason — see `Components/parts/AdGate.dsx`.
+- **Art is authored at the ratio it is displayed at.** A 2:3 poster in a 3:4 frame under
+  `object-fit: cover` loses a quarter of its height, and one 16:9 hero cannot serve both a
+  3:1 desktop band and a 0.75:1 phone frame — generate both (`scripts/gen-art.mjs`).
 - **Purge the service worker before you trust a local measurement.** `despia build` emits a
   precaching SW; a stale bundle against fresh SSR HTML makes correct markup look broken
   (this cost a full redesign once — PLAN.md §6.13a). `npm run serve` sets `DSX_DEV_NO_SW=1`

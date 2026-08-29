@@ -35,6 +35,14 @@
       const g = dsx.variable.gutter
       return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
+    <!-- a rail track is `max-content` with the gutter as its padding: `width: 100%` (the
+         page-shell recipe) caps the track at the scroller and the cards eat the difference. -->
+    <variable as="railShell" computed="true">
+      const g = dsx.variable.gutter
+      const over = dsx.screen.width - 1440
+      const lead = g + (over > 0 ? Math.round(over / 2) : 0)
+      return 'width: max-content; padding-left: ' + lead + 'px; padding-right: ' + lead + 'px'
+    </variable>
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
@@ -51,7 +59,7 @@
     <style as="sectionTitle" fontSize="17" fontWeight="bold" color="#FFFFFF" tracking="-0.2"/>
     <style as="empty" fontSize="13" color="rgba(255,255,255,0.45)"/>
 
-    <style as="rail" spacing="12" alignItems="flex-start" paddingTrailing="16"/>
+    <style as="rail" spacing="12" alignItems="flex-start"/>
     <style as="card" spacing="7" alignItems="stretch"/>
     <style as="cardTitle" fontSize="15" fontWeight="medium" color="rgba(255,255,255,0.95)" lineLimit="1"/>
     <style as="cardMeta" fontSize="12" color="rgba(255,255,255,0.5)"/>
@@ -83,13 +91,15 @@
             <text class="empty" visible-if="continue.data != null && continue.data.items.length == 0"
                   value="Nothing in progress yet — start a show from Home."/>
             <scroll axis="horizontal" indicators="false">
-              <hstack class="rail">
+              <hstack class="rail" style="{{ dsx.variable.railShell }}">
                 <list bind="continue.data.items" key="episode" axis="horizontal" scroll="false" spacing="12">
                   <vstack class="card" style="width: 132px" href="/watch/{{ item.show }}/{{ item.idx }}" a11yGroup="true" a11yLabel="Continue {{ item.title }}, episode {{ item.idx }}">
                     <zstack>
                       <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
                              style="width: 132px; height: 198px; border-radius: 8px"/>
-                      <vstack class="badgeWrap" style="width: 132px; height: 198px; justify-content: flex-end">
+                      <!-- top-left: the key art keeps that corner clear and carries its own
+                           title at the foot of the poster -->
+                      <vstack class="badgeWrap" style="width: 132px; height: 198px; pointer-events: none">
                         <text value="EP {{ item.idx }}" class="badgeDark"/>
                       </vstack>
                       <vstack style="width: 132px; height: 198px; justify-content: flex-end">

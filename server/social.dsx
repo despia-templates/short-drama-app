@@ -18,7 +18,7 @@
 
     <action as="listComments" inputs="episode">
       if (episode == null || episode === '') { throw { reason: 'invalid', message: 'episode is required' } }
-      const rows = await dsx.module.data.comment.list({ filters: { episode: episode }, limit: 200 })
+      const rows = await dsx.module.data.comment.list({ filters: { episode: episode }, limit: 100 })
       if (!rows.ok) { return { count: 0, rows: [] } }
       const out = []
       for (const c of rows.data) {
@@ -29,8 +29,10 @@
 
     <action as="countComments" inputs="episode">
       if (episode == null || episode === '') { return { count: 0 } }
-      const rows = await dsx.module.data.comment.list({ filters: { episode: episode }, limit: 500 })
-      return { count: rows.ok ? rows.data.length : 0 }
+      // no count op and a 100-row page ceiling: `capped` is what lets the UI render "99+"
+      const rows = await dsx.module.data.comment.list({ filters: { episode: episode }, limit: 100 })
+      const n = rows.ok ? rows.data.length : 0
+      return { count: n, capped: n >= 100 }
     </action>
 
     <action as="postComment" inputs="show, episode, body">

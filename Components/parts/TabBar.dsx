@@ -18,7 +18,6 @@
     <style as="vipWrap" alignItems="center" spacing="4" paddingH="4" width="66"/>
     <style as="vipGem" width="30" height="30" radius="10" alignItems="center"/>
     <style as="dot" background="#FF2C55" width="7" height="7" radius="4"/>
-    <style as="badgeSlot" alignItems="flex-end" width="30" height="0"/>
   </head>
 
   <vstack class="item" on:tap="dsx.module.route.reset({ path: '/' })" a11yTrait="button" a11yLabel="Home">
@@ -35,14 +34,18 @@
 
   <!-- VIP: the centre slot the category reserves for the subscription -->
   <vstack class="vipWrap" on:tap="dsx.module.route.reset({ path: '/vip' })" a11yTrait="button" a11yLabel="VIP">
-    <zstack>
-      <vstack class="vipGem" style="justify-content: center; background: linear-gradient(150deg, #FF7BAA 0%, #FF2C55 45%, #B3103A 100%); box-shadow: 0 4px 14px rgba(255,44,85,0.45)">
-        <image icon="crown.fill" iconSize="15" color="#FFE9A8" a11yHidden="true"/>
-      </vstack>
-      <vstack class="badgeSlot" style="pointer-events: none">
-        <stack class="dot" style="border: 2px solid #000000; margin-top: -2px; margin-right: -2px"/>
-      </vstack>
-    </zstack>
+    <!-- `align-self: center` is LOAD-BEARING, not decoration. A column stack nested in a
+         column stack is given `align-self: stretch` by the web sheet (globals.ts, "a form is
+         a block") — and CSS says a stretch with a DEFINITE cross size behaves as flex-start,
+         so this 30pt gem ignored `alignItems="center"` on its parent and sat 14px left of the
+         tab centre while the "VIP" caption under it stayed centred. The sheet's own comment
+         says "an authored width still wins", and the width does win; the POSITION does not.
+         Filed upstream (PLAN.md §6.21) with the fix — `width: 100%` instead of stretch leaves
+         `align-self: auto`, so the parent's `align-items` keeps governing. -->
+    <vstack class="vipGem" style="align-self: center; position: relative; justify-content: center; background: linear-gradient(150deg, #FF7BAA 0%, #FF2C55 45%, #B3103A 100%); box-shadow: 0 4px 14px rgba(255,44,85,0.45)">
+      <image icon="crown.fill" iconSize="15" color="#FFE9A8" a11yHidden="true"/>
+      <stack class="dot" style="position: absolute; top: -1px; right: -1px; border: 2px solid #000000"/>
+    </vstack>
     <text value="VIP" class="cap" color="{{ dsx.attribute.active == 'vip' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>
 

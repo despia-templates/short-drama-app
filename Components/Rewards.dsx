@@ -17,7 +17,6 @@
     <api as="checkinCall" url="/rewards/checkin" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
     <api as="spinCall" url="/rewards/spin" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
     <api as="claimCall" url="/rewards/task" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
-    <api as="adCall" url="/rewards/ad" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
 
     <variable as="toast">return ''</variable>
     <variable as="tier">return 'monthly'</variable>
@@ -51,11 +50,6 @@
     <variable as="balance" computed="true">
       if (wallet.data == null) { return 0 }
       return wallet.data.coins + wallet.data.bonus
-    </variable>
-    <variable as="adLabel" computed="true">
-      if (state.data == null) { return 'Watch an ad' }
-      if (state.data.adsLeft <= 0) { return 'Daily ad limit reached' }
-      return 'Watch an ad  ·  +' + state.data.adReward
     </variable>
 
     <formula as="dayState" i="item.i">
@@ -92,10 +86,14 @@
       if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins'; state.refresh(); wallet.refresh() }
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Not yet' }
     </action>
-    <action as="watchAd">
-      const r = await adCall.send({})
-      if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins · ' + r.data.left + ' left today'; state.refresh(); wallet.refresh() }
-      else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'No ad available' }
+    <!-- the ad lane lives in <AdGate>; this screen only reacts to its outcome -->
+    <action as="adGranted" reward="event.reward" left="event.left">
+      dsx.variable.toast = '+' + reward + ' bonus coins · ' + left + ' left today'
+      state.refresh()
+      wallet.refresh()
+    </action>
+    <action as="adFailed" message="event.message">
+      dsx.variable.toast = message
     </action>
 
     <style as="screen" background="#000000" alignItems="stretch"/>
@@ -199,18 +197,16 @@
                     on:tap="dsx.action.checkin()"/>
           </vstack>
 
-          <!-- rewarded ads: the capped lane -->
-          <vstack class="card">
-            <hstack class="cardHead">
-              <text value="Watch ads, earn coins" class="h2"/>
-              <spacer/>
-              <text value="{{ state.data == null ? 0 : state.data.adsToday }}/{{ state.data == null ? 10 : state.data.adCap }} today" class="taskMeta"/>
-            </hstack>
-            <button label="{{ dsx.variable.adLabel }}" class="cta"
-                    background="{{ state.data != null && state.data.adsLeft > 0 ? '#FF2C55' : '#26262C' }}"
-                    on:tap="dsx.action.watchAd()"/>
-            <text value="Rewarded ads play in the iOS and Android apps (AdMob), and the server verifies the view before granting a coin. On the web this button grants the same reward through the test lane so the cap and ledger stay honest." class="note"/>
-          </vstack>
+          <!-- rewarded ads: the capped lane. The component owns the PLATFORM decision
+               (`has('admob')` / `os`) and the creative; this screen owns the server facts
+               and what to do with the outcome. -->
+          <AdGate left="{{ state.data == null ? 0 : state.data.adsLeft }}"
+                  today="{{ state.data == null ? 0 : state.data.adsToday }}"
+                  cap="{{ state.data == null ? 10 : state.data.adCap }}"
+                  reward="{{ state.data == null ? 15 : state.data.adReward }}"
+                  headers="{{ dsx.variable.authHeaders }}"
+                  on:granted="dsx.action.adGranted()"
+                  on:failed="dsx.action.adFailed()"/>
 
           <!-- spin -->
           <vstack class="card">

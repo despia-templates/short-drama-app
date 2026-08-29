@@ -59,34 +59,40 @@ installEntities(entities);
 const svc = serviceRepo();
 const need = (v, name) => { if (v === undefined || v === null || v === "") throw { reason: "invalid", message: `${name} is required` }; return v; };
 const opsHandlers = {
+  // The internal twins mirror server/admin.dsx exactly, INCLUDING its ceiling: `svc.list`
+  // clamps `limit` to LIST_LIMIT (100) and says nothing, so asking for 2000 returned 100 and
+  // the dashboard reported "100 episodes" for a 352-episode catalogue. Page counts, plus the
+  // flag that says the page was full.
   stats: async () => {
-    const [shows, eps, notices] = await Promise.all([svc.list("show", { limit: 500 }), svc.list("episode", { limit: 2000 }), svc.list("notice", { limit: 200 })]);
+    const [shows, eps, notices] = await Promise.all([svc.list("show", { limit: 100 }), svc.list("episode", { limit: 100 }), svc.list("notice", { limit: 100 })]);
     return {
       shows: shows.length,
       live: shows.filter((s) => s.state === "live").length,
       drafts: shows.filter((s) => s.state === "draft").length,
       episodes: eps.length,
       notices: notices.length,
+      capped: shows.length >= 100 || eps.length >= 100 || notices.length >= 100,
     };
   },
   listShows: async () => {
-    const [shows, eps] = await Promise.all([svc.list("show", { limit: 500 }), svc.list("episode", { limit: 2000 })]);
+    const shows = await svc.list("show", { limit: 100 });
+    // one bounded read per show — a catalogue-wide episode list stops at 100 rows silently
     const counts = {};
-    for (const e of eps) counts[e.show] = (counts[e.show] ?? 0) + 1;
+    for (const s of shows) counts[s.id] = (await svc.list("episode", { filters: { show: s.id }, limit: 100 })).length;
     const rows = shows
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
       .map((s) => ({ id: s.id, title: s.title, genre: s.genre, state: s.state, featured: s.featured === true, freeUntil: s.free_until, episodes: counts[s.id] ?? 0, poster: s.poster }));
     return { rows };
   },
   listEpisodes: async (args) => {
-    const eps = await svc.list("episode", { filters: { show: String(need(args.show, "show")) }, limit: 500 });
+    const eps = await svc.list("episode", { filters: { show: String(need(args.show, "show")) }, limit: 100 });
     return { rows: eps.sort((a, b) => a.idx - b.idx) };
   },
   upsertShow: async (args) => {
     const values = {
       title: String(need(args.title, "title")),
       synopsis: String(args.synopsis ?? ""), genre: String(args.genre ?? "" ) || "Drama",
-      poster: String(args.poster ?? ""), hero: String(args.hero ?? ""),
+      poster: String(args.poster ?? ""), hero: String(args.hero ?? ""), hero_tall: String(args.heroTall ?? ""),
       state: String(args.state ?? "") || "draft",
       free_until: Number.isFinite(Number(args.freeUntil)) ? Number(args.freeUntil) : 8,
       featured: args.featured === true,

@@ -28,6 +28,7 @@
     <entity as="adview" ownership="owner">
       <field as="day" type="text"/>
       <field as="reward" type="integer"/>
+      <field as="lane" type="text"/>   <!-- house | admob | metaads — which lane showed it -->
       <index on="day"/>
     </entity>
 
@@ -150,19 +151,29 @@
       await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
       return { claimed: task, reward: reward }
     </action>
-    <action as="grantAdReward">
+    <!-- The client reports WHICH lane showed the impression (see Components/parts/AdGate.dsx);
+         the server decides everything that costs money. A mediation lane will one day arrive
+         with a signed server-side-verification callback, and this is where that check lands —
+         which is exactly why the lane is recorded now rather than after the fact. An unknown
+         lane is refused rather than trusted: a client that can name its own lane could
+         otherwise claim the verified one. -->
+    <action as="grantAdReward" inputs="lane">
+      const shown = lane == null || lane === '' ? 'house' : String(lane)
+      if (shown !== 'house' && shown !== 'admob' && shown !== 'metaads') {
+        throw { reason: 'invalid', message: 'unknown ad lane' }
+      }
       const today = new Date().toISOString().slice(0, 10)
       const seen = await dsx.module.data.adview.list({ filters: { day: today }, limit: 40 })
       const count = seen.ok ? seen.data.length : 0
       if (count >= 10) { throw { reason: 'conflict', message: 'daily ad limit reached — come back tomorrow' } }
       const reward = 15
-      await dsx.module.data.adview.create({ day: today, reward: reward })
+      await dsx.module.data.adview.create({ day: today, reward: reward, lane: shown })
       const mine = await dsx.module.data.wallet.list({ limit: 1 })
       if (!mine.ok || mine.data.length === 0) { throw { reason: 'conflict', message: 'no wallet' } }
       const w = mine.data[0]
       await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
-      await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'ad', ref: 'ad-' + today + '-' + (count + 1) })
-      return { reward: reward, left: 10 - (count + 1) }
+      await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'ad', ref: 'ad-' + shown + '-' + today + '-' + (count + 1) })
+      return { reward: reward, left: 10 - (count + 1), lane: shown }
     </action>
   </head>
 

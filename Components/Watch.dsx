@@ -259,9 +259,12 @@
     <style as="railCount" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
     <style as="railCap" fontSize="11" color="rgba(255,255,255,0.9)"/>
     <style as="vipTag" background="#F6B63D" radius="4" paddingH="5" paddingV="1" fontSize="11" fontWeight="bold" color="#3A2A08"/>
+    <!-- the corner twin: a badge riding an icon is a MARKER, not a label. 11 is the bottom
+         of the type ramp and the review gate is right to hold it there — a 9pt badge reads
+         as noise at arm's length. The pill stays small by trimming its PADDING instead. -->
+    <style as="vipCorner" background="#F6B63D" radius="4" paddingH="4" paddingV="0" fontSize="11" fontWeight="bold" color="#3A2A08"/>
     <style as="cellTag" background="#F6B63D" paddingH="3" paddingV="0" fontSize="11" fontWeight="bold" color="#3A2A08"/>
     <style as="nowBars" alignItems="center"/>
-    <style as="vipSlot" alignItems="flex-end" width="30" height="0"/>
 
     <!-- ── bottom: scrubber + the EP pill ── -->
     <style as="bottomBar" paddingLeading="14" paddingTrailing="14" paddingBottom="14" spacing="10" alignItems="stretch"/>
@@ -392,12 +395,17 @@
                 <text value="Share" class="railCap"/>
               </vstack>
               <vstack class="railItem" on:tap="dsx.module.route.push({ path: '/vip' })" a11yGroup="true" a11yTrait="button" a11yLabel="Download — VIP">
-                <zstack>
+                <!-- `align-self: center` is load-bearing: a column stack nested in a column
+                     stack is handed `align-self: stretch` by the web sheet, and a stretch
+                     with a definite cross size behaves as flex-start — so this anchor grew
+                     to the rail's full 51px and the icon inside it sat at the LEFT edge
+                     while "Download" under it stayed centred (measured, PLAN.md §6.21).
+                     The badge is sized and offset to stay inside the rail: at `right: -14`
+                     off a stretched anchor it ran to x=377 on a 375pt screen and clipped. -->
+                <stack style="align-self: center; position: relative">
                   <image icon="square.and.arrow.down" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
-                  <vstack class="vipSlot" style="pointer-events: none">
-                    <text value="VIP" class="vipTag" style="margin-top: -6px; margin-right: -12px"/>
-                  </vstack>
-                </zstack>
+                  <text value="VIP" class="vipCorner" style="position: absolute; top: -6px; right: -11px"/>
+                </stack>
                 <text value="Download" class="railCap"/>
               </vstack>
             </vstack>

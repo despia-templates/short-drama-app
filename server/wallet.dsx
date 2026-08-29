@@ -37,11 +37,15 @@
         if (!made.ok) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
         w = made.data
       }
-      const unlocks = await dsx.module.data.unlock.list({ limit: 500 })
+      // 100 is the ceiling `list` actually honours; a viewer past it would see the oldest
+      // unlocks fall out of this set, so the flag travels with it and the UI says so rather
+      // than quietly re-locking an episode the viewer paid for
+      const unlocks = await dsx.module.data.unlock.list({ limit: 100 })
       const vip = w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
       return {
         coins: w.coins, bonus: w.bonus, vip: vip, vipUntil: w.vip_until,
-        unlocked: (unlocks.ok ? unlocks.data : []).map(u => u.episode)
+        unlocked: (unlocks.ok ? unlocks.data : []).map(u => u.episode),
+        unlockedCapped: unlocks.ok && unlocks.data.length >= 100
       }
     </action>
 

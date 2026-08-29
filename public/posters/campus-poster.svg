@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="480" viewBox="0 0 360 480" role="img" aria-label="My Cold Campus Prince">
+  <defs><linearGradient id="sky" x1="0.08" y1="0" x2="0.92" y2="1">
+      <stop offset="0" stop-color="#0F1B33"/><stop offset="0.52" stop-color="#3C74D6"/><stop offset="1" stop-color="#0F1B33"/>
+    </linearGradient>
+    <radialGradient id="rim" cx="0.55" cy="0.27" r="0.72">
+      <stop offset="0" stop-color="#9CC2FF" stop-opacity="0.62"/>
+      <stop offset="0.55" stop-color="#9CC2FF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#9CC2FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.46" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="0.58" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.44" r="0.78">
+      <stop offset="0.45" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.62"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="44" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.16"/></feComponentTransfer>
+    </filter><filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <linearGradient id="scrim" x1="0" y1="0.34" x2="0" y2="1">
+      <stop offset="0" stop-color="#05030A" stop-opacity="0"/>
+      <stop offset="0.34" stop-color="#05030A" stop-opacity="0.22"/>
+      <stop offset="0.68" stop-color="#05030A" stop-opacity="0.70"/>
+      <stop offset="1" stop-color="#05030A" stop-opacity="0.95"/>
+    </linearGradient>
+  </defs>
+  <rect width="360" height="480" fill="url(#sky)"/>
+    <g filter="url(#soft)" opacity="0.9">
+      <ellipse cx="248.4" cy="122.4" rx="108.0" ry="93.6" fill="#9CC2FF" opacity="0.30"/>
+      <ellipse cx="118.8" cy="237.6" rx="86.4" ry="75.6" fill="#1A3468" opacity="0.24"/>
+    </g>
+    <rect width="360" height="480" fill="url(#rim)"/>
+    <g opacity="0.85" fill="#060C18">
+      <ellipse cx="156.6" cy="178.2" rx="25.2" ry="29.2"/>
+      <path d="M 78.5 505.2
+               C 78.5 235.9
+                 120.8 209.4
+                 156.6 209.4
+               C 192.4 209.4
+                 234.7 235.9
+                 234.7 505.2
+               Z"/>
+    </g>
+    <g opacity="0.92" fill="#060C18">
+      <ellipse cx="243.0" cy="162.7" rx="28.2" ry="32.7"/>
+      <path d="M 155.5 508.2
+               C 155.5 227.4
+                 202.9 197.7
+                 243.0 197.7
+               C 283.1 197.7
+                 330.5 227.4
+                 330.5 508.2
+               Z"/>
+    </g>
+    <rect width="360" height="480" fill="url(#sweep)"/>
+    <circle cx="194.4" cy="225.7" r="2.4" fill="#E0EBFF" opacity="0.18"/><circle cx="15.1" cy="389.5" r="1.0" fill="#E0EBFF" opacity="0.37"/><circle cx="138.2" cy="312.9" r="1.6" fill="#E0EBFF" opacity="0.52"/><circle cx="303.1" cy="38.3" r="2.5" fill="#E0EBFF" opacity="0.63"/><circle cx="160.5" cy="392.8" r="1.9" fill="#E0EBFF" opacity="0.32"/><circle cx="364.6" cy="55.6" r="1.5" fill="#E0EBFF" opacity="0.18"/><circle cx="353.7" cy="148.0" r="1.2" fill="#E0EBFF" opacity="0.62"/><circle cx="5.8" cy="312.2" r="2.0" fill="#E0EBFF" opacity="0.37"/><circle cx="5.9" cy="189.2" r="1.3" fill="#E0EBFF" opacity="0.62"/><circle cx="187.5" cy="155.8" r="0.9" fill="#E0EBFF" opacity="0.46"/><circle cx="310.2" cy="271.6" r="1.4" fill="#E0EBFF" opacity="0.50"/><circle cx="105.1" cy="90.0" r="1.7" fill="#E0EBFF" opacity="0.18"/><circle cx="190.9" cy="364.9" r="2.0" fill="#E0EBFF" opacity="0.44"/><circle cx="167.8" cy="257.1" r="1.5" fill="#E0EBFF" opacity="0.60"/><circle cx="203.4" cy="222.5" r="2.3" fill="#E0EBFF" opacity="0.27"/><circle cx="211.9" cy="192.7" r="2.2" fill="#E0EBFF" opacity="0.38"/><circle cx="152.7" cy="293.7" r="1.7" fill="#E0EBFF" opacity="0.30"/><circle cx="239.2" cy="182.9" r="0.8" fill="#E0EBFF" opacity="0.38"/><circle cx="270.0" cy="0.7" r="1.2" fill="#E0EBFF" opacity="0.42"/><circle cx="158.2" cy="14.7" r="2.3" fill="#E0EBFF" opacity="0.59"/><circle cx="85.7" cy="40.2" r="1.3" fill="#E0EBFF" opacity="0.27"/><circle cx="359.1" cy="121.9" r="1.2" fill="#E0EBFF" opacity="0.54"/><circle cx="184.6" cy="211.7" r="2.1" fill="#E0EBFF" opacity="0.38"/><circle cx="205.5" cy="56.1" r="2.0" fill="#E0EBFF" opacity="0.30"/><circle cx="100.2" cy="391.2" r="2.1" fill="#E0EBFF" opacity="0.59"/><circle cx="364.3" cy="377.0" r="1.2" fill="#E0EBFF" opacity="0.56"/>
+    <rect width="360" height="480" fill="url(#vig)"/>
+    <rect width="360" height="480" filter="url(#grain)" opacity="0.5"/>
+  <rect width="360" height="480" fill="url(#scrim)"/>
+  <text x="24" y="357.2" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="3.2" fill="#9CC2FF" opacity="0.95">NEW</text>
+  <text x="24" y="407.2" font-family="Georgia, Times New Roman, serif" font-size="34" font-weight="700" fill="#FFFFFF"><tspan x="24" dy="0">My Cold Campus</tspan><tspan x="24" dy="38.8">Prince</tspan></text>
+</svg>

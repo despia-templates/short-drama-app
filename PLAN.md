@@ -256,3 +256,73 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     brand ramp (14/18/24/32) is the design, applied consistently; R3 only knows the iOS
     ramp. Sibling of §6.16 — one `design: { palette, typeRamp }` declaration closes both.
     Bridge: `scripts/review.mjs` waives only declared-ramp sizes; anything else still fails.
+
+19. **A horizontal `<list>`'s rows SHRINK instead of scrolling** — FIXED UPSTREAM in this
+    pass (found 2026-08-30, seeding the demo catalogue to 14 shows). `.dsx-list` had a rule
+    making a VERTICAL collection stretch its cross axis, with a comment explaining that a
+    horizontal collection is deliberately untouched — but nothing governed the horizontal
+    collection's MAIN axis, so its rows kept the web's `flex-shrink: 1`. Measured on a 375pt
+    phone: a rail of `width: 150px` posters rendered them at **72.25px** each, `getComputed
+    Style().width` reporting the squeezed number, so `object-fit: cover` cropped art nobody
+    authored and every badge wrapped one letter per line. `ScrollView(.horizontal)` and
+    `LazyRow` both keep the row's size and scroll the content. Fix landed in
+    `packages/dom/src/theme.ts`: `.dsx-list[data-dsx-axis="horizontal"] > .dsx-row > *
+    { flex: none; }`, in `dsx-elements` so `grow="width"` still wins from `dsx-attrs`.
+    Template-side sibling: a rail TRACK is `width: max-content`, never the page shell's
+    `width: 100%` (which caps it at the scroller and makes the rows eat the difference).
+
+20. **`list` clamps `limit` to 100 silently — no truncation flag, no cursor, no count**
+    (measured 2026-08-30 with 14 shows / 352 episodes). `repo.ts` `LIST_LIMIT = 100` is
+    correct policy — the comment "an unbounded list is a data-exfiltration primitive and a
+    DoS" is right — but `Math.min(LIST_LIMIT, want)` is the whole of it: a caller asking for
+    1000 gets 100 and is told nothing. `RepoQuery` has no `offset`/`cursor` and no `count`
+    op, so rows past the first page are **unreachable by any supported spelling**. Live
+    consequence in this template: `homeShelves` counted episodes with one
+    `episode.list({ limit: 1000 })`, the read stopped at row 100, and every show past it
+    rendered "EP 0" on a shipped storefront. Nothing failed. Asks: (a) `list` reports
+    truncation the way the DOM collection already does (`data-dsx-truncated`); (b) a cursor
+    or offset; (c) a `count` op. Template-side: every read is now per-show and inside the
+    ceiling, and the Manage screen renders "100+" rather than a confident lie.
+
+21. **A column stack nested in a column stack is given `align-self: stretch`, which
+    silently defeats the parent's `align-items`** (measured 2026-08-30, five separate
+    instances in this template). `globals.ts` ("a form is a block") stretches
+    `.dsx-stack:not(.dsx-hstack):not(.dsx-zstack)` children of a column, and its comment
+    says "an authored width still wins". The width does win — the POSITION does not: CSS
+    says a stretch with a definite cross size behaves as `flex-start`, so a fixed-size child
+    lands at the leading edge while its siblings stay centred. Measured: the 30pt VIP tab gem
+    sat 14px left of the tab centre under `alignItems="center"` while its caption was
+    centred; the player rail's Download anchor grew to the rail's full 51px and put its icon
+    at the left edge. Proposed fix — swap `align-self: stretch` for `width: 100%` in those
+    rules: identical filling for an auto-width block, and `align-self` stays `auto` so the
+    parent's `align-items` keeps governing a child that has its own size. Third case of the
+    same family as #238 (the alignment vocabulary misleading authors).
+
+22. **`<sheet inset>` is declared and ignored by the web renderer** (measured 2026-08-30).
+    `stack-elements.json` declares `inset` on `<sheet>` (number, default 14);
+    `.dsx-sheet-content` keeps `padding: 12px 16px 16px` regardless and no sheet-inset custom
+    property is emitted. A full-bleed cover sheet — a rewarded ad, a lightbox, a media viewer
+    — has no supported spelling. Bridged loudly in `Components/parts/AdGate.dsx`: the
+    declared `inset="0"` STAYS on the tag and the layer cancels the pad, so the bridge is a
+    no-op the day the renderer honours it.
+
+23. **A `<video>` inside a `<sheet>` is paused by the overlay portal, and a two-way
+    `paused=` binding latches that pause forever** (measured 2026-08-30). The sheet
+    re-parents its content into an overlay portal; moving a `<video>` in the DOM pauses it in
+    every browser. `media-surfaces.ts` treats any non-internal `pause` as authored and writes
+    `true` back through the binding, so the clip can never restart; drop the binding instead
+    and nothing retries, so it stalls at t≈0.16. Ask: `pauseInternally`'s `ignoreNextPause`
+    discipline should cover a re-parent (or the portal should restore playback), the way it
+    already covers the renderer's own pauses. Bridged in `AdGate.dsx` by re-asserting the
+    product rule ("a rewarded ad is not pausable") through a bounded `<watch>`, with a
+    tap-to-play fallback when the browser is genuinely refusing autoplay.
+
+24. **Core/AdMob has no declared REWARDED face** (found 2026-08-30 building the ads lane).
+    The banner face is fully declared — `dsx.module.admob.banner`, `<admob.Banner/>`,
+    `<admob.Native/>`, `Conformance/inline-surfaces/admob.json` — but rewarded video is still
+    only the legacy registry alias `displayrewardedad`
+    (`architecture/proposals/legacy-package.md` lists it as pending declaration), so there is
+    no action an app may call. Rewarded video is the earn lane the entire short-drama
+    category runs on. `AdGate.dsx` refuses to guess one: `dsx.action.playNetwork` is the
+    single place the real call lands, the card says out loud that the lane is unavailable,
+    and the house creative runs meanwhile.

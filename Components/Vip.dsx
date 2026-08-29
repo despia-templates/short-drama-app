@@ -42,6 +42,14 @@
       const g = dsx.variable.gutter
       return 'width: 100%; max-width: 1100px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
+    <!-- a rail track is `max-content` with the gutter as its padding: `width: 100%` (the
+         page-shell recipe) caps the track at the scroller and the cards eat the difference. -->
+    <variable as="railShell" computed="true">
+      const g = dsx.variable.gutter
+      const over = dsx.screen.width - 1440
+      const lead = g + (over > 0 ? Math.round(over / 2) : 0)
+      return 'width: max-content; padding-left: ' + lead + 'px; padding-right: ' + lead + 'px'
+    </variable>
     <variable as="mastheadBox" computed="true">
       return dsx.variable.shell + '; background: linear-gradient(180deg, rgba(246,182,61,0.16) 0%, rgba(0,0,0,0) 100%)'
     </variable>
@@ -65,7 +73,7 @@
     <style as="watchNum" fontSize="24" fontWeight="bold" color="#F6B63D"/>
     <style as="watchLink" fontSize="14" color="#F6B63D"/>
 
-    <style as="rail" spacing="12" alignItems="flex-start" paddingTrailing="16"/>
+    <style as="rail" spacing="12" alignItems="flex-start"/>
     <style as="card" spacing="8" alignItems="stretch"/>
     <style as="cardTitle" fontSize="14" color="rgba(255,255,255,0.9)" lineLimit="2" lineSpacing="2"/>
     <style as="vipTag" background="#F6B63D" radius="4" paddingH="7" paddingV="2" fontSize="11" fontWeight="bold" color="#3A2A08"/>
@@ -120,7 +128,7 @@
       <vstack class="section">
         <text value="VIP-Only Dramas" class="sectionTitle"/>
         <scroll axis="horizontal" indicators="false">
-          <hstack class="rail" style="{{ dsx.variable.shell }}">
+          <hstack class="rail" style="{{ dsx.variable.railShell }}">
             <list bind="home.data.trending" key="id" axis="horizontal" scroll="false" spacing="12">
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/watch/{{ item.id }}/1"
                       a11yGroup="true" a11yLabel="{{ item.title }}">
@@ -148,7 +156,7 @@
           </hstack>
         </vstack>
         <scroll axis="horizontal" indicators="false">
-          <hstack class="rail" style="{{ dsx.variable.shell }}">
+          <hstack class="rail" style="{{ dsx.variable.railShell }}">
             <list bind="home.data.latest" key="id" axis="horizontal" scroll="false" spacing="12">
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/show/{{ item.id }}"
                       a11yGroup="true" a11yLabel="{{ item.title }}">

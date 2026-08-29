@@ -47,7 +47,7 @@
           const dur = e.ok && e.data.duration > 0 ? e.data.duration : 75
           const pct = Math.min(100, Math.round((p.position / dur) * 100))
           // eps feeds the category-standard "EP.3 / EP.49" line under the card
-          const all = await dsx.module.data.episode.list({ filters: { show: p.show, state: 'live' }, limit: 200 })
+          const all = await dsx.module.data.episode.list({ filters: { show: p.show, state: 'live' }, limit: 100 })
           items.push({
             show: p.show, title: s.data.title, poster: s.data.poster,
             episode: p.episode, idx: p.idx, position: p.position, pct: pct,
