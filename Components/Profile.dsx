@@ -74,7 +74,7 @@
     <style as="stat" background="#1E1E24" radius="10" paddingV="13" spacing="3" alignItems="center"/>
     <style as="statNum" fontSize="22" fontWeight="bold"/>
     <style as="statCap" fontSize="11" color="rgba(255,255,255,0.5)"/>
-    <style as="topupBtn" background="#E52E2E" radius="21" paddingV="12" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="topupBtn" background="#FF2C55" radius="21" paddingV="12" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="note" fontSize="11" color="rgba(255,255,255,0.4)" lineSpacing="2"/>
 
     <style as="h2" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
@@ -163,7 +163,7 @@
                   <text value="{{ rowLabel }}" class="ledgerTitle"/>
                   <text value="{{ item.kind == 'bonus' ? 'Bonus coins' : 'Coins' }}{{ item.expires == null ? '' : ' · expires in 7 days' }}" class="ledgerMeta"/>
                 </vstack>
-                <text value="{{ rowSign }}" class="amount" color="{{ item.amount > 0 ? '#F7C948' : '#E52E2E' }}"/>
+                <text value="{{ rowSign }}" class="amount" color="{{ item.amount > 0 ? '#F7C948' : '#FF2C55' }}"/>
               </hstack>
             </list>
           </vstack>

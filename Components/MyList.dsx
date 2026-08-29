@@ -58,7 +58,7 @@
     <style as="badgeDark" background="rgba(0,0,0,0.72)" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
     <style as="badgeWrap" paddingLeading="7" paddingBottom="9" alignItems="flex-start"/>
     <style as="resumeTrack" background="rgba(255,255,255,0.22)"/>
-    <style as="resumeFill" background="#E52E2E"/>
+    <style as="resumeFill" background="#FF2C55"/>
   </head>
 
   <TopNav active="list" visible-if="dsx.variable.wide"/>

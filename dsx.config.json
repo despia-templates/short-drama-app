@@ -20,6 +20,14 @@
       "motion": "none"
     },
     {
+      "path": "/vip",
+      "component": "shortdrama.Vip",
+      "meta": {
+        "title": "VIP \u2014 Short Drama"
+      },
+      "motion": "none"
+    },
+    {
       "path": "/store",
       "component": "shortdrama.Store",
       "meta": {

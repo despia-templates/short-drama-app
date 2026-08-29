@@ -67,8 +67,8 @@
       return 'future'
     </formula>
     <formula as="dayColor" st="dayState">
-      if (st == 'done') { return 'rgba(229,46,46,0.22)' }
-      if (st == 'next') { return '#E52E2E' }
+      if (st == 'done') { return 'rgba(255,44,85,0.22)' }
+      if (st == 'next') { return '#FF2C55' }
       return '#1E1E24'
     </formula>
     <formula as="checkinLabel">
@@ -195,7 +195,7 @@
               </vstack>
             </grid>
             <button label="{{ checkinLabel }}" class="cta"
-                    background="{{ state.data != null && state.data.checkedToday ? '#26262C' : '#E52E2E' }}"
+                    background="{{ state.data != null && state.data.checkedToday ? '#26262C' : '#FF2C55' }}"
                     on:tap="dsx.action.checkin()"/>
           </vstack>
 
@@ -207,7 +207,7 @@
               <text value="{{ state.data == null ? 0 : state.data.adsToday }}/{{ state.data == null ? 10 : state.data.adCap }} today" class="taskMeta"/>
             </hstack>
             <button label="{{ dsx.variable.adLabel }}" class="cta"
-                    background="{{ state.data != null && state.data.adsLeft > 0 ? '#E52E2E' : '#26262C' }}"
+                    background="{{ state.data != null && state.data.adsLeft > 0 ? '#FF2C55' : '#26262C' }}"
                     on:tap="dsx.action.watchAd()"/>
             <text value="Rewarded ads play in the iOS and Android apps (AdMob), and the server verifies the view before granting a coin. On the web this button grants the same reward through the test lane so the cap and ledger stay honest." class="note"/>
           </vstack>
@@ -217,14 +217,14 @@
             <vstack class="wheelWrap">
               <text value="Spin the wheel" class="h2"/>
               <zstack>
-                <stack style="width: 132px; height: 132px; border-radius: 66px; background: conic-gradient(#E52E2E 0deg 45deg, #1E1E24 45deg 90deg, #F6B63D 90deg 135deg, #1E1E24 135deg 180deg, #E52E2E 180deg 225deg, #1E1E24 225deg 270deg, #F6B63D 270deg 315deg, #1E1E24 315deg 360deg)"/>
+                <stack style="width: 132px; height: 132px; border-radius: 66px; background: conic-gradient(#FF2C55 0deg 45deg, #1E1E24 45deg 90deg, #F6B63D 90deg 135deg, #1E1E24 135deg 180deg, #FF2C55 180deg 225deg, #1E1E24 225deg 270deg, #F6B63D 270deg 315deg, #1E1E24 315deg 360deg)"/>
                 <vstack style="width: 132px; height: 132px; align-items: center; justify-content: center">
                   <text value="10–100" class="wheelLabel"/>
                 </vstack>
               </zstack>
               <button label="{{ state.data != null && state.data.freeSpinLeft ? 'Spin — 1 free today' : 'No spin left today' }}"
                       class="ctaWide"
-                      background="{{ state.data != null && state.data.freeSpinLeft ? '#E52E2E' : '#26262C' }}"
+                      background="{{ state.data != null && state.data.freeSpinLeft ? '#FF2C55' : '#26262C' }}"
                       on:tap="dsx.action.spin()"/>
             </vstack>
           </vstack>
@@ -240,7 +240,7 @@
                 </vstack>
                 <button label="{{ item.claimed ? 'Claimed' : 'Claim' }}" class="claimBtn"
                         color="{{ item.claimed ? 'rgba(255,255,255,0.4)' : '#FFFFFF' }}"
-                        background="{{ item.claimed ? '#26262C' : '#E52E2E' }}"
+                        background="{{ item.claimed ? '#26262C' : '#FF2C55' }}"
                         on:tap="dsx.action.claim()"/>
               </hstack>
             </list>
@@ -250,5 +250,5 @@
 
     </vstack>
   </scroll>
-  <TabBar active="rewards" visible-if="dsx.variable.wide == false"/>
+  <TabBar active="vip" visible-if="dsx.variable.wide == false"/>
 </vstack>

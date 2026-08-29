@@ -1,43 +1,82 @@
-<!-- Watch — the vertical player. Phone: full-bleed video with in-stage chrome. Wide:
-     the category-standard two-column face — the 9:16 stage on the left, and the details
-     panel on the right (breadcrumb · episode H1 · plot · tags · My List · the numbered
-     episode grid with lock badges, current episode tinted red).
+<!-- Watch — the player, built to the category reference (DramaWave) surface for surface:
+     a full-bleed vertical stage, `‹ EP.n` and the speed/⋯ cluster on top, the ENGAGEMENT
+     RAIL down the right (bookmark · comments · share · download), a hairline scrubber, and
+     the EP.n / EP.N pill that raises the episode drawer.
 
-     TRUST SHAPE (product spec §3): the client never decides entitlement — `epLocked`
-     reads /wallet/state, the Unlock button calls the server, and the video only mounts
-     an unlocked source. Auto-unlock spends server-side too; this surface just asks.
-     Native lane swaps this file for VerticalPlayerStack — same payload, same events
-     (upstream #215: its web facet). -->
+     The drawer is the show sheet: poster, title, All N Episodes, Follow, and Synopsis |
+     Episodes tabs with the ranged 6-column grid. The ⋯ opens the options stack —
+     audio/subtitles, quality, speed, PiP, share, help — each its own sheet, exactly as the
+     reference nests them.
+
+     TRUST SHAPE (spec §3): the client never decides entitlement. `epLocked` reads
+     /wallet/state, unlock spends server-side, and a locked episode never mounts a source. -->
 <vstack background="#000000" alignItems="stretch" style="min-height: {{ dsx.screen.height }}px">
   <head>
-    <!-- the router publishes nav.canPop / nav.depth; back reads it -->
     <expects variable="nav"/>
-    <!-- route /watch/:show/:idx — params arrive as vars.show / vars.idx -->
+
     <api as="detail" url="/catalog/show/{{ vars.show }}"/>
     <api as="session" url="/dev-session.json" ssr="false"/>
     <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
     <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <api as="thread" url="/social/comments/{{ dsx.variable.epId }}" ssr="false" auto="false"/>
     <api as="unlockCall" url="/wallet/unlock" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
     <api as="progressCall" url="/viewer/progress" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
     <api as="favCall" url="/viewer/favorite" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+    <api as="commentCall" url="/social/comment" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
 
     <variable as="cur">return 1</variable>
-    <variable as="showId">return ''</variable>   <!-- vars.* is markup scope; actions read this mirror -->
+    <variable as="showId">return ''</variable>
     <variable as="paused">return false</variable>
-    <variable as="wMuted">return true</variable>   <!-- web autoplay policy: start muted, one tap for sound -->
-    <variable as="pos">return 0</variable>          <!-- 0–1 position fraction (video bind) -->
+    <variable as="wMuted">return true</variable>
+    <variable as="pos">return 0</variable>
     <variable as="time">return 0</variable>
     <variable as="duration">return 0</variable>
     <variable as="speed">return 1</variable>
+    <variable as="holding">return false</variable>
     <variable as="drawer">return false</variable>
-    <variable as="autoUnlock">return true</variable>   <!-- on by default: the category standard -->
+    <variable as="drawerTab">return 'episodes'</variable>
+    <variable as="range">return 0</variable>
+    <variable as="menu">return false</variable>
+    <variable as="sheet">return ''</variable>        <!-- '' | lang | quality | speed -->
+    <variable as="comments">return false</variable>
+    <variable as="draft">return ''</variable>
+    <variable as="captions">return true</variable>
+    <variable as="lang">return 'English'</variable>
+    <variable as="quality">return 'Auto'</variable>
+    <variable as="pip">return true</variable>
+    <variable as="autoUnlock">return true</variable>
     <variable as="unlocking">return false</variable>
     <variable as="toast">return ''</variable>
     <variable as="favTouched">return ''</variable>
-    <variable as="holding">return false</variable>    <!-- hold-to-2x is active -->
-    <variable as="menu">return false</variable>       <!-- the ⋯ options sheet -->
-    <variable as="captions">return true</variable>
-    <variable as="lang">return 'English'</variable>  <!-- '' until toggled; then 'y' / 'n' -->
+
+    <!-- the option tables the sheets render from -->
+    <variable as="speedOptions">
+      return [
+        { id: 's05', v: 0.5, label: '0.5x' }, { id: 's075', v: 0.75, label: '0.75x' },
+        { id: 's1', v: 1, label: '1.0x' }, { id: 's125', v: 1.25, label: '1.25x' },
+        { id: 's15', v: 1.5, label: '1.5x' }, { id: 's2', v: 2, label: '2.0x' },
+        { id: 's3', v: 3, label: '3.0x' }
+      ]
+    </variable>
+    <variable as="languages">
+      return [
+        { id: 'en', label: 'English' }, { id: 'es', label: 'Español' }, { id: 'pt', label: 'Português' },
+        { id: 'de', label: 'Deutsch' }, { id: 'fr', label: 'Français' }, { id: 'pl', label: 'Polish' },
+        { id: 'cs', label: 'Czech' }, { id: 'bn', label: 'Bengali' }, { id: 'ta', label: 'Tamil' },
+        { id: 'te', label: 'Telugu' }, { id: 'ro', label: 'Romanian' }
+      ]
+    </variable>
+    <variable as="qualities">
+      return [
+        { id: 'auto', label: 'Auto', vip: false, note: 'Adjusts to give you the best experience for your conditions' },
+        { id: 'q1080', label: '1080p', vip: true,  note: '' },
+        { id: 'q720', label: '720p',  vip: false, note: '' },
+        { id: 'q540', label: '540p',  vip: false, note: '' },
+        { id: 'q480', label: '480p',  vip: false, note: '' },
+        { id: 'q360', label: '360p',  vip: false, note: '' },
+        { id: 'q240', label: '240p',  vip: false, note: '' }
+      ]
+    </variable>
 
     <variable as="bp" computed="true">
       const s = dsx.screen.width
@@ -46,24 +85,28 @@
       return 'phone'
     </variable>
     <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
-    <!-- the stage loses the nav's height on wide viewports -->
     <variable as="stageH" computed="true">
       if (dsx.variable.wide) { return dsx.screen.height - 62 }
       return dsx.screen.height
     </variable>
-    <!-- The stage is ONE interpolated number fed to the catalog's maxWidth, not a CSS
-         chunk spliced into style= (see Discover for why). -->
     <variable as="stageMax" computed="true">
       if (dsx.variable.bp == 'phone') { return 4096 }
       return Math.round(Math.min(461, dsx.screen.height * 0.56))
     </variable>
-
     <variable as="episode" computed="true">
       if (detail.data == null) { return null }
       const eps = detail.data.episodes
       const i = Number(dsx.variable.cur)
       if (i < 1 || i > eps.length) { return null }
       return eps[i - 1]
+    </variable>
+    <variable as="epId" computed="true">
+      const e = dsx.variable.episode
+      return e == null ? '' : e.id
+    </variable>
+    <variable as="total" computed="true">
+      if (detail.data == null) { return 0 }
+      return detail.data.episodes.length
     </variable>
     <variable as="epLocked" computed="true">
       const ep = dsx.variable.episode
@@ -76,19 +119,43 @@
       if (wallet.data == null) { return 0 }
       return wallet.data.coins + wallet.data.bonus
     </variable>
-    <variable as="unlockLabel" computed="true">
-      if (dsx.variable.unlocking) { return 'Unlocking…' }
-      const ep = dsx.variable.episode
-      return (ep == null ? '' : ep.price) + '  Unlock Now'
-    </variable>
     <variable as="favOn" computed="true">
       if (dsx.variable.favTouched != '') { return dsx.variable.favTouched == 'y' }
       if (favs.data == null) { return false }
       return favs.data.items.filter(x => x.show == dsx.variable.showId).length > 0
     </variable>
+    <variable as="commentCount" computed="true">
+      if (thread.data == null) { return 0 }
+      return thread.data.count
+    </variable>
+    <variable as="unlockLabel" computed="true">
+      if (dsx.variable.unlocking) { return 'Unlocking…' }
+      const ep = dsx.variable.episode
+      return (ep == null ? '' : ep.price) + '  Unlock Now'
+    </variable>
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
+    </variable>
+    <!-- the drawer's range pills: 1-30 · 31-60 · … built from the real episode count -->
+    <variable as="ranges" computed="true">
+      const n = dsx.variable.total
+      const out = []
+      let start = 1
+      while (start <= n) {
+        const end = Math.min(start + 29, n)
+        out.push({ id: 'r' + start, from: start, to: end, label: start + '-' + end })
+        start = end + 1
+      }
+      return out
+    </variable>
+    <variable as="visibleEps" computed="true">
+      if (detail.data == null) { return [] }
+      const rs = dsx.variable.ranges
+      const i = Number(dsx.variable.range)
+      if (i < 0 || i >= rs.length) { return detail.data.episodes }
+      const r = rs[i]
+      return detail.data.episodes.filter(e => e.idx >= r.from && e.idx <= r.to)
     </variable>
 
     <formula as="gridLocked" free="item.free" epid="item.id">
@@ -97,18 +164,16 @@
       return !wallet.data.unlocked.includes(epid)
     </formula>
 
-    <!-- The canonical back (writing-an-app.md §5): POP when there is history, REPLACE
-         when the screen was deep-linked, so a dismiss never teleports home and never
-         stacks a second copy of where you came from. Back is never href — href pushes. -->
+    <action as="boot" show="vars.show" idx="vars.idx">
+      dsx.variable.showId = show;
+      dsx.variable.cur = Number(idx);
+      thread.refresh()
+    </action>
     <action as="goBack">
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
       else { dsx.module.route.replace({ path: '/' }) }
     </action>
-    <action as="boot" show="vars.show" idx="vars.idx">
-      dsx.variable.showId = show;
-      dsx.variable.cur = Number(idx)
-    </action>
-    <action as="saveNow" epid="dsx.variable.episode == null ? '' : dsx.variable.episode.id" epidx="dsx.variable.cur" locked="dsx.variable.epLocked">
+    <action as="saveNow" epid="dsx.variable.epId" epidx="dsx.variable.cur" locked="dsx.variable.epLocked">
       if (epid == null || epid === '' || locked) { return }
       await progressCall.send({ episode: epid, show: dsx.variable.showId, idx: Number(epidx), position: dsx.variable.time })
     </action>
@@ -120,11 +185,10 @@
       dsx.variable.cur = n;
       dsx.variable.pos = 0;
       dsx.variable.paused = false;
-      dsx.variable.drawer = false
+      dsx.variable.drawer = false;
+      thread.refresh()
     </action>
-    <action as="next">
-      dsx.action.go({ target: Number(dsx.variable.cur) + 1 })
-    </action>
+    <action as="next">dsx.action.go({ target: Number(dsx.variable.cur) + 1 })</action>
     <action as="onEnded">
       const ep = dsx.variable.episode
       if (detail.data == null || ep == null) { return }
@@ -133,7 +197,7 @@
       const nxt = detail.data.episodes[n - 1]
       const nextLocked = nxt.free === false && wallet.data != null && !wallet.data.unlocked.includes(nxt.id)
       if (nextLocked && dsx.variable.autoUnlock && dsx.variable.balance >= nxt.price) {
-        dsx.variable.cur = n;
+        dsx.variable.cur = n
         await dsx.action.unlockNow()
       } else {
         dsx.action.go({ target: n })
@@ -145,362 +209,470 @@
       dsx.variable.unlocking = true
       const r = await unlockCall.send({ episode: ep.id })
       dsx.variable.unlocking = false
-      if (r.ok) {
-        dsx.variable.toast = 'Unlocked for ' + r.data.spent + ' coins'
-        dsx.variable.paused = false
-        wallet.refresh()
-      } else {
-        dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Unlock failed'
-      }
+      if (r.ok) { dsx.variable.toast = 'Unlocked for ' + r.data.spent + ' coins'; dsx.variable.paused = false; wallet.refresh() }
+      else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Unlock failed' }
     </action>
     <action as="toggleFav">
       const r = await favCall.send({ show: dsx.variable.showId })
       if (r.ok) { dsx.variable.favTouched = r.data.favorite ? 'y' : 'n' }
     </action>
-    <!-- HOLD TO 2x — the category-standard gesture. DSX exposes on:longpress (one-shot)
-         but no press-RELEASE event, so release is recovered from on:dragEnd and the next
-         tap; both are wired so the speed can never stick. Gap filed upstream. -->
     <action as="holdStart">
       if (dsx.variable.epLocked) { return }
-      dsx.variable.holding = true
-      dsx.variable.speed = 2
-      dsx.variable.toast = 'Playing at 2x'
+      dsx.variable.holding = true; dsx.variable.speed = 2
     </action>
     <action as="holdEnd">
       if (!dsx.variable.holding) { return }
-      dsx.variable.holding = false
-      dsx.variable.speed = 1
-      dsx.variable.toast = ''
+      dsx.variable.holding = false; dsx.variable.speed = 1
     </action>
-    <action as="cycleSpeed">
-      const s = dsx.variable.speed
-      dsx.variable.speed = s == 1 ? 1.5 : (s == 1.5 ? 2 : 1)
+    <action as="seek">dsx.variable.pos = dsx.this.fraction</action>
+    <action as="openComments">
+      dsx.variable.comments = true
+      thread.refresh()
     </action>
-    <action as="seek">
-      dsx.variable.pos = dsx.this.fraction
+    <action as="postComment">
+      const text = dsx.variable.draft
+      if (text == null || text === '') { return }
+      const r = await commentCall.send({ show: dsx.variable.showId, episode: dsx.variable.epId, body: text })
+      if (r.ok) { dsx.variable.draft = ''; thread.refresh() }
+      else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Could not post' }
     </action>
 
-    <!-- The blurred backdrop carries a filter, which makes it a stacking context; the
-         chrome and the paywall declare their order explicitly so the lock screen always
-         composites above the frame it is dimming. -->
+    <!-- ── stage chrome ── -->
     <style as="chromeLayer" zIndex="2"/>
     <style as="lockedLayer" zIndex="3"/>
-    <style as="back" fontSize="24" color="#FFFFFF" paddingH="8"/>
-    <style as="topBar" paddingLeading="12" paddingTrailing="14" paddingTop="12" spacing="10" alignItems="center"/>
-    <style as="topMeta" spacing="1"/>
-    <style as="showTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
-    <style as="epLine" fontSize="12" color="rgba(255,255,255,0.66)"/>
-    <style as="chip" background="rgba(255,255,255,0.16)" radius="17" paddingH="13" paddingV="10" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="bottomBar" paddingLeading="14" paddingTrailing="14" paddingBottom="16" spacing="10" alignItems="stretch"/>
-    <style as="bottomRow" alignItems="flex-end" spacing="12"/>
-    <style as="bottomCol" spacing="4"/>
-    <style as="sideRail" spacing="16" alignItems="center"/>
+    <style as="topBar" paddingLeading="10" paddingTrailing="14" paddingTop="12" spacing="10" alignItems="center"/>
+    <style as="epLabel" fontSize="17" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="speedChip" spacing="5" alignItems="center" paddingH="4"/>
+    <style as="speedText" fontSize="15" color="#FFFFFF"/>
 
-    <!-- the locked stage (the category's own vocabulary: paid episode · unlock · earn) -->
+    <!-- ── the engagement rail ── -->
+    <style as="rail" spacing="22" alignItems="center" paddingTrailing="12"/>
+    <style as="railItem" spacing="4" alignItems="center"/>
+    <style as="railCount" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="railCap" fontSize="11" color="rgba(255,255,255,0.9)"/>
+    <style as="vipTag" background="#F6B63D" radius="3" paddingH="4" paddingV="0" fontSize="11" fontWeight="bold" color="#3A2A08"/>
+    <style as="vipSlot" alignItems="flex-end" width="30" height="0"/>
+
+    <!-- ── bottom: scrubber + the EP pill ── -->
+    <style as="bottomBar" paddingLeading="14" paddingTrailing="14" paddingBottom="14" spacing="10" alignItems="stretch"/>
+    <style as="epPill" background="rgba(255,255,255,0.12)" radius="12" paddingH="14" paddingV="12" spacing="9" alignItems="center"/>
+    <style as="epPillNow" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="epPillAll" fontSize="15" color="rgba(255,255,255,0.55)"/>
+    <style as="toastLine" fontSize="12" color="#F6B63D"/>
+    <style as="speedToast" background="rgba(0,0,0,0.72)" radius="18" paddingH="14" paddingV="8" spacing="7" alignItems="center"/>
+    <style as="speedToastLabel" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+
+    <!-- ── the locked stage ── -->
     <style as="lockBlock" spacing="14" alignItems="center" paddingH="26"/>
     <style as="lockHead" fontSize="17" fontWeight="bold" color="#FFFFFF" textAlign="center" lineSpacing="4"/>
-    <style as="unlockBtn" background="#E52E2E" radius="24" paddingV="13" paddingH="30" spacing="8" alignItems="center"/>
-    <style as="earnBtn" background="rgba(255,255,255,0.1)" radius="24" paddingV="14" paddingH="20" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="unlockBtn" background="#FF2C55" radius="24" paddingV="14" paddingH="30" spacing="8" alignItems="center"/>
+    <style as="unlockLabelTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="lockDoors" spacing="10" alignItems="center"/>
-    <style as="lockMeta" fontSize="13" color="#F7C948"/>
-    <style as="unlockLabel" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="earnBtn" background="rgba(255,255,255,0.1)" radius="24" paddingV="14" paddingH="20" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="lockMetaRow" spacing="6" alignItems="center"/>
-    <style as="chipIcon" background="rgba(255,255,255,0.16)" radius="19" paddingH="12" paddingV="11" alignItems="center"/>
-    <style as="gridAllRow" spacing="4" alignItems="center"/>
+    <style as="lockMeta" fontSize="13" color="#F6B63D"/>
     <style as="autoRow" spacing="9" alignItems="center" paddingTop="2"/>
     <style as="checkBox" width="18" height="18" radius="5" alignItems="center"/>
     <style as="autoLabel" fontSize="13" color="rgba(255,255,255,0.66)"/>
 
-    <!-- the wide details panel -->
-    <style as="panel" spacing="16" paddingTrailing="32" paddingTop="24" paddingBottom="30" alignItems="stretch"/>
-    <style as="crumb" fontSize="13" color="rgba(255,255,255,0.45)"/>
-    <style as="crumbOn" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
-    <style as="crumbRow" spacing="7" alignItems="center"/>
-    <style as="panelH1" fontSize="20" fontWeight="bold" color="rgba(255,255,255,0.9)" lineSpacing="6"/>
-    <style as="plotHead" fontSize="16" color="rgba(255,255,255,0.9)"/>
-    <style as="plotBody" fontSize="14" color="rgba(255,255,255,0.6)" lineSpacing="5" lineLimit="4"/>
+    <!-- ── the episode drawer ── -->
+    <style as="drawerHead" spacing="12" alignItems="center" paddingH="18" paddingTop="6" paddingBottom="14"/>
+    <style as="drawerTitle" fontSize="17" fontWeight="bold" color="#FFFFFF" lineLimit="2" lineSpacing="3"/>
+    <style as="drawerSub" fontSize="13" color="rgba(255,255,255,0.5)"/>
+    <style as="followBtn" radius="20" paddingH="22" paddingV="10" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="tabRow" spacing="26" alignItems="center" paddingH="18" paddingBottom="2"/>
+    <style as="tabTxt" fontSize="16" fontWeight="semibold"/>
+    <style as="tabUnderline" background="#FF2C55" height="3" radius="2" width="26"/>
+    <style as="rangeRow" spacing="18" alignItems="center" paddingH="18" paddingTop="14" paddingBottom="10"/>
+    <style as="rangeTxt" fontSize="14" fontWeight="semibold"/>
+    <style as="epGridWrap" paddingH="16" paddingBottom="26"/>
+    <style as="epCell" radius="10" alignItems="center"/>
+    <style as="epNum" fontSize="16" fontWeight="semibold" paddingTop="6"/>
+    <style as="synopsisWrap" paddingH="18" paddingTop="14" paddingBottom="26" spacing="12" alignItems="flex-start"/>
     <style as="tagRow" spacing="8" alignItems="center"/>
-    <style as="tag" background="rgba(255,255,255,0.1)" radius="16" paddingH="16" paddingV="7" fontSize="14" color="rgba(255,255,255,0.7)"/>
-    <style as="statRow" spacing="26" alignItems="center" paddingV="8"/>
-    <style as="statCol" spacing="4" alignItems="center"/>
-    <style as="statCap" fontSize="12" color="rgba(255,255,255,0.6)"/>
-    <style as="gridHead" alignItems="center" paddingTop="6"/>
-    <style as="gridRange" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
-    <style as="gridAll" fontSize="13" color="rgba(255,255,255,0.55)"/>
-    <style as="epCell" radius="8" alignItems="center" height="46"/>
-    <style as="epNum" fontSize="14" fontWeight="semibold"/>
-    <style as="toastLine" fontSize="12" color="#F7C948"/>
+    <style as="tag" background="rgba(255,255,255,0.1)" radius="6" paddingH="12" paddingV="6" fontSize="13" color="rgba(255,255,255,0.7)"/>
+    <style as="synopsisTxt" fontSize="15" color="rgba(255,255,255,0.8)" lineSpacing="6"/>
 
-    <style as="speedToast" background="rgba(0,0,0,0.72)" radius="18" paddingH="14" paddingV="8" spacing="7" alignItems="center"/>
-    <style as="speedToastLabel" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="menuBody" paddingH="18" paddingTop="6" paddingBottom="20" spacing="4" alignItems="stretch"/>
-    <style as="menuRow" spacing="13" alignItems="center" paddingV="14"/>
-    <style as="menuLabel" fontSize="15" color="#FFFFFF"/>
-    <style as="menuNote" fontSize="12" color="rgba(255,255,255,0.45)"/>
-    <style as="drawerGrid" paddingLeading="16" paddingTrailing="16" paddingTop="8"/>
-    <style as="drawerCell" radius="9" alignItems="center" paddingV="12"/>
+    <!-- ── the options stack ── -->
+    <style as="menuBody" paddingH="16" paddingTop="4" paddingBottom="22" spacing="0" alignItems="stretch"/>
+    <style as="menuCard" background="#1C1C1E" radius="14" paddingH="16" spacing="0" alignItems="stretch"/>
+    <style as="menuRow" spacing="14" alignItems="center" paddingV="16"/>
+    <style as="menuLabel" fontSize="16" color="#FFFFFF"/>
+    <style as="menuValue" fontSize="15" color="rgba(255,255,255,0.5)"/>
+    <style as="menuHead" fontSize="20" fontWeight="bold" color="#FFFFFF" paddingH="4" paddingBottom="12" paddingTop="6"/>
+    <style as="speedSeg" background="rgba(255,255,255,0.08)" radius="10" paddingH="4" paddingV="4" spacing="0" alignItems="center"/>
+    <style as="speedOpt" radius="8" paddingH="12" paddingV="8" fontSize="14"/>
+    <style as="optRow" spacing="12" alignItems="center" paddingV="15" paddingH="14" radius="10"/>
+    <style as="optLabel" fontSize="17"/>
+    <style as="optNote" fontSize="13" color="rgba(255,255,255,0.5)"/>
+
+    <!-- ── comments ── -->
+    <style as="cHead" alignItems="center" paddingH="16" paddingV="12"/>
+    <style as="cTitle" fontSize="17" fontWeight="bold" color="#FFFFFF"/>
+    <style as="cRow" spacing="12" alignItems="flex-start" paddingH="16" paddingV="12"/>
+    <style as="cAvatar" width="34" height="34" radius="17" background="#2A2A2E" alignItems="center"/>
+    <style as="cAuthor" fontSize="14" color="rgba(255,255,255,0.55)"/>
+    <style as="cBody" fontSize="15" color="#FFFFFF" lineSpacing="4"/>
+    <style as="cMeta" fontSize="12" color="rgba(255,255,255,0.4)"/>
+    <style as="cEmpty" fontSize="14" color="rgba(255,255,255,0.45)" textAlign="center" paddingV="30"/>
+    <style as="cField" background="#1C1C1E" radius="22" paddingLeading="16" paddingTrailing="6" paddingV="6" spacing="8" alignItems="center"/>
+    <style as="cSend" background="#FF2C55" radius="18" paddingH="16" paddingV="9" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
   <TopNav active="home" visible-if="dsx.variable.wide"/>
   <hstack alignItems="stretch" style="flex: 1; min-height: 0; width: 100%">
-
-    <!-- ================= THE STAGE ================= -->
     <vstack alignItems="stretch" style="flex: 1; min-width: 0">
       <zstack>
-      <!-- the morph target: the card's poster flies into this rect (U03 shared element),
-           then the video fades over it. Same id on both ends is the whole contract. -->
-      <image src="{{ detail.data == null ? '' : detail.data.show.poster }}" contentFit="cover"
-             shared="poster-{{ vars.show }}" a11yHidden="true"
-             height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
-             style="width: 100%; margin-left: auto; margin-right: auto; object-fit: cover"/>
+        <!-- the morph target: a card's poster flies into this rect -->
+        <image src="{{ detail.data == null ? '' : detail.data.show.poster }}" contentFit="cover"
+               shared="poster-{{ vars.show }}" a11yHidden="true"
+               height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+               style="width: 100%; margin-left: auto; margin-right: auto; object-fit: cover"/>
 
-      <!-- the picture (only when entitled; a locked episode never mounts its source) -->
-      <video visible-if="dsx.variable.episode != null && dsx.variable.epLocked == false"
-             src="{{ dsx.variable.episode == null ? '' : dsx.variable.episode.video }}"
-             active="{{ dsx.variable.epLocked == false }}" muted="{{ dsx.variable.wMuted }}"
-             paused="dsx.variable.paused" bind="dsx.variable.pos"
-             time="dsx.variable.time" duration="dsx.variable.duration"
-             speed="{{ dsx.variable.speed }}" gravity="fill" audio="playback"
-             height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto"
-             on:ready="dsx.variable.paused = false"
-             on:ended="dsx.action.onEnded()" on:appear="dsx.action.boot()"/>
+        <video visible-if="dsx.variable.episode != null && dsx.variable.epLocked == false"
+               src="{{ dsx.variable.episode == null ? '' : dsx.variable.episode.video }}"
+               active="{{ dsx.variable.epLocked == false }}" muted="{{ dsx.variable.wMuted }}"
+               paused="dsx.variable.paused" bind="dsx.variable.pos"
+               time="dsx.variable.time" duration="dsx.variable.duration"
+               speed="{{ dsx.variable.speed }}" gravity="fill" audio="playback"
+               height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+               style="width: 100%; margin-left: auto; margin-right: auto"
+               on:ready="dsx.variable.paused = false"
+               on:ended="dsx.action.onEnded()" on:appear="dsx.action.boot()"/>
 
-      <!-- locked backdrop: the poster, dimmed -->
-      <image visible-if="dsx.variable.epLocked" src="{{ dsx.variable.episode == null ? '' : dsx.variable.episode.poster }}"
-             height="{{ dsx.variable.stageH }}" contentFit="cover"
-             maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; filter: blur(16px) brightness(0.4)" a11yHidden="true"/>
+        <image visible-if="dsx.variable.epLocked" src="{{ dsx.variable.episode == null ? '' : dsx.variable.episode.poster }}"
+               height="{{ dsx.variable.stageH }}" contentFit="cover" maxWidth="{{ dsx.variable.stageMax }}"
+               style="width: 100%; margin-left: auto; margin-right: auto; filter: blur(16px) brightness(0.4)" a11yHidden="true"/>
 
-      <!-- tap to pause/play across the middle -->
-      <!-- the gesture surface: tap pauses, HOLD runs 2x. `user-select: none` keeps a long
-           press from selecting text on the web (the native lanes never select here). -->
-      <stack visible-if="dsx.variable.epLocked == false" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
-             style="width: 100%; margin-left: auto; margin-right: auto; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none"
-             on:tap="dsx.action.holdEnd(); dsx.variable.paused = !dsx.variable.paused"
-             on:longpress="dsx.action.holdStart()"
-             on:dragEnd="dsx.action.holdEnd()"
-             a11yLabel="Play or pause. Hold for double speed."
-             a11yValue="{{ dsx.variable.speed }}x"
-             on:adjust="dsx.action.cycleSpeed()"/>
+        <!-- tap pauses · hold runs 2x -->
+        <stack visible-if="dsx.variable.epLocked == false" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+               style="width: 100%; margin-left: auto; margin-right: auto; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none"
+               on:tap="dsx.action.holdEnd(); dsx.variable.paused = !dsx.variable.paused"
+               on:longpress="dsx.action.holdStart()" on:dragEnd="dsx.action.holdEnd()"
+               a11yLabel="Play or pause. Hold for double speed." a11yValue="{{ dsx.variable.speed }}x"
+               on:adjust="dsx.variable.speed = dsx.variable.speed == 1 ? 2 : 1"/>
 
-      <!-- the 2x indicator -->
-      <vstack class="chromeLayer" visible-if="dsx.variable.holding" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
-              style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: flex-start; padding-top: 84px; pointer-events: none">
-        <hstack class="speedToast">
-          <image icon="forward.fill" iconSize="13" color="#FFFFFF" a11yHidden="true"/>
-          <text value="2x speed" class="speedToastLabel"/>
-        </hstack>
-      </vstack>
-      <vstack class="chromeLayer" visible-if="dsx.variable.paused" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center; pointer-events: none">
-        <image icon="play.fill" iconSize="34" color="rgba(255,255,255,0.9)" a11yHidden="true"/>
-      </vstack>
+        <vstack class="chromeLayer" visible-if="dsx.variable.paused" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+                style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center; pointer-events: none">
+          <image icon="pause.fill" iconSize="40" color="rgba(255,255,255,0.82)" a11yHidden="true"/>
+        </vstack>
+        <vstack class="chromeLayer" visible-if="dsx.variable.holding" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+                style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: flex-start; padding-top: 84px; pointer-events: none">
+          <hstack class="speedToast">
+            <image icon="forward.fill" iconSize="13" color="#FFFFFF" a11yHidden="true"/>
+            <text value="2x speed" class="speedToastLabel"/>
+          </hstack>
+        </vstack>
 
-      <!-- immersive chrome scrims: the picture runs edge to edge and the controls sit on
-           blurred bands rather than a dimmed frame (the category's full-screen feel) -->
-      <vstack class="chromeLayer" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
-              style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
-        <stack style="width: 100%; height: 112px; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent 100%); mask-image: linear-gradient(180deg, #000 45%, transparent 100%); background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%)"/>
-        <stack style="width: 100%; height: 168px; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); -webkit-mask-image: linear-gradient(0deg, #000 45%, transparent 100%); mask-image: linear-gradient(0deg, #000 45%, transparent 100%); background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)"/>
-      </vstack>
+        <!-- ══ chrome: top bar · right rail · bottom ══ -->
+        <vstack class="chromeLayer" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+                style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
+          <hstack class="topBar" style="pointer-events: auto">
+            <image icon="chevron.left" iconSize="22" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
+            <text value="EP.{{ dsx.variable.cur }}" class="epLabel"/>
+            <spacer/>
+            <hstack class="speedChip" on:tap="dsx.variable.sheet = 'speed'; dsx.variable.menu = true"
+                    a11yGroup="true" a11yTrait="button" a11yLabel="Playback speed">
+              <image icon="arrow.clockwise" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
+              <text value="{{ dsx.variable.speed }}.0x" class="speedText"/>
+            </hstack>
+            <image icon="ellipsis" iconSize="19" color="#FFFFFF" on:tap="dsx.variable.sheet = ''; dsx.variable.menu = true"
+                   a11yLabel="More options" a11yTrait="button"/>
+          </hstack>
 
-      <!-- chrome -->
-      <vstack class="chromeLayer" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
-        <hstack class="topBar" style="pointer-events: auto">
-          <image icon="xmark" iconSize="20" color="#FFFFFF" class="back"
-                 on:tap="dsx.action.goBack()" a11yLabel="Close player" a11yTrait="button"/>
-          <vstack class="topMeta" style="flex: 1">
-            <text value="{{ detail.data == null ? '' : detail.data.show.title }}" class="showTitle"/>
-            <text value="EP {{ dsx.variable.cur }}{{ detail.data == null ? '' : ' / ' + detail.data.episodes.length }}" class="epLine"/>
-          </vstack>
-          <vstack class="chipIcon" on:tap="dsx.variable.wMuted = !dsx.variable.wMuted"
-                  a11yLabel="{{ dsx.variable.wMuted ? 'Unmute' : 'Mute' }}" a11yTrait="button">
-            <image icon="{{ dsx.variable.wMuted ? 'speaker.slash.fill' : 'waveform' }}" iconSize="16" color="#FFFFFF" a11yHidden="true"/>
-          </vstack>
-          <button label="{{ dsx.variable.speed }}x" class="chip"
-                  on:tap="dsx.action.cycleSpeed()" a11yLabel="Playback speed"/>
-          <vstack class="chipIcon" on:tap="dsx.variable.menu = true" a11yLabel="Player options" a11yTrait="button">
-            <image icon="ellipsis" iconSize="16" color="#FFFFFF" a11yHidden="true"/>
-          </vstack>
-        </hstack>
-
-        <vstack class="bottomBar" style="pointer-events: auto">
-          <hstack class="bottomRow">
-            <vstack class="bottomCol" style="flex: 1">
-              <text value="{{ dsx.variable.episode == null ? '' : dsx.variable.episode.title }}" fontSize="13" fontWeight="semibold" color="#FFFFFF" lines="1"/>
-              <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
-            </vstack>
-            <vstack class="sideRail">
-              <image icon="rectangle.stack.fill" iconSize="21" color="#FFFFFF" on:tap="dsx.variable.drawer = true" a11yLabel="Episodes" a11yTrait="button" visible-if="dsx.variable.wide == false"/>
-              <image icon="forward.fill" iconSize="21" color="#FFFFFF" on:tap="dsx.action.next()" a11yLabel="Next episode" a11yTrait="button"/>
+          <hstack style="width: 100%; align-items: flex-end; pointer-events: none">
+            <spacer/>
+            <vstack class="rail" style="pointer-events: auto">
+              <vstack class="railItem" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button" a11yLabel="Save to My List">
+                <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="27"
+                       color="{{ dsx.variable.favOn ? '#FF2C55' : '#FFFFFF' }}" a11yHidden="true"/>
+                <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="railCap"/>
+              </vstack>
+              <!-- the shared catalog has no speech-bubble glyph (upstream #235); note.text
+                   is the closest three-way match until one lands -->
+              <vstack class="railItem" on:tap="dsx.action.openComments()" a11yGroup="true" a11yTrait="button" a11yLabel="Comments">
+                <image icon="note.text" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
+                <text value="{{ dsx.variable.commentCount }}" class="railCount"/>
+              </vstack>
+              <vstack class="railItem" on:tap="dsx.variable.sheet = ''; dsx.variable.menu = true" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
+                <image icon="square.and.arrow.up" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
+                <text value="Share" class="railCap"/>
+              </vstack>
+              <vstack class="railItem" on:tap="dsx.module.route.push({ path: '/vip' })" a11yGroup="true" a11yTrait="button" a11yLabel="Download — VIP">
+                <zstack>
+                  <image icon="square.and.arrow.down" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
+                  <vstack class="vipSlot" style="pointer-events: none">
+                    <text value="VIP" class="vipTag" style="margin-top: -6px; margin-right: -12px"/>
+                  </vstack>
+                </zstack>
+                <text value="Download" class="railCap"/>
+              </vstack>
             </vstack>
           </hstack>
-          <!-- custom scrubber: on:drag seeks through the shared position fraction -->
-          <stack height="26" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
-                 a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
-                 on:adjust="dsx.variable.pos = dsx.variable.pos + (dsx.this.direction == 'increment' ? 0.05 : -0.05)">
-            <stack height="4" radius="2" background="rgba(255,255,255,0.25)" style="width: 100%">
-              <stack height="4" radius="2" background="#E52E2E" style="width: {{ dsx.variable.pos * 100 }}%"/>
+
+          <vstack class="bottomBar" style="pointer-events: auto">
+            <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
+            <stack height="18" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
+                   a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
+                   on:adjust="dsx.variable.pos = dsx.variable.pos + (dsx.this.direction == 'increment' ? 0.05 : -0.05)">
+              <stack height="2" radius="1" background="rgba(255,255,255,0.28)" style="width: 100%">
+                <stack height="2" radius="1" background="#FFFFFF" style="width: {{ dsx.variable.pos * 100 }}%"/>
+              </stack>
             </stack>
-          </stack>
+            <hstack class="epPill" on:tap="dsx.variable.drawer = true" a11yGroup="true" a11yTrait="button" a11yLabel="Episodes">
+              <image icon="rectangle.stack.fill" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
+              <text value="EP.{{ dsx.variable.cur }}" class="epPillNow"/>
+              <text value="/ EP.{{ dsx.variable.total }}" class="epPillAll"/>
+              <spacer/>
+              <image icon="chevron.up.chevron.down" iconSize="14" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+            </hstack>
+          </vstack>
         </vstack>
-      </vstack>
 
-      <!-- THE LOCKED STAGE — "This is a paid episode." (unlock spends server-side) -->
-      <vstack class="lockedLayer" visible-if="dsx.variable.epLocked" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center" background="rgba(0,0,0,0.45)">
-        <vstack class="lockBlock">
-          <image icon="lock.fill" iconSize="26" color="rgba(255,255,255,0.85)" a11yHidden="true"/>
-          <text value="This is a paid episode.
+        <!-- ══ the locked stage ══ -->
+        <vstack class="lockedLayer" visible-if="dsx.variable.epLocked" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+                style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center" background="rgba(0,0,0,0.45)">
+          <vstack class="lockBlock">
+            <image icon="lock.fill" iconSize="26" color="rgba(255,255,255,0.85)" a11yHidden="true"/>
+            <text value="This is a paid episode.
 Please unlock to watch." class="lockHead"/>
-          <hstack class="unlockBtn" a11yGroup="true" a11yTrait="button"
-                  a11yLabel="Unlock this episode for {{ dsx.variable.episode == null ? '' : dsx.variable.episode.price }} coins"
-                  on:tap="dsx.action.unlockNow()">
-            <image icon="dollarsign.circle.fill" iconSize="17" color="#FFFFFF" a11yHidden="true"
-                   visible-if="dsx.variable.unlocking == false"/>
-            <text value="{{ dsx.variable.unlockLabel }}" class="unlockLabel"/>
-          </hstack>
-          <hstack class="lockDoors">
-            <button label="Get coins" class="earnBtn" style="flex: 1"
-                    on:tap="dsx.module.route.push({ path: '/store' })"/>
-            <button label="Earn free" class="earnBtn" style="flex: 1"
-                    on:tap="dsx.module.route.push({ path: '/rewards' })"/>
-          </hstack>
-          <hstack class="lockMetaRow" a11yGroup="true"
-                  a11yLabel="Price {{ dsx.variable.episode == null ? '' : dsx.variable.episode.price }} coins, balance {{ dsx.variable.balance }} coins">
-            <text value="Price:" class="lockMeta"/>
-            <image icon="dollarsign.circle.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
-            <text value="{{ dsx.variable.episode == null ? '' : dsx.variable.episode.price }}" class="lockMeta"/>
-            <text value="·" class="lockMeta"/>
-            <text value="Balance:" class="lockMeta"/>
-            <image icon="dollarsign.circle.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
-            <text value="{{ dsx.variable.balance }}" class="lockMeta"/>
-          </hstack>
-          <hstack class="autoRow" on:tap="dsx.variable.autoUnlock = !dsx.variable.autoUnlock"
-                  a11yGroup="true" a11yTrait="button"
-                  a11yLabel="Auto-unlock next episodes, {{ dsx.variable.autoUnlock ? 'on' : 'off' }}">
-            <vstack class="checkBox" background="{{ dsx.variable.autoUnlock ? '#E52E2E' : 'rgba(255,255,255,0.08)' }}"
-                    style="border: 1.5px solid {{ dsx.variable.autoUnlock ? '#E52E2E' : 'rgba(255,255,255,0.3)' }}">
-              <image icon="checkmark" iconSize="11" color="#FFFFFF" visible-if="dsx.variable.autoUnlock" a11yHidden="true"/>
-            </vstack>
-            <text value="Auto-unlock next episodes" class="autoLabel"/>
-          </hstack>
-          <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
+            <hstack class="unlockBtn" on:tap="dsx.action.unlockNow()" a11yGroup="true" a11yTrait="button"
+                    a11yLabel="Unlock this episode for {{ dsx.variable.episode == null ? '' : dsx.variable.episode.price }} coins">
+              <image src="/assets/coin.svg" a11yHidden="true" style="width: 18px; height: 18px"
+                     visible-if="dsx.variable.unlocking == false"/>
+              <text value="{{ dsx.variable.unlockLabel }}" class="unlockLabelTxt"/>
+            </hstack>
+            <hstack class="lockDoors">
+              <button label="Get coins" class="earnBtn" style="flex: 1" on:tap="dsx.module.route.push({ path: '/store' })"/>
+              <button label="Earn free" class="earnBtn" style="flex: 1" on:tap="dsx.module.route.push({ path: '/rewards' })"/>
+            </hstack>
+            <hstack class="lockMetaRow" a11yGroup="true" a11yLabel="Balance {{ dsx.variable.balance }} coins">
+              <text value="Balance:" class="lockMeta"/>
+              <image src="/assets/coin.svg" a11yHidden="true" style="width: 15px; height: 15px"/>
+              <text value="{{ dsx.variable.balance }}" class="lockMeta"/>
+            </hstack>
+            <hstack class="autoRow" on:tap="dsx.variable.autoUnlock = !dsx.variable.autoUnlock"
+                    a11yGroup="true" a11yTrait="button"
+                    a11yLabel="Auto-unlock next episodes, {{ dsx.variable.autoUnlock ? 'on' : 'off' }}">
+              <vstack class="checkBox" background="{{ dsx.variable.autoUnlock ? '#FF2C55' : 'rgba(255,255,255,0.08)' }}"
+                      style="justify-content: center; border: 1.5px solid {{ dsx.variable.autoUnlock ? '#FF2C55' : 'rgba(255,255,255,0.3)' }}">
+                <image icon="checkmark" iconSize="11" color="#FFFFFF" visible-if="dsx.variable.autoUnlock" a11yHidden="true"/>
+              </vstack>
+              <text value="Auto-unlock next episodes" class="autoLabel"/>
+            </hstack>
+          </vstack>
         </vstack>
-      </vstack>
       </zstack>
     </vstack>
-
-    <!-- ================= THE DETAILS PANEL (wide only) ================= -->
-    <scroll visible-if="dsx.variable.wide" style="width: 416px; min-width: 416px; height: {{ dsx.variable.stageH }}px">
-      <vstack class="panel">
-        <hstack class="crumbRow">
-          <text value="Home" class="crumb" href="/"/>
-          <text value="/" class="crumb"/>
-          <text value="{{ detail.data == null ? '' : detail.data.show.title }}" class="crumb" href="/show/{{ vars.show }}"/>
-          <text value="/" class="crumb"/>
-          <text value="Episode {{ dsx.variable.cur }}" class="crumbOn"/>
-        </hstack>
-
-        <text value="Episode {{ dsx.variable.cur }} - {{ detail.data == null ? '' : detail.data.show.title }}" class="panelH1"/>
-
-        <vstack spacing="7" alignItems="flex-start">
-          <text value="Plot of Episode {{ dsx.variable.cur }}" class="plotHead"/>
-          <text value="{{ detail.data == null ? '' : detail.data.show.synopsis }}" class="plotBody"/>
-        </vstack>
-
-        <hstack class="tagRow">
-          <text value="{{ detail.data == null ? '' : detail.data.show.genre }}" class="tag"/>
-          <text value="Series" class="tag"/>
-          <text value="EP 1–{{ detail.data == null ? '' : detail.data.show.free_until }} Free" class="tag"/>
-        </hstack>
-
-        <hstack class="statRow" style="border-top: 1px solid rgba(255,255,255,0.07); border-bottom: 1px solid rgba(255,255,255,0.07)">
-          <vstack class="statCol" on:tap="dsx.action.toggleFav()" a11yLabel="Toggle My List" a11yTrait="button">
-            <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="20"
-                   color="{{ dsx.variable.favOn ? '#E52E2E' : '#FFFFFF' }}" a11yHidden="true"/>
-            <text value="{{ dsx.variable.favOn ? 'In My List' : 'My List' }}" class="statCap"/>
-          </vstack>
-          <vstack class="statCol" href="/rewards" a11yLabel="Your balance — open Rewards">
-            <image icon="dollarsign.circle.fill" iconSize="20" color="#F7C948" a11yHidden="true"/>
-            <text value="{{ dsx.variable.balance }} coins" class="statCap"/>
-          </vstack>
-        </hstack>
-
-        <hstack class="gridHead">
-          <text value="1 - {{ detail.data == null ? '' : detail.data.episodes.length }}" class="gridRange"/>
-          <spacer/>
-          <hstack class="gridAllRow" href="/show/{{ vars.show }}" a11yGroup="true" a11yLabel="All episodes">
-            <text value="All Episodes" class="gridAll"/>
-            <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.55)" a11yHidden="true"/>
-          </hstack>
-        </hstack>
-
-        <!-- cells are DIRECT grid children (the column-sizing rule targets them); the
-             padlock overlays by position on web and degrades to flow on native -->
-        <grid bind="detail.data.episodes" key="id" columns="6" spacing="6" scroll="false">
-          <vstack class="epCell" style="position: relative; justify-content: center" on:tap="dsx.action.go({ target: item.idx })"
-                  background="{{ item.idx == Number(dsx.variable.cur) ? 'rgba(229,46,46,0.28)' : 'rgba(255,255,255,0.1)' }}"
-                  a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', locked' : '' }}" a11yTrait="button">
-            <text value="{{ item.idx }}" class="epNum"
-                  color="{{ item.idx == Number(dsx.variable.cur) ? '#F2607A' : '#FFFFFF' }}"/>
-            <image icon="lock.fill" iconSize="8" color="rgba(255,255,255,0.55)" visible-if="gridLocked"
-                   a11yHidden="true" style="position: absolute; top: 3px; right: 4px"/>
-          </vstack>
-        </grid>
-      </vstack>
-    </scroll>
   </hstack>
 
-  <!-- player options: captions · language · speed · download. `detents="content"` hugs
-       the rows. Download is a NATIVE-lane capability and says so rather than faking. -->
-  <sheet present="dsx.variable.menu" detents="content" title="Player options" background="#141419"
-         on:dismiss="dsx.variable.menu = false">
+  <!-- ══════ the episode drawer ══════ -->
+  <sheet present="dsx.variable.drawer" detents="half,full" background="#141414"
+         on:dismiss="dsx.variable.drawer = false">
+    <scroll style="flex: 1; min-height: 0">
+      <vstack alignItems="stretch">
+        <hstack class="drawerHead">
+          <image src="{{ detail.data == null ? '' : detail.data.show.poster }}" contentFit="cover" a11yHidden="true"
+                 style="width: 50px; height: 66px; border-radius: 8px; object-fit: cover"/>
+          <vstack spacing="4" style="flex: 1; min-width: 0">
+            <text value="{{ detail.data == null ? '' : detail.data.show.title }}" class="drawerTitle"/>
+            <text value="All {{ dsx.variable.total }} Episodes" class="drawerSub"/>
+          </vstack>
+          <button label="{{ dsx.variable.favOn ? 'Following' : 'Follow' }}" class="followBtn"
+                  background="{{ dsx.variable.favOn ? '#8E1637' : '#FF2C55' }}" on:tap="dsx.action.toggleFav()"/>
+        </hstack>
+
+        <hstack class="tabRow">
+          <vstack spacing="5" alignItems="center" on:tap="dsx.variable.drawerTab = 'synopsis'" a11yTrait="button" a11yLabel="Synopsis">
+            <text value="Synopsis" class="tabTxt" color="{{ dsx.variable.drawerTab == 'synopsis' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
+            <stack class="tabUnderline" visible-if="dsx.variable.drawerTab == 'synopsis'"/>
+          </vstack>
+          <vstack spacing="5" alignItems="center" on:tap="dsx.variable.drawerTab = 'episodes'" a11yTrait="button" a11yLabel="Episodes">
+            <text value="Episodes" class="tabTxt" color="{{ dsx.variable.drawerTab == 'episodes' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
+            <stack class="tabUnderline" visible-if="dsx.variable.drawerTab == 'episodes'"/>
+          </vstack>
+        </hstack>
+        <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
+
+        <!-- Synopsis -->
+        <vstack class="synopsisWrap" visible-if="dsx.variable.drawerTab == 'synopsis'">
+          <hstack class="tagRow">
+            <text value="{{ detail.data == null ? '' : detail.data.show.genre }}" class="tag"/>
+            <text value="Series" class="tag"/>
+          </hstack>
+          <text value="{{ detail.data == null ? '' : detail.data.show.synopsis }}" class="synopsisTxt"/>
+        </vstack>
+
+        <!-- Episodes -->
+        <vstack visible-if="dsx.variable.drawerTab == 'episodes'" alignItems="stretch">
+          <hstack class="rangeRow">
+            <list bind="dsx.variable.ranges" key="id" axis="horizontal" scroll="false" spacing="18">
+              <text value="{{ item.label }}" class="rangeTxt"
+                    color="{{ item.from - 1 == Number(dsx.variable.range) * 30 ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}"
+                    on:tap="dsx.variable.range = (item.from - 1) / 30" a11yTrait="button"/>
+            </list>
+            <spacer/>
+            <zstack on:tap="dsx.module.route.push({ path: '/vip' })" a11yLabel="Download — VIP" a11yTrait="button">
+              <image icon="square.and.arrow.down" iconSize="21" color="#FFFFFF" a11yHidden="true"/>
+              <vstack class="vipSlot" style="pointer-events: none">
+                <text value="VIP" class="vipTag" style="margin-top: -6px; margin-right: -10px"/>
+              </vstack>
+            </zstack>
+          </hstack>
+          <vstack class="epGridWrap">
+            <!-- the cell is the DIRECT grid child: a wrapper here loses the column width
+                 (AGENTS.md). The VIP tag overlays by position, flow-fallback on native. -->
+            <grid bind="dsx.variable.visibleEps" key="id" columns="6" spacing="8" scroll="false">
+              <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center"
+                      on:tap="dsx.action.go({ target: item.idx })"
+                      background="{{ item.idx == Number(dsx.variable.cur) ? '#FF2C55' : '#242426' }}"
+                      a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', locked' : '' }}" a11yTrait="button">
+                <text value="{{ item.idx }}" class="epNum" color="#FFFFFF"/>
+                <text value="VIP" class="vipTag" visible-if="gridLocked"
+                      style="position: absolute; top: 0; right: 0; border-top-right-radius: 10px; border-bottom-left-radius: 6px; border-top-left-radius: 0; border-bottom-right-radius: 0"/>
+              </vstack>
+            </grid>
+          </vstack>
+        </vstack>
+      </vstack>
+    </scroll>
+  </sheet>
+
+  <!-- ══════ options: the ⋯ stack ══════ -->
+  <sheet present="dsx.variable.menu" detents="content" background="#141414"
+         on:dismiss="dsx.variable.menu = false; dsx.variable.sheet = ''">
     <vstack class="menuBody">
-      <hstack class="menuRow" on:tap="dsx.variable.captions = !dsx.variable.captions"
-              a11yGroup="true" a11yTrait="button"
-              a11yLabel="Captions, {{ dsx.variable.captions ? 'on' : 'off' }}">
-        <image icon="note.text" iconSize="18" color="rgba(255,255,255,0.75)" a11yHidden="true"/>
-        <text value="Captions" class="menuLabel" style="flex: 1"/>
-        <vstack class="checkBox" background="{{ dsx.variable.captions ? '#E52E2E' : 'rgba(255,255,255,0.08)' }}"
-                style="border: 1.5px solid {{ dsx.variable.captions ? '#E52E2E' : 'rgba(255,255,255,0.3)' }}">
-          <image icon="checkmark" iconSize="11" color="#FFFFFF" visible-if="dsx.variable.captions" a11yHidden="true"/>
+      <!-- root -->
+      <vstack visible-if="dsx.variable.sheet == ''" alignItems="stretch">
+        <text value="More" class="menuHead"/>
+        <vstack class="menuCard">
+          <hstack class="menuRow" on:tap="dsx.variable.sheet = 'lang'" a11yGroup="true" a11yTrait="button" a11yLabel="Audio and subtitles">
+            <image icon="globe" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
+            <text value="Audio / Subtitles" class="menuLabel" style="flex: 1"/>
+            <text value="{{ dsx.variable.lang }}" class="menuValue"/>
+            <image icon="chevron.right" iconSize="14" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+          </hstack>
+          <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
+          <hstack class="menuRow" on:tap="dsx.variable.sheet = 'quality'" a11yGroup="true" a11yTrait="button" a11yLabel="Quality">
+            <image icon="slider.horizontal.3" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
+            <text value="Quality" class="menuLabel" style="flex: 1"/>
+            <text value="{{ dsx.variable.quality }}" class="menuValue"/>
+            <image icon="chevron.right" iconSize="14" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+          </hstack>
+          <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
+          <vstack spacing="12" alignItems="stretch" paddingV="16">
+            <hstack spacing="14" alignItems="center">
+              <image icon="arrow.clockwise" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
+              <text value="Speed" class="menuLabel"/>
+            </hstack>
+            <hstack class="speedSeg" style="justify-content: space-between">
+              <list bind="dsx.variable.speedOptions" key="id" axis="horizontal" scroll="false" spacing="0">
+                <text value="{{ item.label }}" class="speedOpt"
+                      color="{{ item.v == dsx.variable.speed ? '#FFFFFF' : 'rgba(255,255,255,0.55)' }}"
+                      background="{{ item.v == dsx.variable.speed ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0)' }}"
+                      on:tap="dsx.variable.speed = item.v" a11yTrait="button" a11yLabel="{{ item.label }} speed"/>
+              </list>
+            </hstack>
+          </vstack>
+          <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
+          <hstack class="menuRow" a11yGroup="true" a11yLabel="Picture in picture">
+            <image icon="rectangle.stack.fill" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
+            <text value="Picture in Picture" class="menuLabel" style="flex: 1"/>
+            <toggle bind="dsx.variable.pip" color="#FF2C55" a11yLabel="Picture in picture"/>
+          </hstack>
         </vstack>
-      </hstack>
+      </vstack>
 
-      <hstack class="menuRow">
-        <image icon="globe" iconSize="18" color="rgba(255,255,255,0.75)" a11yHidden="true"/>
-        <text value="Audio &amp; subtitles" class="menuLabel" style="flex: 1"/>
-        <picker bind="dsx.variable.lang" options="English,Español,Português,Deutsch,Français"
-                color="#E52E2E" a11yLabel="Language"/>
-      </hstack>
+      <!-- audio / subtitles -->
+      <vstack visible-if="dsx.variable.sheet == 'lang'" alignItems="stretch">
+        <hstack alignItems="center" paddingBottom="8">
+          <image icon="chevron.left" iconSize="19" color="#FFFFFF" on:tap="dsx.variable.sheet = ''" a11yLabel="Back" a11yTrait="button"/>
+          <text value="Subtitles" class="menuHead" style="flex: 1"/>
+          <toggle bind="dsx.variable.captions" color="#FF2C55" a11yLabel="Subtitles"/>
+        </hstack>
+        <list bind="dsx.variable.languages" key="id" scroll="false" spacing="2">
+          <hstack class="optRow" on:tap="dsx.variable.lang = item.label" a11yTrait="button" a11yLabel="{{ item.label }}"
+                  background="{{ item.label == dsx.variable.lang ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0)' }}">
+            <image icon="checkmark" iconSize="15" color="#FF2C55" visible-if="item.label == dsx.variable.lang" a11yHidden="true"/>
+            <text value="{{ item.label }}" class="optLabel"
+                  color="{{ item.label == dsx.variable.lang ? '#FFFFFF' : 'rgba(255,255,255,0.8)' }}"
+                  fontWeight="{{ item.label == dsx.variable.lang ? 'semibold' : 'regular' }}"/>
+          </hstack>
+        </list>
+      </vstack>
 
-      <hstack class="menuRow">
-        <image icon="speedometer" iconSize="18" color="rgba(255,255,255,0.75)" a11yHidden="true"/>
-        <text value="Playback speed" class="menuLabel" style="flex: 1"/>
-        <segmented bind="dsx.variable.speed" options="1,1.5,2" color="#E52E2E" a11yLabel="Playback speed"/>
-      </hstack>
+      <!-- quality -->
+      <vstack visible-if="dsx.variable.sheet == 'quality'" alignItems="stretch">
+        <hstack alignItems="center" paddingBottom="8">
+          <image icon="chevron.left" iconSize="19" color="#FFFFFF" on:tap="dsx.variable.sheet = ''" a11yLabel="Back" a11yTrait="button"/>
+          <text value="Quality" class="menuHead"/>
+        </hstack>
+        <list bind="dsx.variable.qualities" key="id" scroll="false" spacing="2">
+          <hstack class="optRow" on:tap="dsx.variable.quality = item.label" a11yTrait="button" a11yGroup="true"
+                  a11yLabel="{{ item.label }}{{ item.vip ? ', VIP' : '' }}"
+                  background="{{ item.label == dsx.variable.quality ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0)' }}">
+            <image icon="checkmark" iconSize="15" color="#FF2C55" visible-if="item.label == dsx.variable.quality" a11yHidden="true"/>
+            <vstack spacing="3" style="flex: 1">
+              <hstack spacing="8" alignItems="center">
+                <text value="{{ item.label }}" class="optLabel" color="{{ item.vip ? '#F6B63D' : '#FFFFFF' }}"/>
+                <text value="VIP" class="vipTag" visible-if="item.vip"/>
+              </hstack>
+              <text value="{{ item.note }}" class="optNote" visible-if="item.note != ''"/>
+            </vstack>
+          </hstack>
+        </list>
+      </vstack>
 
-      <hstack class="menuRow" style="opacity: 0.5">
-        <image icon="square.and.arrow.down" iconSize="18" color="rgba(255,255,255,0.75)" a11yHidden="true"/>
-        <vstack spacing="2" style="flex: 1">
-          <text value="Download episode" class="menuLabel"/>
-          <text value="Offline downloads run in the iOS and Android apps" class="menuNote"/>
-        </vstack>
-      </hstack>
+      <!-- speed -->
+      <vstack visible-if="dsx.variable.sheet == 'speed'" alignItems="stretch">
+        <hstack alignItems="center" paddingBottom="8">
+          <image icon="chevron.left" iconSize="19" color="#FFFFFF" on:tap="dsx.variable.sheet = ''" a11yLabel="Back" a11yTrait="button"/>
+          <text value="Playback Speed" class="menuHead"/>
+        </hstack>
+        <list bind="dsx.variable.speedOptions" key="id" scroll="false" spacing="2">
+          <hstack class="optRow" on:tap="dsx.variable.speed = item.v" a11yTrait="button" a11yLabel="{{ item.label }}"
+                  background="{{ item.v == dsx.variable.speed ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0)' }}">
+            <image icon="checkmark" iconSize="15" color="#FF2C55" visible-if="item.v == dsx.variable.speed" a11yHidden="true"/>
+            <text value="{{ item.label }}" class="optLabel" color="#FFFFFF"/>
+          </hstack>
+        </list>
+      </vstack>
     </vstack>
   </sheet>
 
-  <!-- episode drawer (phone) -->
-  <sheet present="dsx.variable.drawer" detents="half,full" title="Episodes" background="#141419"
-         on:dismiss="dsx.variable.drawer = false">
-    <scroll style="flex: 1; min-height: 0">
-      <vstack class="drawerGrid">
-      <grid bind="detail.data.episodes" key="id" columns="5" spacing="9" scroll="false">
-        <vstack class="drawerCell"
-                background="{{ item.idx == Number(dsx.variable.cur) ? '#E52E2E' : '#1E1E24' }}"
-                on:tap="dsx.action.go({ target: item.idx })" a11yLabel="Episode {{ item.idx }}">
-          <text value="{{ item.idx }}" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+  <!-- ══════ comments ══════ -->
+  <sheet present="dsx.variable.comments" detents="half,full" background="#141414"
+         on:dismiss="dsx.variable.comments = false">
+    <vstack alignItems="stretch" style="flex: 1; min-height: 0">
+      <hstack class="cHead">
+        <text value="{{ dsx.variable.commentCount }} comments" class="cTitle" style="flex: 1"/>
+      </hstack>
+      <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
+      <scroll style="flex: 1; min-height: 0">
+        <vstack alignItems="stretch">
+          <text class="cEmpty" visible-if="thread.data != null && thread.data.count == 0"
+                value="No comments yet — be the first."/>
+          <list bind="thread.data.rows" key="id" scroll="false" spacing="0">
+            <hstack class="cRow">
+              <vstack class="cAvatar" style="justify-content: center">
+                <image icon="person.fill" iconSize="16" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
+              </vstack>
+              <vstack spacing="5" style="flex: 1; min-width: 0">
+                <text value="{{ item.author }}" class="cAuthor"/>
+                <text value="{{ item.body }}" class="cBody"/>
+                <text value="{{ item.likes }} likes" class="cMeta"/>
+              </vstack>
+            </hstack>
+          </list>
         </vstack>
-        </grid>
-      </vstack>
-    </scroll>
+      </scroll>
+      <hstack style="padding: 12px 16px 20px 16px">
+        <hstack class="cField" style="flex: 1">
+          <textfield bind="dsx.variable.draft" placeholder="Enter your comment here..." color="#FFFFFF"
+                     style="flex: 1" on:submit="dsx.action.postComment()"/>
+          <button label="Submit" class="cSend" on:tap="dsx.action.postComment()"/>
+        </hstack>
+      </hstack>
+    </vstack>
   </sheet>
 </vstack>

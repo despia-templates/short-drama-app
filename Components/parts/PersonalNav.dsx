@@ -33,7 +33,7 @@
     <style as="balNum" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
     <style as="balSub" fontSize="12" color="rgba(255,255,255,0.5)"/>
     <style as="balDiv" background="rgba(255,255,255,0.1)" width="1" height="34"/>
-    <style as="topupBtn" background="#E52E2E" radius="21" paddingV="12" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="topupBtn" background="#FF2C55" radius="21" paddingV="12" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
 
     <style as="menu" background="#141419" radius="12" paddingH="8" paddingV="8" spacing="2" alignItems="stretch"/>
     <style as="menuRow" radius="9" paddingH="12" paddingV="12" spacing="11" alignItems="center"/>
@@ -83,23 +83,23 @@
     <hstack class="menuRow" href="/profile" a11yLabel="Wallet"
             background="{{ dsx.attribute.active == 'wallet' ? '#1F1F26' : 'rgba(0,0,0,0)' }}">
       <image icon="dollarsign.circle.fill" iconSize="18"
-             color="{{ dsx.attribute.active == 'wallet' ? '#E52E2E' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
+             color="{{ dsx.attribute.active == 'wallet' ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
       <text value="Wallet" class="menuLabel"
-            color="{{ dsx.attribute.active == 'wallet' ? '#E52E2E' : '#FFFFFF' }}"/>
+            color="{{ dsx.attribute.active == 'wallet' ? '#FF2C55' : '#FFFFFF' }}"/>
     </hstack>
     <hstack class="menuRow" href="/list" a11yLabel="My list"
             background="{{ dsx.attribute.active == 'list' ? '#1F1F26' : 'rgba(0,0,0,0)' }}">
       <image icon="play.rectangle.fill" iconSize="18"
-             color="{{ dsx.attribute.active == 'list' ? '#E52E2E' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
+             color="{{ dsx.attribute.active == 'list' ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
       <text value="My list" class="menuLabel"
-            color="{{ dsx.attribute.active == 'list' ? '#E52E2E' : '#FFFFFF' }}"/>
+            color="{{ dsx.attribute.active == 'list' ? '#FF2C55' : '#FFFFFF' }}"/>
     </hstack>
     <hstack class="menuRow" href="/list" a11yLabel="History"
             background="{{ dsx.attribute.active == 'history' ? '#1F1F26' : 'rgba(0,0,0,0)' }}">
       <image icon="clock.fill" iconSize="18"
-             color="{{ dsx.attribute.active == 'history' ? '#E52E2E' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
+             color="{{ dsx.attribute.active == 'history' ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
       <text value="History" class="menuLabel"
-            color="{{ dsx.attribute.active == 'history' ? '#E52E2E' : '#FFFFFF' }}"/>
+            color="{{ dsx.attribute.active == 'history' ? '#FF2C55' : '#FFFFFF' }}"/>
     </hstack>
   </vstack>
 </vstack>

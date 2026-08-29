@@ -1,0 +1,200 @@
+<!-- VIP — the subscription's own destination, the centre tab in the category's bar. Built
+     to the reference: a gold masthead, the viewer's own watch-time card, the VIP-only rail,
+     a dated Coming Soon shelf, and the benefit list — then the tiers themselves.
+
+     Entitlement is read from /wallet/state (`vip`), never assumed, and every price comes
+     from /store/catalog so an operator changes it without a build. Buying routes to the
+     one checkout path in /store. -->
+<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <expects variable="nav"/>
+
+    <api as="session" url="/dev-session.json" ssr="false"/>
+    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <api as="catalog" url="/store/catalog"/>
+    <api as="home" url="/catalog/home"/>
+
+    <variable as="benefits">
+      return [
+        { id: 'b1', icon: 'lock.open.fill', label: 'Unlimited viewing',        note: 'Every series, every episode' },
+        { id: 'b2', icon: 'sparkles',       label: '1080p high quality',       note: 'The best available master' },
+        { id: 'b3', icon: 'square.and.arrow.down', label: 'Offline downloads', note: 'High-speed, watch anywhere' },
+        { id: 'b4', icon: 'bolt.fill',      label: 'No ads',                   note: 'Nothing between you and the next episode' }
+      ]
+    </variable>
+    <variable as="authHeaders" computed="true">
+      if (session.data == null) { return {} }
+      return { authorization: 'Bearer ' + session.data.viewer.token }
+    </variable>
+    <variable as="bp" computed="true">
+      const w = dsx.screen.width
+      if (w >= 1120) { return 'desktop' }
+      if (w >= 768) { return 'tablet' }
+      return 'phone'
+    </variable>
+    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="gutter" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
+      return 16
+    </variable>
+    <variable as="shell" computed="true">
+      const g = dsx.variable.gutter
+      return 'width: 100%; max-width: 1100px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+    </variable>
+    <variable as="isVip" computed="true">
+      if (wallet.data == null) { return false }
+      return wallet.data.vip === true
+    </variable>
+    <variable as="posterW" computed="true">return dsx.variable.bp == 'phone' ? 150 : 186</variable>
+
+    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="scroller" alignItems="stretch"/>
+    <style as="page" spacing="0" paddingBottom="34" alignItems="stretch"/>
+    <style as="masthead" alignItems="center" spacing="8" paddingTop="20" paddingBottom="22"/>
+    <style as="mastheadTitle" fontSize="20" fontWeight="bold" color="#F6B63D" textAlign="center"/>
+    <style as="section" spacing="14" alignItems="stretch" paddingTop="28"/>
+    <style as="sectionTitle" fontSize="20" fontWeight="bold" color="#F6B63D" textAlign="center"/>
+    <style as="rowTitle" fontSize="17" fontWeight="bold" color="#FFFFFF"/>
+
+    <style as="watchCard" background="#1A1A1C" radius="14" paddingH="18" paddingV="16" alignItems="center" spacing="12"/>
+    <style as="watchCap" fontSize="14" color="rgba(255,255,255,0.55)"/>
+    <style as="watchNum" fontSize="24" fontWeight="bold" color="#F6B63D"/>
+    <style as="watchLink" fontSize="14" color="#F6B63D"/>
+
+    <style as="rail" spacing="12" alignItems="flex-start" paddingTrailing="16"/>
+    <style as="card" spacing="8" alignItems="stretch"/>
+    <style as="cardTitle" fontSize="14" color="rgba(255,255,255,0.9)" lineLimit="2" lineSpacing="2"/>
+    <style as="vipTag" background="#F6B63D" radius="4" paddingH="7" paddingV="2" fontSize="11" fontWeight="bold" color="#3A2A08"/>
+    <style as="tagWrap" paddingTrailing="8" paddingTop="8" alignItems="flex-end" zIndex="1"/>
+    <style as="dateRow" spacing="9" alignItems="center" paddingBottom="4"/>
+    <style as="dateTxt" fontSize="13" color="rgba(255,255,255,0.55)"/>
+
+    <style as="benefitRow" spacing="14" alignItems="center" paddingV="14"/>
+    <style as="benefitLabel" fontSize="16" color="#FFFFFF"/>
+    <style as="benefitNote" fontSize="13" color="rgba(255,255,255,0.45)"/>
+
+    <style as="tierCard" radius="14" paddingH="18" paddingV="18" spacing="8" alignItems="flex-start"/>
+    <style as="tierName" fontSize="15" fontWeight="semibold" color="#3A2A08"/>
+    <style as="tierPrice" fontSize="24" fontWeight="bold" color="#2A1D04"/>
+    <style as="tierNote" fontSize="12" color="rgba(42,29,4,0.7)"/>
+    <style as="tierBadge" background="#FF2C55" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+    <style as="cta" background="#FF2C55" radius="24" paddingV="15" fontSize="16" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="statusPill" background="rgba(246,182,61,0.16)" radius="14" paddingH="14" paddingV="8" spacing="7" alignItems="center"/>
+    <style as="statusTxt" fontSize="13" fontWeight="semibold" color="#F6B63D"/>
+  </head>
+
+  <scroll class="scroller" style="flex: 1; min-height: 0">
+    <vstack class="page">
+      <TopNav active="vip" visible-if="dsx.variable.wide"/>
+
+      <vstack class="masthead" style="{{ dsx.variable.shell }}; background: linear-gradient(180deg, rgba(246,182,61,0.16) 0%, rgba(0,0,0,0) 100%)">
+        <image src="/assets/coin.svg" a11yHidden="true" style="width: 54px; height: 54px"/>
+        <text value="Enjoy Your VIP Access and Privileges" class="mastheadTitle"/>
+        <hstack class="statusPill" visible-if="dsx.variable.isVip">
+          <image icon="crown.fill" iconSize="13" color="#F6B63D" a11yHidden="true"/>
+          <text value="VIP active" class="statusTxt"/>
+        </hstack>
+      </vstack>
+
+      <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+        <hstack class="watchCard">
+          <vstack spacing="4" style="flex: 1">
+            <text value="Last Week's Watch Time" class="watchCap"/>
+            <hstack spacing="6" alignItems="flex-end">
+              <text value="{{ wallet.data == null ? 0 : wallet.data.coins }}" class="watchNum"/>
+              <text value="coins in wallet" class="watchCap" style="padding-bottom: 4px"/>
+            </hstack>
+          </vstack>
+          <hstack spacing="4" alignItems="center" href="/profile" a11yGroup="true" a11yLabel="View your wallet">
+            <text value="View wallet" class="watchLink"/>
+            <image icon="chevron.right" iconSize="12" color="#F6B63D" a11yHidden="true"/>
+          </hstack>
+        </hstack>
+      </vstack>
+
+      <!-- VIP-only rail -->
+      <vstack class="section">
+        <text value="VIP-Only Dramas" class="sectionTitle"/>
+        <scroll axis="horizontal" indicators="false">
+          <hstack class="rail" style="{{ dsx.variable.shell }}">
+            <list bind="home.data.trending" key="id" axis="horizontal" scroll="false" spacing="12">
+              <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/watch/{{ item.id }}/1"
+                      a11yGroup="true" a11yLabel="{{ item.title }}">
+                <zstack>
+                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                         style="width: 100%; aspect-ratio: 3/4; border-radius: 10px; object-fit: cover"/>
+                  <vstack class="tagWrap" style="width: 100%; height: 100%; pointer-events: none">
+                    <text value="VIP" class="vipTag"/>
+                  </vstack>
+                </zstack>
+                <text value="{{ item.title }}" class="cardTitle"/>
+              </vstack>
+            </list>
+          </hstack>
+        </scroll>
+      </vstack>
+
+      <!-- coming soon -->
+      <vstack class="section">
+        <text value="Coming Soon" class="sectionTitle"/>
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" spacing="12">
+          <hstack class="dateRow">
+            <image icon="timer" iconSize="14" color="rgba(255,255,255,0.55)" a11yHidden="true"/>
+            <text value="New episodes every week" class="dateTxt"/>
+          </hstack>
+        </vstack>
+        <scroll axis="horizontal" indicators="false">
+          <hstack class="rail" style="{{ dsx.variable.shell }}">
+            <list bind="home.data.latest" key="id" axis="horizontal" scroll="false" spacing="12">
+              <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/show/{{ item.id }}"
+                      a11yGroup="true" a11yLabel="{{ item.title }}">
+                <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                       style="width: 100%; aspect-ratio: 3/4; border-radius: 10px; object-fit: cover"/>
+                <text value="{{ item.title }}" class="cardTitle"/>
+              </vstack>
+            </list>
+          </hstack>
+        </scroll>
+      </vstack>
+
+      <!-- benefits -->
+      <vstack class="section">
+        <text value="Your Benefits" class="sectionTitle"/>
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <list bind="dsx.variable.benefits" key="id" scroll="false" spacing="0">
+            <hstack class="benefitRow">
+              <image icon="{{ item.icon }}" iconSize="20" color="#F6B63D" a11yHidden="true"/>
+              <vstack spacing="3" style="flex: 1; min-width: 0">
+                <text value="{{ item.label }}" class="benefitLabel"/>
+                <text value="{{ item.note }}" class="benefitNote"/>
+              </vstack>
+            </hstack>
+          </list>
+        </vstack>
+      </vstack>
+
+      <!-- the tiers -->
+      <vstack class="section">
+        <text value="Choose your plan" class="sectionTitle"/>
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" spacing="12">
+          <list bind="catalog.data.vip" key="id" scroll="false" spacing="12">
+            <vstack class="tierCard" on:tap="dsx.module.route.push({ path: '/store' })"
+                    a11yGroup="true" a11yTrait="button" a11yLabel="{{ item.label }}, {{ item.price }}"
+                    style="background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid {{ item.best ? '#FF2C55' : 'rgba(0,0,0,0)' }}">
+              <hstack spacing="8" alignItems="center" style="width: 100%">
+                <text value="{{ item.label }}" class="tierName"/>
+                <spacer/>
+                <text value="{{ item.badge }}" class="tierBadge" visible-if="item.badge != ''"/>
+              </hstack>
+              <text value="{{ item.price }}" class="tierPrice"/>
+              <text value="{{ item.note }}" class="tierNote"/>
+            </vstack>
+          </list>
+          <button label="Go VIP" class="cta" on:tap="dsx.module.route.push({ path: '/store' })"/>
+        </vstack>
+      </vstack>
+    </vstack>
+  </scroll>
+  <TabBar active="vip" visible-if="dsx.variable.wide == false"/>
+</vstack>

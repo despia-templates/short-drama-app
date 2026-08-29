@@ -51,7 +51,7 @@
     <style as="watchLabel" fontSize="13" fontWeight="bold" color="#111111"/>
     <style as="soundBtn" background="rgba(255,255,255,0.16)" radius="20" paddingH="12" paddingV="11" alignItems="center"/>
     <style as="statusWrap" alignItems="center" paddingV="40" spacing="10"/>
-    <style as="retryBtn" background="#E52E2E" radius="22" paddingH="20" paddingV="11" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="retryBtn" background="#FF2C55" radius="22" paddingH="20" paddingV="11" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
   <TopNav active="discover" visible-if="dsx.variable.wide"/>
@@ -97,7 +97,7 @@
         <button label="Retry" class="retryBtn" on:tap="feed.refresh()"/>
       </vstack>
       <stack alignItems="stretch" style="width: 100%; pointer-events: auto" visible-if="dsx.variable.wide == false">
-        <TabBar active="discover"/>
+        <TabBar active="foryou"/>
       </stack>
     </vstack>
   </zstack>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="cEdge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7C948"/><stop offset="1" stop-color="#B87A16"/>
+    </linearGradient>
+    <linearGradient id="cFace" x1=".2" y1="0" x2=".8" y2="1">
+      <stop offset="0" stop-color="#FFE9A8"/><stop offset=".45" stop-color="#F6B63D"/><stop offset="1" stop-color="#D98E1C"/>
+    </linearGradient>
+    <linearGradient id="cShine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".85"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="32" cy="38" rx="24" ry="21" fill="url(#cEdge)"/>
+  <ellipse cx="32" cy="31" rx="24" ry="21" fill="url(#cFace)"/>
+  <ellipse cx="32" cy="31" rx="18" ry="15.5" fill="none" stroke="#C98A1E" stroke-opacity=".55" stroke-width="2"/>
+  <path d="M32 20c-5.5 0-9.5 3.4-9.5 8 0 3.2 2 5.4 5.4 6.6l-4.6 6.7h5.9l3.4-5.2 3.4 5.2h5.9l-4.6-6.7c3.4-1.2 5.4-3.4 5.4-6.6 0-4.6-4-8-9.5-8zm0 4.2c2.6 0 4.4 1.5 4.4 3.8S34.6 31.8 32 31.8s-4.4-1.5-4.4-3.8 1.8-3.8 4.4-3.8z" fill="#8A5B0C" fill-opacity=".8"/>
+  <ellipse cx="24" cy="22" rx="9" ry="5" fill="url(#cShine)" transform="rotate(-22 24 22)"/>
+</svg>

@@ -1,44 +1,60 @@
-<!-- TabBar — the app's own bottom navigation (custom UI, deliberately not the native tab
-     chrome: the drama category is a fully custom surface, and this template is the proof
-     it renders unified everywhere).
+<!-- TabBar — the category-standard five: Home · For You · VIP · My List · Profile, with
+     VIP raised in the centre as its own gold moment (measured off the DramaWave reference:
+     outline icons at rest, accent-filled when active, an 11px caption under each, and a
+     dot badge on the surfaces that have news).
 
-     Icons come from the shared catalog (Conformance/icons/sf-map.json), so ONE name
-     resolves per renderer: Boxicons paths on web, SF Symbols on iOS, Material Symbols on
-     Android. Never a per-platform icon fork. -->
-<hstack class="bar" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.08); justify-content: space-evenly">
+     A tap is a RESET to that root, never a push — tabs are lateral moves, so the stack
+     never grows and the bar never travels with a transition (writing-an-app.md §5). -->
+<hstack class="bar" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.07); justify-content: space-around">
   <head>
-    <attribute as="active" default="'home'"/>   <!-- home | discover | rewards | list | profile -->
+    <attribute as="active" default="'home'"/>   <!-- home | foryou | vip | list | profile -->
 
-    <variable as="on" computed="true">'#E52E2E'</variable>
-    <variable as="off" computed="true">'rgba(255,255,255,0.42)'</variable>
+    <variable as="on" computed="true">'#FF2C55'</variable>
+    <variable as="off" computed="true">'rgba(255,255,255,0.45)'</variable>
 
-    <style as="bar" background="#0A0A0E" paddingTop="8" paddingBottom="8" alignItems="center"/>
-    <style as="item" spacing="3" alignItems="center" paddingV="2" paddingH="6"/>
+    <style as="bar" background="#000000" paddingTop="9" paddingBottom="9" alignItems="flex-start"/>
+    <style as="item" spacing="4" alignItems="center" paddingV="2" paddingH="4" width="66"/>
     <style as="cap" fontSize="11" fontWeight="medium"/>
+    <style as="vipWrap" alignItems="center" spacing="4" paddingH="4" width="66"/>
+    <style as="vipGem" width="30" height="30" radius="10" alignItems="center"/>
+    <style as="dot" background="#FF2C55" width="7" height="7" radius="4"/>
+    <style as="badgeSlot" alignItems="flex-end" width="30" height="0"/>
   </head>
 
   <vstack class="item" on:tap="dsx.module.route.reset({ path: '/' })" a11yTrait="button" a11yLabel="Home">
-    <image icon="house.fill" iconSize="20" color="{{ dsx.attribute.active == 'home' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    <image icon="{{ dsx.attribute.active == 'home' ? 'house.fill' : 'house' }}" iconSize="22"
+           color="{{ dsx.attribute.active == 'home' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
     <text value="Home" class="cap" color="{{ dsx.attribute.active == 'home' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>
 
-  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/discover' })" a11yTrait="button" a11yLabel="Discover">
-    <image icon="play.rectangle.fill" iconSize="20" color="{{ dsx.attribute.active == 'discover' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
-    <text value="Discover" class="cap" color="{{ dsx.attribute.active == 'discover' ? '#FFFFFF' : dsx.variable.off }}"/>
+  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/discover' })" a11yTrait="button" a11yLabel="For You">
+    <image icon="play.rectangle.fill" iconSize="22"
+           color="{{ dsx.attribute.active == 'foryou' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    <text value="For You" class="cap" color="{{ dsx.attribute.active == 'foryou' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>
 
-  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/rewards' })" a11yTrait="button" a11yLabel="Rewards">
-    <image icon="gift.fill" iconSize="20" color="{{ dsx.attribute.active == 'rewards' ? '#F7C948' : dsx.variable.off }}" a11yHidden="true"/>
-    <text value="Rewards" class="cap" color="{{ dsx.attribute.active == 'rewards' ? '#FFFFFF' : dsx.variable.off }}"/>
+  <!-- VIP: the centre slot the category reserves for the subscription -->
+  <vstack class="vipWrap" on:tap="dsx.module.route.reset({ path: '/vip' })" a11yTrait="button" a11yLabel="VIP">
+    <zstack>
+      <vstack class="vipGem" style="justify-content: center; background: linear-gradient(150deg, #FF7BAA 0%, #FF2C55 45%, #B3103A 100%); box-shadow: 0 4px 14px rgba(255,44,85,0.45)">
+        <image icon="crown.fill" iconSize="15" color="#FFE9A8" a11yHidden="true"/>
+      </vstack>
+      <vstack class="badgeSlot" style="pointer-events: none">
+        <stack class="dot" style="border: 2px solid #000000; margin-top: -2px; margin-right: -2px"/>
+      </vstack>
+    </zstack>
+    <text value="VIP" class="cap" color="{{ dsx.attribute.active == 'vip' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>
 
   <vstack class="item" on:tap="dsx.module.route.reset({ path: '/list' })" a11yTrait="button" a11yLabel="My List">
-    <image icon="heart.fill" iconSize="20" color="{{ dsx.attribute.active == 'list' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    <image icon="{{ dsx.attribute.active == 'list' ? 'bookmark.fill' : 'bookmark' }}" iconSize="21"
+           color="{{ dsx.attribute.active == 'list' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
     <text value="My List" class="cap" color="{{ dsx.attribute.active == 'list' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>
 
   <vstack class="item" on:tap="dsx.module.route.reset({ path: '/profile' })" a11yTrait="button" a11yLabel="Profile">
-    <image icon="person.crop.circle" iconSize="20" color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
-    <text value="Me" class="cap" color="{{ dsx.attribute.active == 'profile' ? '#FFFFFF' : dsx.variable.off }}"/>
+    <image icon="person.crop.circle" iconSize="22"
+           color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    <text value="Profile" class="cap" color="{{ dsx.attribute.active == 'profile' ? '#FFFFFF' : dsx.variable.off }}"/>
   </vstack>
 </hstack>

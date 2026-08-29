@@ -128,13 +128,13 @@
     <style as="vipNote" fontSize="12" color="rgba(42,29,4,0.7)"/>
     <style as="vipPerk" spacing="6" alignItems="center"/>
     <style as="vipPerkText" fontSize="12" fontWeight="medium" color="#2A1D04"/>
-    <style as="vipBadge" background="#E52E2E" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+    <style as="vipBadge" background="#FF2C55" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
 
     <style as="packCard" background="#141419" radius="12" paddingH="14" paddingV="16" spacing="7" alignItems="flex-start"/>
     <style as="packCoins" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
     <style as="packLine" fontSize="12" color="rgba(255,255,255,0.5)"/>
     <style as="packPrice" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="packBonus" background="#E52E2E" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+    <style as="packBonus" background="#FF2C55" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
     <style as="coinRow" spacing="6" alignItems="center"/>
 
     <style as="earnCard" background="#141419" radius="14" paddingH="18" paddingV="18" spacing="12" alignItems="stretch"/>
@@ -174,7 +174,7 @@
           <grid bind="catalog.data.vip" key="id" columns="{{ dsx.variable.vipCols }}" spacing="14" scroll="false">
             <vstack class="vipCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
                     a11yLabel="Buy {{ item.label }} for {{ item.price }}"
-                    style="background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid {{ item.best ? '#E52E2E' : 'rgba(0,0,0,0)' }}">
+                    style="background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid {{ item.best ? '#FF2C55' : 'rgba(0,0,0,0)' }}">
               <hstack spacing="8" alignItems="center" style="width: 100%">
                 <text value="{{ item.label }}" class="vipName"/>
                 <spacer/>
@@ -234,5 +234,5 @@
 
     </vstack>
   </scroll>
-  <TabBar active="rewards" visible-if="dsx.variable.wide == false"/>
+  <TabBar active="vip" visible-if="dsx.variable.wide == false"/>
 </vstack>

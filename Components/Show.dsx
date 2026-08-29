@@ -185,7 +185,7 @@
           <hstack class="ctaRow">
             <hstack class="favBtn" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button" a11yLabel="Toggle My List">
               <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="17"
-                     color="{{ dsx.variable.favOn ? '#E52E2E' : '#FFFFFF' }}" a11yHidden="true"/>
+                     color="{{ dsx.variable.favOn ? '#FF2C55' : '#FFFFFF' }}" a11yHidden="true"/>
               <text value="{{ dsx.variable.favOn ? 'Saved' : 'My List' }}" class="favLabel"/>
             </hstack>
             <hstack class="favBtn" href="/rewards" a11yGroup="true" a11yLabel="Your coins — open Rewards">

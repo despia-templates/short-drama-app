@@ -13,18 +13,18 @@
   <head>
     <attribute as="active" default="'home'"/>
 
-    <variable as="on" computed="true">'#E52E2E'</variable>
+    <variable as="on" computed="true">'#FF2C55'</variable>
     <variable as="off" computed="true">'rgba(255,255,255,0.95)'</variable>
 
     <style as="nav" background="rgba(0,0,0,0)" height="80" alignItems="center"/>
     <style as="inner" alignItems="center" spacing="30" paddingLeading="86" paddingTrailing="86"/>
     <style as="brand" spacing="10" alignItems="center"/>
-    <style as="logoBox" background="#E52E2E" radius="9" alignItems="center" width="32" height="32"/>
+    <style as="logoBox" background="#FF2C55" radius="9" alignItems="center" width="32" height="32"/>
     <style as="wordmark" fontSize="22" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
     <style as="links" spacing="30" alignItems="center"/>
     <style as="link" fontSize="18" fontWeight="bold"/>
     <style as="tools" spacing="22" alignItems="center"/>
-    <style as="cta" background="#E52E2E" radius="20" paddingH="22" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="cta" background="#FF2C55" radius="20" paddingH="22" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
   <hstack class="inner" style="width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto">

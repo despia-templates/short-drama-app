@@ -5,7 +5,7 @@
 
      Measured constants, not invented ones: gutter 77 · poster 3:4 at radius 16 · rail
      gap 18 · section head 24/700 at rgba(255,255,255,0.8) · card title 14 at 0.8 ·
-     card meta 14 at 0.9 · brand red #E52E2E · hero title 32/700 at 0.9.
+     card meta 14 at 0.9 · brand red #FF2C55 · hero title 32/700 at 0.9.
 
      Hero type lives OUTSIDE the pager, bound to the resting page: a caption that
      restyles itself mid-swipe flickers. Hover is a REAL pointer affordance
@@ -116,13 +116,13 @@
     <style as="section" spacing="14" alignItems="stretch" paddingTop="44" grow="width"/>
 
     <style as="phoneBar" paddingV="12" alignItems="center" spacing="10"/>
-    <style as="logoBox" background="#E52E2E" radius="8" alignItems="center" width="29" height="29"/>
+    <style as="logoBox" background="#FF2C55" radius="8" alignItems="center" width="29" height="29"/>
     <style as="wordmark" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
 
     <style as="heroBlock" spacing="16" alignItems="flex-start"/>
     <style as="heroTitle" fontWeight="bold" color="rgba(255,255,255,0.9)" lineLimit="2" tracking="-0.5"/>
     <style as="heroPills" spacing="8" alignItems="center"/>
-    <style as="pillHot" background="#E52E2E" radius="13" paddingH="12" paddingV="5" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="pillHot" background="#FF2C55" radius="13" paddingH="12" paddingV="5" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
     <style as="pillTag" background="rgba(255,255,255,0.14)" radius="13" paddingH="12" paddingV="5" fontSize="12" fontWeight="medium" color="rgba(255,255,255,0.92)"/>
     <style as="heroSyn" fontSize="14" color="rgba(255,255,255,0.72)" lineLimit="2" lineSpacing="4"/>
     <style as="playPill" background="#FFFFFF" radius="24" paddingH="34" paddingV="13" spacing="9" alignItems="center"/>
@@ -141,7 +141,7 @@
     <style as="card" spacing="8" alignItems="stretch"/>
     <style as="cardTitle" fontSize="14" color="rgba(255,255,255,0.8)" lineLimit="1"/>
     <style as="cardMeta" fontSize="14" color="rgba(255,255,255,0.9)" lineLimit="1"/>
-    <style as="badge" background="#E52E2E" radius="4" paddingH="8" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="badge" background="#FF2C55" radius="4" paddingH="8" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
     <style as="badgeDark" background="rgba(0,0,0,0.72)" radius="4" paddingH="8" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
     <style as="badgeWrap" paddingLeading="10" paddingTop="10" alignItems="flex-start" zIndex="1"/>
     <style as="epWrap" paddingLeading="10" paddingBottom="12" alignItems="flex-start" zIndex="1"/>
@@ -152,7 +152,7 @@
 
     <style as="rankNum" fontWeight="heavy"/>
     <style as="resumeTrack" background="rgba(255,255,255,0.22)" radius="2"/>
-    <style as="resumeFill" background="#E52E2E" radius="2"/>
+    <style as="resumeFill" background="#FF2C55" radius="2"/>
 
     <style as="footer" alignItems="stretch" spacing="26" paddingTop="40" paddingBottom="34"/>
     <style as="footCols" spacing="70" alignItems="flex-start"/>
@@ -163,7 +163,7 @@
     <style as="footLink" fontSize="14" color="rgba(255,255,255,0.55)"/>
 
     <style as="errCard" background="#141419" radius="16" spacing="10" paddingH="18" paddingV="20" alignItems="center"/>
-    <style as="retryBtn" background="#E52E2E" radius="20" paddingH="20" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
   <scroll class="scroller" style="flex: 1; min-height: 0">
@@ -330,7 +330,7 @@
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="TOP" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           <spacer/>
-          <image icon="flame.fill" iconSize="16" color="#E52E2E" a11yHidden="true"/>
+          <image icon="flame.fill" iconSize="16" color="#FF2C55" a11yHidden="true"/>
         </hstack>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">

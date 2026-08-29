@@ -83,7 +83,7 @@
     <style as="stage" background="#000000" alignItems="stretch" paddingTop="18"/>
     <style as="barRow" spacing="12" alignItems="center" paddingBottom="18"/>
     <style as="bar" background="#1C1C22" radius="28" paddingLeading="18" paddingTrailing="10" paddingV="6" spacing="10" alignItems="center"/>
-    <style as="goBtn" background="#E52E2E" radius="22" paddingH="22" paddingV="11" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="goBtn" background="#FF2C55" radius="22" paddingH="22" paddingV="11" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
 
     <style as="panel" background="#141419" radius="16" paddingH="22" paddingV="20" spacing="16" alignItems="stretch"/>
     <style as="panelHead" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
@@ -93,7 +93,7 @@
     <style as="hotTitle" fontSize="14" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
     <style as="pills" spacing="6" alignItems="center"/>
     <style as="pill" background="rgba(255,255,255,0.1)" radius="9" paddingH="9" paddingV="3" fontSize="12" color="rgba(255,255,255,0.75)"/>
-    <style as="trend" background="#E52E2E" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+    <style as="trend" background="#FF2C55" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
 
     <style as="card" spacing="8" alignItems="stretch"/>
     <style as="cardTitle" fontSize="14" color="rgba(255,255,255,0.8)" lineLimit="1"/>

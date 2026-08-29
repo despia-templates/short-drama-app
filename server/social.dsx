@@ -1,0 +1,50 @@
+<!-- social.dsx — the comment thread under an episode. The category's player rail is built
+     around it (a count you can see, a sheet you can open, a field you can type in), so it
+     is real here: rows in Postgres, RLS-scoped writes, public reads.
+
+     ownership="public-read" — anyone can read a thread, only the author's own row is
+     writable through the generated CRUD. The listing action shapes the wire payload so a
+     screen never sees a raw row. -->
+<server>
+  <head>
+    <entity as="comment" ownership="public-read">
+      <field as="show" type="uuid"/>
+      <field as="episode" type="uuid"/>
+      <field as="author" type="text"/>
+      <field as="body" type="text"/>
+      <field as="likes" type="integer"/>
+      <index on="episode"/>
+    </entity>
+
+    <action as="listComments" inputs="episode">
+      if (episode == null || episode === '') { throw { reason: 'invalid', message: 'episode is required' } }
+      const rows = await dsx.module.data.comment.list({ filters: { episode: episode }, limit: 200 })
+      if (!rows.ok) { return { count: 0, rows: [] } }
+      const out = []
+      for (const c of rows.data) {
+        out.push({ id: c.id, author: c.author, body: c.body, likes: c.likes == null ? 0 : c.likes, at: c.created_at })
+      }
+      return { count: out.length, rows: out }
+    </action>
+
+    <action as="countComments" inputs="episode">
+      if (episode == null || episode === '') { return { count: 0 } }
+      const rows = await dsx.module.data.comment.list({ filters: { episode: episode }, limit: 500 })
+      return { count: rows.ok ? rows.data.length : 0 }
+    </action>
+
+    <action as="postComment" inputs="show, episode, body">
+      const text = body == null ? '' : String(body).trim()
+      if (text === '') { throw { reason: 'invalid', message: 'say something first' } }
+      if (text.length > 500) { throw { reason: 'invalid', message: 'comments are capped at 500 characters' } }
+      const made = await dsx.module.data.comment.create({
+        show: show, episode: episode, author: 'You', body: text, likes: 0
+      })
+      if (!made.ok) { throw { reason: 'conflict', message: 'could not post that' } }
+      return { id: made.data.id, body: text }
+    </action>
+  </head>
+
+  <route method="GET"  path="/social/comments/:episode" action="listComments"  auth="none"/>
+  <route method="POST" path="/social/comment"           action="postComment"   auth="required"/>
+</server>
