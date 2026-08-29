@@ -250,7 +250,9 @@
     <style as="railItem" spacing="4" alignItems="center"/>
     <style as="railCount" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
     <style as="railCap" fontSize="11" color="rgba(255,255,255,0.9)"/>
-    <style as="vipTag" background="#F6B63D" radius="3" paddingH="4" paddingV="0" fontSize="11" fontWeight="bold" color="#3A2A08"/>
+    <style as="vipTag" background="#F6B63D" radius="4" paddingH="5" paddingV="1" fontSize="11" fontWeight="bold" color="#3A2A08"/>
+    <style as="cellTag" background="#F6B63D" paddingH="3" paddingV="0" fontSize="11" fontWeight="bold" color="#3A2A08"/>
+    <style as="nowBars" alignItems="center"/>
     <style as="vipSlot" alignItems="flex-end" width="30" height="0"/>
 
     <!-- ── bottom: scrubber + the EP pill ── -->
@@ -276,18 +278,18 @@
     <style as="autoLabel" fontSize="13" color="rgba(255,255,255,0.66)"/>
 
     <!-- ── the episode drawer ── -->
-    <style as="drawerHead" spacing="12" alignItems="center" paddingH="18" paddingTop="6" paddingBottom="14"/>
+    <style as="drawerHead" spacing="14" alignItems="center" paddingH="16" paddingTop="10" paddingBottom="18"/>
     <style as="drawerTitle" fontSize="17" fontWeight="bold" color="#FFFFFF" lineLimit="2" lineSpacing="3"/>
     <style as="drawerSub" fontSize="13" color="rgba(255,255,255,0.5)"/>
-    <style as="followBtn" radius="20" paddingH="22" paddingV="10" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="tabRow" spacing="26" alignItems="center" paddingH="18" paddingBottom="2"/>
+    <style as="followBtn" radius="24" paddingH="24" paddingV="13" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="tabRow" spacing="28" alignItems="center" paddingH="16" paddingBottom="4"/>
     <style as="tabTxt" fontSize="16" fontWeight="semibold"/>
     <style as="tabUnderline" background="#FF2C55" height="3" radius="2" width="26"/>
-    <style as="rangeRow" spacing="18" alignItems="center" paddingH="18" paddingTop="14" paddingBottom="10"/>
+    <style as="rangeRow" spacing="20" alignItems="center" paddingH="16" paddingTop="18" paddingBottom="12"/>
     <style as="rangeTxt" fontSize="14" fontWeight="semibold"/>
-    <style as="epGridWrap" paddingH="16" paddingBottom="26"/>
-    <style as="epCell" radius="10" alignItems="center"/>
-    <style as="epNum" fontSize="16" fontWeight="semibold" paddingTop="6"/>
+    <style as="epGridWrap" paddingH="12" paddingBottom="28"/>
+    <style as="epCell" radius="11" alignItems="center" background="#2C2C2E"/>
+    <style as="epNum" fontSize="16" fontWeight="semibold"/>
     <style as="synopsisWrap" paddingH="18" paddingTop="14" paddingBottom="26" spacing="12" alignItems="flex-start"/>
     <style as="tagRow" spacing="8" alignItems="center"/>
     <style as="tag" background="rgba(255,255,255,0.1)" radius="6" paddingH="12" paddingV="6" fontSize="13" color="rgba(255,255,255,0.7)"/>
@@ -473,7 +475,7 @@ Please unlock to watch." class="lockHead"/>
       <vstack alignItems="stretch">
         <hstack class="drawerHead">
           <image src="{{ detail.data == null ? '' : detail.data.show.poster }}" contentFit="cover" a11yHidden="true"
-                 style="width: 50px; height: 66px; border-radius: 8px; object-fit: cover"/>
+                 style="width: 52px; height: 69px; border-radius: 8px; object-fit: cover"/>
           <vstack spacing="4" style="flex: 1; min-width: 0">
             <text value="{{ detail.data == null ? '' : detail.data.show.title }}" class="drawerTitle"/>
             <text value="All {{ dsx.variable.total }} Episodes" class="drawerSub"/>
@@ -512,24 +514,27 @@ Please unlock to watch." class="lockHead"/>
                     on:tap="dsx.variable.range = (item.from - 1) / 30" a11yTrait="button"/>
             </list>
             <spacer/>
-            <zstack on:tap="dsx.module.route.push({ path: '/vip' })" a11yLabel="Download — VIP" a11yTrait="button">
-              <image icon="square.and.arrow.down" iconSize="21" color="#FFFFFF" a11yHidden="true"/>
-              <vstack class="vipSlot" style="pointer-events: none">
-                <text value="VIP" class="vipTag" style="margin-top: -6px; margin-right: -10px"/>
-              </vstack>
-            </zstack>
+            <hstack spacing="6" alignItems="center" on:tap="dsx.module.route.push({ path: '/vip' })"
+                    a11yGroup="true" a11yTrait="button" a11yLabel="Download episodes — VIP">
+              <image icon="square.and.arrow.down" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
+              <text value="VIP" class="vipTag"/>
+            </hstack>
           </hstack>
           <vstack class="epGridWrap">
             <!-- the cell is the DIRECT grid child: a wrapper here loses the column width
                  (AGENTS.md). The VIP tag overlays by position, flow-fallback on native. -->
             <grid bind="dsx.variable.visibleEps" key="id" columns="6" spacing="8" scroll="false">
-              <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center"
+              <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center; overflow: hidden"
                       on:tap="dsx.action.go({ target: item.idx })"
-                      background="{{ item.idx == Number(dsx.variable.cur) ? '#FF2C55' : '#242426' }}"
+                      background="{{ item.idx == Number(dsx.variable.cur) ? '#FF2C55' : '#2C2C2E' }}"
                       a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', VIP' : '' }}" a11yTrait="button" a11yGroup="true">
                 <text value="{{ item.idx }}" class="epNum" color="#FFFFFF"/>
-                <text value="VIP" class="vipTag" visible-if="gridLocked"
-                      style="position: absolute; top: 0; right: 0; border-top-right-radius: 10px; border-bottom-left-radius: 6px; border-top-left-radius: 0; border-bottom-right-radius: 0"/>
+                <!-- the corner tab: flush to the cell's own corner, never over the numeral -->
+                <text value="VIP" class="cellTag" visible-if="gridLocked"
+                      style="position: absolute; top: 0; right: 0; border-bottom-left-radius: 6px"/>
+                <!-- the now-playing tell the reference puts on the current cell -->
+                <image icon="waveform" iconSize="11" color="#FFFFFF" visible-if="item.idx == Number(dsx.variable.cur)"
+                       a11yHidden="true" style="position: absolute; top: 4px; right: 5px"/>
               </vstack>
             </grid>
           </vstack>

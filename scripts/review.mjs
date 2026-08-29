@@ -26,7 +26,7 @@ const PALETTE = new Set([
   "#0a0a0e", "#141419", "#17171c", "#1c1c22", "#1e1e24",    // the dark surface ramp
   "#232329", "#26262c", "#3a3a42", "#43434d",
   "#141414", "#1a1a1c", "#1c1c1e", "#242426", "#2a2a2e",    // the DramaWave sheet ramp
-  "#ffe9a8", "#8e1637",                                     // gold highlight · pressed follow
+  "#ffe9a8", "#8e1637", "#2c2c2e",                                     // gold highlight · pressed follow
   "#ff2c55", "#ff6b8a", "#e5225a",                          // DramaWave pink-red + tint + pressed
   "#f7c948", "#f6b63d", "#b9c5d8", "#ce8b5c",               // coin gold · rank metals
   "#3a2a08", "#2a1d04",                                     // VIP-card ink (dark on gold)
