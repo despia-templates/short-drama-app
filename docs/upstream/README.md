@@ -23,3 +23,5 @@ retracted in the ledger instead of filed).
 - `16-style-fragment-silent-drop.md` — lint/web: style fragment silently discarded → https://github.com/despia-native/despia-framework/issues/231
 - `17-review-type-ramp.md` — review: R3 has no project type-ramp declaration → https://github.com/despia-native/despia-framework/issues/232
 - `18-entry-frame-double-mount.md` — web/router: entry frame double-mounted on every route → https://github.com/despia-native/despia-framework/issues/233
+- `19-persistent-chrome.md` — router/layout: no persistent chrome slot → https://github.com/despia-native/despia-framework/issues/234
+- `20-coin-icon.md` — icons: no currency-neutral coin glyph → https://github.com/despia-native/despia-framework/issues/235
