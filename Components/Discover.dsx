@@ -70,14 +70,38 @@
     <pager axis="vertical" ignoreSafeArea="true" bind="feed.data.cards" key="show"
            value="dsx.variable.page" dots="false" on:change="dsx.action.rest()"
            height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto">
-      <video src="{{ item.video }}" active="{{ item.show == dsx.variable.activeShow }}"
-             muted="{{ dsx.variable.muted }}" loop="true" gravity="fill"
-             height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto"
-             on:appear="dsx.action.rest()"/>
+      <zstack>
+        <!-- the art is the FIRST paint: a feed that opens onto a black hole and then pops
+             a bright video reads as a glitch; opening onto the key art reads as intent.
+             The clip sits above and simply covers it once frames exist. -->
+        <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+               height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+               style="width: 100%; object-fit: cover"/>
+        <video src="{{ item.video }}" active="{{ item.show == dsx.variable.activeShow }}"
+               muted="{{ dsx.variable.muted }}" loop="true" gravity="fill"
+               height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; z-index: 1"
+               on:appear="dsx.action.rest()"/>
+      </zstack>
     </pager>
 
+    <!-- the loading stage is its OWN LAYER (a stage-tall child inside the flex-end caption
+         column would fight the spacer): shimmer ground + brand spinner where the video
+         will land, so the tab switch opens onto something designed, never a black hole -->
+    <vstack visible-if="feed.data == null && feed.error == null"
+            height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+            style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center; background: radial-gradient(120% 70% at 50% 30%, #17171C 0%, #0A0A0E 70%)">
+      <vstack spacing="14" alignItems="center">
+        <spinner color="#FF2C55"/>
+        <text value="Loading the feed…" fontSize="13" color="rgba(255,255,255,0.6)"/>
+      </vstack>
+    </vstack>
+
+    <!-- explicit z ABOVE the clip: the video carries z-index:1 to cover its poster, and a
+         positioned child's z competes across the whole outer zstack — without this the
+         gradient, caption and tab bar all vanished under the video (measured; the same
+         stacking law as AGENTS.md's transformed-sibling rule) -->
     <vstack height="{{ dsx.variable.stageH }}"
-            maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; justify-content: flex-end; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0) 52%, rgba(0,0,0,0.86) 100%)">
+            maxWidth="{{ dsx.variable.stageMax }}" style="z-index: 2; width: 100%; margin-left: auto; margin-right: auto; justify-content: flex-end; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0) 52%, rgba(0,0,0,0.86) 100%)">
       <spacer/>
       <vstack class="caption" visible-if="card != null">
         <text value="{{ card == null ? '' : card.genre }}" class="capGenre"/>
@@ -95,9 +119,6 @@
             <image icon="{{ dsx.variable.muted ? 'speaker.slash.fill' : 'waveform' }}" iconSize="16" color="#FFFFFF" a11yHidden="true"/>
           </vstack>
         </hstack>
-      </vstack>
-      <vstack class="statusWrap" visible-if="feed.loading">
-        <text value="Loading the feed…" fontSize="13" color="rgba(255,255,255,0.6)"/>
       </vstack>
       <vstack class="statusWrap" style="pointer-events: auto"
               visible-if="feed.data != null && feed.data.cards.length == 0">

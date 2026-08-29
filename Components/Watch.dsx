@@ -282,6 +282,7 @@
     <style as="unlockLabelTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="lockDoors" spacing="10" alignItems="center"/>
     <style as="earnBtn" background="rgba(255,255,255,0.1)" radius="24" paddingV="14" paddingH="20" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="lockClose" width="34" height="34" radius="17" background="rgba(255,255,255,0.12)" alignItems="center"/>
     <style as="lockMetaRow" spacing="6" alignItems="center"/>
     <style as="lockMeta" fontSize="13" color="#F6B63D"/>
     <style as="autoRow" spacing="9" alignItems="center" paddingTop="2"/>
@@ -430,9 +431,16 @@
           </vstack>
         </vstack>
 
-        <!-- ══ the locked stage ══ -->
+        <!-- ══ the locked stage ══ The dim is the BASE read on every renderer; the frost
+             is the web enhancement (an unmapped declaration passes through on web and is
+             dropped per-declaration native, so nothing load-bearing rides it). The X is
+             the paywall's own way out — a wall the viewer cannot leave is a refund. -->
         <vstack class="lockedLayer" visible-if="dsx.variable.epLocked" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
-                style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center" background="rgba(0,0,0,0.45)">
+                style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center; backdrop-filter: blur(22px) saturate(1.15); -webkit-backdrop-filter: blur(22px) saturate(1.15)" background="rgba(0,0,0,0.45)">
+          <vstack class="lockClose" style="position: absolute; top: 14px; right: 14px; justify-content: center; z-index: 1"
+                  on:tap="dsx.action.goBack()" a11yTrait="button" a11yLabel="Close and go back">
+            <image icon="xmark" iconSize="15" color="rgba(255,255,255,0.9)" a11yHidden="true"/>
+          </vstack>
           <vstack class="lockBlock" enter="fade" anim="spring">
             <image icon="lock.fill" iconSize="26" color="rgba(255,255,255,0.85)" a11yHidden="true"/>
             <text value="This is a paid episode.
@@ -444,8 +452,12 @@ Please unlock to watch." class="lockHead"/>
               <text value="{{ dsx.variable.unlockLabel }}" class="unlockLabelTxt"/>
             </hstack>
             <hstack class="lockDoors">
-              <button label="Get coins" class="earnBtn" style="flex: 1" on:tap="dsx.module.route.push({ path: '/store' })"/>
-              <button label="Earn free" class="earnBtn" style="flex: 1" on:tap="dsx.module.route.push({ path: '/rewards' })"/>
+              <!-- pill labels NEVER wrap ("Get coins" measured 105px wide with 40px of
+                   padding: the space became a break point and the label split — not a
+                   renderer bug, white-space: normal is the web default; the pill idiom
+                   is nowrap + hug) -->
+              <button label="Get coins" class="earnBtn" style="flex: 1; white-space: nowrap" on:tap="dsx.module.route.push({ path: '/store' })"/>
+              <button label="Earn free" class="earnBtn" style="flex: 1; white-space: nowrap" on:tap="dsx.module.route.push({ path: '/rewards' })"/>
             </hstack>
             <hstack class="lockMetaRow" a11yGroup="true" a11yLabel="Balance {{ dsx.variable.balance }} coins">
               <text value="Balance:" class="lockMeta"/>

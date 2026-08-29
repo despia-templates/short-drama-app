@@ -208,9 +208,9 @@
               </vstack>
             </hstack>
             <hstack spacing="10" alignItems="stretch">
-              <button label="Get Coins" class="topupBtn" style="flex: 1"
+              <button label="Get Coins" class="topupBtn" style="flex: 1; white-space: nowrap"
                       on:tap="dsx.module.route.push({ path: '/store' })" a11yLabel="Get coins — open the store"/>
-              <button label="Earn free" class="earnBtn" style="flex: 1"
+              <button label="Earn free" class="earnBtn" style="flex: 1; white-space: nowrap"
                       on:tap="dsx.module.route.push({ path: '/rewards' })" a11yLabel="Earn free coins in Rewards"/>
             </hstack>
           </vstack>
