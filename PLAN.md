@@ -94,11 +94,11 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
 
 ## 6 · Upstream items (the no-hacks ledger — file these, do not absorb them)
 
-1. **VerticalPlayerStack web facet.** No `web/` twin exists; the SSR web app needs the same
+1. **VerticalPlayerStack web facet.** → filed: https://github.com/despia-native/despia-framework/issues/215 — No `web/` twin exists; the SSR web app needs the same
    player/paywall behaviour. Article 10: supported, polyfilled, or platform-limited-with-named-
    degradation. The fix belongs in the module (a `web/index.js` twin over `<video>`/`<pager>`),
    not as a template-side fork.
-2. **Role-gated auth in the server grammar.** `<route auth="required">` exists; the Manage
+2. **Role-gated auth in the server grammar.** → filed: https://github.com/despia-native/despia-framework/issues/216 — `<route auth="required">` exists; the Manage
    plane needs `role`-scoped routes/actions (owner / admin / operator vs. end user). Verify
    against `full-stack.md` identity claims first; if absent, propose `auth="role:<name>"` +
    `<role>` declaration upstream.
@@ -112,33 +112,52 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
 5. **Deploy-link contract** (rfcs/0004 §4) — `despia.com/new?template=…` + Cloudflare OAuth:
    lands in despia-platform (private). The template declares; the platform executes.
 
-### Filed from the implementation slice (2026-08-29, all reproduced on dev@92b844b0)
+### Filed from the implementation slice (measured on dev@92b844b0; re-verified 2026-08-29
+### evening at dev@ae0669ad — no relevant framework sources changed between the two, and
+### every browser-era claim was re-tested in a clean room per §6.13a's rule; three claims
+### died there and are marked RETRACTED where they stood)
 
-6. **`<webhook>` parity in the standalone server compile** — the monorepo grammar has it;
+6. **`<webhook>` parity in the standalone server compile** → filed: https://github.com/despia-native/despia-framework/issues/217 — — the monorepo grammar has it;
    `server-document.ts` aborts on it. Blocks the RevenueCat receiver outside the monorepo.
-7. **Operator/service authority for declared actions** — `repoFor` pins user scope and
+7. **Operator/service authority for declared actions** → filed: https://github.com/despia-native/despia-framework/issues/216 — — `repoFor` pins user scope and
    `serviceRepo` is deliberately unreachable from documents, so no `<server>`-grammar path
    can write a public-read entity. The Manage bridge runs on host-gated internal TS twins
    (scripts/serve.mjs) until `auth="role:…"`/an authority word lands. This is §6.2's
    server-side face and RFC 0003 §5's concrete blocker.
-8. **Stored-null truthiness diverges within the TS runner** — literal `!null` is true, but a
-   stored null is NSNull and `!x` yields false / `if (x)` runs. The corpus is silent; the
-   intra-runtime disagreement is the defect. Template idiom until pinned: `x == null`.
-9. **JSE value semantics traps** — `arr.push` on a read is a silent no-op (concat-write-back
-   is the idiom); 2-arg `Array.map((v, i) => …)` misbinds; explicit `field: null` in
-   `data.create` values fails the statement (omit the key).
-10. **Wire serializer elides repeated dict references as null** — a row appearing on two
-    rails serializes once, then null. Actions must return value copies per collection.
-11. **`<api>` `send()` posts its argument verbatim** — the documented `send({ body: X })`
-    double-wraps; `send(X)` is what works. Docs/impl divergence, pick one.
-12. **Web renderer gaps in list/pager/style planes** — nested repeater row templates lose
-    `item.*` scope; per-node text styles are dropped inside `<pager>` rows (the external
-    overlay bound to the resting page is the workable pattern, and honestly the better one);
-    `zstack` ignores `align`/`width`/`height` attrs; `<image>` size attrs don't emit
-    (`<video>`'s do); component-invocation attrs in row templates don't resolve row scope;
-    one unsupported property drops a whole `style=""` declaration (`vh`, `position`,
-    `conic-gradient` are outside the vocabulary — screen facts `dsx.screen.*` are the
-    portable full-bleed spelling).
+8. **Stored-null truthiness diverges within the TS runner** → filed: https://github.com/despia-native/despia-framework/issues/218 — — clean-room probe
+   (declaredHandler, no browser): `{"literal":true,"stored":false,"branch":"ENTERED-ON-NULL"}`
+   — literal `!null` is true, stored `!w` is false, and `if (w)` ENTERS on a null. The
+   corpus is silent; the intra-runtime disagreement is the defect. Idiom: `x == null`.
+9. **JSE value-semantics defects, refined by clean-room probes (2026-08-29 evening):** → filed: https://github.com/despia-native/despia-framework/issues/219 (a) + https://github.com/despia-native/despia-framework/issues/220 (c) —
+   (a) mutation through a BRACKET read with a variable key is a silent no-op —
+   `by[g].push(x)` leaves length 0 — while literal paths work (`by.k.push(x)` and
+   `a.b.c.push(x)` both land). Write-back (`by[g] = by[g].concat([x])`) is the idiom.
+   (b) ~~2-arg `Array.map((v, i) => …)` misbinds~~ **RETRACTED** — probe returns
+   `[{"i":0,"v":"a"},…]` correctly; the rewards-calendar collapse was the §6.13a
+   stale-bundle window. (c) explicit `field: null` in `data.create` values fails the
+   whole statement — probe: `{"withExplicitNull":false,"withKeyOmitted":true}`.
+10. **Wire serializer elides repeated dict references as null** → filed: https://github.com/despia-native/despia-framework/issues/221 — — `toWire`
+    (`packages/server/src/actions.ts`) adds every object to its `seen` WeakSet and never
+    releases it after the subtree, so the cycle guard treats a DAG as a cycle. Probe: a
+    handler returning `{ first: row, second: row, list: [row, row] }` serializes as
+    `{"first":{…},"second":null,"list":[null,null]}`. Fix shape: release on subtree exit.
+11. **`<api>` `send()` posts its argument verbatim** → filed: https://github.com/despia-native/despia-framework/issues/222 — — `packages/kernel/src/api.ts`
+    `send(args)` does `req["body"] = args`, so the documented `send({ body: X })`
+    (web/05-api-blocks.md) posts `{"body":{…}}`. Docs/impl divergence, pick one.
+12. **Web renderer — the two claims that SURVIVED clean-room re-testing** → filed: https://github.com/despia-native/despia-framework/issues/223 (image) + https://github.com/despia-native/despia-framework/issues/224 (inline component) — (everything else
+    in this row's earlier form was a §6.13a-class artifact and is retracted below):
+    - `<image>` `width=`/`height=` attributes do not emit — a 60×90 request rendered
+      911×300; `<video>`'s size attributes DO emit. Style px beside the attrs is the bridge.
+    - a head-declared inline component (`<component as="Chip">…`) renders a literal
+      `<Chip>?` placeholder wherever invoked — in row templates and standalone alike.
+      FILE components work everywhere, including row scope resolving into their
+      attributes (`<ProbeChip label="{{ item.genre }}"/>` renders correctly per row).
+    **Retracted after clean probes**: nested repeater `item.*` scope (works), per-node
+    text styles in `<pager>` rows (compute correctly), `zstack` align/width/height attrs
+    (a 120×80 `align="bottomLeading"` zstack renders exactly that), file-component attrs
+    in row templates (work), and accent inheritance inside `href` containers (a `color=`
+    attr computes as authored). The absent style-vocabulary words (`vh`, `position`,
+    `conic-gradient`) are documented catalog DESIGN, not defects.
 13a. **RETRACTED — there was no layout-plane defect.** An earlier revision of this ledger
     claimed three of them (inline layout attributes inert on web, `<style>` class names
     app-global, `grow` never emitting). All three were re-tested in isolation with a probe
@@ -161,15 +180,19 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
       serve `dsx-sw.js` when `DSX_DEV_NO_SW=1`, which `npm run serve` sets), so a stale
       bundle can never again masquerade as a framework defect.
 
-    Nothing in this row is an upstream item. It stays in the ledger as the correction of
+    The dev-lane asks distilled from this row (plus the dev deep-link fallback) are
+    filed as https://github.com/despia-native/despia-framework/issues/228.
+
+    Nothing in this row is a semantics item. It stays in the ledger as the correction of
     record, because a template that silently deleted a wrong claim would teach the next
     reader nothing.
 
-14. **`vars.*` (route params) resolve in markup but not in action bodies** — mirror them into
-    a variable at boot, or pass them through declared action inputs (inputs snapshot at call
-    time in caller scope, which markup provides).
+14. **RETRACTED — `vars.*` resolves in action bodies too.** Clean-room probe on a routed
+    screen (`/probe/:id`): markup `{{ vars.id }}` AND an action body reading `vars.id` both
+    yield the param. The 400s that produced this claim were inside the §6.13a stale-bundle
+    window. The mirror-at-boot pattern in Watch.dsx is now a style choice, not a necessity.
 
-15. **The MCP face, measured end-to-end (2026-08-29).** `<tool>` rows in `server/admin.dsx`
+15. **The MCP face, measured end-to-end (2026-08-29).** → filed: https://github.com/despia-native/despia-framework/issues/225 (a) · https://github.com/despia-native/despia-framework/issues/226 (b) · https://github.com/despia-native/despia-framework/issues/227 (c) — `<tool>` rows in `server/admin.dsx`
     do serve: `initialize` ✅, `tools/list` ✅ with `destructiveHint` correctly set from
     `mutates=`, and `tools/call` ✅ for read tools (`adminStats` returns real counters as
     text + `structuredContent`). Three defects sit on top of that, in severity order:

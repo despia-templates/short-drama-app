@@ -33,22 +33,25 @@ and generated barrel are read once at boot). Schema change → re-apply
 
 - **Absence checks are `x == null`** (never `!x` on possibly-null values — stored null is
   NSNull and its truthiness is inconsistent today). Boolean flags may use `!x`.
-- **Collections are value-typed**: `byKey[k].push(v)` mutates a copy;
-  write back `byKey[k] = (byKey[k] == null ? [] : byKey[k]).concat([v])`.
+- **Bracket-read mutation is a silent no-op**: `byKey[k].push(v)` (variable key) writes
+  nothing; write back `byKey[k] = (byKey[k] == null ? [] : byKey[k]).concat([v])`.
+  Literal paths (`obj.list.push(v)`) work.
 - **Never pass `field: null` in `data.create` values** — omit the key.
 - **Return value copies per collection** from server actions (`{ ...row }`) — the wire
   serializer elides repeated references.
 - **`api.send(payload)`** — the payload is the body; do not wrap in `{ body: … }`.
 - **Repeaters are `list`/`grid`/`pager`/`flow` only** (bind on the repeater, single child =
-  row template). Don't nest repeaters yet; don't put styled text inside `<pager>` rows —
-  bind an overlay outside to the resting page (`value=` + a computed row) instead.
+  row template). Nesting works; FILE components work as row templates with `item.*`
+  resolving into their attributes. Inline `<component as=>` does NOT render on web today
+  (placeholder — PLAN.md §6.12); use a file component. The external-overlay pattern for
+  pager captions remains good design (a caption bound to the resting index doesn't move),
+  but it is a choice, not a workaround.
 - **Full-bleed = screen facts**: `width="{{ dsx.screen.width }}" height="{{ dsx.screen.height }}"`
   per layer. The style vocabulary has no `vh`/`position`; one unknown property drops the
   whole `style=""`.
 - **Fixed-size `<image>` needs style px** (`style="width: 120px; height: 180px"`) beside the
   attrs; `<video>` honors its attrs.
-- **Route params** are `vars.id` in markup; mirror into a variable (or pass as declared
-  action inputs) before using them in action bodies.
+- **Route params** are `vars.id` — in markup AND in action bodies (both verified).
 - **CTAs are `<button on:tap="dsx.module.route.push({ path: … })">`** when they need a
   background; `href` containers are for cards/links whose text stays plain.
 - **Style the documented way**: layout attributes (`padding`, `spacing`, `align`,
