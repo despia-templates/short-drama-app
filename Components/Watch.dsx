@@ -526,7 +526,7 @@ Please unlock to watch." class="lockHead"/>
               <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center"
                       on:tap="dsx.action.go({ target: item.idx })"
                       background="{{ item.idx == Number(dsx.variable.cur) ? '#FF2C55' : '#242426' }}"
-                      a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', locked' : '' }}" a11yTrait="button">
+                      a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', VIP' : '' }}" a11yTrait="button" a11yGroup="true">
                 <text value="{{ item.idx }}" class="epNum" color="#FFFFFF"/>
                 <text value="VIP" class="vipTag" visible-if="gridLocked"
                       style="position: absolute; top: 0; right: 0; border-top-right-radius: 10px; border-bottom-left-radius: 6px; border-top-left-radius: 0; border-bottom-right-radius: 0"/>
