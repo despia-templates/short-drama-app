@@ -1,33 +1,36 @@
-<!-- TopNav — the wide-viewport navigation, styled to the category standard (the
-     ReelShort-class bar): logo mark + wordmark, bold white links with the active one in
-     brand red, then the utility cluster — search, history, profile — and the red pill
-     CTA. Phones get the bottom <TabBar> instead; same five destinations either way.
+<!-- TopNav — the wide-viewport bar, built to the category reference measured live at
+     1440×900: 80px tall, TRANSPARENT and sticky so the hero art runs underneath it,
+     18px/700 links with the active one in brand red, then the utility cluster and the
+     red CTA pill. Phones get <TabBar>; same destinations either way.
+
+     Search is an OVERLAY (<SearchOverlay/> owns its trigger and its cover sheet), never
+     a route — the storefront stays mounted behind it.
 
      Icons resolve per renderer from the shared catalog (Boxicons on web, SF Symbols on
-     iOS, Material Symbols on Android) — one name, never a per-platform fork. -->
-<hstack class="nav" style="width: 100%; border-bottom: 1px solid rgba(255,255,255,0.06)">
+     iOS, Material Symbols on Android). No emoji anywhere: an emoji is a font-dependent
+     glyph, not an icon, and it cannot carry a per-platform twin. -->
+<hstack class="nav" style="width: 100%; position: sticky; top: 0; z-index: 50">
   <head>
     <attribute as="active" default="'home'"/>
 
-    <variable as="on" computed="true">'#FF2D55'</variable>
-    <variable as="off" computed="true">'#FFFFFF'</variable>
+    <variable as="on" computed="true">'#E52E2E'</variable>
+    <variable as="off" computed="true">'rgba(255,255,255,0.95)'</variable>
 
-    <style as="nav" background="#000000" paddingV="15" alignItems="center"/>
-    <style as="inner" alignItems="center" spacing="28" paddingLeading="32" paddingTrailing="32"/>
-    <style as="brand" spacing="9" alignItems="center"/>
-    <style as="logoBox" background="#FF2D55" radius="9" alignItems="center" width="30" height="30"/>
-    <style as="logoGlyph" fontSize="13" fontWeight="heavy" color="#FFFFFF"/>
-    <style as="wordmark" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
+    <style as="nav" background="rgba(0,0,0,0)" height="80" alignItems="center"/>
+    <style as="inner" alignItems="center" spacing="30" paddingLeading="86" paddingTrailing="86"/>
+    <style as="brand" spacing="10" alignItems="center"/>
+    <style as="logoBox" background="#E52E2E" radius="9" alignItems="center" width="32" height="32"/>
+    <style as="wordmark" fontSize="22" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
     <style as="links" spacing="30" alignItems="center"/>
-    <style as="link" fontSize="15" fontWeight="semibold"/>
-    <style as="tools" spacing="20" alignItems="center"/>
-    <style as="cta" background="#FF2D55" radius="19" paddingH="18" paddingV="9" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="link" fontSize="18" fontWeight="bold"/>
+    <style as="tools" spacing="22" alignItems="center"/>
+    <style as="cta" background="#E52E2E" radius="20" paddingH="22" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
-  <hstack class="inner" style="width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto">
-    <hstack class="brand" href="/" a11yLabel="Short Drama — home">
+  <hstack class="inner" style="width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto">
+    <hstack class="brand" href="/" a11yGroup="true" a11yLabel="Short Drama — home">
       <vstack class="logoBox" style="justify-content: center">
-        <text value="▶" class="logoGlyph" a11yHidden="true"/>
+        <image icon="play.fill" iconSize="15" color="#FFFFFF" a11yHidden="true"/>
       </vstack>
       <text value="ShortDrama" class="wordmark"/>
     </hstack>
@@ -46,10 +49,9 @@
     <spacer/>
 
     <hstack class="tools">
-      <image icon="magnifyingglass" iconSize="21" href="/search" a11yLabel="Search"
-             color="{{ dsx.attribute.active == 'search' ? dsx.variable.on : dsx.variable.off }}"/>
+      <SearchOverlay size="21"/>
       <image icon="clock.fill" iconSize="20" href="/list" a11yLabel="Watch history"
-             color="rgba(255,255,255,0.88)"/>
+             color="rgba(255,255,255,0.95)"/>
       <image icon="person.crop.circle" iconSize="23" href="/profile" a11yLabel="Profile"
              color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}"/>
     </hstack>

@@ -1,0 +1,173 @@
+<!-- SearchOverlay — search is an OVERLAY, never its own page (the category standard:
+     the storefront stays mounted behind it). Self-contained: it renders its own trigger
+     icon AND the cover sheet, so no screen has to plumb state through to a child.
+
+     Portable by construction — `<sheet mode="cover">` is a full-screen modal on every
+     renderer, which is exactly what the native drama apps present for search too.
+
+     Geometry measured off the category reference at 1440×900: a fully-rounded bar over
+     a dark panel, the ranked "Hot Movie" list two-up on desktop. -->
+<hstack alignItems="center">
+  <head>
+    <attribute as="size" default="21"/>
+    <attribute as="color" default="'rgba(255,255,255,0.95)'"/>
+
+    <!-- lazy: the overlay is mounted on every screen, so the catalogue is
+         fetched when it OPENS, never on page load -->
+    <api as="home" url="/catalog/home" auto="false"/>
+    <api as="searchCall" url="/catalog/search" method="POST" auto="false"/>
+
+    <variable as="open">return false</variable>
+    <variable as="q">return ''</variable>
+    <variable as="results">return null</variable>
+    <variable as="busy">return false</variable>
+
+    <variable as="bp" computed="true">
+      const w = dsx.screen.width
+      if (w >= 1120) { return 'desktop' }
+      if (w >= 768) { return 'tablet' }
+      return 'phone'
+    </variable>
+    <variable as="hotCols" computed="true">return dsx.variable.bp == 'phone' ? 1 : 2</variable>
+    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="resCols" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 5 }
+      if (dsx.variable.bp == 'tablet') { return 4 }
+      return 3
+    </variable>
+    <variable as="statusMsg" computed="true">
+      if (dsx.variable.busy) { return 'Searching…' }
+      const r = dsx.variable.results
+      if (r != null && r.length == 0) { return 'Nothing matches that yet — try a genre like Romance or Revenge.' }
+      return ''
+    </variable>
+
+    <variable as="gutter" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
+      return 16
+    </variable>
+    <!-- compound lists are ONE computed value used as the whole attribute (AGENTS.md) -->
+    <variable as="shellBox" computed="true">
+      const g = dsx.variable.gutter
+      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+    </variable>
+
+    <formula as="rankTint" r="item.rank">
+      if (r == 1 || r == 2) { return '#F6B63D' }
+      return 'rgba(255,255,255,0.4)'
+    </formula>
+
+    <action as="openSearch">
+      dsx.variable.open = true
+      if (home.data == null) { home.refresh() }
+    </action>
+    <action as="runSearch">
+      const term = dsx.variable.q
+      if (term == null || term === '') { dsx.variable.results = null; return }
+      dsx.variable.busy = true
+      const res = await searchCall.send({ q: term })
+      dsx.variable.busy = false
+      if (res.ok) { dsx.variable.results = res.data.items }
+      else { dsx.variable.results = [] }
+    </action>
+    <action as="clearSearch">
+      dsx.variable.q = ''
+      dsx.variable.results = null
+    </action>
+    <action as="closeSearch">
+      dsx.variable.open = false
+      dsx.action.clearSearch()
+    </action>
+
+    <style as="stage" background="#000000" alignItems="stretch" paddingTop="18"/>
+    <style as="barRow" spacing="12" alignItems="center" paddingBottom="18"/>
+    <style as="bar" background="#1C1C22" radius="28" paddingLeading="18" paddingTrailing="10" paddingV="6" spacing="10" alignItems="center"/>
+    <style as="goBtn" background="#E52E2E" radius="22" paddingH="22" paddingV="11" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+
+    <style as="panel" background="#141419" radius="16" paddingH="22" paddingV="20" spacing="16" alignItems="stretch"/>
+    <style as="panelHead" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
+    <style as="hotRow" spacing="14" alignItems="center" paddingV="7"/>
+    <style as="hotNum" fontSize="24" fontWeight="heavy"/>
+    <style as="hotCol" spacing="6" alignItems="stretch"/>
+    <style as="hotTitle" fontSize="14" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+    <style as="pills" spacing="6" alignItems="center"/>
+    <style as="pill" background="rgba(255,255,255,0.1)" radius="9" paddingH="9" paddingV="3" fontSize="12" color="rgba(255,255,255,0.75)"/>
+    <style as="trend" background="#E52E2E" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+
+    <style as="card" spacing="8" alignItems="stretch"/>
+    <style as="cardTitle" fontSize="14" color="rgba(255,255,255,0.8)" lineLimit="1"/>
+    <style as="cardMeta" fontSize="14" color="rgba(255,255,255,0.9)" lineLimit="1"/>
+    <style as="status" fontSize="14" color="rgba(255,255,255,0.55)" textAlign="center" paddingV="14"/>
+  </head>
+
+  <image icon="magnifyingglass" iconSize="{{ dsx.attribute.size }}" color="{{ dsx.attribute.color }}"
+         on:tap="dsx.action.openSearch()" a11yLabel="Search" a11yTrait="button"/>
+
+  <sheet present="dsx.variable.open" mode="cover" background="#000000"
+         on:dismiss="dsx.action.closeSearch()">
+    <scroll style="flex: 1; min-height: 0">
+      <vstack class="stage" style="{{ dsx.variable.shellBox }}">
+
+        <hstack class="barRow">
+          <hstack class="bar" style="flex: 1">
+            <image icon="magnifyingglass" iconSize="18" color="rgba(255,255,255,0.55)" a11yHidden="true"/>
+            <textfield bind="dsx.variable.q" placeholder="Search anything you like"
+                       color="#FFFFFF" style="flex: 1" on:submit="dsx.action.runSearch()"/>
+            <image icon="xmark" iconSize="15" color="rgba(255,255,255,0.5)" visible-if="dsx.variable.q != ''"
+                   on:tap="dsx.action.clearSearch()" a11yLabel="Clear search" a11yTrait="button"/>
+            <button label="Search" class="goBtn" on:tap="dsx.action.runSearch()" visible-if="dsx.variable.wide"/>
+          </hstack>
+          <image icon="xmark" iconSize="20" color="rgba(255,255,255,0.85)"
+                 on:tap="dsx.action.closeSearch()" a11yLabel="Close search" a11yTrait="button"/>
+        </hstack>
+
+        <!-- resting state: the ranked hot list -->
+        <vstack class="panel" visible-if="dsx.variable.results == null">
+          <text value="Hot Movie" class="panelHead"/>
+          <grid bind="home.data.trending" key="id" columns="{{ dsx.variable.hotCols }}" spacing="6" scroll="false">
+            <hstack class="hotRow" href="/show/{{ item.id }}" a11yGroup="true"
+                    a11yLabel="Number {{ item.rank }}, {{ item.title }}">
+              <zstack>
+                <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                       style="width: 60px; height: 80px; border-radius: 8px; object-fit: cover"/>
+                <vstack style="width: 60px; height: 80px; justify-content: flex-end; align-items: flex-start; pointer-events: none">
+                  <text value="{{ item.rank }}" class="hotNum" color="{{ rankTint }}"
+                        style="line-height: 0.82; padding-left: 4px; text-shadow: 0 2px 8px rgba(0,0,0,0.85)"/>
+                </vstack>
+              </zstack>
+              <vstack class="hotCol" style="flex: 1; min-width: 0">
+                <hstack spacing="7" alignItems="center" style="min-width: 0; width: 100%">
+                  <text value="TRENDING" class="trend" visible-if="item.rank <= 3"/>
+                  <text value="{{ item.title }}" class="hotTitle" style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                </hstack>
+                <hstack class="pills">
+                  <text value="{{ item.genre }}" class="pill"/>
+                  <text value="Series" class="pill"/>
+                  <text value="EP {{ item.episodes }}" class="pill" visible-if="item.episodes > 0"/>
+                </hstack>
+              </vstack>
+              <image icon="chevron.right" iconSize="13" color="rgba(255,255,255,0.3)" a11yHidden="true"/>
+            </hstack>
+          </grid>
+        </vstack>
+
+        <!-- results -->
+        <vstack visible-if="dsx.variable.results != null" alignItems="stretch" spacing="16">
+          <text value="{{ dsx.variable.statusMsg }}" class="status" visible-if="dsx.variable.statusMsg != ''"/>
+          <grid bind="dsx.variable.results" key="id" columns="{{ dsx.variable.resCols }}" spacing="18" scroll="false">
+            <vstack class="card" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="{{ item.title }}">
+              <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                     style="width: 100%; aspect-ratio: 3/4; border-radius: 16px; object-fit: cover"/>
+              <vstack spacing="4" alignItems="stretch">
+                <text value="{{ item.title }}" class="cardTitle"/>
+                <text value="{{ item.genre }}  |  Series" class="cardMeta"/>
+              </vstack>
+            </vstack>
+          </grid>
+        </vstack>
+
+      </vstack>
+    </scroll>
+  </sheet>
+</hstack>

@@ -28,8 +28,8 @@
     </variable>
     <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
     <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 32 }
-      if (dsx.variable.bp == 'tablet') { return 24 }
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
       return 16
     </variable>
     <variable as="shell" computed="true">
@@ -46,8 +46,8 @@
       return 'future'
     </formula>
     <formula as="dayColor" st="dayState">
-      if (st == 'done') { return 'rgba(255,45,85,0.22)' }
-      if (st == 'next') { return '#FF2D55' }
+      if (st == 'done') { return 'rgba(229,46,46,0.22)' }
+      if (st == 'next') { return '#E52E2E' }
       return '#1E1E24'
     </formula>
     <formula as="checkinLabel">
@@ -92,6 +92,7 @@
     <style as="streakPill" fontSize="12" fontWeight="semibold" color="#F7C948"/>
 
     <style as="dayCell" spacing="3" alignItems="center" paddingV="9" radius="9"/>
+    <style as="streakRow" spacing="5" alignItems="center"/>
     <style as="dayAmt" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
     <style as="dayNum" fontSize="11" color="rgba(255,255,255,0.5)"/>
 
@@ -129,16 +130,20 @@
         <hstack class="cardHead">
           <text value="Daily check-in" class="h2"/>
           <spacer/>
-          <text value="🔥 {{ state.data == null ? 0 : state.data.streak }} day streak" class="streakPill"/>
+          <hstack class="streakRow" a11yGroup="true" a11yLabel="{{ state.data == null ? 0 : state.data.streak }} day streak">
+            <image icon="flame.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+            <text value="{{ state.data == null ? 0 : state.data.streak }} day streak" class="streakPill"/>
+          </hstack>
         </hstack>
         <grid bind="state.data.days" key="id" columns="7" spacing="5" scroll="false">
           <vstack class="dayCell" background="{{ dayColor }}">
-            <text value="{{ dayState == 'done' ? '✓' : '+' + item.reward }}" class="dayAmt"/>
+            <image icon="checkmark" iconSize="12" color="#FFFFFF" visible-if="dayState == 'done'" a11yHidden="true"/>
+            <text value="+{{ item.reward }}" class="dayAmt" visible-if="dayState != 'done'"/>
             <text value="D{{ item.i + 1 }}" class="dayNum"/>
           </vstack>
         </grid>
         <button label="{{ checkinLabel }}" class="cta"
-                background="{{ state.data != null && state.data.checkedToday ? '#26262C' : '#FF2D55' }}"
+                background="{{ state.data != null && state.data.checkedToday ? '#26262C' : '#E52E2E' }}"
                 on:tap="dsx.action.checkin()"/>
       </vstack>
 
@@ -147,14 +152,14 @@
         <vstack class="wheelWrap">
           <text value="Spin the wheel" class="h2"/>
           <zstack>
-            <stack style="width: 132px; height: 132px; border-radius: 66px; background: conic-gradient(#FF2D55 0deg 45deg, #1E1E24 45deg 90deg, #F7C948 90deg 135deg, #1E1E24 135deg 180deg, #FF2D55 180deg 225deg, #1E1E24 225deg 270deg, #F7C948 270deg 315deg, #1E1E24 315deg 360deg)"/>
+            <stack style="width: 132px; height: 132px; border-radius: 66px; background: conic-gradient(#E52E2E 0deg 45deg, #1E1E24 45deg 90deg, #F7C948 90deg 135deg, #1E1E24 135deg 180deg, #E52E2E 180deg 225deg, #1E1E24 225deg 270deg, #F7C948 270deg 315deg, #1E1E24 315deg 360deg)"/>
             <vstack style="width: 132px; height: 132px; align-items: center; justify-content: center">
               <text value="10–100" class="wheelLabel"/>
             </vstack>
           </zstack>
           <button label="{{ state.data != null && state.data.freeSpinLeft ? 'Spin — 1 free today' : 'No spin left today' }}"
                   class="ctaWide"
-                  background="{{ state.data != null && state.data.freeSpinLeft ? '#FF2D55' : '#26262C' }}"
+                  background="{{ state.data != null && state.data.freeSpinLeft ? '#E52E2E' : '#26262C' }}"
                   on:tap="dsx.action.spin()"/>
         </vstack>
       </vstack>
@@ -170,7 +175,7 @@
             </vstack>
             <button label="{{ item.claimed ? 'Claimed' : 'Claim' }}" class="claimBtn"
                     color="{{ item.claimed ? 'rgba(255,255,255,0.4)' : '#FFFFFF' }}"
-                    background="{{ item.claimed ? '#26262C' : '#FF2D55' }}"
+                    background="{{ item.claimed ? '#26262C' : '#E52E2E' }}"
                     on:tap="dsx.action.claim()"/>
           </hstack>
         </list>

@@ -9,7 +9,7 @@
   <head>
     <attribute as="active" default="'home'"/>   <!-- home | discover | rewards | list | profile -->
 
-    <variable as="on" computed="true">'#FF2D55'</variable>
+    <variable as="on" computed="true">'#E52E2E'</variable>
     <variable as="off" computed="true">'rgba(255,255,255,0.42)'</variable>
 
     <style as="bar" background="#0A0A0E" paddingTop="8" paddingBottom="8" alignItems="center"/>

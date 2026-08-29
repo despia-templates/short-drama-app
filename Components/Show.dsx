@@ -1,7 +1,17 @@
-<!-- Show — the series page in the category's "All Episodes" shape: full-bleed key art
-     with the title block on the scrim, white Play pill + My List, then the episode
-     thumb grid with lock badges. Entitlement is ALWAYS the server's opinion: `epLocked`
-     reads /wallet/state, so a lock badge is never a client guess. -->
+<!-- Show — the series page in the shape the category actually ships (measured on the
+     reference watch/detail page at 1440×900): a portrait key-art stage on the LEFT and
+     the detail panel on the RIGHT — breadcrumb, title, plot, tag pills, actions, and the
+     numbered EPISODE GRID beside the art rather than a screen below it. Short episodes
+     mean the episode list is the primary navigation, so it belongs next to the content,
+     never under a scroll.
+
+     Measured constants: panel 416 wide · grid 6 columns at 6px · cell 64×46 radius 8 on
+     rgba(255,255,255,0.1) · title 20/700 at 0.9 · plot head 16/400 · tag pills 14 at
+     rgba(255,255,255,0.1)/0.7 · stage 9:16.
+
+     Entitlement is ALWAYS the server's opinion: `epLocked` reads /wallet/state, so a lock
+     badge is never a client guess. Phones fall back to the stacked layout — a two-column
+     detail on a 375pt screen is a desktop layout in a phone's clothes. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="detail" url="/catalog/show/{{ vars.id }}"/>
@@ -25,6 +35,10 @@
       if (favs.data == null) { return false }
       return favs.data.items.filter(x => x.show == vars.id).length > 0
     </variable>
+    <variable as="freeCount" computed="true">
+      if (detail.data == null) { return 0 }
+      return detail.data.episodes.filter(e => e.free).length
+    </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
     <variable as="bp" computed="true">
@@ -34,29 +48,33 @@
       return 'phone'
     </variable>
     <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
-    <variable as="artH" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 460 }
-      if (dsx.variable.bp == 'tablet') { return 380 }
-      return 300
+    <variable as="gutter" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
+      return 16
     </variable>
+    <!-- the stage is a real 9:16 portrait, capped by the viewport height (the reference
+         runs 461×820 in a 900pt window) -->
+    <variable as="stageW" computed="true">
+      if (dsx.variable.bp == 'desktop') { return Math.round(Math.min(461, (dsx.screen.height - 150) * 9 / 16)) }
+      if (dsx.variable.bp == 'tablet') { return 320 }
+      return 220
+    </variable>
+    <variable as="stageH" computed="true">return Math.round(dsx.variable.stageW * 16 / 9)</variable>
     <variable as="epCols" computed="true">
       if (dsx.variable.bp == 'desktop') { return 6 }
-      if (dsx.variable.bp == 'tablet') { return 4 }
-      return 3
-    </variable>
-    <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 32 }
-      if (dsx.variable.bp == 'tablet') { return 24 }
-      return 16
+      if (dsx.variable.bp == 'tablet') { return 6 }
+      return 5
     </variable>
     <variable as="shell" computed="true">
       const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
-
-    <!-- one computed list for the scrim (compound styles: whole-attribute only) -->
-    <variable as="artScrimBox" computed="true">
-      return dsx.variable.shell + '; height: ' + dsx.variable.artH + 'px; justify-content: space-between; background: linear-gradient(90deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0) 70%), linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0) 25%, rgba(0,0,0,0.6) 78%, #000000 100%)'
+    <variable as="stageBox" computed="true">
+      return 'width: ' + dsx.variable.stageW + 'px; height: ' + dsx.variable.stageH + 'px; border-radius: 12px; object-fit: cover'
+    </variable>
+    <variable as="stageOverlayBox" computed="true">
+      return 'width: ' + dsx.variable.stageW + 'px; height: ' + dsx.variable.stageH + 'px; justify-content: flex-end; border-radius: 12px; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.85) 100%)'
     </variable>
 
     <formula as="epLocked" free="item.free" epid="item.id">
@@ -72,106 +90,143 @@
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
-    <style as="page" spacing="20" paddingBottom="24" alignItems="stretch"/>
+    <style as="page" spacing="0" paddingBottom="40" alignItems="stretch"/>
+    <style as="split" spacing="0" alignItems="flex-start" paddingTop="26"/>
 
-    <style as="artScrim" paddingBottom="26" paddingTop="14" spacing="12" alignItems="flex-start"/>
-    <style as="backBtn" background="rgba(0,0,0,0.55)" radius="17" paddingH="12" paddingV="7" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="titleBlock" spacing="11" alignItems="flex-start"/>
-    <style as="title" fontWeight="bold" color="#FFFFFF" lineLimit="2" tracking="-0.5"/>
-    <style as="pillRow" spacing="8" alignItems="center"/>
-    <style as="pillHot" background="#FF2D55" radius="13" paddingH="11" paddingV="5" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="pillTag" background="rgba(255,255,255,0.14)" radius="13" paddingH="11" paddingV="5" fontSize="12" fontWeight="medium" color="rgba(255,255,255,0.92)"/>
-    <style as="meta" fontSize="13" color="rgba(255,255,255,0.62)"/>
-    <style as="ctaRow" spacing="12" alignItems="center"/>
-    <style as="playWhite" background="#FFFFFF" radius="24" paddingH="34" paddingV="13" fontSize="15" fontWeight="bold" color="#111111"/>
-    <style as="favBtn" background="rgba(255,255,255,0.12)" radius="24" paddingH="16" paddingV="12"/>
-    <style as="synopsis" fontSize="15" color="rgba(255,255,255,0.66)" lineSpacing="5"/>
+    <style as="stageCol" alignItems="center" spacing="14"/>
+    <style as="stageCap" spacing="6" alignItems="flex-start" paddingH="16" paddingBottom="16"/>
+    <style as="stageEp" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="stageFree" fontSize="12" color="rgba(255,255,255,0.7)"/>
 
-    <style as="crumb" fontSize="13" color="rgba(255,255,255,0.5)"/>
+    <style as="panel" spacing="16" alignItems="stretch"/>
+    <style as="crumbRow" spacing="7" alignItems="center"/>
+    <style as="crumb" fontSize="13" color="rgba(255,255,255,0.45)"/>
     <style as="crumbOn" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
-    <style as="crumbRow" spacing="7" alignItems="center" paddingTop="14"/>
+    <style as="title" fontWeight="bold" color="rgba(255,255,255,0.9)" lineLimit="3" lineSpacing="6"/>
+    <style as="plotHead" fontSize="16" color="rgba(255,255,255,0.9)"/>
+    <style as="plotBody" fontSize="14" color="rgba(255,255,255,0.6)" lineSpacing="5"/>
+    <style as="tagRow" spacing="8" alignItems="center"/>
+    <style as="tag" background="rgba(255,255,255,0.1)" radius="16" paddingH="16" paddingV="7" fontSize="14" color="rgba(255,255,255,0.7)"/>
+    <style as="ctaRow" spacing="12" alignItems="center"/>
+    <style as="playWhite" background="#FFFFFF" radius="24" paddingH="34" paddingV="13" spacing="9" alignItems="center"/>
+    <style as="playLabel" fontSize="15" fontWeight="bold" color="#111111"/>
+    <style as="favBtn" background="rgba(255,255,255,0.1)" radius="24" paddingH="18" paddingV="13" spacing="8" alignItems="center"/>
+    <style as="favLabel" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
 
-    <style as="epHead" alignItems="flex-end" paddingTop="6"/>
-    <style as="epTitle" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
-    <style as="epCount" fontSize="13" color="rgba(255,255,255,0.5)"/>
-    <style as="epCard" spacing="7" alignItems="stretch"/>
-    <style as="epNum" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
-    <style as="epName" fontSize="12" color="rgba(255,255,255,0.5)" lineLimit="1"/>
-    <style as="freeChip" background="rgba(0,0,0,0.72)" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="semibold" color="#F7C948"/>
-    <style as="lockChip" background="rgba(0,0,0,0.72)" radius="4" paddingH="6" paddingV="3"/>
-    <style as="chipWrap" paddingLeading="7" paddingTop="7" alignItems="flex-start" zIndex="1"/>
+    <style as="statRow" spacing="30" alignItems="center" paddingV="12"/>
+    <style as="statCol" spacing="5" alignItems="center"/>
+    <style as="statCap" fontSize="12" color="rgba(255,255,255,0.6)"/>
+
+    <style as="gridHead" alignItems="center" paddingTop="4"/>
+    <style as="gridRange" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
+    <style as="gridAllRow" spacing="4" alignItems="center"/>
+    <style as="gridAll" fontSize="13" color="rgba(255,255,255,0.55)"/>
+    <style as="epCell" radius="8" alignItems="center" height="46" background="rgba(255,255,255,0.1)"/>
+    <style as="epNum" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
     <style as="skeleton" background="#141419" radius="12"/>
   </head>
 
-  <TopNav active="home" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
 
-      <!-- key art + title block -->
-      <zstack>
-        <image src="{{ show == null ? '' : show.hero }}" contentFit="cover" a11yHidden="true"
-               style="width: 100%; height: {{ dsx.variable.artH }}px"/>
-        <vstack class="artScrim" style="{{ dsx.variable.artScrimBox }}">
-          <text value="‹  Back" class="backBtn" href="/" a11yLabel="Back to home" visible-if="dsx.variable.wide == false"/>
-          <hstack class="crumbRow" visible-if="dsx.variable.wide">
+      <TopNav active="home" visible-if="dsx.variable.wide"/>
+
+      <hstack class="split" style="{{ dsx.variable.shell }}" alignItems="flex-start">
+
+        <!-- ===== the key-art stage (left) ===== -->
+        <vstack class="stageCol" style="flex: 1; min-width: 0">
+          <zstack>
+            <image src="{{ show == null ? '' : show.poster }}" contentFit="cover" a11yHidden="true"
+                   style="{{ dsx.variable.stageBox }}"/>
+            <vstack style="{{ dsx.variable.stageOverlayBox }}">
+              <vstack class="stageCap">
+                <text value="EP 1 — {{ detail.data == null ? '' : detail.data.episodes.length }} episodes" class="stageEp"/>
+                <text value="EP 1–{{ show == null ? '' : show.free_until }} free to watch" class="stageFree"/>
+              </vstack>
+            </vstack>
+          </zstack>
+          <hstack class="playWhite" a11yGroup="true" a11yTrait="button" a11yLabel="Play episode 1"
+                  on:tap="dsx.module.route.push({ path: '/watch/' + vars.id + '/1' })">
+            <image icon="play.fill" iconSize="14" color="#111111" a11yHidden="true"/>
+            <text value="Play EP 1" class="playLabel"/>
+          </hstack>
+        </vstack>
+
+        <!-- ===== the detail panel + EPISODE GRID (right) ===== -->
+        <vstack class="panel" style="width: 456px; min-width: 456px; padding-left: 40px" visible-if="dsx.variable.wide">
+          <hstack class="crumbRow">
             <text value="Home" class="crumb" href="/"/>
             <text value="/" class="crumb"/>
             <text value="{{ show == null ? '' : show.title }}" class="crumbOn"/>
           </hstack>
-          <vstack class="titleBlock">
-            <text value="{{ show == null ? '' : show.title }}" class="title" fontSize="{{ dsx.variable.wide ? 34 : 24 }}"/>
-            <hstack class="pillRow">
-              <text value="Hot" class="pillHot" visible-if="show != null && show.featured"/>
-              <text value="{{ show == null ? '' : show.genre }}" class="pillTag"/>
-              <text value="Series" class="pillTag"/>
-            </hstack>
-            <text value="{{ detail.data == null ? '' : detail.data.episodes.length }} Episodes   |   EP 1–{{ show == null ? '' : show.free_until }} Free   |   then 60 🪙 each" class="meta"/>
-            <hstack class="ctaRow">
-              <button label="▶   Play EP 1" class="playWhite"
-                      on:tap="dsx.module.route.push({ path: '/watch/' + vars.id + '/1' })"/>
-              <hstack class="favBtn" on:tap="dsx.action.toggleFav()" a11yLabel="Toggle My List" a11yTrait="button" spacing="7" alignItems="center">
-                <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="17"
-                       color="{{ dsx.variable.favOn ? '#FF2D55' : '#FFFFFF' }}" a11yHidden="true"/>
-                <text value="{{ dsx.variable.favOn ? 'Saved' : 'My List' }}" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-              </hstack>
-            </hstack>
+
+          <text value="{{ show == null ? '' : show.title }}" class="title" fontSize="20"/>
+
+          <vstack spacing="8" alignItems="flex-start">
+            <text value="Plot" class="plotHead"/>
+            <text value="{{ show == null ? '' : show.synopsis }}" class="plotBody"/>
           </vstack>
-        </vstack>
-      </zstack>
 
-      <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-        <text value="{{ show == null ? '' : show.synopsis }}" class="synopsis" style="max-width: 760px"/>
-      </vstack>
+          <hstack class="tagRow">
+            <text value="{{ show == null ? '' : show.genre }}" class="tag"/>
+            <text value="Series" class="tag"/>
+            <text value="EP 1–{{ show == null ? '' : show.free_until }} Free" class="tag"/>
+          </hstack>
 
-      <!-- all episodes -->
-      <vstack spacing="14" alignItems="stretch">
-        <hstack class="epHead" style="{{ dsx.variable.shell }}">
-          <text value="{{ show == null ? '' : show.title }} — All Episodes" class="epTitle" fontSize="{{ dsx.variable.wide ? 22 : 17 }}"/>
-          <spacer/>
-          <text value="{{ detail.data == null ? '' : detail.data.episodes.length }} Episodes" class="epCount"/>
-        </hstack>
-        <stack class="skeleton" visible-if="detail.loading" style="height: 160px; margin: 0 16px"/>
-        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <grid bind="detail.data.episodes" key="id" columns="{{ dsx.variable.epCols }}" spacing="14" scroll="false">
-            <vstack class="epCard" href="/watch/{{ vars.id }}/{{ item.idx }}"
-                    a11yGroup="true" a11yLabel="Episode {{ item.idx }}{{ epLocked ? ', locked' : '' }}">
-              <zstack>
-                <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                       style="width: 100%; aspect-ratio: 2/3; border-radius: 8px; object-fit: cover; filter: brightness({{ epLocked ? 0.55 : 1 }})"/>
-                <vstack class="chipWrap" style="width: 100%; height: 100%; pointer-events: none">
-                  <text value="FREE" class="freeChip" visible-if="item.free"/>
-                  <hstack class="lockChip" visible-if="epLocked">
-                    <image icon="lock.fill" iconSize="9" color="rgba(255,255,255,0.85)" a11yHidden="true"/>
-                  </hstack>
-                </vstack>
-              </zstack>
-              <vstack spacing="2" alignItems="stretch">
-                <text value="EP {{ item.idx }}" class="epNum"/>
-                <text value="{{ item.title }}" class="epName"/>
-              </vstack>
+          <hstack class="ctaRow">
+            <hstack class="favBtn" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button" a11yLabel="Toggle My List">
+              <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="17"
+                     color="{{ dsx.variable.favOn ? '#E52E2E' : '#FFFFFF' }}" a11yHidden="true"/>
+              <text value="{{ dsx.variable.favOn ? 'Saved' : 'My List' }}" class="favLabel"/>
+            </hstack>
+            <hstack class="favBtn" href="/rewards" a11yGroup="true" a11yLabel="Your coins — open Rewards">
+              <image icon="bitcoinsign.circle.fill" iconSize="17" color="#F6B63D" a11yHidden="true"/>
+              <text value="{{ wallet.data == null ? 0 : wallet.data.coins + wallet.data.bonus }}" class="favLabel"/>
+            </hstack>
+          </hstack>
+
+          <hstack class="gridHead" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px">
+            <text value="1 - {{ detail.data == null ? '' : detail.data.episodes.length }}" class="gridRange"/>
+            <spacer/>
+            <hstack class="gridAllRow">
+              <text value="{{ dsx.variable.freeCount }} free" class="gridAll"/>
+              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.55)" a11yHidden="true"/>
+            </hstack>
+          </hstack>
+
+          <stack class="skeleton" visible-if="detail.loading" style="height: 160px"/>
+          <grid bind="detail.data.episodes" key="id" columns="{{ dsx.variable.epCols }}" spacing="6" scroll="false">
+            <vstack class="epCell" style="position: relative" href="/watch/{{ vars.id }}/{{ item.idx }}"
+                    a11yLabel="Episode {{ item.idx }}{{ epLocked ? ', locked' : '' }}">
+              <text value="{{ item.idx }}" class="epNum"/>
+              <image icon="lock.fill" iconSize="8" color="rgba(255,255,255,0.55)" visible-if="epLocked"
+                     a11yHidden="true" style="position: absolute; top: 4px; right: 5px"/>
             </vstack>
           </grid>
         </vstack>
+      </hstack>
+
+      <!-- ===== phone: the same content, stacked ===== -->
+      <vstack style="{{ dsx.variable.shell }}" spacing="18" alignItems="stretch" visible-if="dsx.variable.wide == false" paddingTop="18">
+        <text value="{{ show == null ? '' : show.title }}" class="title" fontSize="24"/>
+        <hstack class="tagRow">
+          <text value="{{ show == null ? '' : show.genre }}" class="tag"/>
+          <text value="EP 1–{{ show == null ? '' : show.free_until }} Free" class="tag"/>
+        </hstack>
+        <text value="{{ show == null ? '' : show.synopsis }}" class="plotBody"/>
+        <hstack class="gridHead" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px">
+          <text value="1 - {{ detail.data == null ? '' : detail.data.episodes.length }}" class="gridRange"/>
+          <spacer/>
+          <text value="{{ dsx.variable.freeCount }} free" class="gridAll"/>
+        </hstack>
+        <grid bind="detail.data.episodes" key="id" columns="{{ dsx.variable.epCols }}" spacing="6" scroll="false">
+          <vstack class="epCell" style="position: relative" href="/watch/{{ vars.id }}/{{ item.idx }}"
+                  a11yLabel="Episode {{ item.idx }}{{ epLocked ? ', locked' : '' }}">
+            <text value="{{ item.idx }}" class="epNum"/>
+            <image icon="lock.fill" iconSize="8" color="rgba(255,255,255,0.55)" visible-if="epLocked"
+                   a11yHidden="true" style="position: absolute; top: 4px; right: 5px"/>
+          </vstack>
+        </grid>
       </vstack>
 
     </vstack>

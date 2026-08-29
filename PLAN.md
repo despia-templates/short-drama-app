@@ -250,3 +250,9 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     `parseStyleAttr` splits on `;` before interpolation, so `style="{{ shell }}; height: 100%"`
     drops the shell while the extras apply; the whole-attribute spelling is a first-class
     door. Idiom adopted (AGENTS.md): compound lists are ONE computed value.
+
+18. **Review R3 (type scale) has no project type-ramp declaration** → filed: https://github.com/despia-native/despia-framework/issues/232 —
+    (found 2026-08-29 building 1:1 to the category reference at dev@ae0669ad). The measured
+    brand ramp (14/18/24/32) is the design, applied consistently; R3 only knows the iOS
+    ramp. Sibling of §6.16 — one `design: { palette, typeRamp }` declaration closes both.
+    Bridge: `scripts/review.mjs` waives only declared-ramp sizes; anything else still fails.

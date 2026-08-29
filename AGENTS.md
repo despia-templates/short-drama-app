@@ -40,6 +40,19 @@ and generated barrel are read once at boot). Schema change → re-apply
 - **Return value copies per collection** from server actions (`{ ...row }`) — the wire
   serializer elides repeated references.
 - **`api.send(payload)`** — the payload is the body; do not wrap in `{ body: … }`.
+- **Never ship an emoji as an icon.** An emoji is a font-dependent glyph with no
+  per-platform twin, no tint, and no a11y story; every icon comes from the shared catalog
+  (`Conformance/icons/sf-map.json`) so ONE name resolves to Boxicons / SF Symbols /
+  Material Symbols. `button` carries `icon` OR `label`, never both — an icon+text control
+  is an `hstack` with `on:tap` + `a11yGroup="true"` + an `a11yLabel`.
+- **Design numbers come from MEASUREMENT, not taste.** The category reference was read
+  live in the browser (nav 80px transparent sticky · gutter 86 · poster 3:4 at radius 16 ·
+  rail gap 18 · section head 24/700 at 0.8 · card text 14 · brand red #E52E2E · hero 480 ·
+  detail panel 416 with a 6-col episode grid of 64×46 cells at radius 8). Re-measure
+  before changing one.
+- **Truncating a flex child needs the CSS trio on web** (`white-space: nowrap; overflow:
+  hidden; text-overflow: ellipsis`) beside `lineLimit=` — `lineLimit` alone wraps once the
+  child is `flex: 1; min-width: 0`. Native honours `lineLimit`; the trio is the web twin.
 - **Repeaters are `list`/`grid`/`pager`/`flow` only** (bind on the repeater, single child =
   row template). Nesting works; FILE components work as row templates with `item.*`
   resolving into their attributes. Inline `<component as=>` does NOT render on web today

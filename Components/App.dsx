@@ -1,13 +1,16 @@
-<!-- Home — the storefront, styled to the category standard the ReelShort-class web apps
-     set: a full-bleed cinematic hero with a left-anchored title block and a poster
-     thumb-rail selector (wide) or centered title + dash indicators (phone), then the
-     rails — Continue Watching · New Release (with pointer hover-cards) · TOP with the
-     giant ranked numerals — then genre grids and the storefront footer.
+<!-- Home — the storefront, built to the category reference measured live at 1440×900:
+     an 80px transparent sticky nav floating over a 480px full-bleed hero, then the
+     rails — Continue Watching · New Release · TOP (giant ranked numerals) · genre
+     grids — over a link-column footer.
+
+     Measured constants, not invented ones: gutter 77 · poster 3:4 at radius 16 · rail
+     gap 18 · section head 24/700 at rgba(255,255,255,0.8) · card title 14 at 0.8 ·
+     card meta 14 at 0.9 · brand red #E52E2E · hero title 32/700 at 0.9.
 
      Hero type lives OUTSIDE the pager, bound to the resting page: a caption that
-     restyles itself mid-swipe flickers; binding the resting index keeps the type still
-     while the art moves. Hover is a REAL pointer affordance (on:hoverStart/End) — on
-     touch it simply never fires, and every card stays a plain link (Article 7). -->
+     restyles itself mid-swipe flickers. Hover is a REAL pointer affordance
+     (on:hoverStart/End) — on touch it never fires and every card stays a plain link.
+     No emoji anywhere: icons come from the shared catalog and have per-platform twins. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="home" url="/catalog/home"/>
@@ -16,10 +19,10 @@
          headers="dsx.variable.authHeaders"/>
 
     <variable as="heroPage">return 0</variable>
-    <variable as="hovId">return ''</variable>   <!-- the card under the pointer (desktop hover-info) -->
+    <variable as="hovId">return ''</variable>   <!-- the card under the pointer -->
 
-    <!-- ONE breakpoint vocabulary, derived from the LIVE screen fact (dsx.screen.width
-         is reactive — a computed variable re-derives as the window changes). -->
+    <!-- ONE breakpoint vocabulary from the LIVE screen fact (dsx.screen.width is
+         reactive — a computed variable re-derives as the window changes). -->
     <variable as="bp" computed="true">
       const w = dsx.screen.width
       if (w >= 1120) { return 'desktop' }
@@ -28,44 +31,55 @@
     </variable>
     <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
     <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 32 }
-      if (dsx.variable.bp == 'tablet') { return 24 }
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
       return 16
     </variable>
     <variable as="posterW" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 196 }
-      if (dsx.variable.bp == 'tablet') { return 156 }
-      return 148
+      if (dsx.variable.bp == 'desktop') { return 239 }
+      if (dsx.variable.bp == 'tablet') { return 186 }
+      return 150
     </variable>
-    <variable as="posterH" computed="true">return Math.round(dsx.variable.posterW * 1.5)</variable>
+    <!-- 3:4 is the measured category ratio (both references), not the 2:3 book ratio -->
+    <variable as="posterH" computed="true">return Math.round(dsx.variable.posterW * 4 / 3)</variable>
     <variable as="heroH" computed="true">
-      if (dsx.variable.bp == 'desktop') { return Math.round(Math.min(700, dsx.screen.height * 0.74)) }
-      if (dsx.variable.bp == 'tablet') { return 460 }
-      return Math.round(dsx.screen.height * 0.56)
+      if (dsx.variable.bp == 'desktop') { return 480 }
+      if (dsx.variable.bp == 'tablet') { return 420 }
+      return Math.round(dsx.screen.height * 0.62)
     </variable>
     <variable as="heroTitleSize" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 34 }
+      if (dsx.variable.bp == 'desktop') { return 32 }
       if (dsx.variable.bp == 'tablet') { return 28 }
       return 24
     </variable>
+    <variable as="headSize" computed="true">return dsx.variable.wide ? 24 : 20</variable>
     <variable as="shelfCols" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 6 }
+      if (dsx.variable.bp == 'desktop') { return 5 }
       if (dsx.variable.bp == 'tablet') { return 4 }
       return 3
     </variable>
-    <!-- TOP-rail geometry: the ranked numeral overlaps the poster's leading edge -->
-    <variable as="rankOvl" computed="true">return Math.round(dsx.variable.posterW * 0.34)</variable>
-    <variable as="rankSize" computed="true">return Math.round(dsx.variable.posterH * 0.56)</variable>
+    <!-- TOP rail: the numeral overlaps the poster's leading edge -->
+    <variable as="rankOvl" computed="true">return Math.round(dsx.variable.posterW * 0.36)</variable>
+    <variable as="rankSize" computed="true">return Math.round(dsx.variable.posterH * 0.62)</variable>
+
+    <!-- compound style lists are ONE computed value used as the WHOLE attribute
+         (a bare {{ }} fragment beside other declarations is discarded — AGENTS.md) -->
     <variable as="shell" computed="true">
       const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
     <variable as="railShell" computed="true">
       const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px'
+      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px'
+    </variable>
+    <variable as="heroInnerBox" computed="true">
+      return dsx.variable.shell + '; height: 100%; justify-content: center; align-items: flex-start'
+    </variable>
+    <variable as="thumbShellBox" computed="true">
+      return dsx.variable.shell + '; justify-content: flex-end; padding-bottom: 34px'
     </variable>
     <variable as="posterStyle" computed="true">
-      return 'width: ' + dsx.variable.posterW + 'px; height: ' + dsx.variable.posterH + 'px; border-radius: 8px'
+      return 'width: ' + dsx.variable.posterW + 'px; height: ' + dsx.variable.posterH + 'px; border-radius: 16px; object-fit: cover'
     </variable>
     <variable as="posterBox" computed="true">
       return 'width: ' + dsx.variable.posterW + 'px; height: ' + dsx.variable.posterH + 'px; justify-content: flex-end'
@@ -73,16 +87,6 @@
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
-    </variable>
-    <!-- COMPOUND style lists must be ONE computed value used as the WHOLE style
-         attribute: `style="{{ chunk }}; extras"` silently drops the chunk (the parser
-         splits on ';' first, and a colon-less fragment is discarded — only the
-         whole-attribute spelling gets the declaration-list door). -->
-    <variable as="heroInnerBox" computed="true">
-      return dsx.variable.shell + '; height: 100%; justify-content: center; align-items: flex-start'
-    </variable>
-    <variable as="thumbShellBox" computed="true">
-      return dsx.variable.shell + '; justify-content: flex-end; padding-bottom: 30px'
     </variable>
     <variable as="heroShow" computed="true">
       if (home.data == null) { return null }
@@ -108,81 +112,85 @@
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
-    <style as="page" spacing="30" paddingBottom="16" alignItems="stretch" grow="width"/>
+    <style as="page" spacing="0" paddingBottom="0" alignItems="stretch" grow="width"/>
+    <style as="section" spacing="14" alignItems="stretch" paddingTop="44" grow="width"/>
 
-    <style as="phoneBar" paddingV="10" alignItems="center" spacing="9"/>
-    <style as="logoBox" background="#FF2D55" radius="8" alignItems="center" width="27" height="27"/>
-    <style as="logoGlyph" fontSize="12" fontWeight="heavy" color="#FFFFFF"/>
+    <style as="phoneBar" paddingV="12" alignItems="center" spacing="10"/>
+    <style as="logoBox" background="#E52E2E" radius="8" alignItems="center" width="29" height="29"/>
     <style as="wordmark" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
 
-    <style as="heroBlock" spacing="13" alignItems="flex-start"/>
-    <style as="heroTitle" fontWeight="bold" color="#FFFFFF" lineLimit="2" tracking="-0.5"/>
+    <style as="heroBlock" spacing="16" alignItems="flex-start"/>
+    <style as="heroTitle" fontWeight="bold" color="rgba(255,255,255,0.9)" lineLimit="2" tracking="-0.5"/>
     <style as="heroPills" spacing="8" alignItems="center"/>
-    <style as="pillHot" background="#FF2D55" radius="13" paddingH="11" paddingV="5" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="pillTag" background="rgba(255,255,255,0.14)" radius="13" paddingH="11" paddingV="5" fontSize="12" fontWeight="medium" color="rgba(255,255,255,0.92)"/>
-    <style as="heroSyn" fontSize="15" color="rgba(255,255,255,0.72)" lineLimit="2" lineSpacing="4"/>
-    <style as="playWhite" background="#FFFFFF" radius="24" paddingH="34" paddingV="13" fontSize="15" fontWeight="bold" color="#111111"/>
+    <style as="pillHot" background="#E52E2E" radius="13" paddingH="12" paddingV="5" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="pillTag" background="rgba(255,255,255,0.14)" radius="13" paddingH="12" paddingV="5" fontSize="12" fontWeight="medium" color="rgba(255,255,255,0.92)"/>
+    <style as="heroSyn" fontSize="14" color="rgba(255,255,255,0.72)" lineLimit="2" lineSpacing="4"/>
+    <style as="playPill" background="#FFFFFF" radius="24" paddingH="34" paddingV="13" spacing="9" alignItems="center"/>
+    <style as="playLabel" fontSize="15" fontWeight="bold" color="#111111"/>
     <style as="thumbRow" spacing="10" alignItems="center"/>
-    <style as="heroPhoneBlock" spacing="12" alignItems="center" paddingLeading="24" paddingTrailing="24" paddingBottom="22"/>
+    <style as="heroPhoneBlock" spacing="14" alignItems="center" paddingLeading="24" paddingTrailing="24" paddingBottom="24"/>
     <style as="heroPhoneTitle" fontWeight="bold" color="#FFFFFF" lineLimit="2" textAlign="center" tracking="-0.4"/>
     <style as="dashRow" spacing="5" alignItems="center" paddingTop="4"/>
 
-    <style as="section" spacing="14" alignItems="stretch" grow="width"/>
-    <style as="sectionHead" alignItems="flex-end"/>
-    <style as="sectionTitle" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
-    <style as="viewAll" fontSize="13" color="rgba(255,255,255,0.55)"/>
-    <style as="rail" spacing="14" alignItems="flex-start" paddingTrailing="16"/>
+    <style as="sectionHead" alignItems="center"/>
+    <style as="sectionTitle" fontWeight="bold" color="rgba(255,255,255,0.8)" tracking="-0.3"/>
+    <style as="viewAll" fontSize="14" color="#FFFFFF"/>
+    <style as="viewAllRow" spacing="4" alignItems="center"/>
+    <style as="rail" spacing="18" alignItems="flex-start" paddingTrailing="16"/>
 
     <style as="card" spacing="8" alignItems="stretch"/>
-    <style as="cardTitle" fontSize="15" fontWeight="medium" color="rgba(255,255,255,0.95)" lineLimit="1"/>
-    <style as="cardMeta" fontSize="12" color="rgba(255,255,255,0.5)"/>
-    <style as="badge" background="#FF2D55" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="badgeDark" background="rgba(0,0,0,0.72)" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="badgeWrap" paddingLeading="8" paddingTop="8" alignItems="flex-start" zIndex="1"/>
-    <style as="epWrap" paddingLeading="8" paddingBottom="10" alignItems="flex-start" zIndex="1"/>
-    <style as="hovPanel" spacing="8" alignItems="flex-start" paddingH="12" paddingBottom="12"/>
+    <style as="cardTitle" fontSize="14" color="rgba(255,255,255,0.8)" lineLimit="1"/>
+    <style as="cardMeta" fontSize="14" color="rgba(255,255,255,0.9)" lineLimit="1"/>
+    <style as="badge" background="#E52E2E" radius="4" paddingH="8" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="badgeDark" background="rgba(0,0,0,0.72)" radius="4" paddingH="8" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="badgeWrap" paddingLeading="10" paddingTop="10" alignItems="flex-start" zIndex="1"/>
+    <style as="epWrap" paddingLeading="10" paddingBottom="12" alignItems="flex-start" zIndex="1"/>
+    <style as="hovPanel" spacing="9" alignItems="flex-start" paddingH="14" paddingBottom="14"/>
     <style as="hovSyn" fontSize="12" color="rgba(255,255,255,0.86)" lineLimit="3" lineSpacing="2"/>
-    <style as="hovPlay" background="#FFFFFF" radius="15" paddingH="14" paddingV="7" fontSize="12" fontWeight="bold" color="#111111"/>
+    <style as="hovPlay" background="#FFFFFF" radius="15" paddingH="14" paddingV="7" spacing="6" alignItems="center"/>
+    <style as="hovPlayLabel" fontSize="12" fontWeight="bold" color="#111111"/>
 
     <style as="rankNum" fontWeight="heavy"/>
     <style as="resumeTrack" background="rgba(255,255,255,0.22)" radius="2"/>
-    <style as="resumeFill" background="#FF2D55" radius="2"/>
+    <style as="resumeFill" background="#E52E2E" radius="2"/>
 
-    <style as="footer" alignItems="stretch" spacing="26" paddingTop="34" paddingBottom="30"/>
-    <style as="footCols" spacing="60" alignItems="flex-start"/>
-    <style as="footBrand" spacing="10" alignItems="flex-start"/>
+    <style as="footer" alignItems="stretch" spacing="26" paddingTop="40" paddingBottom="34"/>
+    <style as="footCols" spacing="70" alignItems="flex-start"/>
+    <style as="footBrand" spacing="12" alignItems="flex-start"/>
     <style as="footCopy" fontSize="12" color="rgba(255,255,255,0.45)" lineSpacing="3"/>
-    <style as="footCol" spacing="11" alignItems="flex-start"/>
-    <style as="footHead" fontSize="15" fontWeight="bold" color="#FFFFFF" tracking="0.3"/>
-    <style as="footLink" fontSize="13" color="rgba(255,255,255,0.55)"/>
+    <style as="footCol" spacing="12" alignItems="flex-start"/>
+    <style as="footHead" fontSize="14" fontWeight="bold" color="#FFFFFF" tracking="0.3"/>
+    <style as="footLink" fontSize="14" color="rgba(255,255,255,0.55)"/>
 
-    <style as="errCard" background="#17171C" radius="14" spacing="9" paddingH="16" paddingV="18" alignItems="center"/>
-    <style as="retryBtn" background="#FF2D55" radius="20" paddingH="18" paddingV="10" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="errCard" background="#141419" radius="16" spacing="10" paddingH="18" paddingV="20" alignItems="center"/>
+    <style as="retryBtn" background="#E52E2E" radius="20" paddingH="20" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
-  <TopNav active="home" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
 
-      <!-- phone title bar (wide viewports carry <TopNav> instead) -->
+      <!-- the nav rides INSIDE the scroll so the hero art runs under it (measured:
+           nav 80px transparent sticky, hero top edge at y≈-8) -->
+      <TopNav active="home" visible-if="dsx.variable.wide"/>
+
       <hstack class="phoneBar" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.wide == false">
         <vstack class="logoBox" style="justify-content: center">
-          <text value="▶" class="logoGlyph" a11yHidden="true"/>
+          <image icon="play.fill" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
         </vstack>
         <text value="ShortDrama" class="wordmark"/>
         <spacer/>
-        <image icon="magnifyingglass" iconSize="21" color="#FFFFFF" href="/search" a11yLabel="Search"/>
+        <SearchOverlay size="21" color="'#FFFFFF'"/>
         <image icon="person.crop.circle" iconSize="23" color="#FFFFFF" href="/profile" a11yLabel="Profile"/>
       </hstack>
 
-      <!-- ============ HERO · wide: full-bleed art, left title block, thumb rail ============ -->
-      <vstack visible-if="dsx.variable.wide && heroShow != null" style="width: 100%" alignItems="stretch">
+      <!-- ============ HERO · wide ============ -->
+      <vstack visible-if="dsx.variable.wide && heroShow != null" style="width: 100%; margin-top: -80px" alignItems="stretch">
         <zstack>
           <pager bind="home.data.hero" key="id" height="{{ dsx.variable.heroH }}" dots="false" value="dsx.variable.heroPage">
             <image src="{{ item.hero }}" contentFit="cover" a11yLabel="{{ item.title }}"
-                   style="width: 100%; height: {{ dsx.variable.heroH }}px"/>
+                   style="width: 100%; height: {{ dsx.variable.heroH }}px; object-fit: cover"/>
           </pager>
-          <vstack style="width: 100%; height: {{ dsx.variable.heroH }}px; pointer-events: none; background: linear-gradient(90deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0) 60%), linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 82%, #000000 100%)">
+          <vstack style="width: 100%; height: {{ dsx.variable.heroH }}px; pointer-events: none; background: linear-gradient(90deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 32%, rgba(0,0,0,0) 62%), linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0.5) 82%, #000000 100%)">
             <vstack style="{{ dsx.variable.heroInnerBox }}">
               <vstack class="heroBlock" style="max-width: 560px; pointer-events: auto">
                 <text value="{{ heroShow == null ? '' : heroShow.title }}" class="heroTitle" fontSize="{{ dsx.variable.heroTitleSize }}"/>
@@ -192,19 +200,22 @@
                   <text value="EP 1–{{ heroShow == null ? '' : heroShow.free_until }} Free" class="pillTag"/>
                 </hstack>
                 <text value="{{ heroShow == null ? '' : heroShow.synopsis }}" class="heroSyn"/>
-                <button label="▶   Play" class="playWhite"
-                        on:tap="dsx.module.route.push({ path: '/watch/' + (heroShow == null ? '' : heroShow.id) + '/1' })"/>
+                <hstack class="playPill" a11yGroup="true" a11yTrait="button" a11yLabel="Play {{ heroShow == null ? '' : heroShow.title }}"
+                        on:tap="dsx.module.route.push({ path: '/watch/' + (heroShow == null ? '' : heroShow.id) + '/1' })">
+                  <image icon="play.fill" iconSize="14" color="#111111" a11yHidden="true"/>
+                  <text value="Play" class="playLabel"/>
+                </hstack>
               </vstack>
             </vstack>
           </vstack>
-          <!-- the thumb rail: tapping a poster drives the pager (value= is two-way) -->
+          <!-- the thumb rail drives the pager (value= is two-way) -->
           <vstack style="width: 100%; height: {{ dsx.variable.heroH }}px; justify-content: flex-end; pointer-events: none">
             <hstack style="{{ dsx.variable.thumbShellBox }}">
               <hstack class="thumbRow" style="pointer-events: auto">
                 <list bind="home.data.hero" key="id" axis="horizontal" scroll="false" spacing="10">
                   <image src="{{ item.poster }}" contentFit="cover" a11yLabel="Feature {{ item.title }}" a11yTrait="button"
                          on:tap="dsx.variable.heroPage = item.rank - 1"
-                         style="width: 72px; height: 102px; border-radius: 8px; border: 2px solid {{ item.rank - 1 == Number(dsx.variable.heroPage) ? '#FFFFFF' : 'rgba(255,255,255,0.14)' }}; transition: border-color 0.2s, transform 0.2s; transform: scale({{ item.rank - 1 == Number(dsx.variable.heroPage) ? 1.06 : 1 }})"/>
+                         style="width: 78px; height: 104px; border-radius: 8px; object-fit: cover; border: 2px solid {{ item.rank - 1 == Number(dsx.variable.heroPage) ? '#FFFFFF' : 'rgba(255,255,255,0.16)' }}; transition: border-color 0.2s, transform 0.2s; transform: scale({{ item.rank - 1 == Number(dsx.variable.heroPage) ? 1.06 : 1 }})"/>
                 </list>
               </hstack>
             </hstack>
@@ -212,19 +223,23 @@
         </zstack>
       </vstack>
 
-      <!-- ============ HERO · phone: centered title over full-bleed art, dash dots ============ -->
-      <vstack visible-if="dsx.variable.wide == false && heroShow != null" style="width: 100%; margin-top: -10px" alignItems="stretch">
+      <!-- ============ HERO · phone ============ -->
+      <vstack visible-if="dsx.variable.wide == false && heroShow != null" style="width: 100%" alignItems="stretch">
         <zstack>
           <pager bind="home.data.hero" key="id" height="{{ dsx.variable.heroH }}" dots="false" value="dsx.variable.heroPage">
             <image src="{{ item.hero }}" contentFit="cover" a11yLabel="{{ item.title }}"
-                   style="width: 100%; height: {{ dsx.variable.heroH }}px"/>
+                   style="width: 100%; height: {{ dsx.variable.heroH }}px; object-fit: cover"/>
           </pager>
-          <vstack style="width: 100%; height: {{ dsx.variable.heroH }}px; justify-content: flex-end; align-items: center; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(0,0,0,0.62) 78%, #000000 100%)">
+          <vstack style="width: 100%; height: {{ dsx.variable.heroH }}px; justify-content: flex-end; align-items: center; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.62) 76%, #000000 100%)">
             <vstack class="heroPhoneBlock" style="pointer-events: auto">
               <text value="{{ heroShow == null ? '' : heroShow.title }}" class="heroPhoneTitle" fontSize="{{ dsx.variable.heroTitleSize }}"/>
               <text value="{{ heroShow == null ? '' : heroShow.genre }}" class="pillTag"/>
-              <button label="▶   Play" class="playWhite" style="min-width: 210px"
-                      on:tap="dsx.module.route.push({ path: '/watch/' + (heroShow == null ? '' : heroShow.id) + '/1' })"/>
+              <hstack class="playPill" style="min-width: 210px; justify-content: center" a11yGroup="true" a11yTrait="button"
+                      a11yLabel="Play {{ heroShow == null ? '' : heroShow.title }}"
+                      on:tap="dsx.module.route.push({ path: '/watch/' + (heroShow == null ? '' : heroShow.id) + '/1' })">
+                <image icon="play.fill" iconSize="14" color="#111111" a11yHidden="true"/>
+                <text value="Play" class="playLabel"/>
+              </hstack>
               <hstack class="dashRow" a11yHidden="true">
                 <list bind="home.data.hero" key="id" axis="horizontal" scroll="false" spacing="5">
                   <stack height="4" radius="2"
@@ -240,25 +255,24 @@
       <!-- ============ Continue Watching ============ -->
       <vstack class="section" visible-if="continue.data != null && continue.data.items.length > 0">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
-          <text value="Continue Watching" class="sectionTitle" fontSize="{{ dsx.variable.wide ? 24 : 20 }}"/>
+          <text value="Continue Watching" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
         </hstack>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
-            <list bind="continue.data.items" key="episode" axis="horizontal" scroll="false" spacing="14">
+            <list bind="continue.data.items" key="episode" axis="horizontal" scroll="false" spacing="18">
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/watch/{{ item.show }}/{{ item.idx }}" a11yGroup="true" a11yLabel="Continue {{ item.title }}, episode {{ item.idx }}">
                 <zstack>
-                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                         style="{{ dsx.variable.posterStyle }}"/>
+                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" style="{{ dsx.variable.posterStyle }}"/>
                   <vstack class="epWrap" style="{{ dsx.variable.posterBox }}">
                     <text value="EP {{ item.idx }}" class="badgeDark"/>
                   </vstack>
                   <vstack style="{{ dsx.variable.posterBox }}">
-                    <stack class="resumeTrack" style="width: {{ dsx.variable.posterW }}px; height: 3px; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px">
+                    <stack class="resumeTrack" style="width: {{ dsx.variable.posterW }}px; height: 3px; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px">
                       <stack class="resumeFill" style="width: {{ item.pct }}%; height: 3px"/>
                     </stack>
                   </vstack>
                 </zstack>
-                <vstack spacing="3" alignItems="stretch">
+                <vstack spacing="4" alignItems="stretch">
                   <text value="{{ item.title }}" class="cardTitle"/>
                   <text value="EP.{{ item.idx }} / EP.{{ item.eps }}" class="cardMeta"/>
                 </vstack>
@@ -268,16 +282,19 @@
         </scroll>
       </vstack>
 
-      <!-- ============ New Release · hover reveals the info card on a real pointer ============ -->
+      <!-- ============ New Release ============ -->
       <vstack class="section">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
-          <text value="New Release" class="sectionTitle" fontSize="{{ dsx.variable.wide ? 24 : 20 }}"/>
+          <text value="New Release" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           <spacer/>
-          <text value="View all ›" class="viewAll" href="/search"/>
+          <hstack class="viewAllRow" href="/discover" a11yGroup="true" a11yLabel="View all new releases">
+            <text value="View all" class="viewAll"/>
+            <image icon="chevron.right" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
+          </hstack>
         </hstack>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
-            <list bind="home.data.latest" key="id" axis="horizontal" scroll="false" spacing="14">
+            <list bind="home.data.latest" key="id" axis="horizontal" scroll="false" spacing="18">
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/show/{{ item.id }}"
                       on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}, {{ item.episodes }} episodes">
@@ -288,14 +305,17 @@
                     <text value="New" class="badge" visible-if="item.rank <= 2"/>
                   </vstack>
                   <vstack visible-if="dsx.variable.hovId == item.id"
-                          style="width: {{ dsx.variable.posterW }}px; height: {{ dsx.variable.posterH }}px; justify-content: flex-end; border-radius: 8px; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.88) 100%); transform: scale(1.04); transition: transform 0.22s ease">
+                          style="width: {{ dsx.variable.posterW }}px; height: {{ dsx.variable.posterH }}px; justify-content: flex-end; border-radius: 16px; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.88) 100%); transform: scale(1.04); transition: transform 0.22s ease; z-index: 2">
                     <vstack class="hovPanel">
                       <text value="{{ item.synopsis }}" class="hovSyn"/>
-                      <text value="▶  Play" class="hovPlay" href="/watch/{{ item.id }}/1" a11yLabel="Play {{ item.title }}"/>
+                      <hstack class="hovPlay" href="/watch/{{ item.id }}/1" a11yGroup="true" a11yLabel="Play {{ item.title }}">
+                        <image icon="play.fill" iconSize="11" color="#111111" a11yHidden="true"/>
+                        <text value="Play" class="hovPlayLabel"/>
+                      </hstack>
                     </vstack>
                   </vstack>
                 </zstack>
-                <vstack spacing="3" alignItems="stretch">
+                <vstack spacing="4" alignItems="stretch">
                   <text value="{{ item.title }}" class="cardTitle"/>
                   <text value="{{ metaLine }}" class="cardMeta"/>
                 </vstack>
@@ -305,32 +325,31 @@
         </scroll>
       </vstack>
 
-      <!-- ============ TOP · the ranked-numeral rail ============ -->
+      <!-- ============ TOP · ranked numerals ============ -->
       <vstack class="section">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
-          <text value="TOP" class="sectionTitle" fontSize="{{ dsx.variable.wide ? 24 : 20 }}"/>
+          <text value="TOP" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           <spacer/>
-          <image icon="flame.fill" iconSize="15" color="#FF2D55" a11yHidden="true"/>
+          <image icon="flame.fill" iconSize="16" color="#E52E2E" a11yHidden="true"/>
         </hstack>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
-            <list bind="home.data.trending" key="id" axis="horizontal" scroll="false" spacing="10">
+            <list bind="home.data.trending" key="id" axis="horizontal" scroll="false" spacing="12">
               <vstack class="card" style="width: {{ dsx.variable.posterW + dsx.variable.rankOvl }}px" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="Number {{ item.rank }}, {{ item.title }}">
                 <zstack>
                   <hstack spacing="0" alignItems="flex-start">
                     <stack style="width: {{ dsx.variable.rankOvl }}px; height: 2px"/>
-                    <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                           style="{{ dsx.variable.posterStyle }}"/>
+                    <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" style="{{ dsx.variable.posterStyle }}"/>
                   </hstack>
                   <vstack style="width: 100%; height: {{ dsx.variable.posterH }}px; justify-content: flex-end; align-items: flex-start; pointer-events: none">
                     <text value="{{ item.rank }}" class="rankNum" color="{{ rankColor }}"
-                          style="font-size: {{ dsx.variable.rankSize }}px; line-height: 0.78; font-weight: 900; letter-spacing: -6px; text-shadow: 0 6px 22px rgba(0,0,0,0.85)"/>
+                          style="font-size: {{ dsx.variable.rankSize }}px; line-height: 0.76; font-weight: 900; letter-spacing: -7px; text-shadow: 0 6px 22px rgba(0,0,0,0.85)"/>
                   </vstack>
-                  <vstack class="badgeWrap" style="width: 100%; height: {{ dsx.variable.posterH }}px; padding-left: {{ dsx.variable.rankOvl + 8 }}px; pointer-events: none">
+                  <vstack class="badgeWrap" style="width: 100%; height: {{ dsx.variable.posterH }}px; padding-left: {{ dsx.variable.rankOvl + 10 }}px; pointer-events: none">
                     <text value="{{ topBadge }}" class="badge" visible-if="topBadge != ''"/>
                   </vstack>
                 </zstack>
-                <vstack spacing="3" alignItems="stretch" style="padding-left: {{ dsx.variable.rankOvl }}px">
+                <vstack spacing="4" alignItems="stretch" style="padding-left: {{ dsx.variable.rankOvl }}px">
                   <text value="{{ item.title }}" class="cardTitle"/>
                   <text value="{{ metaLine }}" class="cardMeta"/>
                 </vstack>
@@ -340,29 +359,32 @@
         </scroll>
       </vstack>
 
-      <!-- ============ genre shelves · the grid sections ============ -->
-      <list bind="home.data.shelves" key="genre" scroll="false" spacing="30">
+      <!-- ============ genre shelves ============ -->
+      <list bind="home.data.shelves" key="genre" scroll="false" spacing="0">
         <vstack class="section">
           <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
-            <text value="{{ item.genre }}" class="sectionTitle" fontSize="{{ dsx.variable.wide ? 24 : 20 }}"/>
+            <text value="{{ item.genre }}" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           </hstack>
           <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-            <grid bind="item.items" key="id" columns="{{ dsx.variable.shelfCols }}" spacing="14" scroll="false">
+            <grid bind="item.items" key="id" columns="{{ dsx.variable.shelfCols }}" spacing="18" scroll="false">
               <vstack class="card" href="/show/{{ item.id }}"
                       on:hoverStart="dsx.variable.hovId = 'g-' + item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}">
                 <zstack>
                   <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                         style="width: 100%; aspect-ratio: 2/3; border-radius: 8px; object-fit: cover; transition: transform 0.22s ease; transform: scale({{ dsx.variable.hovId == 'g-' + item.id ? 1.03 : 1 }})"/>
+                         style="width: 100%; aspect-ratio: 3/4; border-radius: 16px; object-fit: cover; transition: transform 0.22s ease; transform: scale({{ dsx.variable.hovId == 'g-' + item.id ? 1.03 : 1 }})"/>
                   <vstack visible-if="dsx.variable.hovId == 'g-' + item.id"
-                          style="width: 100%; height: 100%; justify-content: flex-end; border-radius: 8px; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.88) 100%); transform: scale(1.03); transition: transform 0.22s ease">
+                          style="width: 100%; height: 100%; justify-content: flex-end; border-radius: 16px; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.88) 100%); transform: scale(1.03); transition: transform 0.22s ease; z-index: 2">
                     <vstack class="hovPanel">
                       <text value="{{ item.synopsis }}" class="hovSyn"/>
-                      <text value="▶  Play" class="hovPlay" href="/watch/{{ item.id }}/1" a11yLabel="Play {{ item.title }}"/>
+                      <hstack class="hovPlay" href="/watch/{{ item.id }}/1" a11yGroup="true" a11yLabel="Play {{ item.title }}">
+                        <image icon="play.fill" iconSize="11" color="#111111" a11yHidden="true"/>
+                        <text value="Play" class="hovPlayLabel"/>
+                      </hstack>
                     </vstack>
                   </vstack>
                 </zstack>
-                <vstack spacing="3" alignItems="stretch">
+                <vstack spacing="4" alignItems="stretch">
                   <text value="{{ item.title }}" class="cardTitle"/>
                   <text value="{{ metaLine }}" class="cardMeta"/>
                 </vstack>
@@ -372,20 +394,20 @@
         </vstack>
       </list>
 
-      <vstack style="{{ dsx.variable.shell }}" visible-if="home.error != null">
+      <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="home.error != null">
         <vstack class="errCard">
-          <text value="The catalogue is unavailable." fontSize="13" color="#FFFFFF"/>
+          <text value="The catalogue is unavailable." fontSize="14" color="#FFFFFF"/>
           <button label="Retry" class="retryBtn" on:tap="home.refresh()"/>
         </vstack>
       </vstack>
 
-      <!-- ============ footer · wide storefront chrome ============ -->
-      <vstack class="footer" visible-if="dsx.variable.wide" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 26px">
+      <!-- ============ footer ============ -->
+      <vstack class="footer" visible-if="dsx.variable.wide" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 44px">
         <hstack class="footCols" style="{{ dsx.variable.shell }}">
           <vstack class="footBrand" style="flex: 1">
-            <hstack spacing="9" alignItems="center">
+            <hstack spacing="10" alignItems="center">
               <vstack class="logoBox" style="justify-content: center">
-                <text value="▶" class="logoGlyph" a11yHidden="true"/>
+                <image icon="play.fill" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
               </vstack>
               <text value="ShortDrama" class="wordmark"/>
             </hstack>
@@ -396,7 +418,7 @@ One source. Native on iOS, Android, web and desktop." class="footCopy"/>
             <text value="BROWSE" class="footHead"/>
             <text value="Home" class="footLink" href="/"/>
             <text value="Discover" class="footLink" href="/discover"/>
-            <text value="Search" class="footLink" href="/search"/>
+            <text value="My List" class="footLink" href="/list"/>
           </vstack>
           <vstack class="footCol">
             <text value="EARN" class="footHead"/>
@@ -406,7 +428,6 @@ One source. Native on iOS, Android, web and desktop." class="footCopy"/>
           </vstack>
           <vstack class="footCol">
             <text value="ACCOUNT" class="footHead"/>
-            <text value="My List" class="footLink" href="/list"/>
             <text value="Wallet" class="footLink" href="/profile"/>
             <text value="Manage this app" class="footLink" href="/admin"/>
           </vstack>

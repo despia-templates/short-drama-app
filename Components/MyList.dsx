@@ -27,13 +27,13 @@
       return 3
     </variable>
     <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 32 }
-      if (dsx.variable.bp == 'tablet') { return 24 }
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
       return 16
     </variable>
     <variable as="shell" computed="true">
       const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
 
     <style as="screen" background="#000000" alignItems="stretch"/>
@@ -58,7 +58,7 @@
     <style as="badgeDark" background="rgba(0,0,0,0.72)" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
     <style as="badgeWrap" paddingLeading="7" paddingBottom="9" alignItems="flex-start"/>
     <style as="resumeTrack" background="rgba(255,255,255,0.22)"/>
-    <style as="resumeFill" background="#FF2D55"/>
+    <style as="resumeFill" background="#E52E2E"/>
   </head>
 
   <TopNav active="list" visible-if="dsx.variable.wide"/>

@@ -89,7 +89,8 @@
     <style as="headCol" spacing="1"/>
     <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
     <style as="sub" fontSize="11" color="rgba(255,255,255,0.42)"/>
-    <style as="backChip" background="#26262C" radius="15" paddingH="12" paddingV="7" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="backChip" background="#26262C" radius="15" paddingH="12" paddingV="7" spacing="5" alignItems="center"/>
+    <style as="backChipLabel" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F7C948"/>
 
     <style as="statRow" spacing="9" alignItems="stretch"/>
@@ -122,7 +123,10 @@
           <text value="Manage" class="h1"/>
           <text value="Operator surface — Manage View bridge" class="sub"/>
         </vstack>
-        <text value="‹ App" class="backChip" href="/profile" a11yLabel="Back to the app"/>
+        <hstack class="backChip" href="/profile" a11yGroup="true" a11yLabel="Back to the app">
+          <image icon="chevron.left" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
+          <text value="App" class="backChipLabel"/>
+        </hstack>
       </hstack>
 
       <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
@@ -174,11 +178,11 @@
         <textfield class="field" bind="dsx.variable.nTitle" placeholder="Title"/>
         <textfield class="field" bind="dsx.variable.nSynopsis" placeholder="Synopsis"/>
         <hstack class="chipRow">
-          <text value="Romance" class="chip" background="{{ dsx.variable.nGenre == 'Romance' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.nGenre = 'Romance'" a11yTrait="button"/>
-          <text value="Fantasy" class="chip" background="{{ dsx.variable.nGenre == 'Fantasy' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.nGenre = 'Fantasy'" a11yTrait="button"/>
-          <text value="Revenge" class="chip" background="{{ dsx.variable.nGenre == 'Revenge' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.nGenre = 'Revenge'" a11yTrait="button"/>
+          <text value="Romance" class="chip" background="{{ dsx.variable.nGenre == 'Romance' ? '#E52E2E' : '#26262C' }}" on:tap="dsx.variable.nGenre = 'Romance'" a11yTrait="button"/>
+          <text value="Fantasy" class="chip" background="{{ dsx.variable.nGenre == 'Fantasy' ? '#E52E2E' : '#26262C' }}" on:tap="dsx.variable.nGenre = 'Fantasy'" a11yTrait="button"/>
+          <text value="Revenge" class="chip" background="{{ dsx.variable.nGenre == 'Revenge' ? '#E52E2E' : '#26262C' }}" on:tap="dsx.variable.nGenre = 'Revenge'" a11yTrait="button"/>
         </hstack>
-        <button label="Create draft" class="cta" background="#FF2D55" on:tap="dsx.action.createShow()"/>
+        <button label="Create draft" class="cta" background="#E52E2E" on:tap="dsx.action.createShow()"/>
       </vstack>
 
       <!-- add episode -->
@@ -186,7 +190,7 @@
         <text value="Add episode" class="h2"/>
         <text value="{{ dsx.variable.epShow == '' ? 'Tap “+ EP” on a show row to target it.' : 'Target set — EP ' + dsx.variable.epIdx }}" class="note"/>
         <textfield class="field" bind="dsx.variable.epUrl" placeholder="Video URL (MP4/HLS — Stream in the hosted lane)"/>
-        <button label="Save episode (60 coins, live)" class="cta" background="#FF2D55" on:tap="dsx.action.addEpisode()"/>
+        <button label="Save episode (60 coins, live)" class="cta" background="#E52E2E" on:tap="dsx.action.addEpisode()"/>
       </vstack>
 
       <!-- notice / push composer -->
@@ -195,11 +199,11 @@
         <textfield class="field" bind="dsx.variable.pTitle" placeholder="Title — e.g. EP 41–45 drop tonight 8PM"/>
         <textfield class="field" bind="dsx.variable.pMessage" placeholder="Message"/>
         <hstack class="chipRow">
-          <text value="All" class="chip" background="{{ dsx.variable.pSegment == 'all' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.pSegment = 'all'" a11yTrait="button"/>
-          <text value="VIP" class="chip" background="{{ dsx.variable.pSegment == 'vip' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.pSegment = 'vip'" a11yTrait="button"/>
-          <text value="Lapsed" class="chip" background="{{ dsx.variable.pSegment == 'lapsed' ? '#FF2D55' : '#26262C' }}" on:tap="dsx.variable.pSegment = 'lapsed'" a11yTrait="button"/>
+          <text value="All" class="chip" background="{{ dsx.variable.pSegment == 'all' ? '#E52E2E' : '#26262C' }}" on:tap="dsx.variable.pSegment = 'all'" a11yTrait="button"/>
+          <text value="VIP" class="chip" background="{{ dsx.variable.pSegment == 'vip' ? '#E52E2E' : '#26262C' }}" on:tap="dsx.variable.pSegment = 'vip'" a11yTrait="button"/>
+          <text value="Lapsed" class="chip" background="{{ dsx.variable.pSegment == 'lapsed' ? '#E52E2E' : '#26262C' }}" on:tap="dsx.variable.pSegment = 'lapsed'" a11yTrait="button"/>
         </hstack>
-        <button label="Queue notice" class="cta" background="#FF2D55" on:tap="dsx.action.sendNotice()"/>
+        <button label="Queue notice" class="cta" background="#E52E2E" on:tap="dsx.action.sendNotice()"/>
       </vstack>
 
       <!-- the MCP face -->
