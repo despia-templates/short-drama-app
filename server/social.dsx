@@ -16,6 +16,21 @@
       <index on="episode"/>
     </entity>
 
+    <!-- The viewer's inbox. Notices are broadcast rows (ownership=public-read, declared in
+         admin.dsx and written only through the operator surface); this read shapes them
+         for the inbox — banner kinds first, newest first, the audience segment carried so
+         a client can filter locally when it knows the viewer is VIP. Read-state is the
+         CLIENT's memory (a lastSeen timestamp), because a per-viewer read receipt is a
+         write amplification this demo does not need. -->
+    <action as="listNotices">
+      const rows = await dsx.module.data.notice.list({ limit: 100 })
+      if (!rows.ok) { return { rows: [] } }
+      const shaped = rows.data
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+        .map(n => ({ id: n.id, title: n.title, message: n.message, segment: n.segment, kind: n.kind, at: n.created_at }))
+      return { rows: shaped }
+    </action>
+
     <action as="listComments" inputs="episode">
       if (episode == null || episode === '') { throw { reason: 'invalid', message: 'episode is required' } }
       const rows = await dsx.module.data.comment.list({ filters: { episode: episode }, limit: 100 })
@@ -48,5 +63,6 @@
   </head>
 
   <route method="GET"  path="/social/comments/:episode" action="listComments"  auth="none"/>
+  <route method="GET"  path="/social/notices"            action="listNotices"   auth="none"/>
   <route method="POST" path="/social/comment"           action="postComment"   auth="required"/>
 </server>

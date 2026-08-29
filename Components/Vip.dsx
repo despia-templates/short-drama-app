@@ -1,7 +1,11 @@
 <!-- VIP — the subscription's own destination, the centre tab in the category's bar. Built
-     to the reference: a gold masthead, the viewer's own watch-time card, the VIP-only rail,
-     a dated Coming Soon shelf, and the benefit list — then the tiers themselves.
+     to the reference: a gold masthead, the wallet card, two merchandising rails, the
+     benefit list — then the tiers themselves.
 
+     FUNNEL ROLE: justify the subscription price. Which is exactly why every claim here is
+     the DATA'S claim: the rails are named for what they bind ("Watch free with VIP" is
+     true of the whole catalogue; "Recently added" is the latest rail) — a "VIP-only"
+     shelf of ordinary trending shows is a lie on the one screen whose job is trust.
      Entitlement is read from /wallet/state (`vip`), never assumed, and every price comes
      from /store/catalog so an operator changes it without a build. Buying routes to the
      one checkout path in /store. -->
@@ -14,6 +18,7 @@
     <api as="catalog" url="/store/catalog"/>
     <api as="home" url="/catalog/home"/>
 
+    <variable as="hovId">return ''</variable>
     <variable as="benefits">
       return [
         { id: 'b1', icon: 'lock.open.fill', label: 'Unlimited viewing',        note: 'Every series, every episode' },
@@ -58,6 +63,16 @@
       return wallet.data.vip === true
     </variable>
     <variable as="posterW" computed="true">return dsx.variable.bp == 'phone' ? 150 : 186</variable>
+    <variable as="phase" computed="true">
+      if (catalog.error != null || home.error != null) { return 'error' }
+      if (catalog.data == null || home.data == null) { return 'loading' }
+      return 'content'
+    </variable>
+
+    <formula as="railFx" id="item.id">
+      const on = dsx.variable.hovId == id
+      return 'width: 100%; aspect-ratio: 3/4; border-radius: 10px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.03 : 1) + ')'
+    </formula>
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
@@ -93,6 +108,9 @@
     <style as="cta" background="#FF2C55" radius="24" paddingV="15" fontSize="16" fontWeight="semibold" color="#FFFFFF"/>
     <style as="statusPill" background="rgba(246,182,61,0.16)" radius="14" paddingH="14" paddingV="8" spacing="7" alignItems="center"/>
     <style as="statusTxt" fontSize="13" fontWeight="semibold" color="#F6B63D"/>
+    <style as="skeleton" background="#141419" radius="14"/>
+    <style as="errCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="20" alignItems="center"/>
+    <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
   <scroll class="scroller" style="flex: 1; min-height: 0">
@@ -111,58 +129,69 @@
       <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
         <hstack class="watchCard">
           <vstack spacing="4" style="flex: 1">
-            <text value="Last Week's Watch Time" class="watchCap"/>
+            <text value="Your wallet" class="watchCap"/>
             <hstack spacing="6" alignItems="flex-end">
-              <text value="{{ wallet.data == null ? 0 : wallet.data.coins }}" class="watchNum"/>
-              <text value="coins in wallet" class="watchCap" style="padding-bottom: 4px"/>
+              <text value="{{ wallet.data == null ? '—' : wallet.data.coins + wallet.data.bonus }}" class="watchNum"/>
+              <text value="coins" class="watchCap" style="padding-bottom: 4px"/>
             </hstack>
           </vstack>
-          <hstack spacing="4" alignItems="center" href="/profile" a11yGroup="true" a11yLabel="View your wallet">
+          <hstack spacing="4" alignItems="center" on:tap="dsx.module.route.reset({ path: '/profile' })"
+                  a11yGroup="true" a11yTrait="button" a11yLabel="View your wallet">
             <text value="View wallet" class="watchLink"/>
             <image icon="chevron.right" iconSize="12" color="#F6B63D" a11yHidden="true"/>
           </hstack>
         </hstack>
       </vstack>
 
-      <!-- VIP-only rail -->
-      <vstack class="section">
-        <text value="VIP-Only Dramas" class="sectionTitle"/>
+      <vstack class="section" visible-if="dsx.variable.phase == 'loading'">
+        <vstack style="{{ dsx.variable.shell }}" spacing="14" alignItems="stretch">
+          <Skeleton height="200" radius="14"/>
+          <Skeleton height="120" radius="14"/>
+        </vstack>
+      </vstack>
+      <vstack class="section" visible-if="dsx.variable.phase == 'error'">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <vstack class="errCard">
+            <text value="VIP plans could not be loaded." fontSize="14" color="#FFFFFF"/>
+            <button label="Retry" class="retryBtn" on:tap="catalog.refresh()"/>
+          </vstack>
+        </vstack>
+      </vstack>
+
+      <!-- what VIP unlocks, shown on the shows people are actually watching: every one of
+           these has locked episodes a member never pays for -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
+        <text value="Watch free with VIP" class="sectionTitle"/>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
             <list bind="home.data.trending" key="id" axis="horizontal" scroll="false" spacing="12">
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/watch/{{ item.id }}/1"
+                      on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}">
                 <zstack>
-                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                         style="width: 100%; aspect-ratio: 3/4; border-radius: 10px; object-fit: cover"/>
+                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" style="{{ railFx }}"/>
                   <vstack class="tagWrap" style="width: 100%; height: 100%; pointer-events: none">
                     <text value="VIP" class="vipTag"/>
                   </vstack>
                 </zstack>
-                <text value="{{ item.title }}" class="cardTitle"/>
+                <text value="{{ item.title }}" class="cardTitle" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
               </vstack>
             </list>
           </hstack>
         </scroll>
       </vstack>
 
-      <!-- coming soon -->
-      <vstack class="section">
-        <text value="Coming Soon" class="sectionTitle"/>
-        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" spacing="12">
-          <hstack class="dateRow">
-            <image icon="timer" iconSize="14" color="rgba(255,255,255,0.55)" a11yHidden="true"/>
-            <text value="New episodes every week" class="dateTxt"/>
-          </hstack>
-        </vstack>
+      <!-- recently added -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
+        <text value="Recently added" class="sectionTitle"/>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
             <list bind="home.data.latest" key="id" axis="horizontal" scroll="false" spacing="12">
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/show/{{ item.id }}"
+                      on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}">
-                <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                       style="width: 100%; aspect-ratio: 3/4; border-radius: 10px; object-fit: cover"/>
-                <text value="{{ item.title }}" class="cardTitle"/>
+                <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" style="{{ railFx }}"/>
+                <text value="{{ item.title }}" class="cardTitle" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
               </vstack>
             </list>
           </hstack>
@@ -170,7 +199,7 @@
       </vstack>
 
       <!-- benefits -->
-      <vstack class="section">
+      <vstack class="section" visible-if="dsx.variable.phase != 'error'">
         <text value="Your Benefits" class="sectionTitle"/>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <list bind="dsx.variable.benefits" key="id" scroll="false" spacing="0">
@@ -186,7 +215,7 @@
       </vstack>
 
       <!-- the tiers -->
-      <vstack class="section">
+      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <text value="Choose your plan" class="sectionTitle"/>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" spacing="12">
           <list bind="catalog.data.vip" key="id" scroll="false" spacing="12">

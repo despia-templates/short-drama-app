@@ -7,7 +7,7 @@
       "path": "/",
       "component": "shortdrama.App",
       "meta": {
-        "title": "Short Drama \u2014 binge-worthy vertical series"
+        "title": "Short Drama — binge-worthy vertical series"
       },
       "motion": "none"
     },
@@ -15,7 +15,7 @@
       "path": "/discover",
       "component": "shortdrama.Discover",
       "meta": {
-        "title": "Discover \u2014 Short Drama"
+        "title": "Discover — Short Drama"
       },
       "motion": "none"
     },
@@ -23,7 +23,7 @@
       "path": "/vip",
       "component": "shortdrama.Vip",
       "meta": {
-        "title": "VIP \u2014 Short Drama"
+        "title": "VIP — Short Drama"
       },
       "motion": "none"
     },
@@ -31,14 +31,14 @@
       "path": "/store",
       "component": "shortdrama.Store",
       "meta": {
-        "title": "Store \u2014 Short Drama"
+        "title": "Store — Short Drama"
       }
     },
     {
       "path": "/rewards",
       "component": "shortdrama.Rewards",
       "meta": {
-        "title": "Rewards \u2014 Short Drama"
+        "title": "Rewards — Short Drama"
       },
       "motion": "none"
     },
@@ -46,7 +46,7 @@
       "path": "/list",
       "component": "shortdrama.MyList",
       "meta": {
-        "title": "My List \u2014 Short Drama"
+        "title": "My List — Short Drama"
       },
       "motion": "none"
     },
@@ -54,29 +54,36 @@
       "path": "/profile",
       "component": "shortdrama.Profile",
       "meta": {
-        "title": "Profile \u2014 Short Drama"
+        "title": "Profile — Short Drama"
       },
       "motion": "none"
+    },
+    {
+      "path": "/notices",
+      "component": "shortdrama.Notices",
+      "meta": {
+        "title": "Notifications — Short Drama"
+      }
     },
     {
       "path": "/show/:id",
       "component": "shortdrama.Show",
       "meta": {
-        "title": "Show \u2014 Short Drama"
+        "title": "Show — Short Drama"
       }
     },
     {
       "path": "/watch/:show/:idx",
       "component": "shortdrama.Watch",
       "meta": {
-        "title": "Watch \u2014 Short Drama"
+        "title": "Watch — Short Drama"
       }
     },
     {
       "path": "/admin",
       "component": "shortdrama.Admin",
       "meta": {
-        "title": "Manage \u2014 Short Drama"
+        "title": "Manage — Short Drama"
       }
     }
   ],

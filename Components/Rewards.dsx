@@ -1,16 +1,26 @@
-<!-- Rewards — the two lanes a short-drama app actually monetises on, in the category's
-     own order: SELL first (VIP subscription tiers, then coin packs), EARN second (daily
-     check-in streak, the wheel, capped rewarded ads, tasks).
+<!-- Rewards — the EARN lane (the SELL lane lives on /store; one door between them, both
+     directions). Four earn mechanics in the category's own order: daily check-in streak,
+     capped rewarded ads, the wheel, tasks.
 
-     Every number is a SERVER fact — the tiers, the pack table, the streak curve, the ad
-     cap and reward all arrive in /rewards/state, so an operator changes price without a
-     build and the client can never invent an entitlement. Buttons only ASK.
+     FUNNEL ROLE: retention. Every mechanic here pays small and daily, which is what makes
+     tomorrow's open worth it; the screen sells nothing except through the one labelled
+     door at the top.
 
-     Purchases ride the native store lane (RevenueCat); on web the buy buttons name that
-     honestly rather than pretending. Rewarded ads are AdMob on native, server-verified
-     before a coin is granted — the web lane says so and offers the other earn paths. -->
+     Every number is a SERVER fact — the streak curve, the ad cap, the wheel's prize table
+     all arrive in /rewards/state, so an operator changes the economy without a build and
+     the client can never invent an entitlement. Buttons only ASK — and a button that has
+     nothing to ask for is disabled in its ACTION, not just grey: a tap on "Checked in —
+     come back tomorrow" must do nothing, because firing it anyway just farms a failure
+     toast from the server.
+
+     Signed out, this screen says so ONCE and shows nothing else. The earlier version
+     rendered the complete fake economy from its null-defaults — streaks, caps, prizes,
+     all invented, every button live — and the viewer's first four taps were four
+     consecutive failure toasts. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
+    <expects variable="nav"/>
+
     <api as="session" url="/dev-session.json" ssr="false"/>
     <api as="state" url="/rewards/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
     <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
@@ -19,10 +29,20 @@
     <api as="claimCall" url="/rewards/task" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
 
     <variable as="toast">return ''</variable>
-    <variable as="tier">return 'monthly'</variable>
+    <variable as="wheelTurn">return 0</variable>     <!-- accumulated rotation, degrees -->
+    <variable as="spinning">return false</variable>
+    <variable as="wheelResult">return ''</variable>  <!-- the hub label after a landing -->
+
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
+    </variable>
+    <variable as="signedOut" computed="true">return session.error != null</variable>
+    <variable as="phase" computed="true">
+      if (dsx.variable.signedOut) { return 'signedout' }
+      if (state.error != null) { return 'error' }
+      if (state.data == null) { return 'loading' }
+      return 'content'
     </variable>
 
     <variable as="bp" computed="true">
@@ -37,19 +57,36 @@
       if (dsx.variable.bp == 'tablet') { return 40 }
       return 16
     </variable>
-    <variable as="vipCols" computed="true">return dsx.variable.bp == 'phone' ? 1 : 3</variable>
-    <variable as="packCols" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 4 }
-      if (dsx.variable.bp == 'tablet') { return 3 }
-      return 2
-    </variable>
     <variable as="shell" computed="true">
       const g = dsx.variable.gutter
       return 'width: 100%; max-width: 1100px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
     <variable as="balance" computed="true">
-      if (wallet.data == null) { return 0 }
+      if (wallet.data == null) { return null }
       return wallet.data.coins + wallet.data.bonus
+    </variable>
+    <variable as="canCheckin" computed="true">
+      return state.data != null && state.data.checkedToday == false
+    </variable>
+    <variable as="canSpin" computed="true">
+      return state.data != null && state.data.freeSpinLeft && dsx.variable.spinning == false
+    </variable>
+    <variable as="spinLabel" computed="true">
+      if (dsx.variable.spinning) { return 'Spinning…' }
+      if (dsx.variable.canSpin) { return 'Spin — 1 free today' }
+      return 'No spin left today'
+    </variable>
+    <variable as="spinRange" computed="true">
+      if (state.data == null || state.data.spinPrizes == null) { return '' }
+      const p = state.data.spinPrizes
+      return p[0] + '–' + p[p.length - 1]
+    </variable>
+    <!-- the wheel's whole look is ONE computed string. The transition is ALWAYS declared:
+         gating it on `spinning` would strip the property the moment the server answers
+         (locally ~200ms in) and snap the wheel to its target mid-ride. wheelTurn only
+         ever changes inside dsx.action.spin, so nothing can animate at mount. -->
+    <variable as="wheelFx" computed="true">
+      return 'width: 132px; height: 132px; border-radius: 66px; background: conic-gradient(#FF2C55 0deg 45deg, #1E1E24 45deg 90deg, #F6B63D 90deg 135deg, #1E1E24 135deg 180deg, #FF2C55 180deg 225deg, #1E1E24 225deg 270deg, #F6B63D 270deg 315deg, #1E1E24 315deg 360deg); transform: rotate(' + dsx.variable.wheelTurn + 'deg); transition: transform 2.4s cubic-bezier(0.16, 0.8, 0.18, 1)'
     </variable>
 
     <formula as="dayState" i="item.i">
@@ -71,21 +108,47 @@
       return 'Check in  ·  +' + state.data.nextReward
     </formula>
 
+    <action as="goBack">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/' }) }
+    </action>
+
+    <!-- disabled means DISABLED: the guard is in the action, the grey is just its face -->
     <action as="checkin">
+      if (dsx.variable.canCheckin == false) { return }
       const r = await checkinCall.send({})
       if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins — day ' + r.data.streak; state.refresh(); wallet.refresh() }
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Check-in failed' }
     </action>
+
+    <!-- The wheel SPINS the moment it is asked (2.4s of eased rotation), the server
+         answers during the ride, and the hub shows the landing. The rotation is
+         DECORATIVE — the prize is the server's alone, so a reduced-motion viewer who
+         sees no ride still gets the result in the hub and the toast. -->
     <action as="spin">
+      if (dsx.variable.canSpin == false) { return }
+      dsx.variable.spinning = true
+      dsx.variable.wheelResult = ''
+      dsx.variable.wheelTurn = Number(dsx.variable.wheelTurn) + 1890
       const r = await spinCall.send({})
-      if (r.ok) { dsx.variable.toast = 'The wheel lands on ' + r.data.prize + ' bonus coins'; state.refresh(); wallet.refresh() }
-      else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'No spin left' }
+      if (r.ok) {
+        dsx.variable.wheelResult = '+' + r.data.prize
+        dsx.variable.toast = 'The wheel lands on ' + r.data.prize + ' bonus coins'
+        state.refresh()
+        wallet.refresh()
+      } else {
+        dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'No spin left'
+      }
+      dsx.variable.spinning = false
     </action>
-    <action as="claim" task="item.id">
+
+    <action as="claim" task="item.id" done="item.claimed">
+      if (done) { return }
       const r = await claimCall.send({ task: task })
       if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins'; state.refresh(); wallet.refresh() }
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Not yet' }
     </action>
+
     <!-- the ad lane lives in <AdGate>; this screen only reacts to its outcome -->
     <action as="adGranted" reward="event.reward" left="event.left">
       dsx.variable.toast = '+' + reward + ' bonus coins · ' + left + ' left today'
@@ -98,63 +161,102 @@
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
-    <style as="page" spacing="0" paddingTop="18" paddingBottom="30" alignItems="stretch"/>
-    <style as="section" spacing="14" alignItems="stretch" paddingTop="34"/>
+    <style as="page" spacing="0" paddingTop="16" paddingBottom="32" alignItems="stretch"/>
+    <style as="section" spacing="14" alignItems="stretch" paddingTop="32"/>
 
-    <style as="head" alignItems="center" paddingBottom="2"/>
+    <style as="head" alignItems="center" spacing="12" paddingBottom="4"/>
     <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
-    <style as="balancePill" background="rgba(255,255,255,0.08)" radius="16" paddingH="12" paddingV="7" spacing="6" alignItems="center"/>
+    <style as="balancePill" background="rgba(255,255,255,0.08)" radius="16" paddingH="12" paddingV="8" spacing="6" alignItems="center"/>
     <style as="balanceNum" fontSize="14" fontWeight="semibold" color="#F6B63D"/>
+    <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
     <style as="sectionTitle" fontSize="24" fontWeight="bold" color="rgba(255,255,255,0.8)" tracking="-0.3"/>
-    <style as="sellCard" background="#141419" radius="14" paddingH="18" paddingV="18" spacing="12" alignItems="center"/>
+    <style as="sellCard" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="12" alignItems="center"/>
     <style as="sellTitle" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
     <style as="sellNote" fontSize="13" color="rgba(255,255,255,0.5)"/>
     <style as="sectionNote" fontSize="13" color="rgba(255,255,255,0.45)"/>
 
-    <!-- VIP -->
-
-    <!-- coin packs -->
-
-    <!-- earn -->
-    <style as="card" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="13" alignItems="stretch"/>
+    <style as="card" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="12" alignItems="stretch"/>
     <style as="cardHead" alignItems="center"/>
     <style as="h2" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
-    <style as="streakRow" spacing="5" alignItems="center"/>
+    <style as="streakRow" spacing="6" alignItems="center"/>
     <style as="streakPill" fontSize="12" fontWeight="semibold" color="#F6B63D"/>
-    <style as="dayCell" spacing="3" alignItems="center" paddingV="9" radius="9"/>
+    <style as="dayCell" spacing="4" alignItems="center" paddingV="8" radius="9"/>
     <style as="dayAmt" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
     <style as="dayNum" fontSize="11" color="rgba(255,255,255,0.5)"/>
     <style as="cta" radius="24" paddingV="14" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
     <style as="ctaWide" radius="24" paddingV="14" paddingH="24" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
     <style as="wheelWrap" alignItems="center" spacing="12"/>
-    <style as="wheelLabel" fontSize="15" fontWeight="bold" color="#FFFFFF" background="rgba(0,0,0,0.8)" paddingH="11" paddingV="6" radius="14"/>
+    <style as="wheelLabel" fontSize="15" fontWeight="bold" color="#FFFFFF" background="rgba(0,0,0,0.8)" paddingH="12" paddingV="6" radius="14"/>
     <style as="taskRow" alignItems="center" spacing="12"/>
-    <style as="taskCol" spacing="2"/>
+    <style as="taskCol" spacing="2" alignItems="stretch"/>
     <style as="taskTitle" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
     <style as="taskMeta" fontSize="12" color="rgba(255,255,255,0.5)"/>
     <style as="claimBtn" radius="18" paddingH="18" paddingV="11" fontSize="13" fontWeight="semibold"/>
-    <style as="note" fontSize="12" color="rgba(255,255,255,0.42)" lineSpacing="3"/>
+    <style as="signCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="24" alignItems="center"/>
+    <style as="signBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="empty" fontSize="13" color="rgba(255,255,255,0.45)"/>
   </head>
 
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
       <TopNav active="rewards" visible-if="dsx.variable.wide"/>
 
-      <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" paddingTop="14">
+      <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" paddingTop="12">
         <hstack class="head">
+          <!-- pushed here from Store, Profile, the player — the way back exists on phone,
+               where no TopNav carries the map -->
+          <image icon="chevron.left" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
+                 a11yLabel="Back" a11yTrait="button" visible-if="dsx.variable.wide == false"/>
           <text value="Rewards" class="h1"/>
           <spacer/>
-          <hstack class="balancePill" visible-if="wallet.data != null">
+          <hstack class="balancePill" visible-if="dsx.variable.balance != null"
+                  on:tap="dsx.module.route.push({ path: '/store' })" a11yGroup="true" a11yTrait="button"
+                  a11yLabel="{{ dsx.variable.balance }} coins — get more in the store">
             <image icon="dollarsign.circle.fill" iconSize="15" color="#F6B63D" a11yHidden="true"/>
             <text value="{{ dsx.variable.balance }}" class="balanceNum"/>
           </hstack>
         </hstack>
-        <text value="{{ dsx.variable.toast }}" class="toastLine" visible-if="dsx.variable.toast != ''" paddingTop="10"/>
+
+        <hstack class="toastRow" visible-if="dsx.variable.toast != ''" style="margin-top: 8px">
+          <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
+          <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+                 a11yLabel="Dismiss message" a11yTrait="button"/>
+        </hstack>
       </vstack>
 
-      <!-- the SELL lane lives on /store; this screen is EARN only -->
-      <vstack class="section">
+      <!-- signed out: one honest card, nothing else -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'signedout'">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <vstack class="signCard">
+            <image icon="gift.fill" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+            <text value="Rewards belong to an account" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+            <text value="Streaks, spins and coins need somewhere to land. Sign in and start earning." class="empty" textAlign="center"/>
+            <button label="Reload session" class="signBtn" on:tap="session.refresh()"/>
+          </vstack>
+        </vstack>
+      </vstack>
+
+      <vstack class="section" visible-if="dsx.variable.phase == 'loading'">
+        <vstack style="{{ dsx.variable.shell }}" spacing="14" alignItems="stretch">
+          <Skeleton height="64" radius="14"/>
+          <Skeleton height="180" radius="14"/>
+          <Skeleton height="140" radius="14"/>
+        </vstack>
+      </vstack>
+
+      <vstack class="section" visible-if="dsx.variable.phase == 'error'">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <vstack class="signCard">
+            <text value="Rewards are unavailable right now." fontSize="14" color="#FFFFFF"/>
+            <text value="Your balance is safe — this screen just could not load its state." class="empty" textAlign="center"/>
+            <button label="Retry" class="signBtn" on:tap="state.refresh()"/>
+          </vstack>
+        </vstack>
+      </vstack>
+
+      <!-- the ONE labelled door to the SELL lane -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <hstack class="sellCard" on:tap="dsx.module.route.push({ path: '/store' })"
                   a11yGroup="true" a11yTrait="button" a11yLabel="Open the store to buy coins or VIP">
@@ -167,8 +269,8 @@
         </vstack>
       </vstack>
 
-      <!-- ═══ LANE 3 — earn it free ═══ -->
-      <vstack class="section">
+      <!-- ═══ EARN ═══ -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
           <text value="Earn free coins" class="sectionTitle"/>
           <text value="Check in daily, spin the wheel, watch a short ad, finish tasks." class="sectionNote"/>
@@ -186,14 +288,14 @@
               </hstack>
             </hstack>
             <grid bind="state.data.days" key="id" columns="7" spacing="5" scroll="false">
-              <vstack class="dayCell" background="{{ dayColor }}">
+              <vstack class="dayCell" background="{{ dayColor }}" style="transition: background-color 0.3s ease">
                 <image icon="checkmark" iconSize="12" color="#FFFFFF" visible-if="dayState == 'done'" a11yHidden="true"/>
                 <text value="+{{ item.reward }}" class="dayAmt" visible-if="dayState != 'done'"/>
                 <text value="D{{ item.i + 1 }}" class="dayNum"/>
               </vstack>
             </grid>
             <button label="{{ checkinLabel }}" class="cta"
-                    background="{{ state.data != null && state.data.checkedToday ? '#26262C' : '#FF2C55' }}"
+                    background="{{ dsx.variable.canCheckin ? '#FF2C55' : '#26262C' }}"
                     on:tap="dsx.action.checkin()"/>
           </vstack>
 
@@ -213,14 +315,19 @@
             <vstack class="wheelWrap">
               <text value="Spin the wheel" class="h2"/>
               <zstack>
-                <stack style="width: 132px; height: 132px; border-radius: 66px; background: conic-gradient(#FF2C55 0deg 45deg, #1E1E24 45deg 90deg, #F6B63D 90deg 135deg, #1E1E24 135deg 180deg, #FF2C55 180deg 225deg, #1E1E24 225deg 270deg, #F6B63D 270deg 315deg, #1E1E24 315deg 360deg)"/>
-                <vstack style="width: 132px; height: 132px; align-items: center; justify-content: center">
-                  <text value="10–100" class="wheelLabel"/>
+                <stack style="{{ dsx.variable.wheelFx }}"/>
+                <!-- explicit z: the wheel carries a transform, and a transformed sibling
+                     paints ABOVE later plain siblings (AGENTS.md) — without this the hub
+                     label vanishes behind the wheel the moment it first spins -->
+                <vstack style="z-index: 1; width: 132px; height: 132px; align-items: center; justify-content: center">
+                  <text value="{{ dsx.variable.wheelResult != '' ? dsx.variable.wheelResult : dsx.variable.spinRange }}"
+                        class="wheelLabel"
+                        a11yLabel="{{ dsx.variable.wheelResult != '' ? 'You won ' + dsx.variable.wheelResult + ' bonus coins' : 'Prizes from ' + dsx.variable.spinRange + ' coins' }}"/>
                 </vstack>
               </zstack>
-              <button label="{{ state.data != null && state.data.freeSpinLeft ? 'Spin — 1 free today' : 'No spin left today' }}"
+              <button label="{{ dsx.variable.spinLabel }}"
                       class="ctaWide"
-                      background="{{ state.data != null && state.data.freeSpinLeft ? '#FF2C55' : '#26262C' }}"
+                      background="{{ dsx.variable.canSpin ? '#FF2C55' : '#26262C' }}"
                       on:tap="dsx.action.spin()"/>
             </vstack>
           </vstack>
@@ -230,8 +337,8 @@
             <text value="Tasks" class="h2"/>
             <list bind="state.data.tasks" key="id" scroll="false" spacing="14">
               <hstack class="taskRow">
-                <vstack class="taskCol" style="flex: 1">
-                  <text value="{{ item.title }}" class="taskTitle"/>
+                <vstack class="taskCol" style="flex: 1; min-width: 0">
+                  <text value="{{ item.title }}" class="taskTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                   <text value="{{ item.progress }}/{{ item.target }} · +{{ item.reward }} bonus" class="taskMeta"/>
                 </vstack>
                 <button label="{{ item.claimed ? 'Claimed' : 'Claim' }}" class="claimBtn"

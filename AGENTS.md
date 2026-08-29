@@ -63,6 +63,11 @@ and generated barrel are read once at boot). Schema change → re-apply
 - **Truncating a flex child needs the CSS trio on web** (`white-space: nowrap; overflow:
   hidden; text-overflow: ellipsis`) beside `lineLimit=` — `lineLimit` alone wraps once the
   child is `flex: 1; min-width: 0`. Native honours `lineLimit`; the trio is the web twin.
+  AND the column holding the text needs `alignItems="stretch"`: a vstack's default cross
+  alignment HUGS, so a nowrap text sizes to its intrinsic width and sails past the parent
+  (measured: 321px of title in a 263px column, the trio present and useless because the
+  box itself never shrank). Multi-line clamps are the box trio (`display: -webkit-box;
+  -webkit-line-clamp: N; -webkit-box-orient: vertical; overflow: hidden`).
 - **Repeaters are `list`/`grid`/`pager`/`flow` only** (bind on the repeater, single child =
   row template). Nesting works; FILE components work as row templates with `item.*`
   resolving into their attributes. Inline `<component as=>` does NOT render on web today

@@ -127,7 +127,7 @@
 
     <style as="h2" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
     <style as="ledgerRow" alignItems="center" paddingV="12"/>
-    <style as="ledgerCol" spacing="2"/>
+    <style as="ledgerCol" spacing="2" alignItems="stretch"/>
     <style as="ledgerTitle" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
     <style as="ledgerMeta" fontSize="11" color="rgba(255,255,255,0.42)"/>
     <style as="amount" fontSize="13" fontWeight="semibold"/>
@@ -268,6 +268,12 @@
                     a11yGroup="true" a11yLabel="My list and history">
               <image icon="bookmark.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
               <text value="My List &amp; History" class="menuLabel" style="flex: 1"/>
+              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+            </hstack>
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)" href="/notices"
+                    a11yGroup="true" a11yLabel="Notifications">
+              <image icon="bell.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+              <text value="Notifications" class="menuLabel" style="flex: 1"/>
               <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
             <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)"

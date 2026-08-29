@@ -1,0 +1,113 @@
+<!-- Notices — the viewer's inbox for operator announcements (the notice entity: written
+     only through the Manage surface, broadcast to everyone, public-read). A pushed
+     utility screen: back bar, the list, and honest states. No read receipts — a
+     per-viewer receipt is a write per notice per viewer, and this inbox does not earn
+     that; the operator's reach is the point, not tracking. -->
+<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <expects variable="nav"/>
+    <api as="inbox" url="/social/notices"/>
+
+    <variable as="bp" computed="true">
+      const w = dsx.screen.width
+      if (w >= 1120) { return 'desktop' }
+      if (w >= 768) { return 'tablet' }
+      return 'phone'
+    </variable>
+    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="gutter" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
+      return 16
+    </variable>
+    <variable as="shell" computed="true">
+      const g = dsx.variable.gutter
+      return 'width: 100%; max-width: 760px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+    </variable>
+    <variable as="phase" computed="true">
+      if (inbox.error != null) { return 'error' }
+      if (inbox.data == null) { return 'loading' }
+      if (inbox.data.rows.length == 0) { return 'empty' }
+      return 'content'
+    </variable>
+
+    <formula as="rowIcon" kind="item.kind">
+      return kind == 'banner' ? 'star.fill' : 'bell.fill'
+    </formula>
+    <formula as="rowDate" at="item.at">
+      if (at == null) { return '' }
+      return String(at).slice(0, 10)
+    </formula>
+
+    <action as="goBack">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/profile' }) }
+    </action>
+
+    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="scroller" alignItems="stretch"/>
+    <style as="page" spacing="16" paddingTop="12" paddingBottom="32" alignItems="stretch"/>
+    <style as="head" alignItems="center" spacing="12"/>
+    <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
+
+    <style as="card" background="#141419" radius="12" paddingH="16" paddingV="4" spacing="0" alignItems="stretch"/>
+    <style as="row" spacing="12" alignItems="flex-start" paddingV="14"/>
+    <style as="rowBadge" background="rgba(255,44,85,0.14)" radius="18" width="36" height="36" alignItems="center"/>
+    <style as="rowTitle" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="rowBody" fontSize="13" color="rgba(255,255,255,0.6)" lineSpacing="3"/>
+    <style as="rowMeta" fontSize="11" color="rgba(255,255,255,0.4)"/>
+
+    <style as="stateCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="24" alignItems="center"/>
+    <style as="stateTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="stateBody" fontSize="13" color="rgba(255,255,255,0.45)" textAlign="center" lineSpacing="3"/>
+    <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+  </head>
+
+  <scroll class="scroller" style="flex: 1; min-height: 0">
+    <vstack class="page">
+      <TopNav active="" visible-if="dsx.variable.wide"/>
+
+      <vstack style="{{ dsx.variable.shell }}" spacing="16" alignItems="stretch">
+        <hstack class="head">
+          <image icon="chevron.left" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
+                 a11yLabel="Back" a11yTrait="button"/>
+          <text value="Notifications" class="h1"/>
+          <spacer/>
+        </hstack>
+
+        <vstack spacing="12" alignItems="stretch" visible-if="dsx.variable.phase == 'loading'">
+          <Skeleton height="64" radius="12"/>
+          <Skeleton height="64" radius="12"/>
+          <Skeleton height="64" radius="12"/>
+        </vstack>
+
+        <vstack class="stateCard" visible-if="dsx.variable.phase == 'empty'">
+          <image icon="bell.fill" iconSize="30" color="rgba(255,255,255,0.3)" a11yHidden="true"/>
+          <text value="Nothing yet" class="stateTitle"/>
+          <text value="Announcements about new series and events land here." class="stateBody"/>
+        </vstack>
+
+        <vstack class="stateCard" visible-if="dsx.variable.phase == 'error'">
+          <text value="Notifications could not be loaded." class="stateTitle"/>
+          <button label="Retry" class="retryBtn" on:tap="inbox.refresh()"/>
+        </vstack>
+
+        <vstack class="card" visible-if="dsx.variable.phase == 'content'">
+          <list bind="inbox.data.rows" key="id" scroll="false" spacing="0">
+            <hstack class="row" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
+              <vstack class="rowBadge" style="justify-content: center">
+                <image icon="{{ rowIcon }}" iconSize="15" color="#FF2C55" a11yHidden="true"/>
+              </vstack>
+              <vstack spacing="4" alignItems="stretch" style="flex: 1; min-width: 0">
+                <text value="{{ item.title }}" class="rowTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                <text value="{{ item.message }}" class="rowBody" visible-if="item.message != ''"/>
+                <text value="{{ rowDate }}" class="rowMeta"/>
+              </vstack>
+            </hstack>
+          </list>
+        </vstack>
+      </vstack>
+    </vstack>
+  </scroll>
+  <TabBar active="" visible-if="dsx.variable.wide == false"/>
+</vstack>

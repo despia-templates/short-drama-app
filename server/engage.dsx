@@ -78,6 +78,7 @@
       return {
         today: today, checkedToday: checkedToday, streak: streak, curve: curve, days: days, nextReward: nextReward,
         freeSpinLeft: spinsToday === 0,
+        spinPrizes: [10, 15, 20, 25, 40, 60, 80, 100],
         adsToday: adsToday, adCap: AD_CAP, adReward: AD_REWARD, adsLeft: Math.max(0, AD_CAP - adsToday),
         vipTiers: vipTiers, coinPacks: coinPacks,
         tasks: [
