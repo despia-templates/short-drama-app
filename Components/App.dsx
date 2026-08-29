@@ -299,7 +299,7 @@
                       on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}, {{ item.episodes }} episodes">
                 <zstack>
-                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" shared="poster-{{ item.id }}"
                          style="{{ dsx.variable.posterStyle }}; transition: transform 0.22s ease; transform: scale({{ dsx.variable.hovId == item.id ? 1.04 : 1 }})"/>
                   <vstack class="badgeWrap" style="width: {{ dsx.variable.posterW }}px; height: {{ dsx.variable.posterH }}px; pointer-events: none">
                     <text value="New" class="badge" visible-if="item.rank <= 2"/>
@@ -371,7 +371,7 @@
                       on:hoverStart="dsx.variable.hovId = 'g-' + item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}">
                 <zstack>
-                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" shared="poster-{{ item.id }}"
                          style="width: 100%; aspect-ratio: 3/4; border-radius: 16px; object-fit: cover; transition: transform 0.22s ease; transform: scale({{ dsx.variable.hovId == 'g-' + item.id ? 1.03 : 1 }})"/>
                   <vstack visible-if="dsx.variable.hovId == 'g-' + item.id"
                           style="width: 100%; height: 100%; justify-content: flex-end; border-radius: 16px; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.88) 100%); transform: scale(1.03); transition: transform 0.22s ease; z-index: 2">

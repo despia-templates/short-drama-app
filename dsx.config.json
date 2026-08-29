@@ -61,6 +61,7 @@
     }
   ],
   "router": {
-    "transition": "dsx"
+    "transition": "ios",
+    "swipeBack": true
   }
 }
