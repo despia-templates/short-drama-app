@@ -21,6 +21,16 @@
       <field as="task" type="text"/>
     </entity>
 
+    <!-- Rewarded ads are the third earn lane beside check-in and the wheel. The CAP is a
+         server fact (the category standard is a hard daily ceiling), and every grant is a
+         checked ledger write — the client only ever ASKS. On web the lane is honestly
+         disabled (no AdMob); the native apps verify the SSV callback before calling this. -->
+    <entity as="adview" ownership="owner">
+      <field as="day" type="text"/>
+      <field as="reward" type="integer"/>
+      <index on="day"/>
+    </entity>
+
     <action as="rewardsState">
       const today = new Date().toISOString().slice(0, 10)
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
@@ -44,9 +54,31 @@
       for (let i = 0; i < curve.length; i++) {
         days.push({ id: 'd' + i, i: i, reward: curve[i] })
       }
+      const ads = await dsx.module.data.adview.list({ filters: { day: today }, limit: 40 })
+      const adsToday = ads.ok ? ads.data.length : 0
+      const AD_CAP = 10
+      const AD_REWARD = 15
+
+      // The two things a drama app actually sells, as SERVER facts so an operator can
+      // change price without a build: VIP tiers first, then coin packs.
+      const vipTiers = [
+        { id: 'weekly',  label: 'Weekly VIP',  price: '$11.99', note: 'then $14.99/week', badge: '21% OFF', best: false },
+        { id: 'monthly', label: 'Monthly VIP', price: '$49.99', note: 'Auto-renew. Cancel anytime.', badge: '', best: true },
+        { id: 'yearly',  label: 'Yearly VIP',  price: '$199.99', note: 'Auto-renew. Cancel anytime.', badge: 'BEST VALUE', best: false }
+      ]
+      const coinPacks = [
+        { id: 'p500',   coins: 500,   free: 25,    price: '$4.99',  bonus: '+5%' },
+        { id: 'p1000',  coins: 1000,  free: 100,   price: '$9.99',  bonus: '+10%' },
+        { id: 'p2000',  coins: 2000,  free: 400,   price: '$19.99', bonus: '+20%' },
+        { id: 'p3000',  coins: 3000,  free: 900,   price: '$29.99', bonus: '+30%' },
+        { id: 'p5000',  coins: 5000,  free: 2500,  price: '$49.99', bonus: '+50%' },
+        { id: 'p10000', coins: 10000, free: 10000, price: '$99.99', bonus: '+100%' }
+      ]
       return {
         today: today, checkedToday: checkedToday, streak: streak, curve: curve, days: days, nextReward: nextReward,
         freeSpinLeft: spinsToday === 0,
+        adsToday: adsToday, adCap: AD_CAP, adReward: AD_REWARD, adsLeft: Math.max(0, AD_CAP - adsToday),
+        vipTiers: vipTiers, coinPacks: coinPacks,
         tasks: [
           { id: 'watch3', title: 'Watch 3 episodes today', reward: 15, progress: Math.min(watchedCount, 3), target: 3, claimed: claimed.includes('watch3') },
           { id: 'firstFavorite', title: 'Add a show to My List', reward: 10, progress: 0, target: 1, claimed: claimed.includes('firstFavorite') }
@@ -118,10 +150,25 @@
       await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
       return { claimed: task, reward: reward }
     </action>
+    <action as="grantAdReward">
+      const today = new Date().toISOString().slice(0, 10)
+      const seen = await dsx.module.data.adview.list({ filters: { day: today }, limit: 40 })
+      const count = seen.ok ? seen.data.length : 0
+      if (count >= 10) { throw { reason: 'conflict', message: 'daily ad limit reached — come back tomorrow' } }
+      const reward = 15
+      await dsx.module.data.adview.create({ day: today, reward: reward })
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      if (!mine.ok || mine.data.length === 0) { throw { reason: 'conflict', message: 'no wallet' } }
+      const w = mine.data[0]
+      await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
+      await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'ad', ref: 'ad-' + today + '-' + (count + 1) })
+      return { reward: reward, left: 10 - (count + 1) }
+    </action>
   </head>
 
   <route method="GET"  path="/rewards/state"   action="rewardsState" auth="required"/>
   <route method="POST" path="/rewards/checkin" action="checkinNow"   auth="required"/>
   <route method="POST" path="/rewards/spin"    action="spinWheel"    auth="required"/>
   <route method="POST" path="/rewards/task"    action="claimTask"    auth="required"/>
+  <route method="POST" path="/rewards/ad"      action="grantAdReward" auth="required"/>
 </server>

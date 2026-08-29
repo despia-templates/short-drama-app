@@ -295,7 +295,7 @@
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
             <list bind="home.data.latest" key="id" axis="horizontal" scroll="false" spacing="18">
-              <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/show/{{ item.id }}"
+              <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/watch/{{ item.id }}/1"
                       on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}, {{ item.episodes }} episodes">
                 <zstack>
@@ -335,7 +335,7 @@
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
             <list bind="home.data.trending" key="id" axis="horizontal" scroll="false" spacing="12">
-              <vstack class="card" style="width: {{ dsx.variable.posterW + dsx.variable.rankOvl }}px" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="Number {{ item.rank }}, {{ item.title }}">
+              <vstack class="card" style="width: {{ dsx.variable.posterW + dsx.variable.rankOvl }}px" href="/watch/{{ item.id }}/1" a11yGroup="true" a11yLabel="Number {{ item.rank }}, {{ item.title }}">
                 <zstack>
                   <hstack spacing="0" alignItems="flex-start">
                     <stack style="width: {{ dsx.variable.rankOvl }}px; height: 2px"/>
@@ -367,7 +367,7 @@
           </hstack>
           <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
             <grid bind="item.items" key="id" columns="{{ dsx.variable.shelfCols }}" spacing="18" scroll="false">
-              <vstack class="card" href="/show/{{ item.id }}"
+              <vstack class="card" href="/watch/{{ item.id }}/1"
                       on:hoverStart="dsx.variable.hovId = 'g-' + item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}">
                 <zstack>

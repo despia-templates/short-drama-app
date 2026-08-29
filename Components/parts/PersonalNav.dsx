@@ -60,7 +60,7 @@
     <hstack class="balRow" style="justify-content: space-evenly">
       <vstack class="balCol">
         <hstack spacing="6" alignItems="center">
-          <image icon="bitcoinsign.circle.fill" iconSize="16" color="#F7C948" a11yHidden="true"/>
+          <image icon="dollarsign.circle.fill" iconSize="16" color="#F7C948" a11yHidden="true"/>
           <text value="{{ wallet.data == null ? 0 : wallet.data.coins }}" class="balNum"/>
         </hstack>
         <text value="Coins" class="balSub"/>
@@ -68,7 +68,7 @@
       <stack class="balDiv"/>
       <vstack class="balCol">
         <hstack spacing="6" alignItems="center">
-          <image icon="bitcoinsign.circle.fill" iconSize="16" color="#F7C948" a11yHidden="true"/>
+          <image icon="dollarsign.circle.fill" iconSize="16" color="#F7C948" a11yHidden="true"/>
           <text value="{{ wallet.data == null ? 0 : wallet.data.bonus }}" class="balNum"/>
         </hstack>
         <text value="Bonus" class="balSub"/>
@@ -82,7 +82,7 @@
   <vstack class="menu">
     <hstack class="menuRow" href="/profile" a11yLabel="Wallet"
             background="{{ dsx.attribute.active == 'wallet' ? '#1F1F26' : 'rgba(0,0,0,0)' }}">
-      <image icon="bitcoinsign.circle.fill" iconSize="18"
+      <image icon="dollarsign.circle.fill" iconSize="18"
              color="{{ dsx.attribute.active == 'wallet' ? '#E52E2E' : 'rgba(255,255,255,0.6)' }}" a11yHidden="true"/>
       <text value="Wallet" class="menuLabel"
             color="{{ dsx.attribute.active == 'wallet' ? '#E52E2E' : '#FFFFFF' }}"/>

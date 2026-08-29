@@ -8,35 +8,40 @@
       "component": "shortdrama.App",
       "meta": {
         "title": "Short Drama \u2014 binge-worthy vertical series"
-      }
+      },
+      "motion": "none"
     },
     {
       "path": "/discover",
       "component": "shortdrama.Discover",
       "meta": {
         "title": "Discover \u2014 Short Drama"
-      }
+      },
+      "motion": "none"
     },
     {
       "path": "/rewards",
       "component": "shortdrama.Rewards",
       "meta": {
         "title": "Rewards \u2014 Short Drama"
-      }
+      },
+      "motion": "none"
     },
     {
       "path": "/list",
       "component": "shortdrama.MyList",
       "meta": {
         "title": "My List \u2014 Short Drama"
-      }
+      },
+      "motion": "none"
     },
     {
       "path": "/profile",
       "component": "shortdrama.Profile",
       "meta": {
         "title": "Profile \u2014 Short Drama"
-      }
+      },
+      "motion": "none"
     },
     {
       "path": "/show/:id",

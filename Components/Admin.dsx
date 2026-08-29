@@ -123,7 +123,7 @@
           <text value="Manage" class="h1"/>
           <text value="Operator surface — Manage View bridge" class="sub"/>
         </vstack>
-        <hstack class="backChip" href="/profile" a11yGroup="true" a11yLabel="Back to the app">
+        <hstack class="backChip" on:tap="dsx.module.route.pop()" a11yGroup="true" a11yTrait="button" a11yLabel="Back">
           <image icon="chevron.left" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
           <text value="App" class="backChipLabel"/>
         </hstack>

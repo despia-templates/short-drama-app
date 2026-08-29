@@ -180,7 +180,7 @@
               <text value="{{ dsx.variable.favOn ? 'Saved' : 'My List' }}" class="favLabel"/>
             </hstack>
             <hstack class="favBtn" href="/rewards" a11yGroup="true" a11yLabel="Your coins — open Rewards">
-              <image icon="bitcoinsign.circle.fill" iconSize="17" color="#F6B63D" a11yHidden="true"/>
+              <image icon="dollarsign.circle.fill" iconSize="17" color="#F6B63D" a11yHidden="true"/>
               <text value="{{ wallet.data == null ? 0 : wallet.data.coins + wallet.data.bonus }}" class="favLabel"/>
             </hstack>
           </hstack>
@@ -196,7 +196,7 @@
 
           <stack class="skeleton" visible-if="detail.loading" style="height: 160px"/>
           <grid bind="detail.data.episodes" key="id" columns="{{ dsx.variable.epCols }}" spacing="6" scroll="false">
-            <vstack class="epCell" style="position: relative" href="/watch/{{ vars.id }}/{{ item.idx }}"
+            <vstack class="epCell" style="position: relative; justify-content: center" href="/watch/{{ vars.id }}/{{ item.idx }}"
                     a11yLabel="Episode {{ item.idx }}{{ epLocked ? ', locked' : '' }}">
               <text value="{{ item.idx }}" class="epNum"/>
               <image icon="lock.fill" iconSize="8" color="rgba(255,255,255,0.55)" visible-if="epLocked"
@@ -220,7 +220,7 @@
           <text value="{{ dsx.variable.freeCount }} free" class="gridAll"/>
         </hstack>
         <grid bind="detail.data.episodes" key="id" columns="{{ dsx.variable.epCols }}" spacing="6" scroll="false">
-          <vstack class="epCell" style="position: relative" href="/watch/{{ vars.id }}/{{ item.idx }}"
+          <vstack class="epCell" style="position: relative; justify-content: center" href="/watch/{{ vars.id }}/{{ item.idx }}"
                   a11yLabel="Episode {{ item.idx }}{{ epLocked ? ', locked' : '' }}">
             <text value="{{ item.idx }}" class="epNum"/>
             <image icon="lock.fill" iconSize="8" color="rgba(255,255,255,0.55)" visible-if="epLocked"

@@ -136,13 +136,13 @@
             <hstack class="stripRow">
               <hstack spacing="7" alignItems="center">
                 <text value="Coins:" class="stripCap"/>
-                <image icon="bitcoinsign.circle.fill" iconSize="15" color="#F7C948" a11yHidden="true"/>
+                <image icon="dollarsign.circle.fill" iconSize="15" color="#F7C948" a11yHidden="true"/>
                 <text value="{{ wallet.data == null ? 0 : wallet.data.coins }}" class="stripNum"/>
               </hstack>
               <text value="|" class="stripCap"/>
               <hstack spacing="7" alignItems="center">
                 <text value="Bonus:" class="stripCap"/>
-                <image icon="bitcoinsign.circle.fill" iconSize="15" color="#F7C948" a11yHidden="true"/>
+                <image icon="dollarsign.circle.fill" iconSize="15" color="#F7C948" a11yHidden="true"/>
                 <text value="{{ wallet.data == null ? 0 : wallet.data.bonus }}" class="stripNum"/>
               </hstack>
               <spacer/>

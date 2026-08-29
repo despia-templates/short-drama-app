@@ -28,7 +28,7 @@
     <variable as="duration">return 0</variable>
     <variable as="speed">return 1</variable>
     <variable as="drawer">return false</variable>
-    <variable as="autoUnlock">return false</variable>
+    <variable as="autoUnlock">return true</variable>   <!-- on by default: the category standard -->
     <variable as="unlocking">return false</variable>
     <variable as="toast">return ''</variable>
     <variable as="favTouched">return ''</variable>  <!-- '' until toggled; then 'y' / 'n' -->
@@ -179,6 +179,7 @@
     <style as="chipIcon" background="rgba(255,255,255,0.16)" radius="16" paddingH="10" paddingV="9" alignItems="center"/>
     <style as="gridAllRow" spacing="4" alignItems="center"/>
     <style as="autoRow" spacing="9" alignItems="center" paddingTop="2"/>
+    <style as="checkBox" width="18" height="18" radius="5" alignItems="center"/>
     <style as="autoLabel" fontSize="13" color="rgba(255,255,255,0.66)"/>
 
     <!-- the wide details panel -->
@@ -211,6 +212,13 @@
     <!-- ================= THE STAGE ================= -->
     <vstack alignItems="stretch" style="flex: 1; min-width: 0">
       <zstack>
+      <!-- the morph target: the card's poster flies into this rect (U03 shared element),
+           then the video fades over it. Same id on both ends is the whole contract. -->
+      <image src="{{ detail.data == null ? '' : detail.data.show.poster }}" contentFit="cover"
+             shared="poster-{{ vars.show }}" a11yHidden="true"
+             height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+             style="width: 100%; margin-left: auto; margin-right: auto; object-fit: cover"/>
+
       <!-- the picture (only when entitled; a locked episode never mounts its source) -->
       <video visible-if="dsx.variable.episode != null && dsx.variable.epLocked == false"
              src="{{ dsx.variable.episode == null ? '' : dsx.variable.episode.video }}"
@@ -234,11 +242,19 @@
         <image icon="play.fill" iconSize="34" color="rgba(255,255,255,0.9)" a11yHidden="true"/>
       </vstack>
 
+      <!-- immersive chrome scrims: the picture runs edge to edge and the controls sit on
+           blurred bands rather than a dimmed frame (the category's full-screen feel) -->
+      <vstack class="chromeLayer" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+              style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
+        <stack style="width: 100%; height: 112px; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent 100%); mask-image: linear-gradient(180deg, #000 45%, transparent 100%); background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%)"/>
+        <stack style="width: 100%; height: 168px; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); -webkit-mask-image: linear-gradient(0deg, #000 45%, transparent 100%); mask-image: linear-gradient(0deg, #000 45%, transparent 100%); background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)"/>
+      </vstack>
+
       <!-- chrome -->
       <vstack class="chromeLayer" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
         <hstack class="topBar" style="pointer-events: auto">
           <image icon="chevron.left" iconSize="22" color="#FFFFFF" class="back"
-                 href="/show/{{ vars.show }}" a11yLabel="Back to show"/>
+                 on:tap="dsx.module.route.pop()" a11yLabel="Back" a11yTrait="button"/>
           <vstack class="topMeta" style="flex: 1">
             <text value="{{ detail.data == null ? '' : detail.data.show.title }}" class="showTitle"/>
             <text value="EP {{ dsx.variable.cur }}{{ detail.data == null ? '' : ' / ' + detail.data.episodes.length }}" class="epLine"/>
@@ -282,7 +298,7 @@ Please unlock to watch." class="lockHead"/>
           <hstack class="unlockBtn" a11yGroup="true" a11yTrait="button"
                   a11yLabel="Unlock this episode for {{ dsx.variable.episode == null ? '' : dsx.variable.episode.price }} coins"
                   on:tap="dsx.action.unlockNow()">
-            <image icon="bitcoinsign.circle.fill" iconSize="17" color="#FFFFFF" a11yHidden="true"
+            <image icon="dollarsign.circle.fill" iconSize="17" color="#FFFFFF" a11yHidden="true"
                    visible-if="dsx.variable.unlocking == false"/>
             <text value="{{ dsx.variable.unlockLabel }}" class="unlockLabel"/>
           </hstack>
@@ -291,15 +307,20 @@ Please unlock to watch." class="lockHead"/>
           <hstack class="lockMetaRow" a11yGroup="true"
                   a11yLabel="Price {{ dsx.variable.episode == null ? '' : dsx.variable.episode.price }} coins, balance {{ dsx.variable.balance }} coins">
             <text value="Price:" class="lockMeta"/>
-            <image icon="bitcoinsign.circle.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+            <image icon="dollarsign.circle.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
             <text value="{{ dsx.variable.episode == null ? '' : dsx.variable.episode.price }}" class="lockMeta"/>
             <text value="·" class="lockMeta"/>
             <text value="Balance:" class="lockMeta"/>
-            <image icon="bitcoinsign.circle.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+            <image icon="dollarsign.circle.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
             <text value="{{ dsx.variable.balance }}" class="lockMeta"/>
           </hstack>
-          <hstack class="autoRow">
-            <toggle bind="dsx.variable.autoUnlock" color="#E52E2E" a11yLabel="Auto-unlock next episodes"/>
+          <hstack class="autoRow" on:tap="dsx.variable.autoUnlock = !dsx.variable.autoUnlock"
+                  a11yGroup="true" a11yTrait="button"
+                  a11yLabel="Auto-unlock next episodes, {{ dsx.variable.autoUnlock ? 'on' : 'off' }}">
+            <vstack class="checkBox" background="{{ dsx.variable.autoUnlock ? '#E52E2E' : 'rgba(255,255,255,0.08)' }}"
+                    style="border: 1.5px solid {{ dsx.variable.autoUnlock ? '#E52E2E' : 'rgba(255,255,255,0.3)' }}">
+              <image icon="checkmark" iconSize="11" color="#FFFFFF" visible-if="dsx.variable.autoUnlock" a11yHidden="true"/>
+            </vstack>
             <text value="Auto-unlock next episodes" class="autoLabel"/>
           </hstack>
           <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
@@ -339,7 +360,7 @@ Please unlock to watch." class="lockHead"/>
             <text value="{{ dsx.variable.favOn ? 'In My List' : 'My List' }}" class="statCap"/>
           </vstack>
           <vstack class="statCol" href="/rewards" a11yLabel="Your balance — open Rewards">
-            <image icon="bitcoinsign.circle.fill" iconSize="20" color="#F7C948" a11yHidden="true"/>
+            <image icon="dollarsign.circle.fill" iconSize="20" color="#F7C948" a11yHidden="true"/>
             <text value="{{ dsx.variable.balance }} coins" class="statCap"/>
           </vstack>
         </hstack>
@@ -356,7 +377,7 @@ Please unlock to watch." class="lockHead"/>
         <!-- cells are DIRECT grid children (the column-sizing rule targets them); the
              padlock overlays by position on web and degrades to flow on native -->
         <grid bind="detail.data.episodes" key="id" columns="6" spacing="6" scroll="false">
-          <vstack class="epCell" style="position: relative" on:tap="dsx.action.go({ target: item.idx })"
+          <vstack class="epCell" style="position: relative; justify-content: center" on:tap="dsx.action.go({ target: item.idx })"
                   background="{{ item.idx == Number(dsx.variable.cur) ? 'rgba(229,46,46,0.28)' : 'rgba(255,255,255,0.1)' }}"
                   a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', locked' : '' }}" a11yTrait="button">
             <text value="{{ item.idx }}" class="epNum"

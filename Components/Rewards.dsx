@@ -1,8 +1,14 @@
-<!-- Rewards — the earn loop: check-in streak, one free spin, daily tasks. Every number on
-     this screen is a SERVER fact (the curve, the prize table, the caps all arrive in
-     /rewards/state); the buttons only ask. The rewarded-ads slot is present and honestly
-     disabled on web — AdMob rewarded is a native-lane capability (spec §5 degradation).
-     -->
+<!-- Rewards — the two lanes a short-drama app actually monetises on, in the category's
+     own order: SELL first (VIP subscription tiers, then coin packs), EARN second (daily
+     check-in streak, the wheel, capped rewarded ads, tasks).
+
+     Every number is a SERVER fact — the tiers, the pack table, the streak curve, the ad
+     cap and reward all arrive in /rewards/state, so an operator changes price without a
+     build and the client can never invent an entitlement. Buttons only ASK.
+
+     Purchases ride the native store lane (RevenueCat); on web the buy buttons name that
+     honestly rather than pretending. Rewarded ads are AdMob on native, server-verified
+     before a coin is granted — the web lane says so and offers the other earn paths. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="session" url="/dev-session.json" ssr="false"/>
@@ -11,15 +17,15 @@
     <api as="checkinCall" url="/rewards/checkin" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
     <api as="spinCall" url="/rewards/spin" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
     <api as="claimCall" url="/rewards/task" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+    <api as="adCall" url="/rewards/ad" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
 
     <variable as="toast">return ''</variable>
-    <variable as="spinning">return false</variable>
+    <variable as="tier">return 'monthly'</variable>
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
     </variable>
 
-    <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
     <variable as="bp" computed="true">
       const w = dsx.screen.width
       if (w >= 1120) { return 'desktop' }
@@ -32,9 +38,24 @@
       if (dsx.variable.bp == 'tablet') { return 40 }
       return 16
     </variable>
+    <variable as="vipCols" computed="true">return dsx.variable.bp == 'phone' ? 1 : 3</variable>
+    <variable as="packCols" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 4 }
+      if (dsx.variable.bp == 'tablet') { return 3 }
+      return 2
+    </variable>
     <variable as="shell" computed="true">
       const g = dsx.variable.gutter
-      return 'width: 100%; max-width: ' + 720 + 'px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+      return 'width: 100%; max-width: 1100px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+    </variable>
+    <variable as="balance" computed="true">
+      if (wallet.data == null) { return 0 }
+      return wallet.data.coins + wallet.data.bonus
+    </variable>
+    <variable as="adLabel" computed="true">
+      if (state.data == null) { return 'Watch an ad' }
+      if (state.data.adsLeft <= 0) { return 'Daily ad limit reached' }
+      return 'Watch an ad  ·  +' + state.data.adReward
     </variable>
 
     <formula as="dayState" i="item.i">
@@ -62,10 +83,8 @@
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Check-in failed' }
     </action>
     <action as="spin">
-      dsx.variable.spinning = true
       const r = await spinCall.send({})
-      dsx.variable.spinning = false
-      if (r.ok) { dsx.variable.toast = 'The wheel lands on ' + r.data.prize + ' bonus coins!'; state.refresh(); wallet.refresh() }
+      if (r.ok) { dsx.variable.toast = 'The wheel lands on ' + r.data.prize + ' bonus coins'; state.refresh(); wallet.refresh() }
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'No spin left' }
     </action>
     <action as="claim" task="item.id">
@@ -73,122 +92,215 @@
       if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins'; state.refresh(); wallet.refresh() }
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Not yet' }
     </action>
+    <action as="watchAd">
+      const r = await adCall.send({})
+      if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins · ' + r.data.left + ' left today'; state.refresh(); wallet.refresh() }
+      else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'No ad available' }
+    </action>
+    <action as="buy">
+      dsx.variable.toast = 'Purchases run in the iOS and Android apps (RevenueCat). Web checkout is on the roadmap — earn below meanwhile.'
+    </action>
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
-    <style as="page" spacing="14" paddingTop="4" paddingBottom="20" alignItems="stretch"/>
+    <style as="page" spacing="0" paddingTop="18" paddingBottom="30" alignItems="stretch"/>
+    <style as="section" spacing="14" alignItems="stretch" paddingTop="34"/>
 
     <style as="head" alignItems="center" paddingBottom="2"/>
     <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
-    <style as="balancePill" background="rgba(255,255,255,0.08)" radius="15" paddingH="11" paddingV="6" spacing="6" alignItems="center"/>
-    <style as="balanceNum" fontSize="13" fontWeight="semibold" color="#F7C948"/>
-    <style as="balanceSub" fontSize="12" color="rgba(255,255,255,0.55)"/>
-    <style as="toastLine" fontSize="13" fontWeight="medium" color="#F7C948"/>
+    <style as="balancePill" background="rgba(255,255,255,0.08)" radius="16" paddingH="12" paddingV="7" spacing="6" alignItems="center"/>
+    <style as="balanceNum" fontSize="14" fontWeight="semibold" color="#F6B63D"/>
+    <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
+    <style as="sectionTitle" fontSize="24" fontWeight="bold" color="rgba(255,255,255,0.8)" tracking="-0.3"/>
+    <style as="sectionNote" fontSize="13" color="rgba(255,255,255,0.45)"/>
 
-    <style as="card" background="#141419" radius="16" paddingH="16" paddingV="16" spacing="13" alignItems="stretch"/>
-    <style as="cardTight" background="#141419" radius="16" paddingH="16" paddingV="16" spacing="7" alignItems="stretch"/>
+    <!-- VIP -->
+    <style as="vipCard" radius="14" paddingH="18" paddingV="18" spacing="8" alignItems="flex-start"/>
+    <style as="vipName" fontSize="15" fontWeight="semibold" color="#3A2A08"/>
+    <style as="vipPrice" fontSize="24" fontWeight="bold" color="#2A1D04"/>
+    <style as="vipNote" fontSize="12" color="rgba(42,29,4,0.7)"/>
+    <style as="vipPerk" spacing="6" alignItems="center"/>
+    <style as="vipPerkText" fontSize="12" fontWeight="medium" color="#2A1D04"/>
+    <style as="vipBadge" background="#E52E2E" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+
+    <!-- coin packs -->
+    <style as="packCard" background="#141419" radius="12" paddingH="14" paddingV="16" spacing="7" alignItems="flex-start"/>
+    <style as="packCoins" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
+    <style as="packLine" fontSize="12" color="rgba(255,255,255,0.5)"/>
+    <style as="packPrice" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="packBonus" background="#E52E2E" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+    <style as="coinRow" spacing="6" alignItems="center"/>
+
+    <!-- earn -->
+    <style as="card" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="13" alignItems="stretch"/>
     <style as="cardHead" alignItems="center"/>
     <style as="h2" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
-    <style as="streakPill" fontSize="12" fontWeight="semibold" color="#F7C948"/>
-
-    <style as="dayCell" spacing="3" alignItems="center" paddingV="9" radius="9"/>
     <style as="streakRow" spacing="5" alignItems="center"/>
+    <style as="streakPill" fontSize="12" fontWeight="semibold" color="#F6B63D"/>
+    <style as="dayCell" spacing="3" alignItems="center" paddingV="9" radius="9"/>
     <style as="dayAmt" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
     <style as="dayNum" fontSize="11" color="rgba(255,255,255,0.5)"/>
-
-    <style as="cta" radius="22" paddingV="12" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="ctaWide" radius="22" paddingV="12" paddingH="22" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="cta" radius="22" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="ctaWide" radius="22" paddingV="12" paddingH="22" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
     <style as="wheelWrap" alignItems="center" spacing="12"/>
     <style as="wheelLabel" fontSize="15" fontWeight="bold" color="#FFFFFF" background="rgba(0,0,0,0.8)" paddingH="11" paddingV="6" radius="14"/>
-
     <style as="taskRow" alignItems="center" spacing="12"/>
     <style as="taskCol" spacing="2"/>
     <style as="taskTitle" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
     <style as="taskMeta" fontSize="12" color="rgba(255,255,255,0.5)"/>
     <style as="claimBtn" radius="15" paddingH="15" paddingV="7" fontSize="13" fontWeight="semibold"/>
-    <style as="note" fontSize="12" color="rgba(255,255,255,0.46)" lineSpacing="2"/>
+    <style as="note" fontSize="12" color="rgba(255,255,255,0.42)" lineSpacing="3"/>
   </head>
 
-  <TopNav active="rewards" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
-    <vstack class="page" style="{{ dsx.variable.shell }}">
+    <vstack class="page">
+      <TopNav active="rewards" visible-if="dsx.variable.wide"/>
 
-      <hstack class="head">
-        <text value="Rewards" class="h1"/>
-        <spacer/>
-        <hstack class="balancePill" visible-if="wallet.data != null">
-          <image icon="bitcoinsign.circle.fill" iconSize="14" color="#F7C948" a11yHidden="true"/>
-          <text value="{{ wallet.data == null ? 0 : wallet.data.coins + wallet.data.bonus }}" class="balanceNum"/>
-          <text value="coins" class="balanceSub"/>
-        </hstack>
-      </hstack>
-
-      <text value="{{ dsx.variable.toast }}" class="toastLine" visible-if="dsx.variable.toast != ''"/>
-
-      <!-- check-in streak -->
-      <vstack class="card">
-        <hstack class="cardHead">
-          <text value="Daily check-in" class="h2"/>
+      <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" paddingTop="14">
+        <hstack class="head">
+          <text value="Store &amp; Rewards" class="h1"/>
           <spacer/>
-          <hstack class="streakRow" a11yGroup="true" a11yLabel="{{ state.data == null ? 0 : state.data.streak }} day streak">
-            <image icon="flame.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
-            <text value="{{ state.data == null ? 0 : state.data.streak }} day streak" class="streakPill"/>
+          <hstack class="balancePill" visible-if="wallet.data != null">
+            <image icon="dollarsign.circle.fill" iconSize="15" color="#F6B63D" a11yHidden="true"/>
+            <text value="{{ dsx.variable.balance }}" class="balanceNum"/>
           </hstack>
         </hstack>
-        <grid bind="state.data.days" key="id" columns="7" spacing="5" scroll="false">
-          <vstack class="dayCell" background="{{ dayColor }}">
-            <image icon="checkmark" iconSize="12" color="#FFFFFF" visible-if="dayState == 'done'" a11yHidden="true"/>
-            <text value="+{{ item.reward }}" class="dayAmt" visible-if="dayState != 'done'"/>
-            <text value="D{{ item.i + 1 }}" class="dayNum"/>
-          </vstack>
-        </grid>
-        <button label="{{ checkinLabel }}" class="cta"
-                background="{{ state.data != null && state.data.checkedToday ? '#26262C' : '#E52E2E' }}"
-                on:tap="dsx.action.checkin()"/>
+        <text value="{{ dsx.variable.toast }}" class="toastLine" visible-if="dsx.variable.toast != ''" paddingTop="10"/>
       </vstack>
 
-      <!-- spin the wheel -->
-      <vstack class="card">
-        <vstack class="wheelWrap">
-          <text value="Spin the wheel" class="h2"/>
-          <zstack>
-            <stack style="width: 132px; height: 132px; border-radius: 66px; background: conic-gradient(#E52E2E 0deg 45deg, #1E1E24 45deg 90deg, #F7C948 90deg 135deg, #1E1E24 135deg 180deg, #E52E2E 180deg 225deg, #1E1E24 225deg 270deg, #F7C948 270deg 315deg, #1E1E24 315deg 360deg)"/>
-            <vstack style="width: 132px; height: 132px; align-items: center; justify-content: center">
-              <text value="10–100" class="wheelLabel"/>
+      <!-- ═══ LANE 1 — VIP: unlimited viewing ═══ -->
+      <vstack class="section">
+        <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
+          <text value="VIP — unlock every series" class="sectionTitle"/>
+          <text value="Unlimited viewing while your plan is active. Auto-renews, cancel anytime." class="sectionNote"/>
+        </vstack>
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <grid bind="state.data.vipTiers" key="id" columns="{{ dsx.variable.vipCols }}" spacing="14" scroll="false">
+            <vstack class="vipCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
+                    a11yLabel="{{ item.label }}, {{ item.price }}"
+                    style="background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid {{ item.best ? '#E52E2E' : 'rgba(0,0,0,0)' }}">
+              <hstack spacing="8" alignItems="center" style="width: 100%">
+                <text value="{{ item.label }}" class="vipName"/>
+                <spacer/>
+                <text value="{{ item.badge }}" class="vipBadge" visible-if="item.badge != ''"/>
+              </hstack>
+              <text value="{{ item.price }}" class="vipPrice"/>
+              <text value="{{ item.note }}" class="vipNote"/>
+              <hstack class="vipPerk">
+                <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
+                <text value="Unlimited viewing" class="vipPerkText"/>
+              </hstack>
+              <hstack class="vipPerk">
+                <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
+                <text value="1080p, no ads" class="vipPerkText"/>
+              </hstack>
             </vstack>
-          </zstack>
-          <button label="{{ state.data != null && state.data.freeSpinLeft ? 'Spin — 1 free today' : 'No spin left today' }}"
-                  class="ctaWide"
-                  background="{{ state.data != null && state.data.freeSpinLeft ? '#E52E2E' : '#26262C' }}"
-                  on:tap="dsx.action.spin()"/>
+          </grid>
         </vstack>
       </vstack>
 
-      <!-- tasks -->
-      <vstack class="card">
-        <text value="Tasks" class="h2"/>
-        <list bind="state.data.tasks" key="id" scroll="false" spacing="14">
-          <hstack class="taskRow">
-            <vstack class="taskCol" style="flex: 1">
-              <text value="{{ item.title }}" class="taskTitle"/>
-              <text value="{{ item.progress }}/{{ item.target }} · +{{ item.reward }} bonus" class="taskMeta"/>
+      <!-- ═══ LANE 2 — coin packs ═══ -->
+      <vstack class="section">
+        <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
+          <text value="Top up coins" class="sectionTitle"/>
+          <text value="Coins unlock individual episodes. Bonus coins are spent first and expire in 7 days." class="sectionNote"/>
+        </vstack>
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <grid bind="state.data.coinPacks" key="id" columns="{{ dsx.variable.packCols }}" spacing="12" scroll="false">
+            <vstack class="packCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
+                    a11yLabel="{{ item.coins }} coins plus {{ item.free }} bonus for {{ item.price }}">
+              <hstack spacing="8" alignItems="center" style="width: 100%">
+                <hstack class="coinRow">
+                  <image icon="dollarsign.circle.fill" iconSize="17" color="#F6B63D" a11yHidden="true"/>
+                  <text value="{{ item.coins + item.free }}" class="packCoins"/>
+                </hstack>
+                <spacer/>
+                <text value="{{ item.bonus }}" class="packBonus"/>
+              </hstack>
+              <text value="{{ item.coins }} coins + {{ item.free }} bonus" class="packLine"/>
+              <text value="{{ item.price }}" class="packPrice"/>
             </vstack>
-            <button label="{{ item.claimed ? 'Claimed' : 'Claim' }}" class="claimBtn"
-                    color="{{ item.claimed ? 'rgba(255,255,255,0.4)' : '#FFFFFF' }}"
-                    background="{{ item.claimed ? '#26262C' : '#E52E2E' }}"
-                    on:tap="dsx.action.claim()"/>
-          </hstack>
-        </list>
+          </grid>
+        </vstack>
       </vstack>
 
-      <!-- rewarded ads: a native-lane capability, named rather than faked -->
-      <vstack class="cardTight">
-        <hstack class="cardHead">
-          <text value="Watch ads, earn coins" class="h2"/>
-          <spacer/>
-          <text value="0/10 today" class="taskMeta"/>
-        </hstack>
-        <text value="Rewarded ads run in the iOS and Android apps (AdMob, verified server-side before any coin is granted). On the web, earn through check-ins, tasks and the wheel." class="note"/>
+      <!-- ═══ LANE 3 — earn it free ═══ -->
+      <vstack class="section">
+        <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
+          <text value="Earn free coins" class="sectionTitle"/>
+          <text value="Check in daily, spin the wheel, watch a short ad, finish tasks." class="sectionNote"/>
+        </vstack>
+
+        <vstack style="{{ dsx.variable.shell }}" spacing="14" alignItems="stretch">
+          <!-- daily check-in -->
+          <vstack class="card">
+            <hstack class="cardHead">
+              <text value="Daily check-in" class="h2"/>
+              <spacer/>
+              <hstack class="streakRow" a11yGroup="true" a11yLabel="{{ state.data == null ? 0 : state.data.streak }} day streak">
+                <image icon="flame.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+                <text value="{{ state.data == null ? 0 : state.data.streak }} day streak" class="streakPill"/>
+              </hstack>
+            </hstack>
+            <grid bind="state.data.days" key="id" columns="7" spacing="5" scroll="false">
+              <vstack class="dayCell" background="{{ dayColor }}">
+                <image icon="checkmark" iconSize="12" color="#FFFFFF" visible-if="dayState == 'done'" a11yHidden="true"/>
+                <text value="+{{ item.reward }}" class="dayAmt" visible-if="dayState != 'done'"/>
+                <text value="D{{ item.i + 1 }}" class="dayNum"/>
+              </vstack>
+            </grid>
+            <button label="{{ checkinLabel }}" class="cta"
+                    background="{{ state.data != null && state.data.checkedToday ? '#26262C' : '#E52E2E' }}"
+                    on:tap="dsx.action.checkin()"/>
+          </vstack>
+
+          <!-- rewarded ads: the capped lane -->
+          <vstack class="card">
+            <hstack class="cardHead">
+              <text value="Watch ads, earn coins" class="h2"/>
+              <spacer/>
+              <text value="{{ state.data == null ? 0 : state.data.adsToday }}/{{ state.data == null ? 10 : state.data.adCap }} today" class="taskMeta"/>
+            </hstack>
+            <button label="{{ dsx.variable.adLabel }}" class="cta"
+                    background="{{ state.data != null && state.data.adsLeft > 0 ? '#E52E2E' : '#26262C' }}"
+                    on:tap="dsx.action.watchAd()"/>
+            <text value="Rewarded ads play in the iOS and Android apps (AdMob), and the server verifies the view before granting a coin. On the web this button grants the same reward through the test lane so the cap and ledger stay honest." class="note"/>
+          </vstack>
+
+          <!-- spin -->
+          <vstack class="card">
+            <vstack class="wheelWrap">
+              <text value="Spin the wheel" class="h2"/>
+              <zstack>
+                <stack style="width: 132px; height: 132px; border-radius: 66px; background: conic-gradient(#E52E2E 0deg 45deg, #1E1E24 45deg 90deg, #F6B63D 90deg 135deg, #1E1E24 135deg 180deg, #E52E2E 180deg 225deg, #1E1E24 225deg 270deg, #F6B63D 270deg 315deg, #1E1E24 315deg 360deg)"/>
+                <vstack style="width: 132px; height: 132px; align-items: center; justify-content: center">
+                  <text value="10–100" class="wheelLabel"/>
+                </vstack>
+              </zstack>
+              <button label="{{ state.data != null && state.data.freeSpinLeft ? 'Spin — 1 free today' : 'No spin left today' }}"
+                      class="ctaWide"
+                      background="{{ state.data != null && state.data.freeSpinLeft ? '#E52E2E' : '#26262C' }}"
+                      on:tap="dsx.action.spin()"/>
+            </vstack>
+          </vstack>
+
+          <!-- tasks -->
+          <vstack class="card">
+            <text value="Tasks" class="h2"/>
+            <list bind="state.data.tasks" key="id" scroll="false" spacing="14">
+              <hstack class="taskRow">
+                <vstack class="taskCol" style="flex: 1">
+                  <text value="{{ item.title }}" class="taskTitle"/>
+                  <text value="{{ item.progress }}/{{ item.target }} · +{{ item.reward }} bonus" class="taskMeta"/>
+                </vstack>
+                <button label="{{ item.claimed ? 'Claimed' : 'Claim' }}" class="claimBtn"
+                        color="{{ item.claimed ? 'rgba(255,255,255,0.4)' : '#FFFFFF' }}"
+                        background="{{ item.claimed ? '#26262C' : '#E52E2E' }}"
+                        on:tap="dsx.action.claim()"/>
+              </hstack>
+            </list>
+          </vstack>
+        </vstack>
       </vstack>
 
     </vstack>

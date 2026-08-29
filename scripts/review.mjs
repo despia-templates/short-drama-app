@@ -27,6 +27,7 @@ const PALETTE = new Set([
   "#232329", "#26262c", "#3a3a42", "#43434d",
   "#e52e2e", "#f2607a",                                     // brand red (measured) + its tint
   "#f7c948", "#f6b63d", "#b9c5d8", "#ce8b5c",               // coin gold · rank metals
+  "#3a2a08", "#2a1d04",                                     // VIP-card ink (dark on gold)
   "#ffffff",
 ]);
 
