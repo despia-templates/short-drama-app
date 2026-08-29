@@ -42,6 +42,7 @@ createdb shortdrama_dev
 cp .env.local.example .env.local  # set DSX_JWT_SECRET; add STRIPE_KEY/STRIPE_PUBLISHABLE (test mode) for checkout
 npm run build                     # compiles Components/**.dsx AND server/*.dsx → dist/, server/generated/
 psql -d shortdrama_dev -f server/generated/migration.sql   # re-runnable by construction
+psql -d shortdrama_dev -f server/policies.local.sql        # the app's policy addendum (PLAN.md §6.25)
 npm run session                   # mints the LOCAL viewer + operator JWTs (reads .env.local)
 npm run serve                     # one origin: SSR site + API @ :8787 (stays in the foreground)
 ```
@@ -59,7 +60,7 @@ precaching service worker — a stale bundle against fresh SSR is the classic "c
 markup looks broken" trap (PLAN.md §6.13a).
 
 **Reset the demo:** `dropdb shortdrama_dev && createdb shortdrama_dev`, re-apply the
-migration, re-run `npm run seed`. The seed converges the database onto
+migration and the addendum, re-run `npm run seed`. The seed converges the database onto
 `scripts/catalogue.mjs` (idempotent by title), and `scripts/gen-art.mjs` regenerates all
 key art deterministically from the same manifest.
 

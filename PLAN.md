@@ -329,3 +329,17 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     category runs on. `AdGate.dsx` refuses to guess one: `dsx.action.playNetwork` is the
     single place the real call lands, the card says out loud that the lane is unavailable,
     and the house creative runs meanwhile.
+
+25. **The ownership vocabulary has no word for ALL-READ / OWN-WRITE** (measured
+    2026-08-30 when the first real comment refused to post). `owner` is own-read/own-write,
+    `public-read` is all-read/SERVICE-write (deliberate, and right for the catalogue —
+    with an owner-write policy any signed-in viewer could insert a `state='live'` show
+    row onto the storefront), `service` is service-only. The shape every comment, review
+    and post table has — anyone reads the thread, the author writes their own row — is
+    unspellable, so `postComment` failed RLS and surfaced as `{reason:'conflict'}` with
+    nothing naming the cause. Two asks: (a) an `ownership="public-read-own-write"` (or
+    equivalent) that emits the public select + owner-scoped insert/update/delete + the
+    `owner_id default auth.uid()` column the owner tables already get; (b) the repo's
+    create error should carry WHICH policy refused, because "conflict" cost a bisection.
+    Bridge: `server/policies.local.sql` — the app's own addendum, applied beside the
+    generated migration, scoped to dsx_comment, loudly labeled, dies when the word lands.
