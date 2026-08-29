@@ -215,17 +215,17 @@
         <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'popular'" a11yTrait="button" a11yLabel="Popular">
           <text value="Popular" class="tabTxt"
                 color="{{ dsx.variable.homeTab == 'popular' ? '#FFFFFF' : 'rgba(255,255,255,0.5)' }}"/>
-          <stack class="tabDash" background="{{ dsx.variable.homeTab == 'popular' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
+          <stack class="tabDash" style="align-self: center" background="{{ dsx.variable.homeTab == 'popular' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
         </vstack>
         <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'new'" a11yTrait="button" a11yLabel="New">
           <text value="New" class="tabTxt"
                 color="{{ dsx.variable.homeTab == 'new' ? '#FFFFFF' : 'rgba(255,255,255,0.5)' }}"/>
-          <stack class="tabDash" background="{{ dsx.variable.homeTab == 'new' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
+          <stack class="tabDash" style="align-self: center" background="{{ dsx.variable.homeTab == 'new' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
         </vstack>
         <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'ranking'" a11yTrait="button" a11yLabel="Ranking">
           <text value="Ranking" class="tabTxt"
                 color="{{ dsx.variable.homeTab == 'ranking' ? '#FFFFFF' : 'rgba(255,255,255,0.5)' }}"/>
-          <stack class="tabDash" background="{{ dsx.variable.homeTab == 'ranking' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
+          <stack class="tabDash" style="align-self: center" background="{{ dsx.variable.homeTab == 'ranking' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
         </vstack>
         <spacer/>
       </hstack>
