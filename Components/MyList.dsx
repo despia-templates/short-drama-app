@@ -99,8 +99,8 @@
                       </vstack>
                     </zstack>
                     <vstack spacing="2" alignItems="stretch">
-                      <text value="{{ item.title }}" class="cardTitle"/>
-                      <text value="EP.{{ item.idx }} / EP.{{ item.eps }}" class="cardMeta"/>
+                      <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                      <text value="EP.{{ item.idx }} / EP.{{ item.eps }}" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                     </vstack>
                   </vstack>
                 </list>
@@ -118,8 +118,8 @@
                 <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
                        style="width: 100%; aspect-ratio: 2/3; border-radius: 8px; object-fit: cover"/>
                 <vstack spacing="2" alignItems="stretch">
-                  <text value="{{ item.title }}" class="cardTitle"/>
-                  <text value="{{ item.genre }}  |  Series" class="cardMeta"/>
+                  <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                  <text value="{{ item.genre }}  |  Series" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                 </vstack>
               </vstack>
             </grid>

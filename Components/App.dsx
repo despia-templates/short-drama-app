@@ -273,8 +273,8 @@
                   </vstack>
                 </zstack>
                 <vstack spacing="4" alignItems="stretch">
-                  <text value="{{ item.title }}" class="cardTitle"/>
-                  <text value="EP.{{ item.idx }} / EP.{{ item.eps }}" class="cardMeta"/>
+                  <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                  <text value="EP.{{ item.idx }} / EP.{{ item.eps }}" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                 </vstack>
               </vstack>
             </list>
@@ -316,8 +316,8 @@
                   </vstack>
                 </zstack>
                 <vstack spacing="4" alignItems="stretch">
-                  <text value="{{ item.title }}" class="cardTitle"/>
-                  <text value="{{ metaLine }}" class="cardMeta"/>
+                  <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                  <text value="{{ metaLine }}" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                 </vstack>
               </vstack>
             </list>
@@ -350,8 +350,8 @@
                   </vstack>
                 </zstack>
                 <vstack spacing="4" alignItems="stretch" style="padding-left: {{ dsx.variable.rankOvl }}px">
-                  <text value="{{ item.title }}" class="cardTitle"/>
-                  <text value="{{ metaLine }}" class="cardMeta"/>
+                  <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                  <text value="{{ metaLine }}" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                 </vstack>
               </vstack>
             </list>
@@ -385,8 +385,8 @@
                   </vstack>
                 </zstack>
                 <vstack spacing="4" alignItems="stretch">
-                  <text value="{{ item.title }}" class="cardTitle"/>
-                  <text value="{{ metaLine }}" class="cardMeta"/>
+                  <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                  <text value="{{ metaLine }}" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                 </vstack>
               </vstack>
             </grid>

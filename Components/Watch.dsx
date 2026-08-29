@@ -31,7 +31,11 @@
     <variable as="autoUnlock">return true</variable>   <!-- on by default: the category standard -->
     <variable as="unlocking">return false</variable>
     <variable as="toast">return ''</variable>
-    <variable as="favTouched">return ''</variable>  <!-- '' until toggled; then 'y' / 'n' -->
+    <variable as="favTouched">return ''</variable>
+    <variable as="holding">return false</variable>    <!-- hold-to-2x is active -->
+    <variable as="menu">return false</variable>       <!-- the ⋯ options sheet -->
+    <variable as="captions">return true</variable>
+    <variable as="lang">return 'English'</variable>  <!-- '' until toggled; then 'y' / 'n' -->
 
     <variable as="bp" computed="true">
       const s = dsx.screen.width
@@ -144,6 +148,21 @@
       const r = await favCall.send({ show: dsx.variable.showId })
       if (r.ok) { dsx.variable.favTouched = r.data.favorite ? 'y' : 'n' }
     </action>
+    <!-- HOLD TO 2x — the category-standard gesture. DSX exposes on:longpress (one-shot)
+         but no press-RELEASE event, so release is recovered from on:dragEnd and the next
+         tap; both are wired so the speed can never stick. Gap filed upstream. -->
+    <action as="holdStart">
+      if (dsx.variable.epLocked) { return }
+      dsx.variable.holding = true
+      dsx.variable.speed = 2
+      dsx.variable.toast = 'Playing at 2x'
+    </action>
+    <action as="holdEnd">
+      if (!dsx.variable.holding) { return }
+      dsx.variable.holding = false
+      dsx.variable.speed = 1
+      dsx.variable.toast = ''
+    </action>
     <action as="cycleSpeed">
       const s = dsx.variable.speed
       dsx.variable.speed = s == 1 ? 1.5 : (s == 1.5 ? 2 : 1)
@@ -202,6 +221,12 @@
     <style as="epNum" fontSize="14" fontWeight="semibold"/>
     <style as="toastLine" fontSize="12" color="#F7C948"/>
 
+    <style as="speedToast" background="rgba(0,0,0,0.72)" radius="18" paddingH="14" paddingV="8" spacing="7" alignItems="center"/>
+    <style as="speedToastLabel" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="menuBody" paddingH="18" paddingTop="6" paddingBottom="20" spacing="4" alignItems="stretch"/>
+    <style as="menuRow" spacing="13" alignItems="center" paddingV="14"/>
+    <style as="menuLabel" fontSize="15" color="#FFFFFF"/>
+    <style as="menuNote" fontSize="12" color="rgba(255,255,255,0.45)"/>
     <style as="drawerGrid" paddingLeading="16" paddingTrailing="16" paddingTop="8"/>
     <style as="drawerCell" radius="9" alignItems="center" paddingV="12"/>
   </head>
@@ -236,8 +261,25 @@
              maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; filter: blur(16px) brightness(0.4)" a11yHidden="true"/>
 
       <!-- tap to pause/play across the middle -->
-      <stack visible-if="dsx.variable.epLocked == false" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto"
-             on:tap="dsx.variable.paused = !dsx.variable.paused"/>
+      <!-- the gesture surface: tap pauses, HOLD runs 2x. `user-select: none` keeps a long
+           press from selecting text on the web (the native lanes never select here). -->
+      <stack visible-if="dsx.variable.epLocked == false" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+             style="width: 100%; margin-left: auto; margin-right: auto; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none"
+             on:tap="dsx.action.holdEnd(); dsx.variable.paused = !dsx.variable.paused"
+             on:longpress="dsx.action.holdStart()"
+             on:dragEnd="dsx.action.holdEnd()"
+             a11yLabel="Play or pause. Hold for double speed."
+             a11yValue="{{ dsx.variable.speed }}x"
+             on:adjust="dsx.action.cycleSpeed()"/>
+
+      <!-- the 2x indicator -->
+      <vstack class="chromeLayer" visible-if="dsx.variable.holding" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+              style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: flex-start; padding-top: 84px; pointer-events: none">
+        <hstack class="speedToast">
+          <image icon="forward.fill" iconSize="13" color="#FFFFFF" a11yHidden="true"/>
+          <text value="2x speed" class="speedToastLabel"/>
+        </hstack>
+      </vstack>
       <vstack class="chromeLayer" visible-if="dsx.variable.paused" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center; pointer-events: none">
         <image icon="play.fill" iconSize="34" color="rgba(255,255,255,0.9)" a11yHidden="true"/>
       </vstack>
@@ -253,8 +295,8 @@
       <!-- chrome -->
       <vstack class="chromeLayer" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
         <hstack class="topBar" style="pointer-events: auto">
-          <image icon="chevron.left" iconSize="22" color="#FFFFFF" class="back"
-                 on:tap="dsx.module.route.pop()" a11yLabel="Back" a11yTrait="button"/>
+          <image icon="xmark" iconSize="20" color="#FFFFFF" class="back"
+                 on:tap="dsx.module.route.pop()" a11yLabel="Close player" a11yTrait="button"/>
           <vstack class="topMeta" style="flex: 1">
             <text value="{{ detail.data == null ? '' : detail.data.show.title }}" class="showTitle"/>
             <text value="EP {{ dsx.variable.cur }}{{ detail.data == null ? '' : ' / ' + detail.data.episodes.length }}" class="epLine"/>
@@ -265,6 +307,9 @@
           </vstack>
           <button label="{{ dsx.variable.speed }}x" class="chip"
                   on:tap="dsx.action.cycleSpeed()" a11yLabel="Playback speed"/>
+          <vstack class="chipIcon" on:tap="dsx.variable.menu = true" a11yLabel="Player options" a11yTrait="button">
+            <image icon="ellipsis" iconSize="16" color="#FFFFFF" a11yHidden="true"/>
+          </vstack>
         </hstack>
 
         <vstack class="bottomBar" style="pointer-events: auto">
@@ -390,17 +435,58 @@ Please unlock to watch." class="lockHead"/>
     </scroll>
   </hstack>
 
+  <!-- player options: captions · language · speed · download. `detents="content"` hugs
+       the rows. Download is a NATIVE-lane capability and says so rather than faking. -->
+  <sheet present="dsx.variable.menu" detents="content" title="Player options" background="#141419"
+         on:dismiss="dsx.variable.menu = false">
+    <vstack class="menuBody">
+      <hstack class="menuRow" on:tap="dsx.variable.captions = !dsx.variable.captions"
+              a11yGroup="true" a11yTrait="button"
+              a11yLabel="Captions, {{ dsx.variable.captions ? 'on' : 'off' }}">
+        <image icon="note.text" iconSize="18" color="rgba(255,255,255,0.75)" a11yHidden="true"/>
+        <text value="Captions" class="menuLabel" style="flex: 1"/>
+        <vstack class="checkBox" background="{{ dsx.variable.captions ? '#E52E2E' : 'rgba(255,255,255,0.08)' }}"
+                style="border: 1.5px solid {{ dsx.variable.captions ? '#E52E2E' : 'rgba(255,255,255,0.3)' }}">
+          <image icon="checkmark" iconSize="11" color="#FFFFFF" visible-if="dsx.variable.captions" a11yHidden="true"/>
+        </vstack>
+      </hstack>
+
+      <hstack class="menuRow">
+        <image icon="globe" iconSize="18" color="rgba(255,255,255,0.75)" a11yHidden="true"/>
+        <text value="Audio &amp; subtitles" class="menuLabel" style="flex: 1"/>
+        <picker bind="dsx.variable.lang" options="English,Español,Português,Deutsch,Français"
+                color="#E52E2E" a11yLabel="Language"/>
+      </hstack>
+
+      <hstack class="menuRow">
+        <image icon="speedometer" iconSize="18" color="rgba(255,255,255,0.75)" a11yHidden="true"/>
+        <text value="Playback speed" class="menuLabel" style="flex: 1"/>
+        <segmented bind="dsx.variable.speed" options="1,1.5,2" color="#E52E2E" a11yLabel="Playback speed"/>
+      </hstack>
+
+      <hstack class="menuRow" style="opacity: 0.5">
+        <image icon="square.and.arrow.down" iconSize="18" color="rgba(255,255,255,0.75)" a11yHidden="true"/>
+        <vstack spacing="2" style="flex: 1">
+          <text value="Download episode" class="menuLabel"/>
+          <text value="Offline downloads run in the iOS and Android apps" class="menuNote"/>
+        </vstack>
+      </hstack>
+    </vstack>
+  </sheet>
+
   <!-- episode drawer (phone) -->
   <sheet present="dsx.variable.drawer" detents="half,full" title="Episodes" background="#141419"
          on:dismiss="dsx.variable.drawer = false">
-    <vstack class="drawerGrid">
+    <scroll style="flex: 1; min-height: 0">
+      <vstack class="drawerGrid">
       <grid bind="detail.data.episodes" key="id" columns="5" spacing="9" scroll="false">
         <vstack class="drawerCell"
                 background="{{ item.idx == Number(dsx.variable.cur) ? '#E52E2E' : '#1E1E24' }}"
                 on:tap="dsx.action.go({ target: item.idx })" a11yLabel="Episode {{ item.idx }}">
           <text value="{{ item.idx }}" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
         </vstack>
-      </grid>
-    </vstack>
+        </grid>
+      </vstack>
+    </scroll>
   </sheet>
 </vstack>
