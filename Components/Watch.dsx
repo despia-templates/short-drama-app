@@ -37,12 +37,10 @@
     <variable as="drawerTab">return 'episodes'</variable>
     <variable as="range">return 0</variable>
     <variable as="menu">return false</variable>
-    <variable as="sheet">return ''</variable>        <!-- '' | lang | quality | speed -->
+    <variable as="sheet">return ''</variable>        <!-- '' | speed -->
     <variable as="comments">return false</variable>
     <variable as="draft">return ''</variable>
     <variable as="captions">return true</variable>
-    <variable as="lang">return 'English'</variable>
-    <variable as="quality">return 'Auto'</variable>
     <variable as="pip">return true</variable>
     <variable as="autoUnlock">return true</variable>
     <variable as="unlocking">return false</variable>
@@ -57,25 +55,6 @@
         { id: 's1', v: 1, label: '1.0x' }, { id: 's125', v: 1.25, label: '1.25x' },
         { id: 's15', v: 1.5, label: '1.5x' }, { id: 's2', v: 2, label: '2.0x' },
         { id: 's3', v: 3, label: '3.0x' }
-      ]
-    </variable>
-    <variable as="languages">
-      return [
-        { id: 'en', label: 'English' }, { id: 'es', label: 'Español' }, { id: 'pt', label: 'Português' },
-        { id: 'de', label: 'Deutsch' }, { id: 'fr', label: 'Français' }, { id: 'pl', label: 'Polish' },
-        { id: 'cs', label: 'Czech' }, { id: 'bn', label: 'Bengali' }, { id: 'ta', label: 'Tamil' },
-        { id: 'te', label: 'Telugu' }, { id: 'ro', label: 'Romanian' }
-      ]
-    </variable>
-    <variable as="qualities">
-      return [
-        { id: 'auto', label: 'Auto', vip: false, note: 'Adjusts to give you the best experience for your conditions' },
-        { id: 'q1080', label: '1080p', vip: true,  note: '' },
-        { id: 'q720', label: '720p',  vip: false, note: '' },
-        { id: 'q540', label: '540p',  vip: false, note: '' },
-        { id: 'q480', label: '480p',  vip: false, note: '' },
-        { id: 'q360', label: '360p',  vip: false, note: '' },
-        { id: 'q240', label: '240p',  vip: false, note: '' }
       ]
     </variable>
 
@@ -97,6 +76,23 @@
          a 6-col episode grid"); 1120 is this app's own desktop breakpoint, and below it the
          clip plus the panel no longer fit, so the drawer takes over unchanged. -->
     <variable as="panel" computed="true">return dsx.screen.width >= 1120</variable>
+    <!-- the pill printed `{{ speed }}.0x`, which reads "0.5.0x" and "1.25.0x" for four of the
+         seven rungs. The option rows always used `item.label`; the pill now does too. -->
+    <!-- THE PLAYER HAD NO FAILURE SURFACE AT ALL. The word "error" did not appear in this
+         file: the pager binds `detail.data.episodes` directly, so a failed or in-flight
+         /catalog/show/:id rendered an empty stage — no message, no retry, no way back except
+         the browser. Same four-state shape every other screen carries (Notices.dsx is the
+         model), plus `on:error` from the <video> itself, which reports a dead source, an
+         unplayable asset or a CDN that neither plays nor fails within ~15s. -->
+    <variable as="phase" computed="true">
+      if (detail.data != null) { return detail.data.episodes.length == 0 ? 'empty' : 'ready' }
+      if (detail.error != null) { return 'error' }
+      return 'loading'
+    </variable>
+    <variable as="speedLabel" computed="true">
+      const match = dsx.variable.speedOptions.filter(o => o.v == dsx.variable.speed)
+      return match.length == 0 ? '1.0x' : match[0].label
+    </variable>
     <!-- ONE computed value used as the WHOLE style attribute (AGENTS.md): a clamp that
          toggles cannot be spliced into a static style string. -->
     <variable as="plotFx" computed="true">
@@ -209,6 +205,28 @@
       dsx.variable.page = Number(idx) - 1;
       thread.refresh()
     </action>
+    <!-- SHARE, for real. This used to be `sheet = ''; menu = true` — byte-identical to the
+         ⋯ button — so tapping Share opened a sheet headed "More" with no share row in it.
+         `share.url` is the declared Core/SocialShare action; its web lane uses the Web Share
+         API and falls back to the clipboard on its own, so both paths are the module's.
+         The URL is a PATH: there is no portable origin fact in the runtime, and a relative
+         url resolves against the document on web. A native build that wants a universal
+         link should prepend its own deep-link origin here.
+         CALL-THEN-CHECK, not `has()`: a module chunk is loaded on FIRST USE, so
+         `has('share')` is false until something has already called it — the guard would have
+         refused the very first tap forever. This is the same shape PlansSheet uses for
+         `stripe.session` (`opened.ok === false` → a named toast), which is the precedent in
+         this template for "the module may not be in this build". -->
+    <action as="doShare">
+      const title = detail.data == null ? 'this series' : detail.data.show.title
+      const r = await dsx.module.share.url({
+        message: title + ' — EP.' + dsx.variable.cur,
+        url: '/watch/' + dsx.variable.showId + '/' + dsx.variable.cur
+      })
+      if (r == null || r.ok === false) {
+        dsx.variable.toast = 'Sharing is not available on this platform.'
+      }
+    </action>
     <action as="goBack">
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
       else { dsx.module.route.replace({ path: '/' }) }
@@ -216,6 +234,15 @@
     <action as="saveNow" epid="dsx.variable.epId" epidx="dsx.variable.cur" locked="dsx.variable.epLocked">
       if (epid == null || epid === '' || locked) { return }
       await progressCall.send({ episode: epid, show: dsx.variable.showId, idx: Number(epidx), position: dsx.variable.time })
+    </action>
+    <!-- THE ADDRESS BAR TRACKS THE EPISODE. `vars.idx` was read once at mount and never
+         again, so watching to EP.40 left the URL on /watch/{show}/1 — a reload, a share or a
+         back-then-forward all returned the viewer to episode 1, and the EP.n label disagreed
+         with the URL for the whole session. REPLACE, never push: 40 episodes must not become
+         40 history entries, and Back still leaves the player rather than stepping back one
+         episode at a time. -->
+    <action as="syncUrl">
+      dsx.module.route.replace({ path: '/watch/' + dsx.variable.showId + '/' + dsx.variable.cur })
     </action>
     <action as="go" to="target">
       if (detail.data == null) { return }
@@ -226,15 +253,18 @@
       dsx.variable.pos = 0;
       dsx.variable.paused = false;
       dsx.variable.drawer = false;
-      thread.refresh()
+      thread.refresh();
+      dsx.action.syncUrl()
     </action>
     <action as="next">dsx.action.go({ target: Number(dsx.variable.cur) + 1 })</action>
     <!-- the pager rested on a new episode: the swipe IS the navigation, so the same
          bookkeeping a tap would do runs here -->
     <action as="rest">
-      dsx.variable.pos = 0
-      dsx.variable.paused = false
-      thread.refresh()
+      dsx.action.saveNow();
+      dsx.variable.pos = 0;
+      dsx.variable.paused = false;
+      thread.refresh();
+      dsx.action.syncUrl()
     </action>
     <action as="onEnded">
       const ep = dsx.variable.episode
@@ -245,6 +275,7 @@
       const nextLocked = nxt.free === false && wallet.data != null && !wallet.data.unlocked.includes(nxt.id)
       if (nextLocked && dsx.variable.autoUnlock && dsx.variable.balance >= nxt.price) {
         dsx.variable.page = n - 1
+        dsx.action.syncUrl()
         await dsx.action.unlockNow()
       } else {
         dsx.action.go({ target: n })
@@ -286,6 +317,10 @@
 
     <!-- ── stage chrome ── -->
     <style as="chromeLayer" zIndex="2"/>
+    <style as="stateWrap" background="#000000" alignItems="center" spacing="10" paddingH="24" paddingV="20"/>
+    <style as="stateHead" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="stateBody" fontSize="13" color="rgba(255,255,255,0.55)"/>
+    <style as="stateBtn" background="#FF2C55" radius="22" paddingH="20" paddingV="11" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
     <style as="lockedLayer" zIndex="3"/>
     <style as="topBar" paddingLeading="10" paddingTrailing="14" paddingTop="12" spacing="10" alignItems="center"/>
     <style as="epLabel" fontSize="17" fontWeight="semibold" color="#FFFFFF"/>
@@ -393,6 +428,28 @@
   <hstack alignItems="stretch" style="flex: 1; min-height: 0; width: 100%">
     <vstack alignItems="stretch" style="flex: 1; min-width: 0">
       <zstack>
+        <vstack visible-if="dsx.variable.phase != 'ready'" class="stateWrap"
+                height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+                style="width: 100%; margin-left: auto; margin-right: auto; z-index: 3">
+          <image icon="chevron.left" iconSize="22" color="#FFFFFF" on:tap="dsx.action.goBack()"
+                 a11yLabel="Back" a11yTrait="button" style="align-self: flex-start"/>
+          <spacer/>
+          <spinner color="#FF2C55" visible-if="dsx.variable.phase == 'loading'"/>
+          <text value="Loading the episode…" class="stateBody" visible-if="dsx.variable.phase == 'loading'"/>
+
+          <image icon="play.rectangle.fill" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"
+                 visible-if="dsx.variable.phase != 'loading'"/>
+          <text value="This series is unavailable." class="stateHead" visible-if="dsx.variable.phase == 'error'"/>
+          <text value="Check your connection and try again." class="stateBody" visible-if="dsx.variable.phase == 'error'"/>
+          <button label="Retry" class="stateBtn" on:tap="detail.refresh()" visible-if="dsx.variable.phase == 'error'"/>
+
+          <text value="No episodes yet." class="stateHead" visible-if="dsx.variable.phase == 'empty'"/>
+          <text value="This series has not published an episode." class="stateBody" visible-if="dsx.variable.phase == 'empty'"/>
+          <button label="Browse series" class="stateBtn" on:tap="dsx.module.route.reset({ path: '/browse' })"
+                  visible-if="dsx.variable.phase == 'empty'"/>
+          <spacer/>
+        </vstack>
+
         <!-- THE VERTICAL PAGER over episodes — swiping up is how this category moves to
              the next episode, and it is the whole feel of the surface. Only the RESTING
              page is active, so a fling never plays three soundtracks at once; the chrome
@@ -419,14 +476,17 @@
                    muted="{{ dsx.variable.wMuted }}" paused="dsx.variable.paused"
                    bind="dsx.variable.pos" time="dsx.variable.time" duration="dsx.variable.duration"
                    speed="{{ dsx.variable.speed }}" gravity="fill" audio="playback" loop="false"
+                   pip="{{ dsx.variable.pip }}" subtitles="{{ dsx.variable.captions }}"
                    height="{{ dsx.variable.stageH }}" style="width: 100%; z-index: 1"
                    on:ready="dsx.variable.paused = false" on:ended="dsx.action.onEnded()"
+                   on:error="dsx.variable.toast = 'This episode would not play — try another.'"
                    on:appear="dsx.action.boot()"/>
           </zstack>
         </pager>
 
         <!-- ══ chrome: top bar · right rail · bottom ══ -->
-        <vstack class="chromeLayer" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+        <vstack class="chromeLayer" visible-if="dsx.variable.phase == 'ready'"
+                height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                 style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
           <hstack class="topBar" style="pointer-events: auto">
             <image icon="chevron.left" iconSize="22" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
@@ -435,7 +495,7 @@
             <hstack class="speedChip" on:tap="dsx.variable.sheet = 'speed'; dsx.variable.menu = true"
                     a11yGroup="true" a11yTrait="button" a11yLabel="Playback speed">
               <image icon="arrow.clockwise" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
-              <text value="{{ dsx.variable.speed }}.0x" class="speedText"/>
+              <text value="{{ dsx.variable.speedLabel }}" class="speedText"/>
             </hstack>
             <image icon="ellipsis" iconSize="19" color="#FFFFFF" on:tap="dsx.variable.sheet = ''; dsx.variable.menu = true"
                    a11yLabel="More options" a11yTrait="button"/>
@@ -455,7 +515,7 @@
                 <image icon="note.text" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
                 <text value="{{ dsx.variable.commentCount }}" class="railCount"/>
               </vstack>
-              <vstack class="railItem" on:tap="dsx.variable.sheet = ''; dsx.variable.menu = true" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
+              <vstack class="railItem" on:tap="dsx.action.doShare()" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
                 <image icon="square.and.arrow.up" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
                 <text value="Share" class="railCap"/>
               </vstack>
@@ -555,7 +615,7 @@ Please unlock to watch." class="lockHead"/>
          wasting, and it scrolls on its own so a 60-episode grid never moves the clip. It is
          the drawer's content, laid out permanently — same ranges, same 6-column grid, same
          lock and now-playing tells — so the two lanes cannot drift apart in behaviour. -->
-    <scroll class="panelScroll" visible-if="dsx.variable.panel"
+    <scroll class="panelScroll" visible-if="dsx.variable.panel && dsx.variable.phase == 'ready'"
             style="width: 416px; flex: none; height: {{ dsx.variable.stageH }}px">
       <vstack class="panelBody">
 
@@ -600,7 +660,7 @@ Please unlock to watch." class="lockHead"/>
                    color="{{ dsx.variable.favOn ? '#FF2C55' : '#FFFFFF' }}" a11yHidden="true"/>
             <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="panelStat"/>
           </hstack>
-          <hstack class="panelAct" on:tap="dsx.variable.sheet = ''; dsx.variable.menu = true" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
+          <hstack class="panelAct" on:tap="dsx.action.doShare()" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
             <image icon="square.and.arrow.up" iconSize="15" color="#FFFFFF" a11yHidden="true"/>
             <text value="Share" class="panelStat"/>
           </hstack>
@@ -718,18 +778,27 @@ Please unlock to watch." class="lockHead"/>
       <vstack visible-if="dsx.variable.sheet == ''" alignItems="stretch">
         <text value="More" class="menuHead"/>
         <vstack class="menuCard">
-          <hstack class="menuRow" on:tap="dsx.variable.sheet = 'lang'" a11yGroup="true" a11yTrait="button" a11yLabel="Audio and subtitles">
+          <!-- SUBTITLES IS REAL: `<video subtitles>` is a declared boolean, so this toggle
+               reaches the player. The eleven-language PICKER that used to live behind this
+               row was not — `<video>` has no track or language attribute — so a viewer chose
+               "Tamil" and got whatever the asset carried. The picker is gone; the switch that
+               works stayed (PLAN.md §6.36). -->
+          <hstack class="menuRow" a11yGroup="true" a11yLabel="Subtitles">
             <image icon="globe" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
-            <text value="Audio / Subtitles" class="menuLabel" style="flex: 1"/>
-            <text value="{{ dsx.variable.lang }}" class="menuValue"/>
-            <image icon="chevron.right" iconSize="14" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+            <text value="Subtitles" class="menuLabel" style="flex: 1"/>
+            <toggle bind="dsx.variable.captions" color="#FF2C55" a11yLabel="Subtitles"/>
           </hstack>
           <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
-          <hstack class="menuRow" on:tap="dsx.variable.sheet = 'quality'" a11yGroup="true" a11yTrait="button" a11yLabel="Quality">
-            <image icon="slider.horizontal.3" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
-            <text value="Quality" class="menuLabel" style="flex: 1"/>
-            <text value="{{ dsx.variable.quality }}" class="menuValue"/>
-            <image icon="chevron.right" iconSize="14" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+          <!-- QUALITY IS NAMED, NOT FAKED (Article 7, the AdGate precedent). `<video>` has no
+               quality attribute, so the 240p–1080p ladder this row used to open changed
+               nothing — and it priced 1080p behind VIP, which made it a paywall on a no-op.
+               The row stays as an honest disabled readout; the ask is filed upstream. -->
+          <hstack class="menuRow" a11yGroup="true" a11yLabel="Quality: adaptive. A quality ladder needs renderer support and is not available in this build.">
+            <image icon="slider.horizontal.3" iconSize="20" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+            <vstack spacing="2" style="flex: 1">
+              <text value="Quality" class="menuLabel" color="rgba(255,255,255,0.4)"/>
+              <text value="Adaptive — one rendition in this build" class="optNote"/>
+            </vstack>
           </hstack>
           <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
           <vstack spacing="10" alignItems="stretch" paddingV="13">
@@ -753,46 +822,6 @@ Please unlock to watch." class="lockHead"/>
             <toggle bind="dsx.variable.pip" color="#FF2C55" a11yLabel="Picture in picture"/>
           </hstack>
         </vstack>
-      </vstack>
-
-      <!-- audio / subtitles -->
-      <vstack visible-if="dsx.variable.sheet == 'lang'" alignItems="stretch">
-        <hstack alignItems="center" paddingBottom="8">
-          <image icon="chevron.left" iconSize="19" color="#FFFFFF" on:tap="dsx.variable.sheet = ''" a11yLabel="Back" a11yTrait="button"/>
-          <text value="Subtitles" class="menuHead" style="flex: 1"/>
-          <toggle bind="dsx.variable.captions" color="#FF2C55" a11yLabel="Subtitles"/>
-        </hstack>
-        <list bind="dsx.variable.languages" key="id" scroll="false" spacing="2">
-          <hstack class="optRow" on:tap="dsx.variable.lang = item.label" a11yTrait="button" a11yLabel="{{ item.label }}"
-                  background="{{ item.label == dsx.variable.lang ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0)' }}">
-            <image icon="checkmark" iconSize="15" color="#FF2C55" visible-if="item.label == dsx.variable.lang" a11yHidden="true"/>
-            <text value="{{ item.label }}" class="optLabel"
-                  color="{{ item.label == dsx.variable.lang ? '#FFFFFF' : 'rgba(255,255,255,0.8)' }}"
-                  fontWeight="{{ item.label == dsx.variable.lang ? 'semibold' : 'regular' }}"/>
-          </hstack>
-        </list>
-      </vstack>
-
-      <!-- quality -->
-      <vstack visible-if="dsx.variable.sheet == 'quality'" alignItems="stretch">
-        <hstack alignItems="center" paddingBottom="8">
-          <image icon="chevron.left" iconSize="19" color="#FFFFFF" on:tap="dsx.variable.sheet = ''" a11yLabel="Back" a11yTrait="button"/>
-          <text value="Quality" class="menuHead"/>
-        </hstack>
-        <list bind="dsx.variable.qualities" key="id" scroll="false" spacing="2">
-          <hstack class="optRow" on:tap="dsx.variable.quality = item.label" a11yTrait="button" a11yGroup="true"
-                  a11yLabel="{{ item.label }}{{ item.vip ? ', VIP' : '' }}"
-                  background="{{ item.label == dsx.variable.quality ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0)' }}">
-            <image icon="checkmark" iconSize="15" color="#FF2C55" visible-if="item.label == dsx.variable.quality" a11yHidden="true"/>
-            <vstack spacing="3" style="flex: 1">
-              <hstack spacing="8" alignItems="center">
-                <text value="{{ item.label }}" class="optLabel" color="{{ item.vip ? '#F6B63D' : '#FFFFFF' }}"/>
-                <text value="VIP" class="vipTag" visible-if="item.vip"/>
-              </hstack>
-              <text value="{{ item.note }}" class="optNote" visible-if="item.note != ''"/>
-            </vstack>
-          </hstack>
-        </list>
       </vstack>
 
       <!-- speed -->

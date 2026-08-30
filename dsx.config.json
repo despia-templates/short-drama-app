@@ -126,9 +126,11 @@
     "wide": "dsx"
   },
   "packages": [
-    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Payments/Stripe"
+    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Payments/Stripe",
+    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/SocialShare"
   ],
   "modules": [
-    "stripe"
+    "stripe",
+    "share"
   ]
 }

@@ -32,8 +32,19 @@
          and an empty-guard on data != null hides the empty copy in exactly that case —
          two headings over void, indistinguishable from a bug -->
     <variable as="signedOut" computed="true">return session.error != null</variable>
+    <!-- A FAILED READ IS NOT A SLOW READ. This tested data-nullness only, and neither
+         `favs.error` nor `continue.error` was read anywhere in the file — so a failed
+         /viewer/list skeletoned FOREVER with no message and no retry. The error lane now
+         wins over the loading lane, and (as everywhere else) only claims the screen when
+         there is nothing cached to show. -->
+    <variable as="listFailed" computed="true">
+      if (dsx.variable.signedOut) { return false }
+      const broke = favs.error != null || continue.error != null
+      return broke && dsx.variable.favsView == null && dsx.variable.continueView == null
+    </variable>
     <variable as="listLoading" computed="true">
-      return dsx.variable.signedOut == false && (dsx.variable.favsView == null || dsx.variable.continueView == null)
+      if (dsx.variable.signedOut || dsx.variable.listFailed) { return false }
+      return dsx.variable.favsView == null || dsx.variable.continueView == null
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
@@ -134,8 +145,14 @@
             <Skeleton height="160" radius="8"/>
           </vstack>
 
+          <vstack class="signCard" visible-if="dsx.variable.listFailed">
+            <text value="Your list is unavailable." class="sectionTitle"/>
+            <text value="Check your connection and try again." class="empty"/>
+            <button label="Retry" class="signBtn" on:tap="favs.refresh(); continue.refresh()"/>
+          </vstack>
+
           <!-- history / continue watching -->
-          <vstack class="section" visible-if="dsx.variable.signedOut == false && dsx.variable.listLoading == false">
+          <vstack class="section" visible-if="dsx.variable.signedOut == false && dsx.variable.listLoading == false && dsx.variable.listFailed == false">
             <text value="History" class="sectionTitle"/>
             <text class="empty" visible-if="dsx.variable.continueView != null && dsx.variable.continueView.items.length == 0"
                   value="Nothing in progress yet — start a show from Home."/>
@@ -170,7 +187,7 @@
           </vstack>
 
           <!-- favorites -->
-          <vstack class="section" visible-if="dsx.variable.signedOut == false && dsx.variable.listLoading == false">
+          <vstack class="section" visible-if="dsx.variable.signedOut == false && dsx.variable.listLoading == false && dsx.variable.listFailed == false">
             <text value="My list" class="sectionTitle"/>
             <text class="empty" visible-if="dsx.variable.favsView != null && dsx.variable.favsView.items.length == 0"
                   value="Tap My List on any show to keep it here."/>

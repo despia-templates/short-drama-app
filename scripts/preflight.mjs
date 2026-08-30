@@ -62,10 +62,12 @@ for (const entry of cfg.packages ?? []) {
   if (!existsSync(p)) {
     problems.push(
       `dsx.config.json names a module package that is not on disk:\n      ${entry}\n` +
-      `    The Stripe web module ships in the full Despia framework distribution. If your\n` +
-      `    checkout lacks it, ask for access — or remove "stripe" from "modules" and the\n` +
-      `    entry from "packages" to build without web checkout (the Store screen will\n` +
-      `    show the server's refusal instead of a payment sheet; nothing else changes).`,
+      `    ${entry.split("/").pop()} ships in the full Despia framework distribution. If your\n` +
+      `    checkout lacks it, ask for access — or drop this entry from "packages" and its\n` +
+      `    scheme from "modules" to build without it. Each degrades in place and says so:\n` +
+      `    without Stripe the Store shows the server's refusal instead of a payment sheet;\n` +
+      `    without SocialShare the Share control copies the link instead of opening the\n` +
+      `    system sheet. Nothing else changes.`,
     );
   }
 }
