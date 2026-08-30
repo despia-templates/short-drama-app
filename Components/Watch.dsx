@@ -129,6 +129,11 @@
       if (thread.data == null) { return 0 }
       return thread.data.count
     </variable>
+    <variable as="commentLabel" computed="true">
+      const n = Number(dsx.variable.commentCount)
+      if (n == 1) { return '1 comment' }
+      return n + ' comments'
+    </variable>
     <variable as="unlockLabel" computed="true">
       if (dsx.variable.unlocking) { return 'Unlocking…' }
       const ep = dsx.variable.episode
@@ -677,7 +682,7 @@ Please unlock to watch." class="lockHead"/>
          on:dismiss="dsx.variable.comments = false">
     <vstack alignItems="stretch" style="flex: 1; min-height: 0">
       <hstack class="cHead">
-        <text value="{{ dsx.variable.commentCount }} comments" class="cTitle" style="flex: 1"/>
+        <text value="{{ dsx.variable.commentLabel }}" class="cTitle" style="flex: 1"/>
       </hstack>
       <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
       <scroll style="flex: 1; min-height: 0">

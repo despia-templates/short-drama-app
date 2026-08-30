@@ -476,7 +476,12 @@
                     a11yLabel="Number {{ item.rank }}, {{ item.title }}"
                     style="border-bottom: 1px solid rgba(255,255,255,0.05)">
               <text value="{{ item.rank }}" class="rankBig" color="{{ rankColor }}"/>
+              <!-- the ONE origin for Show's shared flight (a match id names one rect per
+                   frame — the linter refuses a second even in a runtime-exclusive tab):
+                   the ranked thumb flying into the 9:16 stage is the flight worth having,
+                   and sharedMode="clip" on the far end reconciles the ratios -->
               <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                     shared="poster-{{ item.id }}"
                      style="width: 62px; height: 83px; border-radius: 8px; object-fit: cover"/>
               <vstack spacing="4" alignItems="stretch" style="flex: 1; min-width: 0">
                 <text value="{{ item.title }}" class="rankTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>

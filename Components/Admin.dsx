@@ -133,7 +133,7 @@
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page" style="{{ dsx.variable.shell }}">
       <hstack class="head">
-        <vstack class="headCol" style="flex: 1">
+        <vstack class="headCol" style="flex: 1; min-width: 0">
           <text value="Manage" class="h1"/>
           <text value="Operator surface — Manage View bridge" class="sub"/>
         </vstack>
@@ -141,13 +141,15 @@
           <image icon="chevron.left" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
           <text value="App" class="backChipLabel"/>
         </hstack>
+      </hstack>
 
       <!-- The platform has no count op and clamps `list` to 100 rows without saying so
            (PLAN.md §6.20), so these are PAGE counts. A dashboard that prints "100" for a
-           352-episode catalogue is worse than one that admits the ceiling. -->
+           352-episode catalogue is worse than one that admits the ceiling. (This note sits
+           BELOW the head row: as a flex sibling of the title it once ate the row's width
+           and squeezed "Manage" to one letter per line — measured on phone.) -->
       <text value="Counts are read a page at a time — the data layer caps a list at 100 rows and offers no count, so a full page shows as 100+ until that lands upstream (PLAN.md §6.20)."
-            class="note" visible-if="stats.data != null &amp;&amp; stats.data.capped" paddingTop="8"/>
-      </hstack>
+            class="note" visible-if="stats.data != null &amp;&amp; stats.data.capped" paddingTop="4"/>
 
       <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
 
