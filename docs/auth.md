@@ -33,7 +33,7 @@ Supabase both do, in their default modes) needs one of:
 
 ## What to replace, concretely
 
-`public/dev-session.json` is the only artifact the client knows about. Its shape:
+`public/dev-session.json` is the only artifact the client knows about (the script writes the same JSON to `dist/dev-session.json` so a built site serves it too). Its shape:
 
 ```json
 { "viewer":   { "sub": "<uuid>", "token": "<jwt>" },

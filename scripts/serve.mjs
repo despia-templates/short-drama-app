@@ -1,7 +1,7 @@
 //
 //  scripts/serve.mjs — the LOCAL production-shaped node: one origin serving the built
 //  DSX site (static + SSR) in front of the generated API host, wired to local Postgres.
-//  This is the standalone twin of @despia/server's bootloader-node serve() (which loads
+//  This is the standalone twin of @despia-native/server's bootloader-node serve() (which loads
 //  the monorepo artifact shape); the barrel import below is the standalone shape
 //  `despia build` emits. Local/dev only — the hosted lane is `despia deploy cloudflare`.
 //
@@ -195,16 +195,12 @@ const mcp = toolRows.length > 0
       onError: (info) => console.error(`[mcp] ${info.tool} failed (${info.correlationId}):`, info.error) })
   : null;
 const registry = JSON.parse(readFileSync(resolve(SITE, "registry.json"), "utf8"));
-// THE FACE. The framework bundles Inter (OpenSource/Type) and `--dsx-font` names
-// "InterVariable" FIRST, but the token sheet is deliberately asset-free, so a surface has
-// to link the stylesheet once — and until now no app built by `despia build` could, which
-// is why this template rendered in whatever face the OS supplied and asked for weights
-// (500, 600) that the Windows and common Linux system faces cannot draw. public/type is a
-// copy of that directory, licence and derivation notes included, per the OFL.
-const site = createSiteHandler(SITE, registry, {
-  stream: false,
-  stylesheets: ["/type/inter.css"],
-});
+// The face is the BUILD's business now: `despia build` resolves the framework's bundled
+// Inter, copies it to dist/fonts, and writes stylesheets:["/fonts/inter.css"] into
+// registry.shell — which this handler already spreads (live.ts), so the live lane and the
+// static export link the same one file. This used to pass its own public/type copy, which
+// worked only here and shipped the face twice.
+const site = createSiteHandler(SITE, registry, { stream: false });
 
 function toWebRequest(req, body) {
   const url = `http://${req.headers.host ?? "localhost"}${req.url ?? "/"}`;

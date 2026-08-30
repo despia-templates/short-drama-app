@@ -39,7 +39,8 @@ specified in `docs/` and land with the framework's native template lane.
 ```sh
 npm install                       # preflight checks the layout first and prints any fix
 createdb shortdrama_dev
-cp .env.local.example .env.local  # set DSX_JWT_SECRET; add STRIPE_KEY/STRIPE_PUBLISHABLE (test mode) for checkout
+cp .env.local.example .env.local  # set DSX_DATABASE_URL and DSX_JWT_SECRET (both required);
+                                  # add STRIPE_KEY/STRIPE_PUBLISHABLE (test mode) for checkout
 npm run build                     # compiles Components/**.dsx AND server/*.dsx → dist/, server/generated/
 psql -d shortdrama_dev -f server/generated/migration.sql   # re-runnable by construction
 psql -d shortdrama_dev -f server/policies.local.sql        # the app's policy addendum (PLAN.md §6.25)
@@ -53,11 +54,23 @@ Then, **in a second terminal**:
 npm run seed                      # 14 demo shows, 352 episodes, via the admin routes; idempotent
 ```
 
-Open http://localhost:8787 — Home, `/discover`, `/vip`, `/store`, `/rewards`, `/list`,
-`/profile`, `/notices`, `/show/:id`, `/watch/:show/:idx`, and the operator bridge at
-`/admin`. `npm run serve` sets `DSX_DEV_NO_SW=1` so the local origin never installs the
+Open http://localhost:8787 — Home, `/discover`, `/browse` (and `/browse/:genre`), `/vip`,
+`/store`, `/rewards`, `/list`, `/profile`, `/notices`, `/show/:id`, `/watch/:show/:idx`, and
+the operator bridge at `/admin`. Search is an OVERLAY on every screen, not a route. `npm run serve` sets `DSX_DEV_NO_SW=1` so the local origin never installs the
 precaching service worker — a stale bundle against fresh SSR is the classic "correct
-markup looks broken" trap (PLAN.md §6.13a).
+markup looks broken" trap (PLAN.md §6.13a — the item is retracted as a *layout* defect; its service-worker
+finding is the part that stands).
+
+**The numbers on the storefront are demo values.** Every series carries a view count and a
+rating (home hero, detail screen, browse cards). They are seeded from `scripts/catalogue.mjs`
+and nothing increments them — there is no telemetry in this template. A real deployment
+replaces that table with its own counter; the wire shape (`show.views`, `show.rating`) is
+unchanged.
+
+**Typography.** `despia build` resolves the framework's bundled Inter, copies it to
+`dist/fonts/` (OFL licence travelling with the bytes) and links it from every page, so the
+served site and the static export render in the same face rather than whatever the OS
+supplies. Nothing to configure.
 
 **Reset the demo:** `dropdb shortdrama_dev && createdb shortdrama_dev`, re-apply the
 migration and the addendum, re-run `npm run seed`. The seed converges the database onto

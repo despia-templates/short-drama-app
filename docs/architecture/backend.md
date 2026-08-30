@@ -9,7 +9,7 @@
 ## 1 · Deployment lane
 
 - **Hosted (default)**: Despia editor → Cloudflare OAuth → Workers deploy (the existing
-  one-button lane; `@despia/server` bootloader-workers + deploy-emit).
+  one-button lane; `@despia-native/server` bootloader-workers + deploy-emit).
 - **Media**: masters → R2; **Cloudflare Stream** encodes → HLS. The template stores only
   `asset` rows with a `playbackBase`; **no Stream API shape leaks into app code** — swap the
   encode worker and the same template runs on any HLS origin (self-host lane, rfcs/0004 §3).

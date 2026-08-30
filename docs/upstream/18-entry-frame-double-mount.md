@@ -5,7 +5,7 @@ component's and the matched route's — so every page renders the home screen's 
 markup beside its own, even though SSR emitted only the correct component.
 
 **Environment.** Measured 2026-08-29 at `dev@ae0669ad` on a production-shaped local origin
-(`@despia/server` `createSiteHandler` over `despia build` output, service worker disabled,
+(`@despia-native/server` `createSiteHandler` over `despia build` output, service worker disabled,
 fresh tab). **Not** the `despia dev` lane — this is the shipped bootloader.
 
 **Repro.**

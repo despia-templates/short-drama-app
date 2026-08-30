@@ -61,7 +61,7 @@ There is no template server, no upload step, no separate format to rot.
 **Computed, never declared:** consumed modules and their shelves. The validator walks the
 dependency tree and *derives* the disclosure (`open` vs `premium` — rfcs/0004); an author
 cannot understate licensing by editing a field. Same twin-validator pattern as studio-apps:
-Ruby in-tree, TS in `@despia/cli`, one conformance fixture so they cannot drift.
+Ruby in-tree, TS in `@despia-native/cli`, one conformance fixture so they cannot drift.
 
 ## 4 · The gates (CI on every template repo; the official shelf requires all green)
 

@@ -65,7 +65,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
   for access + credits**. `shelf: open`, platforms `phone, desktop` — **no web facet yet** (§6.1).
 - **Backend authoring LANDED** — `<server>` documents: `<entity>` (ownership/RLS), `<action>`
   (the one action grammar), `<route>`, `<worker>` (queues + cron + idempotency), `<secret>`,
-  `<egress>`; deployed via the Workers bootloader (`@despia/server`), with identity, declared
+  `<egress>`; deployed via the Workers bootloader (`@despia-native/server`), with identity, declared
   CRUD, webhooks (HMAC), realtime, rate limits, tracing, one-button deploy.
 - **Despia Apps (studio-apps, PROPOSED v1 2026-08-28)** — registry packages contributing DSX
   components into closed slots (`studio.panel`, `studio.rail`, `dashboard.card`, `tool`,
@@ -211,7 +211,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
        `inputSchema` and arguments are dropped. Bridged locally by reading the actions'
        declared `inputs=` back out of the documents at boot (`scripts/serve.mjs`) — the row
        should carry it, and the bridge dies when it does.
-    c. **`@despia/server` exports no way to serve them.** `despia build` emits `mcpTools`
+    c. **`@despia-native/server` exports no way to serve them.** `despia build` emits `mcpTools`
        into the standalone barrel, but the package export map has no `"./mcp-face"`, and
        `bootloader-node`'s `serve()` consumes the MONOREPO artifact shape rather than this
        barrel. A standalone project can declare `<tool>` rows it has no supported way to
@@ -490,8 +490,15 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     and `scripts/serve.mjs` passes `stylesheets: ["/type/inter.css"]`. Verified after: the
     latin face reports `loaded`, latin-ext stays deferred by unicode-range, and InterVariable
     measures distinctly from both system-ui and serif.
-    The remaining ask: `despia build`'s static export assembles heads too, so the same option
-    should be reachable from `dsx.config.json` rather than only from a hand-written host.
+    CLOSED 2026-08-30, both halves. The remaining ask — that `despia build`'s static export
+    reach the same option rather than it living only in a hand-written host — landed in the
+    CLI while this template was being finished: `resolveFontsDir` locates the bundled face,
+    the build copies it to `dist/fonts` and writes `stylesheets: ["/fonts/inter.css"]` into
+    `registry.shell`, which BOTH lanes read (`live.ts` spreads it; `exportStatic` emits the
+    link). The template's own `public/type` copy and its `serve.mjs` override are gone with
+    it — they worked only on the local origin and shipped the face a second time under a
+    different path. Verified: live page and static export both link /fonts/inter.css, and
+    `document.fonts` reports InterVariable loaded.
 
 35. **Only `push` animated: a `replace`/`reset` hard-cut, and a route override could not name
     the two lanes** — FIXED UPSTREAM in this pass (measured 2026-08-30 from "all route changes

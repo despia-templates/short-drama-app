@@ -1,7 +1,7 @@
 # packaging/mcp: a standalone project has no supported way to SERVE its emitted mcpTools
 
 **One line.** `despia build` emits `mcpTools` into the standalone barrel
-(`server/generated/index.ts`), but `@despia/server`'s export map has no `"./mcp-face"`,
+(`server/generated/index.ts`), but `@despia-native/server`'s export map has no `"./mcp-face"`,
 and `bootloader-node`'s `serve()` loads the MONOREPO artifact shape (`generated/routes.json`
 etc.) — so the `<tool>` grammar produces rows nothing can mount outside the monorepo.
 
@@ -12,7 +12,7 @@ checkout's `OpenSource/Web/packages/*`, probes run against a freshly rebuilt `di
 Filed under the template program's no-hacks law: the template ships a labeled bridge where
 one exists, and the bridge dies when this lands.
 
-**Observed.** `import { createMcpFace } from "@despia/server/mcp-face"` →
+**Observed.** `import { createMcpFace } from "@despia-native/server/mcp-face"` →
 `ERR_PACKAGE_PATH_NOT_EXPORTED`. Exports today: `. ./host ./actions ./identity
 ./bootloader-node ./bootloader-deno ./deploy ./bootloader-workers ./postgres
 ./preview-workers`. The template's local origin imports

@@ -2,7 +2,7 @@
   "name": "short-drama-app",
   "private": true,
   "version": "0.1.0",
-  "description": "The Despia flagship short-drama template: a ReelShort-class vertical-drama storefront \u2014 coin wallet, episode paywall, VIP, Stripe web checkout, rewarded-ads lane, comments, and an operator Manage surface \u2014 from one set of DSX sources.",
+  "description": "The Despia flagship short-drama template: a ReelShort-class vertical-drama storefront — coin wallet, episode paywall, VIP, Stripe web checkout, rewarded-ads lane, comments, and an operator Manage surface — from one set of DSX sources.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -31,7 +31,8 @@
     "session": "node scripts/dev-session.mjs",
     "preflight": "node scripts/preflight.mjs",
     "preinstall": "node scripts/preflight.mjs",
-    "deploy": "despia deploy cloudflare"
+    "deploy": "despia deploy cloudflare",
+    "verify": "node scripts/verify.mjs"
   },
   "dependencies": {
     "@despia-native/compiler": "file:../despia_dsx/despia-framework/OpenSource/Web/packages/compiler",

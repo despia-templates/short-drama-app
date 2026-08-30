@@ -29,11 +29,26 @@ const problems = [];
 
 // 1 · node version (package.json engines is advisory unless engine-strict is set)
 const wanted = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")).engines?.node ?? "";
-const major = Number(process.versions.node.split(".")[0]);
-if (major < 22) {
+// COMPARE WHAT ENGINES ACTUALLY SAYS. This used to test the major only, so the whole of
+// Node 22.0–22.17 sailed through a check whose own message quoted ">=22.18" — the gate
+// disagreed with the range it was printing. Parse the floor out of `engines.node` and
+// compare major.minor.patch, so the two can never drift again.
+// `>=22.18` has TWO parts, so a three-part-only regex silently fell back to [22] and let
+// every 22.x through — the first version of this fix shipped that bug and the check below
+// caught it. Capture one to three parts.
+const floorMatch = wanted.match(/(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+const floor = floorMatch === null ? [22] : floorMatch.slice(1).filter((p) => p !== undefined).map(Number);
+const here = process.versions.node.split(".").map(Number);
+const older = (a, b) => {
+  for (let i = 0; i < b.length; i += 1) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0);
+  }
+  return false;
+};
+if (older(here, floor)) {
   problems.push(
     `Node ${process.versions.node} is too old — this template needs ${wanted}.\n` +
-    `    Fix: install Node 22+ (https://nodejs.org) and re-run.`,
+    `    Fix: install a newer Node (https://nodejs.org) and re-run.`,
   );
 }
 
