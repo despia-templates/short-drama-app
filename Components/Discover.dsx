@@ -15,7 +15,10 @@
          pager preload must never overwrite the shared active clip's bindings"), so
          exactly one clip writes it and no event ordering is involved. null = no clip has
          spoken yet · true = the resting clip is still buffering · false = frames on
-         glass, lift the cover. (Event-based designs were abandoned unproven either way:
+         glass, lift the cover. The fade is 180ms, not the 450ms it started at: with the
+         page server-rendered the clip requests at ~75ms and is ready almost immediately,
+         so a long dissolve stopped reading as a reveal and started reading as a ghost —
+         two images visibly superimposed. (Event-based designs were abandoned unproven:
          the probe used to condemn them was itself sampling the WRONG pager — Home's hero
          track during the route swap — a reminder that a failing measurement needs the
          same scrutiny as a passing one.) -->
@@ -59,7 +62,7 @@
 
     <formula as="fadeFx" show="item.show">
       const lifted = dsx.variable.activeShow == show && dsx.variable.buf === false
-      return 'width: 100%; height: ' + dsx.variable.stageH + 'px; object-fit: cover; z-index: 1; pointer-events: none; opacity: ' + (lifted ? 0 : 1) + '; transition: opacity 0.45s ease'
+      return 'width: 100%; height: ' + dsx.variable.stageH + 'px; object-fit: cover; z-index: 1; pointer-events: none; opacity: ' + (lifted ? 0 : 1) + '; transition: opacity 0.18s ease'
     </formula>
 
     <action as="rest">
