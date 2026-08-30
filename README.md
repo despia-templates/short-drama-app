@@ -192,6 +192,16 @@ npx despia export ios --out ../shortdrama-ios
 npx despia export android --out ../shortdrama-android
 ```
 
+**The native lane renders — proven end-to-end on 2026-08-31.** An exported app was blank
+because `despia export` shipped no element library (`<vstack>`/`<text>` are Foundation
+components only Runtime.app ever bundled — the bisect and fix live on
+[issue 278](https://github.com/despia-native/despia-framework/issues/278), fixed in
+`dev@69581687`). With the fold in place: this app builds, boots, fetches over its App.json
+origin, renders its phone chrome on an iPhone 17 Pro — logo, search pill, tab row, the full
+tab bar with catalog icons — and an iPad Pro 13″ mounts the DESKTOP lane, TopNav and footer,
+from the same source. What is still dark is the content the 252 `style=""` declarations size
+(the §6.43 port): rails and posters get their boxes as the port lands, screen by screen.
+
 **These eighteen screens DO render on iOS — measured.** All of them were staged as fixtures into
 the framework's own parity corpus and run through its hosted iOS capture plane
 (`RuntimeParityTests`, the same harness the parity contract uses): every screen parsed, and the

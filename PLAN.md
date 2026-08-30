@@ -777,6 +777,20 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     exactly what "probe before you generalise" exists to prevent. The CSS debt is real and still
     worth paying — 252 declarations that genuinely do not cross over — but it explains none of
     the blank.
+    RESOLVED 2026-08-31 (`despia-framework dev@69581687`): the bisect walked the kernel down to
+    the answer, and it was neither the renderer nor the Router. "Every leaf, control and
+    container is now a component" (raw()'s own header) — `<vstack>`/`<text>`/`<image>` are
+    GlobalStackComponent swift lanes in `Modules/Mandatory/Foundation` (shelf: open), folded
+    into Runtime.app by prepare_config.rb and into NO export. Every element resolved to nil and
+    fell through the TRANSPARENT lowercase fallback: children recurse (bodies evaluate), nothing
+    draws, and no diagnostic fires because `flagsUnresolved` covers Capitalized tags only. The
+    export now folds the element library — 64 native lanes, satellite backends excluded exactly
+    as Runtime.app's own target excludes them, skips cascading and LOUD. Verified: the probe
+    renders through the full boot path; THIS APP's phone chrome renders on an iPhone 17 Pro and
+    the iPad Pro 13" mounts the DESKTOP lane (TopNav + footer) — `dsx.screen.width` firing
+    on-device from one source. What remains dark is the content the 252 css declarations size:
+    §6.43's port, now the only thing between the native lane and parity. The Android host has
+    the same hole (tracked on 278); `<DSXView>` and Dom-coupled lanes are named skips.
 
 45. → filed: https://github.com/despia-native/despia-framework/issues/279 — **The export has no
     ASSET LANE, so a native app cannot ship its own images, fonts or media** — (measured
