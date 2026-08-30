@@ -15,12 +15,13 @@
       "web",
       "server"
     ],
-    "_surfaces_note": "ios/android join when the native lane lands (VerticalPlayerStack consumption \u2014 PLAN.md \u00a75 Phase 3)",
+    "_surfaces_note": "ios/android join when the native lane lands (VerticalPlayerStack consumption — PLAN.md §5 Phase 3)",
     "services": {
       "required": [
         "postgres"
       ],
       "optional": [
+        "stripe",
         "admob",
         "revenuecat",
         "onesignal",
@@ -34,26 +35,31 @@
     "setup": [
       {
         "step": "deploy",
-        "doc": "README.md \u2014 build, migrate, serve"
+        "doc": "README.md — install (preflight), build, migrate + policies.local.sql, session, serve"
       },
       {
         "step": "seed",
-        "doc": "scripts/seed.mjs \u2014 3 demo shows through the admin routes"
+        "doc": "scripts/seed.mjs — 14 demo shows / 352 episodes through the admin routes; idempotent by title"
+      },
+      {
+        "step": "connect",
+        "service": "stripe",
+        "doc": "README.md Requirements — test-mode STRIPE_KEY/STRIPE_PUBLISHABLE in .env.local; without them the Store shows the server's refusal"
       },
       {
         "step": "connect",
         "service": "admob",
-        "doc": "docs/product/spec.md \u00a73 \u2014 native lane"
+        "doc": "docs/product/spec.md §3 — native lane; the web serves the house creative meanwhile (Components/parts/AdGate.dsx)"
       },
       {
         "step": "connect",
         "service": "revenuecat",
-        "doc": "docs/product/spec.md \u00a73 \u2014 native lane"
+        "doc": "docs/product/spec.md §3 — native lane; web sells through Stripe"
       },
       {
         "step": "connect",
         "service": "onesignal",
-        "doc": "docs/product/spec.md \u00a74 \u2014 hosted lane"
+        "doc": "docs/product/spec.md §4 — hosted lane; notices land in the in-app inbox meanwhile"
       }
     ],
     "demo": {

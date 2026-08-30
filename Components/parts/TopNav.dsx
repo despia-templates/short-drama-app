@@ -23,6 +23,17 @@
 
     <variable as="hov">return ''</variable>
     <variable as="on" computed="true">'#FF2C55'</variable>
+    <!-- the bar owns its own breakpoint: measured at 1440 (gutter 86 · gaps 30), and at
+         768 the same numbers put the wordmark under "Home" and the tools under "My List"
+         — tablet drops the wordmark (the logo square carries the brand) and tightens -->
+    <variable as="isDesktop" computed="true">return dsx.screen.width >= 1120</variable>
+    <variable as="pad" computed="true">return dsx.variable.isDesktop ? 86 : 40</variable>
+    <variable as="gap" computed="true">return dsx.variable.isDesktop ? 30 : 20</variable>
+    <variable as="innerBox" computed="true">
+      const p = dsx.variable.pad
+      const g = dsx.variable.gap
+      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + p + 'px; padding-right: ' + p + 'px; gap: ' + g + 'px'
+    </variable>
     <variable as="off" computed="true">'rgba(255,255,255,0.95)'</variable>
     <variable as="links" computed="true">
       return [
@@ -42,7 +53,7 @@
     </formula>
 
     <style as="nav" background="rgba(0,0,0,0)" height="80" alignItems="center"/>
-    <style as="inner" alignItems="center" spacing="30" paddingLeading="86" paddingTrailing="86"/>
+    <style as="inner" alignItems="center"/>
     <style as="brand" spacing="10" alignItems="center"/>
     <style as="logoBox" background="#FF2C55" radius="9" alignItems="center" width="32" height="32"/>
     <style as="wordmark" fontSize="22" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
@@ -52,16 +63,16 @@
     <style as="cta" background="#FF2C55" radius="20" paddingH="22" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
-  <hstack class="inner" style="width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto">
+  <hstack class="inner" style="{{ dsx.variable.innerBox }}">
     <hstack class="brand" on:tap="dsx.module.route.reset({ path: '/' })" a11yGroup="true" a11yTrait="button" a11yLabel="Short Drama — home">
       <vstack class="logoBox" style="justify-content: center">
         <image icon="play.fill" iconSize="15" color="#FFFFFF" a11yHidden="true"/>
       </vstack>
-      <text value="ShortDrama" class="wordmark"/>
+      <text value="ShortDrama" class="wordmark" visible-if="dsx.variable.isDesktop"/>
     </hstack>
 
     <hstack class="links">
-      <list bind="dsx.variable.links" key="key" axis="horizontal" scroll="false" spacing="30">
+      <list bind="dsx.variable.links" key="key" axis="horizontal" scroll="false" spacing="{{ dsx.variable.gap }}">
         <text value="{{ item.label }}" class="link" a11yTrait="button"
               on:tap="dsx.module.route.reset({ path: item.path })"
               on:hoverStart="dsx.variable.hov = item.key" on:hoverEnd="dsx.variable.hov = ''"
