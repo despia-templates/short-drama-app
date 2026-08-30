@@ -195,6 +195,40 @@ and generated barrel are read once at boot). Schema change → re-apply
   precaching SW; a stale bundle against fresh SSR HTML makes correct markup look broken
   (this cost a full redesign once — PLAN.md §6.13a). `npm run serve` sets `DSX_DEV_NO_SW=1`
   so the local origin never serves one.
+- **A `<formula>` is read by BARE NAME in an interpolation** — `style="{{ coverCell }}"`, never
+  `style="{{ dsx.formula.coverCell(item.rank) }}"`. Inside a repeater the formula's declared
+  inputs (`r="item.rank"`) bind from the row scope automatically. The call spelling produces
+  nothing, the whole `style=""` is then empty, and the element falls back to intrinsic size:
+  measured, 78×104 poster cells rendered at 360×480 and ate the entire hero band. The linter
+  does not catch it.
+- **A markup attribute arrives as a STRING; `default=` is a JSE EXPRESSION.** `overArt="true"`
+  is four characters, `default="false"` is the boolean, and `dsx.attribute.overArt == true` is
+  therefore false for the caller who wrote the obvious thing. Either interpolate a real value
+  (`overArt="{{ true }}"`) or accept both spellings in the consumer — and prefer the latter,
+  because a component cannot make its callers remember.
+- **A HYDRATED `<scroll>` has no scroll plane** (PLAN.md §6.40): a server-rendered screen's
+  outermost scroller comes back with no `data-dsx-scroll-axis`, no inline `overflow`, none of
+  the scroll-linked custom properties and no `on:scroll` dispatch — while the identical
+  component mounted by a client-side route change has all of it. So a scroll-driven affordance
+  works everywhere except the page a viewer LANDS on. Design it static, or verify it on a cold
+  load specifically. (Nested scrollers are fine; only the hydrated root is affected.)
+- **Restart `npm run serve` after every build, and know why.** Atomic style ids are POSITIONAL
+  and the SSR html and the client bundle each carry their own copy of the same id namespace
+  (PLAN.md §6.39). One stale sheet does not fail loudly — it hands elements each other's
+  declarations. Measured: the top nav rendered 32×64 instead of 1440×64, wearing the logo
+  square's width and the bar's height. The dev origin now reloads its registry when `dist/`
+  changes and logs it, so trust the log rather than your memory.
+- **Every icon must be in `OpenSource/Conformance/icons/sf-map.json`, and `check:styles`
+  now proves it.** A name outside the catalog often still renders on web — Boxicons has plenty
+  the catalog does not map — which is exactly what makes the defect invisible: it looks right
+  in the browser and the glyph is missing on iOS and Android. Two shipped here before the gate
+  existed (`eye` beside every view count, `rectangle.stack` in three empty states).
+- **Art is cropped by the FRAME, so check the frame's ratio before choosing the asset.** A 9:16
+  stage showing 3:4 art under `cover` loses a quarter of the width — and if the asset bakes its
+  title, the reader gets "y Cold Campus Prince". Assets with baked type can only go in frames
+  authored for them; a frame of any other ratio takes an untyped asset (`hero_tall`) and lets
+  the markup carry the words.
+
 - **Probe before you generalise.** If a property "doesn't work", reproduce it in a throwaway
   one-element component first. Three framework defects were once filed from one bad
   measurement; all three were false.
