@@ -536,3 +536,37 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     The two that landed on us were badge soup and metric drift: the METRICS table was keyed on
     slugs I invented rather than read, so six shows silently shared one fallback number. Both
     fixed; the second is a reminder that demo data deserves the same verification as code.
+
+36. **`<video>` can select neither a RENDITION nor a TRACK** — NOT YET FILED (measured
+    2026-08-30 auditing the player). The element census gives `<video>` `subtitles` and `pip`
+    as booleans — both real, both now bound — but nothing to choose a quality rendition or an
+    audio/subtitle LANGUAGE. This template had shipped a 240p–1080p ladder and an
+    eleven-language picker against those absent attributes, so a viewer chose "1080p" or
+    "Tamil" and got whatever the asset happened to be. Worse, 1080p carried a VIP tag: a
+    paywall on a control with no effect, which is the one thing a monetisation reference must
+    never demonstrate. Both are removed; Quality survives as a disabled readout naming what
+    the build does (Article 7, the AdGate precedent). The ask: `quality`/`track` on `<video>`
+    with a typed absence when the source is a single rendition, so an app can offer the
+    control the whole category offers instead of deleting it.
+
+37. **A declared web package is unreachable unless it declares `boot: true`** — the manifest
+    half FIXED UPSTREAM in this pass, the runtime half NOT YET FILED (isolated 2026-08-30
+    wiring the player's Share control). Two layers:
+    (a) Core/SocialShare has shipped a complete web facet since 1.0 — `web/index.js`, the Web
+        Share API with a clipboard fallback, resolving the same `{ completed, activityType }`
+        as the native lanes — and its `dsx.json` never declared `web.entry`. The CLI only
+        emits a browser chunk for a package that declares one (`build.ts`: `if (pkg.entry ===
+        undefined) continue`), so every web build had no chunk and `has('share') === false`
+        while the implementation sat there complete. Fixed by declaring the entry.
+    (b) That was half. A declared package is imported by the bootloader ONLY when `boot` is
+        true, and there is no lazy `dsx:package/<scheme>` import anywhere in the runtime.
+        Measured after (a): chunk served 200, import map carried `dsx:package/share`, and
+        `share.url` still answered not-ok because nothing had ever imported it. **This
+        silently disabled STRIPE too** — it declares an entry, did not declare boot, and so
+        could not be dispatched from a browser: the web checkout would have failed the first
+        time anyone set STRIPE_KEY and pressed Buy, which no gate would have caught because
+        the server refuses first when the key is unset. Both modules now boot.
+        The ask: the build already emits an import-map entry for every declared package, so
+        the bus should dynamic-import `dsx:package/<scheme>` on first call and `boot: true`
+        should be an optimisation rather than the only way to be reachable. Until then, any
+        module a template declares without boot is dead weight that fails at the worst moment.
