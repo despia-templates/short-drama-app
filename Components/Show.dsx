@@ -21,8 +21,14 @@
     <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
     <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheFavs = favs.data"/>
     <api as="fav" url="/viewer/favorite" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+    <!-- the basket, priced by the server (one BULK_OFF, server-side) and re-quoted after a
+         purchase so the offer can never advertise something already owned -->
+    <api as="offer" url="/wallet/series/{{ vars.id }}" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <api as="buySeries" url="/wallet/unlockseries" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
 
     <variable as="favTouched">return ''</variable>
+    <variable as="buyingSeries">return false</variable>
+    <variable as="seriesToast">return ''</variable>
 
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
          last good payload lives in the app-wide store and is the FIRST PAINT while the
@@ -117,6 +123,17 @@
       if (d == null || d.show == null || d.show.tags == null) { return [] }
       return d.show.tags.map(t => ({ name: t }))
     </variable>
+    <!-- the offer is worth showing only when there is something to sell: a VIP, a fully
+         unlocked series and a free-to-the-end series all return remaining 0 and the whole
+         card stands down rather than advertising "unlock 0 episodes" -->
+    <variable as="bulkLabel" computed="true">
+      if (dsx.variable.buyingSeries) { return 'Unlocking…' }
+      const o = offer.data
+      return o == null ? 'Unlock the series' : 'Unlock for ' + o.price + ' coins'
+    </variable>
+    <variable as="bulkOn" computed="true">
+      return offer.data != null && offer.data.remaining > 0
+    </variable>
     <variable as="relCols" computed="true">
       if (dsx.variable.bp == 'desktop') { return 6 }
       if (dsx.variable.bp == 'tablet') { return 4 }
@@ -142,6 +159,20 @@
     <!-- The canonical back (writing-an-app.md §5): POP when there is history, REPLACE
          when the screen was deep-linked, so a dismiss never teleports home and never
          stacks a second copy of where you came from. Back is never href — href pushes. -->
+    <action as="buyWholeSeries">
+      if (dsx.variable.buyingSeries) { return }
+      dsx.variable.buyingSeries = true
+      const r = await buySeries.send({ show: vars.id })
+      dsx.variable.buyingSeries = false
+      if (r.ok !== true) {
+        // a declared rejection lands on r.data.message; r.error is transport only (AGENTS.md)
+        dsx.variable.seriesToast = r.data == null ? 'That did not go through.' : r.data.message
+        return
+      }
+      dsx.variable.seriesToast = 'Unlocked ' + r.data.unlocked + ' episodes — saved ' + r.data.saved + ' coins'
+      wallet.refresh()
+      offer.refresh()
+    </action>
     <action as="goBack">
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
       else { dsx.module.route.replace({ path: '/' }) }
@@ -175,6 +206,12 @@
     <style as="relTitle" fontSize="13" color="rgba(255,255,255,0.85)" lineLimit="1"/>
     <style as="metaRow" spacing="6" alignItems="center" paddingTop="2"/>
     <style as="metaTxt" fontSize="13" fontWeight="medium" color="rgba(255,255,255,0.6)"/>
+    <style as="bulkCard" background="#1C1C1E" radius="14" spacing="10" paddingH="16" paddingV="14" alignItems="stretch"/>
+    <style as="bulkTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="2"/>
+    <style as="bulkWas" fontSize="13" color="rgba(255,255,255,0.55)"/>
+    <style as="bulkBtn" background="#F6B63D" radius="22" paddingH="18" paddingV="11" fontSize="14" fontWeight="bold" color="#3A2A08"/>
+    <style as="bulkReceipt" background="#1C1C1E" radius="10" spacing="8" alignItems="center" paddingH="14" paddingV="10"/>
+    <style as="bulkNote" fontSize="12" color="rgba(255,255,255,0.6)"/>
     <style as="tagFlow" alignItems="flex-start"/>
     <style as="tagSoft" background="rgba(255,233,168,0.10)" radius="4" paddingH="10" paddingV="5" fontSize="13" color="#FFE9A8"/>
     <style as="tag" background="rgba(255,255,255,0.1)" radius="16" paddingH="16" paddingV="7" fontSize="14" color="rgba(255,255,255,0.7)"/>
@@ -301,6 +338,34 @@
                   a11yLabel="rated {{ show == null ? '' : show.rating }} out of 10"/>
           </hstack>
 
+
+          <!-- THE SERIES BASKET. Both leaders sell this and it is the biggest single
+               decision in the funnel, so every number on it comes from the server's own
+               quote (`/wallet/series/:id`) rather than a client-side sum with a second copy
+               of the discount rate. The button states its price; the toast reports what the
+               server actually charged. -->
+          <vstack class="bulkCard" visible-if="dsx.variable.bulkOn">
+            <hstack spacing="10" alignItems="center">
+              <image icon="lock.open.fill" iconSize="16" color="#F6B63D" a11yHidden="true"/>
+              <vstack spacing="2" style="flex: 1; min-width: 0">
+                <text value="Unlock all {{ offer.data == null ? '' : offer.data.remaining }} remaining episodes" class="bulkTitle"/>
+                <text value="{{ offer.data == null ? '' : offer.data.listPrice }} coins  ·  save {{ offer.data == null ? '' : offer.data.off }}%" class="bulkWas"/>
+              </vstack>
+            </hstack>
+            <button label="{{ dsx.variable.bulkLabel }}"
+                    class="bulkBtn" on:tap="dsx.action.buyWholeSeries()"
+                    a11yLabel="Unlock all remaining episodes for {{ offer.data == null ? '' : offer.data.price }} coins"/>
+            <text value="Not enough coins — top up in the Store" class="bulkNote"
+                  visible-if="offer.data != null && offer.data.affordable == false"/>
+          </vstack>
+
+          <!-- the receipt OUTSIDE the card: once the last episode is bought the card stands
+               down (nothing left to sell), and a confirmation nested inside it would vanish
+               in the same frame — the viewer would see 448 coins leave and be told nothing -->
+          <hstack class="bulkReceipt" visible-if="dsx.variable.seriesToast != ''">
+            <image icon="checkmark" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+            <text value="{{ dsx.variable.seriesToast }}" class="bulkNote"/>
+          </hstack>
           <hstack class="ctaRow">
             <hstack class="favBtn" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button" a11yLabel="Toggle My List">
               <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="17"

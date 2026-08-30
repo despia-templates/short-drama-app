@@ -49,6 +49,126 @@
       }
     </action>
 
+    <!-- THE QUOTE. The screen has to show "unlock all 10 for 320, save 20%" before the
+         viewer commits, and the price it shows must be the price it charges. Computing that
+         on the client would put BULK_OFF in two places and let them drift, so the server
+         quotes the same basket the same way and the UI renders what it is told. Viewer-
+         specific (it subtracts what you already own), so it is auth'd, unlike the catalogue. -->
+    <action as="seriesOffer" inputs="show">
+      if (show == null || show === '') { throw { reason: 'invalid', message: 'show is required' } }
+      const BULK_OFF = 20
+      const s = await dsx.module.data.show.get({ id: show })
+      if (!s.ok) { throw { reason: 'not_found', message: 'no such show' } }
+      const eps = await dsx.module.data.episode.list({ filters: { show: show, state: 'live' }, limit: 100 })
+      const all = eps.ok ? eps.data : []
+
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      const w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      const vip = w != null && w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
+      const owned = await dsx.module.data.unlock.list({ filters: { show: show }, limit: 100 })
+      const have = (owned.ok ? owned.data : []).map(u => u.episode)
+
+      const chargeable = all.filter(row =>
+        row.price > 0 && row.idx > s.data.free_until && !have.includes(row.id) && vip === false)
+      const listTotal = chargeable.reduce((sum, row) => sum + row.price, 0)
+      const total = chargeable.reduce((sum, row) => sum + Math.round(row.price * (100 - BULK_OFF) / 100), 0)
+      return {
+        remaining: chargeable.length,
+        price: total,
+        listPrice: listTotal,
+        saved: listTotal - total,
+        off: BULK_OFF,
+        affordable: w != null && (w.coins + w.bonus) >= total
+      }
+    </action>
+
+    <!-- BULK UNLOCK — "unlock all N remaining for X, save Y%". Both category leaders sell
+         this and it is the single biggest basket in the funnel, so it gets the same rules as
+         the one-episode path and none of the shortcuts.
+
+         THE SERVER PRICES IT. `show` is the only input; the client never sends an amount, a
+         count or a discount. BULK_OFF is a server constant, so a crafted request cannot ask
+         for a better deal than the storefront offers.
+
+         IDEMPOTENT, NOT ATOMIC — and deliberately so. Every data call runs in its OWN
+         transaction (postgres.ts sets the caller identity per statement), and a declared
+         action has no way to wrap several of them, so N rows for one payment cannot be made
+         atomic today (PLAN.md §6.38). The fold is therefore per EPISODE — ledger, wallet,
+         unlock row, one episode at a time, exactly the order the single unlock uses. A
+         failure half way leaves K episodes paid for and owned and the rest untouched, which
+         is consistent; re-running charges only the remainder and never twice. The tempting
+         shape — debit the whole basket, then grant N rows — is the one that double-charges
+         on a retry, so it is not used.
+
+         The discount is applied to each UNIT price rather than refunded at the end: a viewer
+         holding exactly the advertised total must be able to afford it, which a
+         charge-full-then-credit design silently breaks. -->
+    <action as="unlockSeries" inputs="show">
+      if (show == null || show === '') { throw { reason: 'invalid', message: 'show is required' } }
+      const BULK_OFF = 20
+
+      const s = await dsx.module.data.show.get({ id: show })
+      if (!s.ok) { throw { reason: 'not_found', message: 'no such show' } }
+      // 100 is the ceiling `list` honours and never reports (PLAN.md §6.20); a series past it
+      // sells what this page can see rather than pretending to sell the whole run
+      const eps = await dsx.module.data.episode.list({ filters: { show: show, state: 'live' }, limit: 100 })
+      const all = eps.ok ? eps.data : []
+
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) {
+        const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (!made.ok) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
+        w = made.data
+      }
+      const vip = w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
+
+      const owned = await dsx.module.data.unlock.list({ filters: { show: show }, limit: 100 })
+      const have = (owned.ok ? owned.data : []).map(u => u.episode)
+
+      const chargeable = all.filter(row =>
+        row.price > 0 && row.idx > s.data.free_until && !have.includes(row.id) && vip === false)
+      if (chargeable.length === 0) {
+        return { unlocked: 0, spent: 0, alreadyOwned: true, remaining: 0 }
+      }
+
+      const unit = (row) => Math.round(row.price * (100 - BULK_OFF) / 100)
+      const total = chargeable.reduce((sum, row) => sum + unit(row), 0)
+      const listTotal = chargeable.reduce((sum, row) => sum + row.price, 0)
+      if (w.bonus + w.coins < total) {
+        throw { reason: 'conflict', message: 'not enough coins for the full series' }
+      }
+
+      let bonusLeft = w.bonus
+      let coinsLeft = w.coins
+      let done = 0
+      let spent = 0
+      for (const row of chargeable) {
+        const price = unit(row)
+        const fromBonus = Math.min(bonusLeft, price)
+        const fromCoins = price - fromBonus
+        if (fromBonus > 0) {
+          const lb = await dsx.module.data.ledger.create({ kind: 'bonus', amount: -fromBonus, source: 'unlock_series', ref: row.id })
+          if (!lb.ok) { throw { reason: 'unavailable', message: 'spend could not be recorded' } }
+        }
+        if (fromCoins > 0) {
+          const lc = await dsx.module.data.ledger.create({ kind: 'coin', amount: -fromCoins, source: 'unlock_series', ref: row.id })
+          if (!lc.ok) { throw { reason: 'unavailable', message: 'spend could not be recorded' } }
+        }
+        bonusLeft = bonusLeft - fromBonus
+        coinsLeft = coinsLeft - fromCoins
+        // the wallet moves WITH each episode, never once at the end: a debit that outlives a
+        // failed grant is the shape that charges twice on the retry
+        const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: bonusLeft, coins: coinsLeft } })
+        if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
+        const got = await dsx.module.data.unlock.create({ episode: row.id, show: show, price: price })
+        if (!got.ok) { throw { reason: 'unavailable', message: 'unlock could not be recorded' } }
+        done = done + 1
+        spent = spent + price
+      }
+      return { unlocked: done, spent: spent, listPrice: listTotal, saved: listTotal - spent, remaining: 0 }
+    </action>
+
     <action as="unlockEpisode" inputs="episode">
       if (episode == null || episode === '') { throw { reason: 'invalid', message: 'episode is required' } }
       const already = await dsx.module.data.unlock.list({ filters: { episode: episode }, limit: 1 })
@@ -101,5 +221,7 @@
 
   <route method="GET"  path="/wallet/state"   action="walletState"   auth="required"/>
   <route method="POST" path="/wallet/unlock"  action="unlockEpisode" auth="required"/>
+  <route method="POST" path="/wallet/unlockseries" action="unlockSeries" auth="required"/>
+  <route method="GET"  path="/wallet/series/:show"  action="seriesOffer"  auth="required"/>
   <route method="GET"  path="/wallet/ledger"  action="ledgerRows"    auth="required"/>
 </server>

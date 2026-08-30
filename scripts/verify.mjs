@@ -160,6 +160,21 @@ const unlock = await fetch(`${base}/wallet/unlock`, {
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ episode: detail.episodes[detail.episodes.length - 1].id }),
 });
+// The bulk basket is the biggest single spend in the app. Its price is quoted and charged
+// by the SERVER; the client sends only a show id. Both faces must refuse an anonymous caller,
+// or the discount becomes a way to read another viewer's entitlements.
+for (const [name, req] of [
+  ["the series quote", fetch(`${base}/wallet/series/${detail.show.id}`)],
+  ["a bulk unlock", fetch(`${base}/wallet/unlockseries`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ show: detail.show.id }),
+  })],
+]) {
+  const res = await req;
+  check(`${name} is refused without a session`, res.status >= 400,
+    `answered ${res.status} to an anonymous caller — pricing and entitlement are the server's word`);
+}
+
 check("an unauthenticated unlock is refused", unlock.status >= 400,
   `POST /wallet/unlock answered ${unlock.status} with no token — entitlement must never be the client's word`);
 

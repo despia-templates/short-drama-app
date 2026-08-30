@@ -570,3 +570,21 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
         the bus should dynamic-import `dsx:package/<scheme>` on first call and `boot: true`
         should be an optimisation rather than the only way to be reachable. Until then, any
         module a template declares without boot is dead weight that fails at the worst moment.
+
+38. **A declared action cannot span a TRANSACTION, so a multi-row spend cannot be atomic** —
+    NOT YET FILED (hit 2026-08-30 building bulk unlock). Every data-module call runs in its
+    own transaction: `postgres.ts` sets the caller identity with `set_config(..., true)`,
+    which is transaction-scoped, so one request's identity can never leak — correct, and the
+    reason there is no seam for wrapping several calls. But "unlock all 14 remaining episodes
+    for 448 coins" is N ledger rows, N unlock rows and a wallet debit for ONE payment, and
+    there is no way to make that all-or-nothing.
+    The template's answer is to be IDEMPOTENT rather than atomic: the fold runs per EPISODE —
+    ledger, wallet, unlock row, one at a time, the same order the single unlock uses — so a
+    failure half way leaves K episodes paid for and owned and the rest untouched, and a retry
+    charges only the remainder. The tempting shape (debit the basket, then grant N rows) is
+    the one that double-charges on retry, so it is not used. The cost is 3N writes for a
+    basket that could be 3 + N.
+    The ask: a declared way to say "these writes commit together" — `<transaction>` around a
+    block in an action body, or a repo-level `batch([...])`. Until then every multi-row spend
+    in every DSX app has to be designed around the absence, and most authors will reach for
+    the shape that double-charges.
