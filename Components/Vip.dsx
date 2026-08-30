@@ -214,24 +214,13 @@
         </vstack>
       </vstack>
 
-      <!-- the tiers -->
+      <!-- the tiers — the SAME component the Profile card raises and the Store embeds, so
+           VIP's own plan list buys through the one checkout instead of bouncing to /store -->
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <text value="Choose your plan" class="sectionTitle"/>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" spacing="12">
-          <list bind="catalog.data.vip" key="id" scroll="false" spacing="12">
-            <vstack class="tierCard" on:tap="dsx.module.route.push({ path: '/store' })"
-                    a11yGroup="true" a11yTrait="button" a11yLabel="{{ item.label }}, {{ item.price }}"
-                    style="background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid {{ item.best ? '#FF2C55' : 'rgba(0,0,0,0)' }}">
-              <hstack spacing="8" alignItems="center" style="width: 100%">
-                <text value="{{ item.label }}" class="tierName"/>
-                <spacer/>
-                <text value="{{ item.badge }}" class="tierBadge" visible-if="item.badge != ''"/>
-              </hstack>
-              <text value="{{ item.price }}" class="tierPrice"/>
-              <text value="{{ item.note }}" class="tierNote"/>
-            </vstack>
-          </list>
-          <button label="Go VIP" class="cta" on:tap="dsx.module.route.push({ path: '/store' })"/>
+          <PlansSheet mode="inline" headers="{{ dsx.variable.authHeaders }}"
+                      vip="{{ dsx.variable.isVip }}" on:purchased="wallet.refresh()"/>
         </vstack>
       </vstack>
     </vstack>

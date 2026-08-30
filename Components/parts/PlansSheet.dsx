@@ -1,0 +1,264 @@
+<!-- PlansSheet — the VIP paywall as a SHEET, which is what a paywall is.
+
+     A price list is an interruption, not a destination: it belongs over the screen that
+     raised the question, dismissible in one gesture, returning the viewer exactly where
+     they were. Pushing a whole route to show three prices costs the viewer their place
+     and buries the answer under a page of benefits they did not ask for. (designing-an-app
+     §8: "present it as a sheet the user can dismiss".)
+
+     SELF-CONTAINED, LIKE <SearchOverlay>. The host passes its own trigger as CHILDREN —
+     Profile's gold card, VIP's CTA, a row anywhere — and this file wraps it in the tap
+     that opens the sheet. No screen plumbs `present` state through to a child, and every
+     trigger in the app raises the identical surface.
+
+     ONE VIP CHECKOUT, HERE. The sequence (server PaymentIntent → one `dsx.module.stripe`
+     session → server-side settle) is money code, so it exists once: this component is
+     mounted by Profile and VIP as a sheet AND by Store as its inline VIP section
+     (`mode="inline"`), so all three buy through the same lines. A settle that Stripe
+     confirmed but the network lost keeps its order id on screen with an idempotent
+     Confirm — the recovery card travels with the flow it belongs to.
+
+     The catalogue is fetched LAZILY: a price list nobody opened costs nothing. -->
+<vstack alignItems="stretch">
+  <head>
+    <attribute as="mode" default="'sheet'"/>      <!-- sheet | inline -->
+    <attribute as="headers" default="{}"/>        <!-- the host's auth headers -->
+    <attribute as="vip" default="false"/>         <!-- is the viewer already a member -->
+    <attribute as="vipUntil" default="''"/>
+
+    <event as="purchased" payload="days"/>
+    <event as="failed" payload="message"/>
+
+    <api as="catalog" url="/store/catalog" auto="false"/>
+    <api as="checkoutCall" url="/store/checkout" method="POST" auto="false" headers="dsx.attribute.headers"/>
+    <api as="settleCall" url="/store/settle" method="POST" auto="false" headers="dsx.attribute.headers"/>
+
+    <variable as="open">return false</variable>
+    <variable as="buying">return ''</variable>
+    <variable as="paying">return false</variable>
+    <variable as="order">return ''</variable>
+    <variable as="settleFailed">return false</variable>
+    <variable as="toast">return ''</variable>
+    <variable as="hovId">return ''</variable>
+
+    <variable as="isInline" computed="true">return dsx.attribute.mode == 'inline'</variable>
+    <variable as="phase" computed="true">
+      if (catalog.error != null) { return 'error' }
+      if (catalog.data == null) { return 'loading' }
+      return 'content'
+    </variable>
+    <variable as="statusLine" computed="true">
+      if (dsx.attribute.vip == false) { return 'Cancel anytime. Your coins stay yours.' }
+      if (dsx.attribute.vipUntil == '') { return 'VIP is active — renewing extends it.' }
+      return 'VIP is active until ' + dsx.attribute.vipUntil + ' — renewing extends it.'
+    </variable>
+
+    <formula as="tierFx" id="item.id" best="item.best">
+      const lift = dsx.variable.hovId == id ? 'translateY(-2px)' : 'none'
+      const dim = dsx.variable.buying == id ? 0.55 : 1
+      const ring = best ? '#FF2C55' : 'rgba(0,0,0,0)'
+      const glow = dsx.variable.hovId == id ? '0 10px 30px rgba(230,190,110,0.25)' : 'none'
+      return 'background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid ' + ring + '; opacity: ' + dim + '; transform: ' + lift + '; box-shadow: ' + glow + '; transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease'
+    </formula>
+    <formula as="tierBusy" id="item.id">
+      if (dsx.variable.buying != id) { return '' }
+      return dsx.variable.paying ? 'Complete the payment…' : 'Contacting Stripe…'
+    </formula>
+
+    <action as="openPlans">
+      dsx.variable.toast = ''
+      if (catalog.data == null) { catalog.refresh() }
+      dsx.variable.open = true
+    </action>
+    <action as="load">
+      if (catalog.data == null) { catalog.refresh() }
+    </action>
+
+    <action as="buy" sku="item.id">
+      if (dsx.variable.buying != '') { return }
+      dsx.variable.buying = sku
+      dsx.variable.toast = ''
+      dsx.variable.settleFailed = false
+      const r = await checkoutCall.send({ sku: sku })
+      if (!r.ok) {
+        dsx.variable.buying = ''
+        dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Checkout is unavailable right now.'
+        dsx.event('failed', { message: dsx.variable.toast })
+        return
+      }
+      dsx.variable.order = r.data.order
+      const opened = await dsx.module.stripe.session({
+        publishable_key: r.data.publishable_key,
+        payment_intent_client_secret: r.data.client_secret
+      })
+      if (opened == null || opened.ok === false) {
+        dsx.variable.buying = ''
+        dsx.variable.toast = 'The payment sheet could not open on this platform.'
+        return
+      }
+      dsx.variable.paying = true
+      const paid = await dsx.module.stripe.payment({ session: dsx.module.stripe.context.session })
+      dsx.variable.paying = false
+      if (paid == null || paid.status !== 'succeeded') {
+        dsx.variable.buying = ''
+        dsx.variable.toast = 'Payment was not completed. Nothing was charged.'
+        return
+      }
+      await dsx.action.settle()
+      dsx.variable.buying = ''
+    </action>
+
+    <!-- settle is idempotent server-side (the order row is the lock), which is exactly
+         what lets the recovery card below exist: retrying is always safe -->
+    <action as="settle">
+      const s = await settleCall.send({ order: dsx.variable.order })
+      if (s.ok) {
+        dsx.variable.settleFailed = false
+        dsx.variable.order = ''
+        dsx.variable.open = false
+        dsx.event('purchased', { days: s.data.days })
+      } else {
+        dsx.variable.settleFailed = true
+        dsx.variable.toast = ''
+      }
+    </action>
+
+    <style as="trigger" alignItems="stretch"/>
+    <style as="sheetBody" spacing="14" alignItems="stretch" paddingH="16" paddingTop="6" paddingBottom="22"/>
+    <style as="head" alignItems="center" spacing="12"/>
+    <style as="title" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
+    <style as="status" fontSize="13" color="rgba(255,255,255,0.55)" lineSpacing="3"/>
+    <style as="closeBtn" width="32" height="32" radius="16" background="rgba(255,255,255,0.1)" alignItems="center"/>
+
+    <style as="tier" radius="14" paddingH="16" paddingV="16" spacing="8" alignItems="flex-start"/>
+    <style as="tierName" fontSize="15" fontWeight="semibold" color="#3A2A08"/>
+    <style as="tierPrice" fontSize="24" fontWeight="bold" color="#2A1D04"/>
+    <style as="tierNote" fontSize="12" color="rgba(42,29,4,0.7)"/>
+    <style as="tierBadge" background="#FF2C55" radius="4" paddingH="8" paddingV="4" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
+    <style as="perk" spacing="6" alignItems="center"/>
+    <style as="perkText" fontSize="12" fontWeight="medium" color="#2A1D04"/>
+    <style as="busyLine" fontSize="12" fontWeight="semibold" color="#2A1D04"/>
+
+    <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
+    <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
+    <style as="retryCard" background="#1E1830" radius="14" paddingH="16" paddingV="16" spacing="10" alignItems="flex-start"/>
+    <style as="retryTitle" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
+    <style as="retryBody" fontSize="13" color="rgba(255,255,255,0.65)" lineSpacing="4"/>
+    <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="benefitsLink" fontSize="13" fontWeight="semibold" color="#F6B63D" textAlign="center" paddingV="6"/>
+    <style as="errCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="20" alignItems="center"/>
+  </head>
+
+  <!-- the host's own trigger markup, wrapped in the tap that raises the sheet -->
+  <vstack class="trigger" visible-if="dsx.variable.isInline == false"
+          on:tap="dsx.action.openPlans()" a11yTrait="button" a11yLabel="See VIP plans">
+    <slot/>
+  </vstack>
+
+  <!-- INLINE: the same tiers as a section (Store mounts this) -->
+  <vstack alignItems="stretch" spacing="14" visible-if="dsx.variable.isInline" on:appear="dsx.action.load()">
+    <vstack spacing="12" alignItems="stretch" visible-if="dsx.variable.phase == 'loading'">
+      <Skeleton height="132" radius="14"/>
+      <Skeleton height="132" radius="14"/>
+    </vstack>
+    <vstack class="errCard" visible-if="dsx.variable.phase == 'error'">
+      <text value="VIP plans could not be loaded." fontSize="14" color="#FFFFFF"/>
+      <button label="Retry" class="retryBtn" on:tap="catalog.refresh()"/>
+    </vstack>
+    <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
+      <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
+      <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+             a11yLabel="Dismiss message" a11yTrait="button"/>
+    </hstack>
+    <vstack class="retryCard" visible-if="dsx.variable.settleFailed" style="border: 1px solid rgba(199,155,255,0.35)">
+      <text value="Payment received — one step left" class="retryTitle"/>
+      <text value="Stripe confirmed your payment, but applying it did not go through. Nothing is lost: confirm below and it lands. Order {{ dsx.variable.order }}." class="retryBody"/>
+      <button label="Confirm payment" class="retryBtn" on:tap="dsx.action.settle()"/>
+    </vstack>
+    <grid bind="catalog.data.vip" key="id" columns="{{ dsx.attribute.mode == 'inline' && dsx.screen.width >= 768 ? 3 : 1 }}" spacing="14" scroll="false"
+          visible-if="dsx.variable.phase == 'content'">
+      <vstack class="tier" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
+              on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
+              a11yLabel="Buy {{ item.label }} for {{ item.price }}" style="{{ tierFx }}">
+        <hstack spacing="8" alignItems="center" style="width: 100%">
+          <text value="{{ item.label }}" class="tierName"/>
+          <spacer/>
+          <text value="{{ item.badge }}" class="tierBadge" visible-if="item.badge != ''"/>
+        </hstack>
+        <text value="{{ item.price }}" class="tierPrice"/>
+        <text value="{{ item.note }}" class="tierNote"/>
+        <hstack class="perk">
+          <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
+          <text value="Unlimited viewing" class="perkText"/>
+        </hstack>
+        <hstack class="perk">
+          <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
+          <text value="1080p, no ads" class="perkText"/>
+        </hstack>
+        <text value="{{ tierBusy }}" class="busyLine" visible-if="tierBusy != ''"/>
+      </vstack>
+    </grid>
+  </vstack>
+
+  <!-- SHEET: content-height, so the plans sit over the screen that asked for them -->
+  <sheet present="dsx.variable.open" detents="content" background="#141414"
+         on:dismiss="dsx.variable.open = false">
+    <vstack class="sheetBody">
+      <hstack class="head">
+        <vstack spacing="4" style="flex: 1; min-width: 0" alignItems="stretch">
+          <text value="Go VIP" class="title"/>
+          <text value="{{ dsx.variable.statusLine }}" class="status"/>
+        </vstack>
+        <vstack class="closeBtn" style="justify-content: center" on:tap="dsx.variable.open = false"
+                a11yTrait="button" a11yLabel="Close plans">
+          <image icon="xmark" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
+        </vstack>
+      </hstack>
+
+      <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
+        <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
+        <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+               a11yLabel="Dismiss message" a11yTrait="button"/>
+      </hstack>
+
+      <vstack class="retryCard" visible-if="dsx.variable.settleFailed" style="border: 1px solid rgba(199,155,255,0.35)">
+        <text value="Payment received — one step left" class="retryTitle"/>
+        <text value="Stripe confirmed your payment, but applying it did not go through. Nothing is lost: confirm below and it lands. Order {{ dsx.variable.order }}." class="retryBody"/>
+        <button label="Confirm payment" class="retryBtn" on:tap="dsx.action.settle()"/>
+      </vstack>
+
+      <vstack spacing="12" alignItems="stretch" visible-if="dsx.variable.phase == 'loading'">
+        <Skeleton height="120" radius="14"/>
+        <Skeleton height="120" radius="14"/>
+      </vstack>
+
+      <vstack class="errCard" visible-if="dsx.variable.phase == 'error'">
+        <text value="VIP plans could not be loaded." fontSize="14" color="#FFFFFF"/>
+        <button label="Retry" class="retryBtn" on:tap="catalog.refresh()"/>
+      </vstack>
+
+      <list bind="catalog.data.vip" key="id" scroll="false" spacing="12" visible-if="dsx.variable.phase == 'content'">
+        <vstack class="tier" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
+                a11yLabel="Buy {{ item.label }} for {{ item.price }}" style="{{ tierFx }}">
+          <hstack spacing="8" alignItems="center" style="width: 100%">
+            <text value="{{ item.label }}" class="tierName"/>
+            <spacer/>
+            <text value="{{ item.badge }}" class="tierBadge" visible-if="item.badge != ''"/>
+          </hstack>
+          <text value="{{ item.price }}" class="tierPrice"/>
+          <text value="{{ item.note }}" class="tierNote"/>
+          <hstack class="perk">
+            <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
+            <text value="Unlimited viewing" class="perkText"/>
+          </hstack>
+          <text value="{{ tierBusy }}" class="busyLine" visible-if="tierBusy != ''"/>
+        </vstack>
+      </list>
+
+      <!-- the full page still exists for the benefit story; the sheet just isn't it -->
+      <text value="See everything VIP includes" class="benefitsLink"
+            visible-if="dsx.variable.phase == 'content'" a11yTrait="button"
+            on:tap="dsx.variable.open = false; dsx.module.route.push({ path: '/vip' })"/>
+    </vstack>
+  </sheet>
+</vstack>

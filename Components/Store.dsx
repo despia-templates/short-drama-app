@@ -76,11 +76,6 @@
     <!-- the card's whole look is ONE computed string (a bare {{ }} fragment beside other
          declarations is discarded — AGENTS.md); hover lift and in-flight dim live here so
          a tapped card responds on the SAME FRAME as the tap -->
-    <formula as="vipCardFx" id="item.id" best="item.best">
-      const lift = dsx.variable.hovId == id ? 'translateY(-2px)' : 'none'
-      const dim = dsx.variable.buying == id ? 0.55 : 1
-      return 'background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid ' + (best ? '#FF2C55' : 'rgba(0,0,0,0)') + '; opacity: ' + dim + '; transform: ' + lift + '; transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease; box-shadow: ' + (dsx.variable.hovId == id ? '0 10px 30px rgba(230,190,110,0.25)' : 'none')
-    </formula>
     <formula as="packCardFx" id="item.id">
       const lift = dsx.variable.hovId == ('p-' + id) ? 'translateY(-2px)' : 'none'
       const dim = dsx.variable.buying == id ? 0.55 : 1
@@ -167,14 +162,6 @@
     <style as="sectionTitle" fontSize="24" fontWeight="bold" color="rgba(255,255,255,0.8)" tracking="-0.3"/>
     <style as="sectionNote" fontSize="13" color="rgba(255,255,255,0.45)"/>
 
-    <style as="vipCard" radius="14" paddingH="16" paddingV="16" spacing="8" alignItems="flex-start"/>
-    <style as="vipName" fontSize="15" fontWeight="semibold" color="#3A2A08"/>
-    <style as="vipPrice" fontSize="24" fontWeight="bold" color="#2A1D04"/>
-    <style as="vipNote" fontSize="12" color="rgba(42,29,4,0.7)"/>
-    <style as="vipPerk" spacing="6" alignItems="center"/>
-    <style as="vipPerkText" fontSize="12" fontWeight="medium" color="#2A1D04"/>
-    <style as="vipBadge" background="#FF2C55" radius="4" paddingH="8" paddingV="4" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
-    <style as="busyLine" fontSize="12" fontWeight="semibold" color="#2A1D04"/>
     <style as="busyLineDark" fontSize="12" fontWeight="semibold" color="#F6B63D"/>
 
     <style as="packCard" background="#141419" radius="12" paddingH="16" paddingV="16" spacing="8" alignItems="flex-start"/>
@@ -254,36 +241,16 @@
         </vstack>
       </vstack>
 
-      <!-- VIP -->
+      <!-- VIP — the ONE plan list in the app: <PlansSheet> owns the tiers, the checkout
+           and the settle-recovery, mounted inline here and as a sheet from Profile/VIP -->
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
           <text value="VIP — unlock every series" class="sectionTitle"/>
           <text value="Unlimited viewing while your plan is active. Cancel anytime." class="sectionNote"/>
         </vstack>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <grid bind="catalog.data.vip" key="id" columns="{{ dsx.variable.vipCols }}" spacing="14" scroll="false">
-            <vstack class="vipCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
-                    on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
-                    a11yLabel="Buy {{ item.label }} for {{ item.price }}"
-                    style="{{ vipCardFx }}">
-              <hstack spacing="8" alignItems="center" style="width: 100%">
-                <text value="{{ item.label }}" class="vipName"/>
-                <spacer/>
-                <text value="{{ item.badge }}" class="vipBadge" visible-if="item.badge != ''"/>
-              </hstack>
-              <text value="{{ item.price }}" class="vipPrice"/>
-              <text value="{{ item.note }}" class="vipNote"/>
-              <hstack class="vipPerk">
-                <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
-                <text value="Unlimited viewing" class="vipPerkText"/>
-              </hstack>
-              <hstack class="vipPerk">
-                <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
-                <text value="1080p, no ads" class="vipPerkText"/>
-              </hstack>
-              <text value="{{ cardBusyLabel }}" class="busyLine" visible-if="cardBusyLabel != ''"/>
-            </vstack>
-          </grid>
+          <PlansSheet mode="inline" headers="{{ dsx.variable.authHeaders }}"
+                      vip="{{ dsx.variable.isVip }}" on:purchased="wallet.refresh()"/>
         </vstack>
       </vstack>
 

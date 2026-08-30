@@ -16,6 +16,8 @@
     <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
     <api as="ledger" url="/wallet/ledger" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
 
+    <variable as="toast">return ''</variable>
+
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
@@ -85,6 +87,14 @@
       return src
     </formula>
 
+    <action as="planBought">
+      wallet.refresh()
+      ledger.refresh()
+    </action>
+    <action as="planFailed" message="event.message">
+      dsx.variable.toast = message
+    </action>
+
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="22" paddingTop="20" paddingBottom="24" alignItems="stretch"/>
@@ -135,6 +145,8 @@
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
     <style as="signCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="24" alignItems="center"/>
 
+    <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
+    <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
     <style as="menuRow" alignItems="center" paddingV="12" spacing="11"/>
     <style as="menuLabel" fontSize="13" color="#FFFFFF"/>
     <style as="menuValue" fontSize="12" color="rgba(255,255,255,0.42)"/>
@@ -158,6 +170,12 @@
         <vstack class="content" style="flex: 1; min-width: 0">
           <text value="Profile" class="h1" visible-if="dsx.variable.wide == false"/>
 
+          <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
+            <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
+            <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+                   a11yLabel="Dismiss message" a11yTrait="button"/>
+          </hstack>
+
           <!-- signed out: the state has words and a way forward -->
           <vstack class="signCard" visible-if="dsx.variable.signedOut">
             <image icon="person.crop.circle" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
@@ -180,20 +198,27 @@
             </hstack>
           </vstack>
 
-          <!-- THE gold surface: VIP status when it is real, the upgrade door when not -->
-          <vstack class="vipCard" visible-if="dsx.variable.signedOut == false"
-                  on:tap="dsx.module.route.push({ path: '/vip' })" a11yGroup="true" a11yTrait="button"
-                  a11yLabel="{{ dsx.variable.isVip ? 'Your VIP membership' : 'Go VIP' }}"
-                  style="background: linear-gradient(150deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); transition: transform 0.18s ease">
-            <hstack spacing="10" alignItems="center" style="width: 100%">
-              <image icon="crown.fill" iconSize="20" color="#2A1D04" a11yHidden="true"/>
-              <vstack spacing="2" style="flex: 1; min-width: 0">
-                <text value="{{ dsx.variable.isVip ? 'VIP is active' : 'Go VIP' }}" class="vipTitle"/>
-                <text value="{{ dsx.variable.vipLine }}" class="vipSub"/>
-              </vstack>
-              <text value="{{ dsx.variable.isVip ? 'Manage' : 'See plans' }}" class="vipGo"/>
-            </hstack>
-          </vstack>
+          <!-- THE gold surface. It raises the PLANS SHEET, not a route: a price list is an
+               interruption, and the viewer should land back on their wallet the moment
+               they decide either way. <PlansSheet> owns the tiers, the checkout and the
+               settle-recovery; this card is just its trigger (passed as children). -->
+          <PlansSheet visible-if="dsx.variable.signedOut == false"
+                      headers="{{ dsx.variable.authHeaders }}"
+                      vip="{{ dsx.variable.isVip }}" vipUntil="{{ dsx.variable.vipUntil }}"
+                      on:purchased="dsx.action.planBought()" on:failed="dsx.action.planFailed()">
+            <vstack class="vipCard"
+                    a11yLabel="{{ dsx.variable.isVip ? 'Your VIP membership' : 'Go VIP' }}"
+                    style="background: linear-gradient(150deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%)">
+              <hstack spacing="10" alignItems="center" style="width: 100%">
+                <image icon="crown.fill" iconSize="20" color="#2A1D04" a11yHidden="true"/>
+                <vstack spacing="2" style="flex: 1; min-width: 0">
+                  <text value="{{ dsx.variable.isVip ? 'VIP is active' : 'Go VIP' }}" class="vipTitle"/>
+                  <text value="{{ dsx.variable.vipLine }}" class="vipSub"/>
+                </vstack>
+                <text value="{{ dsx.variable.isVip ? 'Manage' : 'See plans' }}" class="vipGo"/>
+              </hstack>
+            </vstack>
+          </PlansSheet>
 
           <!-- wallet: phone card (wide gets the strip below) -->
           <vstack class="card" visible-if="dsx.variable.wide == false && dsx.variable.signedOut == false">
