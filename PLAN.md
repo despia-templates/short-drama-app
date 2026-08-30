@@ -747,6 +747,25 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     `entry.surfaces=1 view=probe.Probe id=probe.Probe timeoutMs=15000`, and
     `StackComponents.resolve("probe.Probe") = FOUND`. So the defect is at or after RouterHost's
     frame-0 mount.
+    NARROWED, and the headline is good news: THE RENDERER IS FINE AND SO IS THIS TEMPLATE.
+    All 18 real screens were staged into `OpenSource/Conformance/parity/fixtures/` and run
+    through the framework's OWN iOS capture plane (`RuntimeParityTests`, the hosted XCTest the
+    parity contract uses): TEST SUCCEEDED, every screen parsed, and the capture measured **830
+    nodes, 775 with a non-zero box** — App 116/112, Profile 91/83, Rewards 85/83, Watch 60/55.
+    Spot-checked against the source: root vstack 390x844, scroll 390x732, TopNav 390x80, the
+    logo box 29x29 and the active tab dash 18x3 — the authored numbers, laid out correctly at
+    390pt. So the iOS renderer, the element set, the attribute plane and component resolution
+    all work on a large real app.
+    The defect is the BARE EXPORT. Mounting the identical way the harness does —
+    `StackSurface(root:webView:) -> windowRootController`, which is also how the export's own
+    ANDROID host mounts — still renders nothing inside the exported app, while the host view
+    measures 402x874, subviews=1, hidden=no, alpha=1, scene foregroundActive, app active. A
+    plain SwiftUI blue banner placed behind it paints, so window, scene and hosting are
+    exonerated: the DSX surface mounts, sizes, paints its background, and produces no content.
+    The one remaining difference is the environment — the harness runs inside `Runtime.app`
+    with the full module catalog; the export reports `0 module(s)`. Something the render path
+    needs is registered by the host catalog rather than the kernel, which no first-party app
+    could ever notice because every first-party app IS Runtime.app.
     What makes it expensive: it is SILENT. No diagnostic card (correctly — the tag resolves, so
     `flagsUnresolved` never fires), no kernel log despite `isTest`, no router-settle or
     root.failed trace, and the 15s settle timeout produces nothing at 34s either. Every

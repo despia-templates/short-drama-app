@@ -192,12 +192,21 @@ npx despia export ios --out ../shortdrama-ios
 npx despia export android --out ../shortdrama-android
 ```
 
-**It does not render yet, and that is upstream, not here.** A minimal one-component project with
-no CSS at all exports, builds and launches to a blank screen — while runtime instrumentation
-proves the component table is loaded, the root plan is normalized, and the entry component
-resolves. Filed with the full repro as
-[issue 278](https://github.com/despia-native/despia-framework/issues/278). Until it lands, the
-native lane is "builds and boots", not "ships".
+**These eighteen screens DO render on iOS — measured.** All of them were staged as fixtures into
+the framework's own parity corpus and run through its hosted iOS capture plane
+(`RuntimeParityTests`, the same harness the parity contract uses): every screen parsed, and the
+capture measured **830 nodes, 775 with a real non-zero box** — Home alone is 116 nodes, 112 sized,
+with the root at 390×844, the nav at 390×80 and the authored 18×3 tab dash exactly where the
+markup puts it.
+
+**What does not work is the bare exported app.** The same components mounted inside a
+`despia export` build render nothing, while the host view measures 402×874, foreground-active,
+visible — and a plain SwiftUI banner placed behind it paints. The renderer is fine and this
+template is fine; something the render path needs is registered by the framework's own host
+catalog rather than by the kernel, and an export reports `0 module(s)`. Filed with both
+measurements as [issue 278](https://github.com/despia-native/despia-framework/issues/278). Until
+it lands the native lane is "builds, boots, and renders under the framework's harness", not
+"ships".
 
 **`App.json` is the native half of the contract.** The web lane is same-origin by construction;
 the native lane has no origin, so `host` is what a root-relative `<api url="/x">` — and every
