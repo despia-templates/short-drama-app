@@ -89,7 +89,9 @@
   ],
   "router": {
     "transition": "ios",
-    "swipeBack": true
+    "swipeBack": true,
+    "motionBreakpoint": 768,
+    "wide": "dsx"
   },
   "packages": [
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Payments/Stripe"

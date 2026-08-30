@@ -149,7 +149,12 @@
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
-    <style as="page" spacing="0" paddingTop="16" paddingBottom="32" alignItems="stretch"/>
+    <!-- NO paddingTop on `page`: <TopNav> is the first child, so a padded page pushes the
+         GLOBAL BAR down — measured at 16px here against 0 everywhere else, which made the
+         bar visibly drop when a route change crossfaded Home into Store. The spacing the
+         page wanted belongs BELOW the bar, on the content (12 + 16 = 28), which leaves the
+         phone lane — where no bar renders — pixel-identical. -->
+    <style as="page" spacing="0" paddingBottom="32" alignItems="stretch"/>
     <style as="section" spacing="14" alignItems="stretch" paddingTop="32"/>
 
     <style as="head" alignItems="center" spacing="12"/>
@@ -188,7 +193,7 @@
     <vstack class="page">
       <TopNav active="store" visible-if="dsx.variable.wide"/>
 
-      <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" paddingTop="12">
+      <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" paddingTop="28">
         <hstack class="head">
           <!-- /store is a PUSHED route on every width (motion: ios), so the back control
                exists on every width too — a desktop viewer mid-paywall deserves the same
@@ -296,8 +301,11 @@
 
     </vstack>
   </scroll>
-  <!-- a pushed utility screen lights NO tab: the tab bar stays for orientation, but
-       claiming the viewer is "on" VIP while they are in the Store is a lie two taps
-       deep (tapping the lit tab resets to a different screen) -->
-  <TabBar active="" visible-if="dsx.variable.wide == false"/>
+  <!-- NO TAB BAR: /store is a PUSHED route, and on the phone lane a push TRANSFORMS the
+       whole frame — global chrome inside it would slide in with the page, which is exactly
+       what a global bar must never do. A pushed screen is therefore full-bleed with a back
+       affordance (UIKit calls this hidesBottomBarWhenPushed; every reference short-drama app
+       agrees). The tab roots keep their bar and swap instantly, so it never moves there
+       either. Wide viewports crossfade instead of pushing, so <TopNav> — painted identically
+       by both frames over an opaque under-frame — composites STILL (PLAN.md §6.26). -->
 </vstack>

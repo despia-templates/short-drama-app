@@ -343,3 +343,62 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     create error should carry WHICH policy refused, because "conflict" cost a bisection.
     Bridge: `server/policies.local.sql` — the app's own addendum, applied beside the
     generated migration, scoped to dsx_comment, loudly labeled, dies when the word lands.
+
+26. **A root-relative `<api url="/x">` cannot be fetched during SSR** — NOT YET FILED; fixed
+    upstream in this pass (measured 2026-08-30 chasing "the first clip loads for half a
+    second"). `executeApiForSSR` passed the authored url straight to `fetch`, so the exact
+    spelling the reference documents (`url="/catalog/discover"`) threw server-side — there is
+    no document to resolve it against — failed open, and seeded NOTHING. Every route's SSR
+    pass ran and was useless: `curl /discover` returned a spinner, zero `<video>` tags and no
+    titles, and the browser hydrated, then fetched, then painted. The origin was available
+    the whole time (`live.ts` holds `new URL(req.url)`), it was simply never threaded.
+    Fix: an `origin` option on the SSR path (`kernel/src/api.ts` resolves a leading `/`
+    against it; `page-render.ts` / `render.ts` / `live.ts` pass it down). Measured after:
+    14 `<video>` tags in the feed's SSR HTML, first media request **194ms → 75ms**.
+
+27. **`exportStatic`'s DATALESS export shadows live SSR seeding** — NOT YET FILED; fixed
+    upstream in this pass (same session). `dsx build` prerenders route HTML with no API host
+    running, so each file holds that route's null-data branch — a spinner where the component
+    declares a loading state, an empty shell otherwise (re-measured with the server stopped:
+    Vip exports its headings and a wallet reading "— coins"; Discover exports "Loading the
+    feed"). `createSiteHandler` served files BEFORE the page handler, so on a running server
+    those files permanently shadowed the live render and seeding could never reach a browser.
+    Fix: route paths (exact, non-pattern) go to the live renderer first — `preferLivePages`,
+    default true, opt-out for a CDN-shaped deployment whose exports are authoritative.
+    Assets are untouched, being route paths in no route table.
+
+28. **The universal-attribute census omitted seven DOCUMENTED attributes** — NOT YET FILED;
+    fixed upstream in this pass. `Documentation/reference/stack-elements.json` listed 30
+    universal attributes; `href`, `shared`, `sharedMode`, `sharedAnim`, `sharedOrder`,
+    `lockOrientation` and `dismissEdge` were missing, though all are documented as universal
+    and `href` is honoured by `mount.ts` and demonstrably navigates. A CLI rebuild exposed a
+    newer linter against the stale census and 29 valid `href` usages became hard errors —
+    i.e. the census, not the reference, was deciding what the language allows. Census now 37.
+    The deeper ask: this file is hand-maintained beside the reference it encodes, with no
+    test proving the two agree.
+
+29. **Router motion has one knob too few for GLOBAL CHROME** — NOT YET FILED; fixed upstream
+    in this pass (measured 2026-08-30, from "the top bar should not move with page route
+    changes"). Two separate gaps, one symptom:
+    (a) `masterDetailBreakpoint` answered TWO unrelated questions — where a master pane pins,
+        and where phone motion stops. An app whose global bar switches at 768 (top bar
+        replacing tab bar) had no way to say so, so tablet widths ran the phone's iOS push
+        WITH the desktop bar mounted; the bar lives inside the animating frame, so it slid in
+        from the right with the page. Fix: `motionBreakpoint`, defaulting to
+        `masterDetailBreakpoint` so every existing app is byte-identical.
+    (b) `wide` could only say `"none"` or `"same"`, when the useful shape is a phone that
+        PUSHES while wide viewports CROSSFADE. Fix: `wide` accepts a family name; an unknown
+        word degrades to `"none"` (the config plane is cast, not validated).
+    Why this is the whole answer on the wide lane: the neutral family animates the INCOMING
+    frame's opacity while the frame beneath stays opaque and untransformed, so a bar both
+    frames paint identically composites to a CONSTANT — it does not move and it does not dip;
+    only the pixels that genuinely differ (an active link's tint) cross-dissolve. Measured at
+    1440 and 900: one 160ms opacity animation, `transform: none` on every frame, the bar at
+    `[0, 0, width]` in every sample. On the MOBILE lane no compositing trick can save chrome
+    inside a transforming frame, so a pushed detail screen must not mount the tab bar at all
+    (UIKit's `hidesBottomBarWhenPushed`; every reference short-drama app agrees) — done here
+    for /store, /notices, /show/:id and /admin, each of which already owns a back affordance.
+    Template-side sibling law: **`<TopNav>` must be the first child of an UNPADDED wrapper.**
+    A `page` style carrying `paddingTop` pushes the global bar off y=0 — measured 16px on
+    Store and 12px on Notices against 0 everywhere else, so a route change visibly DROPPED
+    the bar. The padding belongs below the bar, on the content.

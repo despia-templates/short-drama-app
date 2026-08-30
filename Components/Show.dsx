@@ -306,5 +306,11 @@
 
     </vstack>
   </scroll>
-  <TabBar active="" visible-if="dsx.variable.wide == false"/>
+  <!-- NO TAB BAR: /show/:id is a PUSHED route, and on the phone lane a push TRANSFORMS the
+       whole frame — global chrome inside it would slide in with the page, which is exactly
+       what a global bar must never do. A pushed screen is therefore full-bleed with a back
+       affordance (UIKit calls this hidesBottomBarWhenPushed; every reference short-drama app
+       agrees). The tab roots keep their bar and swap instantly, so it never moves there
+       either. Wide viewports crossfade instead of pushing, so <TopNav> — painted identically
+       by both frames over an opaque under-frame — composites STILL (PLAN.md §6.26). -->
 </vstack>

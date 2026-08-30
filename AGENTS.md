@@ -140,6 +140,17 @@ and generated barrel are read once at boot). Schema change → re-apply
   intent (a `<watch>` on `paused`), bound the retries, and give the viewer a tap target when
   the browser is genuinely refusing autoplay (PLAN.md §6.23). `<sheet inset>` is declared and
   ignored on web, so a full-bleed sheet still needs a named bridge (PLAN.md §6.22).
+- **Global chrome never rides a route transition.** Two halves. (1) `<TopNav>` must be the
+  FIRST child of an UNPADDED wrapper: a `page` style carrying `paddingTop` pushes the bar off
+  y=0 (measured 16px on Store, 12px on Notices, against 0 everywhere else), so a route change
+  visibly drops the bar — put that padding on the content BELOW the bar, which also leaves the
+  phone lane, where no bar renders, pixel-identical. (2) A PUSHED route mounts no tab bar: the
+  phone lane transforms the whole frame, so chrome inside it slides in with the page and no
+  compositing trick can save it (UIKit calls this `hidesBottomBarWhenPushed`). Tab roots keep
+  their bar and are `motion: "none"`, so it never moves there either. Wide viewports crossfade
+  (`router.wide: "dsx"` + `motionBreakpoint` matching the app's own chrome breakpoint), and the
+  neutral family is opacity-only over an OPAQUE under-frame — so a bar both frames paint
+  identically composites STILL, while only a changed active tint cross-dissolves (PLAN.md §6.29).
 - **Ask the CAPABILITY plane before the platform.** `has('scheme')` answers "can I",
   `os` answers "which words" (`ios · android · web · macos · windows · linux`), `env` answers
   "which channel". A lane picked by `os == 'web'` first sends a build that DOES have the

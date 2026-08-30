@@ -46,7 +46,9 @@
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
-    <style as="page" spacing="16" paddingTop="12" paddingBottom="32" alignItems="stretch"/>
+    <!-- NO paddingTop on `page`: it would push <TopNav>, the global bar, off y=0 (see the
+         same note in Store.dsx). The 12px moves onto the content below the bar. -->
+    <style as="page" spacing="16" paddingBottom="32" alignItems="stretch"/>
     <style as="head" alignItems="center" spacing="12"/>
     <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
 
@@ -67,7 +69,7 @@
     <vstack class="page">
       <TopNav active="" visible-if="dsx.variable.wide"/>
 
-      <vstack style="{{ dsx.variable.shell }}" spacing="16" alignItems="stretch">
+      <vstack style="{{ dsx.variable.shell }}" spacing="16" alignItems="stretch" paddingTop="12">
         <hstack class="head">
           <image icon="chevron.left" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
                  a11yLabel="Back" a11yTrait="button"/>
@@ -109,5 +111,11 @@
       </vstack>
     </vstack>
   </scroll>
-  <TabBar active="" visible-if="dsx.variable.wide == false"/>
+  <!-- NO TAB BAR: /notices is a PUSHED route, and on the phone lane a push TRANSFORMS the
+       whole frame — global chrome inside it would slide in with the page, which is exactly
+       what a global bar must never do. A pushed screen is therefore full-bleed with a back
+       affordance (UIKit calls this hidesBottomBarWhenPushed; every reference short-drama app
+       agrees). The tab roots keep their bar and swap instantly, so it never moves there
+       either. Wide viewports crossfade instead of pushing, so <TopNav> — painted identically
+       by both frames over an opaque under-frame — composites STILL (PLAN.md §6.26). -->
 </vstack>
