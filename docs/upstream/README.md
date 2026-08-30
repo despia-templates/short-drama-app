@@ -29,3 +29,17 @@ retracted in the ledger instead of filed).
 - `22-linelimit-inert-web.md` — web: lineLimit is inert → https://github.com/despia-native/despia-framework/issues/237
 - `23-justifycontent-missing.md` — layout: justifyContent missing → https://github.com/despia-native/despia-framework/issues/238
 - `24-sibling-inputs-scope-leak.md` — sibling-with-inputs corrupts the caller's next binding → https://github.com/despia-native/despia-framework/issues/242
+- `25-ssr-relative-api-url.md` — ssr: a root-relative <api url="/x"> cannot be fetched during SSR — every seeded page shipped empty → https://github.com/despia-native/despia-framework/issues/260
+- `26-exportstatic-shadows-live.md` — site: exportStatic's dataless export permanently shadows live SSR seeding → https://github.com/despia-native/despia-framework/issues/261
+- `27-universal-attribute-census.md` — reference/lint: the universal-attribute census omitted seven documented attributes → https://github.com/despia-native/despia-framework/issues/262
+- `28-router-motion-chrome.md` — router: motion has one knob too few for global chrome → https://github.com/despia-native/despia-framework/issues/263
+- `29-api-cache-mount-scope.md` — api: cache="swr(...)" cannot survive a mount → https://github.com/despia-native/despia-framework/issues/264
+- `30-await-in-ternary.md` — jse/server: await inside a ternary silently yields a non-ok result → https://github.com/despia-native/despia-framework/issues/265
+- `31-route-param-initializer-and-order.md` — router: route param unreadable from a <variable> initializer; route order captures the URL → https://github.com/despia-native/despia-framework/issues/266
+- `32-no-kv-storage.md` — modules: no declared cross-platform key-value storage → https://github.com/despia-native/despia-framework/issues/267
+- `33-shell-stylesheets.md` — build/shell: the bundled face was unreachable — no app could link a stylesheet → https://github.com/despia-native/despia-framework/issues/268
+- `34-replace-reset-motion.md` — router: only push animated — replace/reset hard-cut → https://github.com/despia-native/despia-framework/issues/269
+- `35-video-rendition-track.md` — elements: <video> can select neither a rendition nor a track → https://github.com/despia-native/despia-framework/issues/270
+- `36-package-boot-required.md` — packages/runtime: a declared web package is unreachable without boot: true — silently disabled Stripe → https://github.com/despia-native/despia-framework/issues/271
+- `37-no-transaction.md` — server/data: a declared action cannot span a transaction → https://github.com/despia-native/despia-framework/issues/272
+- `38-atomic-style-id-collision.md` — web/ssr: atomic style ids are positional and unversioned → https://github.com/despia-native/despia-framework/issues/273

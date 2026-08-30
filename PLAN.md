@@ -1,16 +1,20 @@
 # short-drama-app — the founding plan
 
-> **Status: BUILT — production-shaped local slice.** Sixteen components, seven server
-> documents, 29 routes, 14 entities; Stripe web checkout, the coin economy, the earn loop
-> and the Manage surface all run against real Postgres with real RLS. This file is the
+> **Status: BUILT — production-shaped local slice.** Eighteen components, seven server
+> documents, 32 routes, 14 entities; Stripe web checkout, the coin economy, the earn loop
+> and the Manage surface all run against real Postgres with real RLS. Five gates run green
+> on every change — `lint · check:styles · review · build · verify` — the last of which boots
+> the origin and asserts payload shapes, SSR content and money authority. This file is the
 > spine; every document under `docs/` hangs off it, and §6 below is the measured upstream
-> ledger. When a decision here conflicts with the framework, the framework wins and this
-> file gets a correction — never the other way around.
+> ledger: 39 entries — 37 measured findings, every one filed upstream, and 2 retracted
+> where they stood rather than quietly deleted. When a decision here conflicts with the
+> framework, the framework wins and this file gets a correction — never the other way around.
 >
 > Source of truth for the framework: `despia-native/despia-framework` **dev branch**
-> (locally `~/despia_dsx/despia-framework`, verified at `92b844b0`, 2026-08-29). The public
-> `despia-native/despia` is the Apache-2.0 open drop of the same tree. Facts below were read
-> from that tree on 2026-08-29, not assumed.
+> (locally `~/despia_dsx/despia-framework`; the tree stood at `92b844b0` when §6 items 1–25
+> were measured and at `621b8dc5` at the close of 2026-08-30 — each item names what it was
+> read against). The public `despia-native/despia` is the Apache-2.0 open drop of the same
+> tree. Facts below were read from that tree, not assumed.
 
 ## 1 · What this repo will become
 
@@ -344,7 +348,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     Bridge: `server/policies.local.sql` — the app's own addendum, applied beside the
     generated migration, scoped to dsx_comment, loudly labeled, dies when the word lands.
 
-26. **A root-relative `<api url="/x">` cannot be fetched during SSR** — NOT YET FILED; fixed
+26. → filed: https://github.com/despia-native/despia-framework/issues/260 — **A root-relative `<api url="/x">` cannot be fetched during SSR** — fixed
     upstream in this pass (measured 2026-08-30 chasing "the first clip loads for half a
     second"). `executeApiForSSR` passed the authored url straight to `fetch`, so the exact
     spelling the reference documents (`url="/catalog/discover"`) threw server-side — there is
@@ -356,7 +360,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     against it; `page-render.ts` / `render.ts` / `live.ts` pass it down). Measured after:
     14 `<video>` tags in the feed's SSR HTML, first media request **194ms → 75ms**.
 
-27. **`exportStatic`'s DATALESS export shadows live SSR seeding** — NOT YET FILED; fixed
+27. → filed: https://github.com/despia-native/despia-framework/issues/261 — **`exportStatic`'s DATALESS export shadows live SSR seeding** — fixed
     upstream in this pass (same session). `dsx build` prerenders route HTML with no API host
     running, so each file holds that route's null-data branch — a spinner where the component
     declares a loading state, an empty shell otherwise (re-measured with the server stopped:
@@ -367,7 +371,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     default true, opt-out for a CDN-shaped deployment whose exports are authoritative.
     Assets are untouched, being route paths in no route table.
 
-28. **The universal-attribute census omitted seven DOCUMENTED attributes** — NOT YET FILED;
+28. → filed: https://github.com/despia-native/despia-framework/issues/262 — **The universal-attribute census omitted seven DOCUMENTED attributes** —
     fixed upstream in this pass. `Documentation/reference/stack-elements.json` listed 30
     universal attributes; `href`, `shared`, `sharedMode`, `sharedAnim`, `sharedOrder`,
     `lockOrientation` and `dismissEdge` were missing, though all are documented as universal
@@ -377,7 +381,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     The deeper ask: this file is hand-maintained beside the reference it encodes, with no
     test proving the two agree.
 
-29. **Router motion has one knob too few for GLOBAL CHROME** — NOT YET FILED; fixed upstream
+29. → filed: https://github.com/despia-native/despia-framework/issues/263 — **Router motion has one knob too few for GLOBAL CHROME** — fixed upstream
     in this pass (measured 2026-08-30, from "the top bar should not move with page route
     changes"). Two separate gaps, one symptom:
     (a) `masterDetailBreakpoint` answered TWO unrelated questions — where a master pane pins,
@@ -403,8 +407,8 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     Store and 12px on Notices against 0 everywhere else, so a route change visibly DROPPED
     the bar. The padding belongs below the bar, on the content.
 
-30. **`<api cache="swr(...)">` cannot survive a MOUNT, so the cache's most valuable case is
-    unreachable** — NOT YET FILED (measured 2026-08-30, from "page change reloads data and
+30. → filed: https://github.com/despia-native/despia-framework/issues/264 — **`<api cache="swr(...)">` cannot survive a MOUNT, so the cache's most valuable case is
+    unreachable** — (measured 2026-08-30, from "page change reloads data and
     flashes"). The policy is right and complete: `swr(fresh, stale)` serves the cached body
     immediately and revalidates in the background (`fire()` → `serveCached(entry)` then
     `network(req, { refreshing: true })`), `refreshing` is a distinct state from `loading`,
@@ -435,8 +439,8 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     must be cleared when the viewer changes (docs/auth.md); the day the cache scope lands
     upstream, all of this collapses to one `cache=` attribute per block.
 
-31. **`await` inside a TERNARY branch silently yields a non-ok result (server action)** —
-    NOT YET FILED (isolated 2026-08-30 building the related rail). `const pool = cond ? await
+31. → filed: https://github.com/despia-native/despia-framework/issues/265 — **`await` inside a TERNARY branch silently yields a non-ok result (server action)** —
+    (isolated 2026-08-30 building the related rail). `const pool = cond ? await
     data.show.list(A) : await data.show.list(B)` returned a value whose `.ok` was falsy, so a
     "More like this" rail came back EMPTY for a genre with two live shows — no throw, no log,
     no rejected envelope, just no data. ISOLATED: with the identical `let pool` and the same
@@ -445,8 +449,8 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     The ask: either support `await` in a conditional expression or make it a LINT ERROR — a
     silent wrong answer in the money/catalogue path is the worst of the three outcomes.
 
-32. **Route params are not readable from a plain `<variable>` initializer, and a bare route
-    listed before its parameterised sibling captures the URL** — NOT YET FILED (both measured
+32. → filed: https://github.com/despia-native/despia-framework/issues/266 — **Route params are not readable from a plain `<variable>` initializer, and a bare route
+    listed before its parameterised sibling captures the URL** — (both measured
     2026-08-30 building Browse). Two separate route-table surprises, one screen:
     (a) `<variable as="active">return vars.genre …</variable>` read EMPTY at mount, so
         /browse/Revenge server-rendered "All series". The same `vars.genre` interpolates
@@ -461,7 +465,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
         whose ORDER changes which URL is written, while the content comes from another
         route, should be either order-independent or a validation error.
 
-33. **No declared cross-platform key-value storage** — NOT YET FILED (found 2026-08-30 adding
+33. → filed: https://github.com/despia-native/despia-framework/issues/267 — **No declared cross-platform key-value storage** — (found 2026-08-30 adding
     recent searches). `global.*` is in-memory and dies with the page; the module catalogue has
     no `storage`/`prefs`/`kv` scheme, and the skills' "Haptics, storage, camera: everything
     native is a module call" names a capability that has no module. So anything a template
@@ -470,7 +474,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     renderer behave differently from the other three, which Article 7 forbids without a named
     degradation. Recent searches are therefore session-scoped and say so in place.
 
-34. **The bundled face was unreachable: no app could link a stylesheet into its head** —
+34. → filed: https://github.com/despia-native/despia-framework/issues/268 — **The bundled face was unreachable: no app could link a stylesheet into its head** —
     FIXED UPSTREAM in this pass (measured 2026-08-30 against the sites the founder rated
     GREAT). The framework SHIPS Inter (`OpenSource/Type`, subsetted variable, 124KB, OFL) and
     `--dsx-font` names "InterVariable" FIRST — but the token sheet is deliberately asset-free
@@ -500,7 +504,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     different path. Verified: live page and static export both link /fonts/inter.css, and
     `document.fonts` reports InterVariable loaded.
 
-35. **Only `push` animated: a `replace`/`reset` hard-cut, and a route override could not name
+35. → filed: https://github.com/despia-native/despia-framework/issues/269 — **Only `push` animated: a `replace`/`reset` hard-cut, and a route override could not name
     the two lanes** — FIXED UPSTREAM in this pass (measured 2026-08-30 from "all route changes
     should have fade animation on desktop"). Two gaps behind one symptom — a desktop app that
     cross-dissolved its pushed routes and hard-cut every tab switch.
@@ -537,7 +541,7 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     slugs I invented rather than read, so six shows silently shared one fallback number. Both
     fixed; the second is a reminder that demo data deserves the same verification as code.
 
-36. **`<video>` can select neither a RENDITION nor a TRACK** — NOT YET FILED (measured
+36. → filed: https://github.com/despia-native/despia-framework/issues/270 — **`<video>` can select neither a RENDITION nor a TRACK** — (measured
     2026-08-30 auditing the player). The element census gives `<video>` `subtitles` and `pip`
     as booleans — both real, both now bound — but nothing to choose a quality rendition or an
     audio/subtitle LANGUAGE. This template had shipped a 240p–1080p ladder and an
@@ -549,8 +553,8 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     with a typed absence when the source is a single rendition, so an app can offer the
     control the whole category offers instead of deleting it.
 
-37. **A declared web package is unreachable unless it declares `boot: true`** — the manifest
-    half FIXED UPSTREAM in this pass, the runtime half NOT YET FILED (isolated 2026-08-30
+37. → filed: https://github.com/despia-native/despia-framework/issues/271 — **A declared web package is unreachable unless it declares `boot: true`** — the manifest
+    half FIXED UPSTREAM in this pass, the runtime half open (isolated 2026-08-30
     wiring the player's Share control). Two layers:
     (a) Core/SocialShare has shipped a complete web facet since 1.0 — `web/index.js`, the Web
         Share API with a clipboard fallback, resolving the same `{ completed, activityType }`
@@ -571,8 +575,8 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
         should be an optimisation rather than the only way to be reachable. Until then, any
         module a template declares without boot is dead weight that fails at the worst moment.
 
-38. **A declared action cannot span a TRANSACTION, so a multi-row spend cannot be atomic** —
-    NOT YET FILED (hit 2026-08-30 building bulk unlock). Every data-module call runs in its
+38. → filed: https://github.com/despia-native/despia-framework/issues/272 — **A declared action cannot span a TRANSACTION, so a multi-row spend cannot be atomic** —
+    (hit 2026-08-30 building bulk unlock). Every data-module call runs in its
     own transaction: `postgres.ts` sets the caller identity with `set_config(..., true)`,
     which is transaction-scoped, so one request's identity can never leak — correct, and the
     reason there is no seam for wrapping several calls. But "unlock all 14 remaining episodes
@@ -589,8 +593,8 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     in every DSX app has to be designed around the absence, and most authors will reach for
     the shape that double-charges.
 
-39. **Atomic style ids are POSITIONAL and UNVERSIONED, so a stale html page silently wears
-    another element's styles** — NOT YET FILED (measured 2026-08-30, from one forgotten
+39. → filed: https://github.com/despia-native/despia-framework/issues/273 — **Atomic style ids are POSITIONAL and UNVERSIONED, so a stale html page silently wears
+    another element's styles** — (measured 2026-08-30, from one forgotten
     server restart while building the hero carousel). A compiled page's styles are emitted as
     atomic classes numbered by position — `[data-dsx~="a517"] { … }` — and the SAME namespace
     is written TWICE: once into the SSR html from the server's registry, once at runtime into
