@@ -35,6 +35,7 @@
     <variable as="paused">return false</variable>
     <variable as="wMuted">return true</variable>
     <variable as="pos">return 0</variable>
+    <variable as="seekBox">return { width: 0, height: 0 }</variable>
     <variable as="time">return 0</variable>
     <variable as="duration">return 0</variable>
     <variable as="speed">return 1</variable>
@@ -553,8 +554,10 @@
             <stack height="18" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
                    a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
                    on:adjust="dsx.variable.pos = dsx.variable.pos + (dsx.this.direction == 'increment' ? 0.05 : -0.05)">
-              <stack height="2" radius="1" background="rgba(255,255,255,0.28)" style="width: 100%">
-                <stack height="2" radius="1" background="#FFFFFF" style="width: {{ dsx.variable.pos * 100 }}%"/>
+              <!-- fill sized from the MEASURED track (the reference's own seek idiom):
+                   percent lengths have no native twin today, and this track is fluid -->
+              <stack height="2" radius="1" background="rgba(255,255,255,0.28)" style="width: 100%" measure="dsx.variable.seekBox">
+                <stack height="2" radius="1" background="#FFFFFF" width="{{ Math.round(dsx.variable.seekBox.width * dsx.variable.pos) }}"/>
               </stack>
             </stack>
             <!-- the pill RAISES the drawer only in the lane that has one; with the panel

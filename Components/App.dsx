@@ -480,8 +480,11 @@
                     <text value="EP {{ item.idx }}" class="badgeDark"/>
                   </vstack>
                   <vstack style="{{ dsx.variable.posterBox }}">
+                    <!-- the fill is COMPUTED PX, not a % of the track: percent lengths have
+                         no native twin today (the CSS bridge drops them, measured — upstream
+                         filing), and the track's width is already a known variable -->
                     <stack class="resumeTrack" style="width: {{ dsx.variable.posterW }}px; height: 3px; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px">
-                      <stack class="resumeFill" style="width: {{ item.pct }}%; height: 3px"/>
+                      <stack class="resumeFill" style="width: {{ Math.round(dsx.variable.posterW * item.pct / 100) }}px; height: 3px"/>
                     </stack>
                   </vstack>
                 </zstack>

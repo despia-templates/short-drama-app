@@ -803,3 +803,41 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     template's `App.json` therefore ships a placeholder https origin rather than a lie, and the
     README names the LAN-address route for local testing along with the ATS exception the
     generated Info.plist does not declare.
+
+46. RESOLVED 2026-08-31 (`despia-framework dev@7514f068`) — **The full-bleed host canvas never
+    read the legacy named-class background layer**, so `<style as="screen" background="#000000">`
+    — the ordinary way a page states its canvas — left the systemBackground white above the
+    content: measured, a 14pt white strip at y=0 on an all-black app (iPhone 17 Pro). The
+    resolver read `store.classes`, which fills only when a head RENDERS — after the first canvas
+    resolution, with nothing republishing — so the fix reads the class background from the
+    resolved template's own head, which is static and timing-proof. Exports also adopted the
+    UIScene lifecycle (scene manifest + SceneDelegate) in the same pass. After: canvas black to
+    pixel 0,0 on phone and tablet, content still safe-area-inset.
+
+47. RESOLVED 2026-08-31 (`despia-framework dev@4526ef24`) — **The whole-attribute computed style
+    was silently inert on native.** The engine's inline-style door opened on a literal `:` in
+    the RAW attribute — and `style="{{ dsx.variable.posterBox }}"` has no colon until
+    interpolation, so the documented spelling (the only one that gets the declaration-list door,
+    §6.38) parsed as CSS on web and as nothing at all on iOS. Measured: the continue-card
+    overlay collapsed to its 3px track and the zstack centered the remains mid-poster. The gate
+    now also opens on an interpolation hole. No template edit; the hairline moved to the poster
+    foot on both devices.
+
+48. RESOLVED 2026-08-31 (`despia-framework dev@4526ef24`) — **A greedy child inflated the depth
+    stack.** SwiftUI's ZStack hands its incoming proposal to every child, so a `height: 100%`
+    scrim (bridged to grow) swallowed the scroll proposal and a fixed-height band rendered 2.2×
+    its declared height — hero copy pinned to the band top, captions adrift. `<zstack>` now
+    sizes CSS-true (CoverZStackLayout): auto size from NON-GREEDY children only; covering layers
+    take the resolved box; an axis with no non-greedy child keeps fill-available (a stack of
+    nothing but layers is a full-bleed surface). Greed is detected by MEASUREMENT, so a class,
+    inline CSS or an explicit `grow=` all count. iPad hero: copy vertically centered in a 421pt
+    band against web's 420 at the same viewport.
+
+49. → filed: https://github.com/despia-native/despia-framework/issues/281 — **Percent lengths
+    have no native twin** (probe: a `width: 64%` fill inside a 220px track renders 141px on web
+    and NOTHING on iOS — the bridge drops non-100 percents per-declaration, silently). Ports in
+    this template: a statically-sized track computes the fill px in the interpolation
+    (App/MyList continue rails); a fluid track uses the reference's own seek idiom —
+    `measure="dsx.variable.seekBox"` on the track, `width="{{ Math.round(seekBox.width * pos) }}"`
+    on the fill (Watch). Both render identically on web, so the port is not a fork. The ask
+    upstream: a real parent-relative twin, or a loud DEBUG drop.

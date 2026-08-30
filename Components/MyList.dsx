@@ -172,7 +172,7 @@
                       </vstack>
                       <vstack style="width: 132px; height: 198px; justify-content: flex-end">
                         <stack class="resumeTrack" style="width: 132px; height: 3px; border-radius: 0 0 8px 8px">
-                          <stack class="resumeFill" style="width: {{ item.pct }}%; height: 3px"/>
+                          <stack class="resumeFill" style="width: {{ Math.round(132 * item.pct / 100) }}px; height: 3px"/>
                         </stack>
                       </vstack>
                     </zstack>

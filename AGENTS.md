@@ -254,6 +254,17 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   `-webkit-line-clamp` box are correct as they stand — they are the web twins of an attribute
   that is already there. PLAN.md §6.43 counts what remains: 252 structural declarations.
 
+- **A progress fill is COMPUTED PX or a MEASURED track — never `width: N%`.** The native
+  bridge drops non-100 percent lengths silently (upstream #281): the web shows a 64% fill,
+  the device shows an empty track. Statically-sized track → compute the px in the hole
+  (`width: {{ Math.round(trackW * pct / 100) }}px`); fluid track → the reference's seek
+  idiom (`measure="dsx.variable.bar"` + `width="{{ Math.round(bar.width * pos) }}"`).
+- **Overlays may trust `height: 100%` and computed styles on native now.** Two engine fixes
+  (dev@4526ef24): the whole-attribute computed spelling reaches the native bridge (it was
+  silently inert — a fixed-size overlay collapsed to its 3px child), and a zstack sizes from
+  its NON-greedy children only, so a `height:100%` scrim covers the band instead of
+  inflating it 2.2×. If an overlay drifts on device, rebuild the export before porting
+  anything — the recipe itself is sound.
 - **Probe before you generalise.** If a property "doesn't work", reproduce it in a throwaway
   one-element component first. Three framework defects were once filed from one bad
   measurement; all three were false.
