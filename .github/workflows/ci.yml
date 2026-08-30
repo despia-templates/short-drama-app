@@ -1,20 +1,23 @@
 #
-#  CI — the five gates, run the way a STRANGER gets this template.
+#  CI — the five gates, against the framework this template is actually written against.
 #
-#  Deliberately built against the PUBLIC Apache-2.0 drop (`despia-native/despia`), not the
-#  private framework repo: that is what someone cloning this template can actually obtain,
-#  so it is what has to keep working. Two consequences, both named rather than hidden:
+#  WHY THIS NEEDS A SECRET, AND WHY THE OBVIOUS ALTERNATIVE DOES NOT WORK.
+#  The first version of this workflow built against the public Apache-2.0 drop
+#  (`despia-native/despia`), on the reasoning that it is what a stranger can obtain. It failed,
+#  and the failure was worth having: the drop mirrors a branch BEHIND `dev`, and this template
+#  is written against `dev`. Measured on the run that proved it — the drop's
+#  `Documentation/reference/stack-elements.json` lists **30** universal attributes where `dev`
+#  lists **38**, missing `href`, `chrome`, `shared`, `sharedMode`, `sharedAnim`, `sharedOrder`,
+#  `lockOrientation` and `dismissEdge`. That census is what the linter enforces, so building
+#  from the drop produced **38 hard errors** on markup that is correct and shipping
+#  (PLAN.md §6.28 / §6.41). The drop also carries no `ClosedSource/`, so Stripe and SocialShare
+#  cannot be configured and every `dsx.module.stripe` call warns — under `--strict`, a failure.
 #
-#    · the drop is the CONTENTS of OpenSource/, so it is cloned INTO `OpenSource` — the exact
-#      trap scripts/preflight.mjs now catches by name;
-#    · the drop carries no ClosedSource/, so the Stripe and SocialShare module packages are
-#      absent. The job drops them from dsx.config.json and prints what that degrades. The
-#      Store then shows the server's honest refusal instead of a payment sheet, and Share
-#      copies the link instead of opening the system sheet — the same degradation the README
-#      documents for anyone building without the full distribution.
-#
-#  `verify` boots the real origin against a real Postgres with the real migration and the
-#  real seed, so this is a behavioural run, not a compile check.
+#  So: CI checks out the private framework at `dev`, which needs a read token. Add a repo
+#  secret named FRAMEWORK_TOKEN (a fine-grained PAT with Contents: read on
+#  despia-native/despia-framework). Without it the gates job SKIPS rather than failing — a red
+#  badge for a missing credential is noise, and this template does not ship noise. The `status`
+#  job below always runs and says which lane you are in.
 #
 name: gates
 
@@ -29,8 +32,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  status:
+    name: which lane
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report whether the gates can run
+        run: |
+          if [ -n "${{ secrets.FRAMEWORK_TOKEN }}" ]; then
+            echo "FRAMEWORK_TOKEN is set — the gates job runs the full five against dev."
+          else
+            echo "::notice::FRAMEWORK_TOKEN is not set, so the gates job is skipped."
+            echo "The DSX packages are not on npm yet and the public Apache-2.0 drop"
+            echo "(despia-native/despia) mirrors a branch behind dev — measured: 30 universal"
+            echo "attributes against dev's 38 — so a build from the drop fails on correct markup."
+            echo "Add a fine-grained PAT with Contents: read on despia-native/despia-framework"
+            echo "as the repo secret FRAMEWORK_TOKEN to turn the gates on."
+          fi
+
   gates:
     name: lint · check:styles · review · build · verify
+    if: ${{ secrets.FRAMEWORK_TOKEN != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -62,11 +83,13 @@ jobs:
       # The sibling convention, exactly as scripts/preflight.mjs documents it:
       #   <parent>/despia_dsx/despia-framework/OpenSource/...
       #   <parent>/short-drama-app/
-      - name: Check out the open drop into OpenSource/
+      - name: Check out the framework (dev)
         uses: actions/checkout@v4
         with:
-          repository: despia-native/despia
-          path: despia_dsx/despia-framework/OpenSource
+          repository: despia-native/despia-framework
+          ref: dev
+          token: ${{ secrets.FRAMEWORK_TOKEN }}
+          path: despia_dsx/despia-framework
 
       - uses: actions/setup-node@v4
         with:
@@ -80,7 +103,9 @@ jobs:
           # the CLI's exec bit does not survive every rebuild
           chmod +x packages/cli/dist/bin/*.js || true
 
-      - name: Drop the ClosedSource modules (not in the open drop)
+      # ClosedSource ships in the full distribution. A checkout that has it builds the real
+      # configuration; one that does not degrades in place and this script says what that costs.
+      - name: Drop any module package this checkout does not carry
         working-directory: short-drama-app
         run: node scripts/ci-open-drop.mjs
 
