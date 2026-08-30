@@ -9,14 +9,21 @@ your training data: do not guess syntax from adjacent frameworks. Read
 ## The verify loop (run it, every time)
 
 ```sh
-npm run lint     # despia lint --strict — zero warnings allowed
-npm run review   # the design bar (a11y, tap targets, type scale, contrast)
-npm run build    # compiles Components/**.dsx AND server/*.dsx
+npm run lint          # despia lint --strict — zero warnings allowed
+npm run check:styles  # every style property, and every icon, against the framework catalogs
+npm run review        # the design bar (a11y, tap targets, type scale, contrast)
+npm run build         # compiles Components/**.dsx AND server/*.dsx
+npm run verify        # BEHAVIOURAL: boots an origin, asserts payloads, SSR content, authority
 ```
 
+The first three read the SOURCE; `verify` runs the thing. Three defects shipped in one week
+that every static gate passed, because each was a runtime disagreement rather than bad source —
+`scripts/verify.mjs` names all three at the top. A change is not done until all five are green.
+
 Backend or UI change → rebuild, then restart `node scripts/serve.mjs` (the site registry
-and generated barrel are read once at boot). Schema change → re-apply
-`server/generated/migration.sql` (re-runnable by construction).
+and generated barrel are read once at boot; the origin now reloads its registry when `dist/`
+changes and LOGS it, because a stale SSR sheet corrupts styling silently — PLAN.md §6.39).
+Schema change → re-apply `server/generated/migration.sql` (re-runnable by construction).
 
 ## This project's layout
 
