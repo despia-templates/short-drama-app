@@ -32,19 +32,26 @@ specified in `docs/` and land with the framework's native template lane.
   preflight's `DSX_FRAMEWORK_DIR` override covers the scripts, but npm's `file:` deps
   read only the relative path.
 
-  **No access to the private framework repo?** The public Apache-2.0 drop
-  (`despia-native/despia`) mirrors the same tree — but it is the *contents* of `OpenSource/`
-  with no wrapping directory, so it is cloned **into** `OpenSource`:
+  **No access to the private framework repo?** There is a public Apache-2.0 drop
+  (`despia-native/despia`), and you should know two things before reaching for it.
+
+  It is the *contents* of `OpenSource/` with no wrapping directory, so it is cloned **into**
+  `OpenSource` — one level higher lands every package where nothing looks for it, and the
+  preflight catches that case by name:
 
   ```sh
   git clone https://github.com/despia-native/despia despia_dsx/despia-framework/OpenSource
   ```
 
-  Cloning it one level higher lands every package where nothing looks for it; the preflight
-  catches that case by name. The drop carries no `ClosedSource/`, so run
-  `node scripts/ci-open-drop.mjs` once to drop the Stripe and SocialShare packages — it
-  prints exactly what that degrades. This is the path CI runs on every push, so it is the
-  path that stays working.
+  And **the drop currently lags the `dev` branch this template is written against.** Measured
+  2026-08-30: its attribute census lists 30 universal attributes where `dev` lists 38, missing
+  `href` among them — so a clean build from the drop fails with 38 lint errors on markup that
+  is correct and shipping. It also carries no `ClosedSource/`, so Stripe and SocialShare cannot
+  be configured (`node scripts/ci-open-drop.mjs` removes them and prints what that degrades).
+  Filed upstream as [issue 275](https://github.com/despia-native/despia-framework/issues/275)
+  with the ask that the drop track `dev` — or better, that the packages publish to npm and
+  retire the sibling-checkout convention entirely. Until then the framework `dev` branch is
+  the only lane that builds this template, which is why CI uses it.
 - **Stripe web checkout** builds against the `Core/Payments/Stripe` module from the full
   Despia distribution (`ClosedSource/`). Without it, drop `"stripe"` from `modules` and
   the `packages` entry in `dsx.config.json`: everything else builds, and the Store shows
@@ -160,19 +167,20 @@ declared actions — UI, AI and HTTP share one contract.
 
 Everything discovered while building this template is filed in [PLAN.md](PLAN.md) §6 —
 per the program's no-hacks law, none of it is worked around silently in template code;
-where a bridge exists it is labeled in place and dies when the upstream lands. **40 ledger
-entries: 38 measured findings, every one filed as an upstream issue, and 2 retracted where
+where a bridge exists it is labeled in place and dies when the upstream lands. **41 ledger
+entries: 39 measured findings, every one filed as an upstream issue, and 2 retracted where
 they stood rather than quietly deleted.** The issue bodies live in `docs/upstream/`, one
 file per finding, each with its repro and its measurement.
 
-Nine are still open and are the ones a DSX author is most likely to hit: the api cache dies
+Ten are still open and are the ones a DSX author is most likely to hit: the api cache dies
 with the mount (§6.30), `await` in a ternary silently yields a non-ok result (§6.31), a route
 param is unreadable from a `<variable>` initializer (§6.32), there is no cross-platform
 key-value storage (§6.33), `<video>` can select neither a rendition nor a track (§6.36), a
 declared web package needs `boot: true` to be reachable at all (§6.37), there is no
 transaction seam for a multi-row spend (§6.38), atomic style ids are positional and
 unversioned (§6.39), and a hydrated `<scroll>` never gets its scroll plane, so `on:scroll`
-is inert on the page a viewer lands on (§6.40).
+is inert on the page a viewer lands on (§6.40), and the public Apache-2.0 drop mirrors a
+branch behind `dev`, so the documented fallback checkout cannot build this template (§6.41).
 
 ## Localisation
 

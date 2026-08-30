@@ -6,7 +6,7 @@
 > on every change — `lint · check:styles · review · build · verify` — the last of which boots
 > the origin and asserts payload shapes, SSR content and money authority. This file is the
 > spine; every document under `docs/` hangs off it, and §6 below is the measured upstream
-> ledger: 40 entries — 38 measured findings, every one filed upstream, and 2 retracted
+> ledger: 41 entries — 39 measured findings, every one filed upstream, and 2 retracted
 > where they stood rather than quietly deleted. When a decision here conflicts with the
 > framework, the framework wins and this file gets a correction — never the other way around.
 >
@@ -647,3 +647,28 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     static per-caller attribute, and the transparent lane carries a gradient scrim so the
     links stay legible over whatever passes beneath. Three lines to make it scroll-aware the
     day the plane hydrates.
+
+41. → filed: https://github.com/despia-native/despia-framework/issues/275 — **The public Apache-2.0 drop mirrors a branch BEHIND `dev`, so the documented fallback
+    cannot build a template written against `dev`** — (measured 2026-08-30 by CI's first run,
+    which is exactly what CI is for). `despia-native/despia` is the open drop of the same
+    tree and is the checkout this template's README and preflight both name for anyone
+    without access to the private repo. It is not equivalent: its
+    `Documentation/reference/stack-elements.json` lists **30** universal attributes where
+    `dev` lists **38**, missing `href`, `chrome`, `shared`, `sharedMode`, `sharedAnim`,
+    `sharedOrder`, `lockOrientation` and `dismissEdge` — the census corrected in §6.28. Since
+    the census is what the linter enforces, a clean clone built against the drop produced
+    **38 hard errors** on markup that is correct and shipping today, plus notices on
+    `chrome=`, `shared=` and `dismissEdge=`.
+    Two more things the drop cannot do, both structural rather than stale: it carries no
+    `ClosedSource/`, so Stripe and SocialShare cannot be configured and every
+    `dsx.module.stripe` call warns (a failure under `--strict`); and its root is the CONTENTS
+    of `OpenSource/`, so it must be cloned INTO `OpenSource` or nothing resolves — a trap
+    `scripts/preflight.mjs` now catches by name.
+    The ask, in order of value: (a) mirror `dev`, or publish a second drop that tracks it, so
+    the open lane can build what the templates are written against; (b) say in the drop's
+    README which branch it mirrors and how far behind it may be, because right now the only
+    way to find out is to build and read 38 errors; (c) publish the `@despia-native/*`
+    packages to npm, which retires the whole sibling-checkout convention and this item with
+    it.
+    Bridged in the template: CI builds against `dev` with a read token and SKIPS rather than
+    failing when the token is absent; the README says the drop lags and what that costs.
