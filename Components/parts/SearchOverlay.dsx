@@ -73,6 +73,30 @@
       dsx.variable.busy = false
       if (res.ok) { dsx.variable.results = res.data.items }
       else { dsx.variable.results = [] }
+      // RECENT SEARCHES — every category app keeps them, and they are the cheapest way back
+      // into a session ("what was that show called"). App-wide, so they survive both the
+      // overlay closing and a route change; deduped with the newest first and capped at 8.
+      // Collections are value-typed: rebuild the array, never mutate a read.
+      // SESSION-SCOPED ON PURPOSE: `global.*` is in-memory, and this framework version ships
+      // no declared cross-platform key-value store (there is no `storage` scheme in the
+      // module catalogue — PLAN.md §6.33), so a reload starts fresh. A web-only
+      // localStorage bridge would be one renderer behaving differently from the other three,
+      // which this template does not do. The day a KV module lands, this is a two-line change.
+      if (res.ok) {
+        // ROWS ARE DICTS, never bare strings: `item` is the reserved row SCOPE, so a list of
+        // scalars renders "[object Object]" and collapses to one row under key="index"
+        // (measured). One field, one stable key.
+        const prev = global.recentSearches == null ? [] : global.recentSearches
+        const kept = prev.filter(r => r.term != term)
+        global.recentSearches = [{ term: term }].concat(kept).slice(0, 8)
+      }
+    </action>
+    <action as="searchAgain" inputs="term">
+      dsx.variable.q = term
+      dsx.action.runSearch()
+    </action>
+    <action as="clearRecent">
+      global.recentSearches = []
     </action>
     <action as="clearSearch">
       dsx.variable.q = ''
@@ -89,6 +113,8 @@
     <style as="goBtn" background="#FF2C55" radius="22" paddingH="22" paddingV="11" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
 
     <style as="panel" background="#141419" radius="16" paddingH="22" paddingV="20" spacing="16" alignItems="stretch"/>
+    <style as="recentChip" background="rgba(255,255,255,0.08)" radius="16" paddingH="14" paddingV="7" fontSize="13" color="rgba(255,255,255,0.85)"/>
+    <style as="clearRecent" fontSize="13" color="rgba(255,255,255,0.45)"/>
     <style as="panelHead" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
     <style as="hotRow" spacing="14" alignItems="center" paddingV="7"/>
     <style as="hotNum" fontSize="24" fontWeight="heavy"/>
@@ -134,6 +160,25 @@
         </hstack>
 
         <!-- resting state: the ranked hot list -->
+        <vstack class="panel" visible-if="dsx.variable.results == null && global.recentSearches != null && global.recentSearches.length > 0"
+                style="padding-bottom: 4px">
+          <hstack alignItems="center">
+            <text value="Recent" class="panelHead"/>
+            <spacer/>
+            <text value="Clear" class="clearRecent" a11yTrait="button" a11yLabel="Clear recent searches"
+                  on:tap="dsx.action.clearRecent()"/>
+          </hstack>
+          <scroll axis="horizontal">
+            <hstack spacing="8" alignItems="center" style="width: max-content">
+              <list bind="global.recentSearches" key="term" axis="horizontal" scroll="false" spacing="8">
+                <text value="{{ item.term }}" class="recentChip" a11yTrait="button"
+                      a11yLabel="Search again for {{ item.term }}"
+                      on:tap="dsx.action.searchAgain(item.term)"/>
+              </list>
+            </hstack>
+          </scroll>
+        </vstack>
+
         <vstack class="panel" visible-if="dsx.variable.results == null">
           <text value="Hot Movie" class="panelHead"/>
           <grid bind="home.data.trending" key="id" columns="{{ dsx.variable.hotCols }}" spacing="6" scroll="false">

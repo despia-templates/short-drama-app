@@ -434,3 +434,38 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     ID-GUARDED — a different show must never borrow the last one's art. Viewer-scoped keys
     must be cleared when the viewer changes (docs/auth.md); the day the cache scope lands
     upstream, all of this collapses to one `cache=` attribute per block.
+
+31. **`await` inside a TERNARY branch silently yields a non-ok result (server action)** —
+    NOT YET FILED (isolated 2026-08-30 building the related rail). `const pool = cond ? await
+    data.show.list(A) : await data.show.list(B)` returned a value whose `.ok` was falsy, so a
+    "More like this" rail came back EMPTY for a genre with two live shows — no throw, no log,
+    no rejected envelope, just no data. ISOLATED: with the identical `let pool` and the same
+    two calls written as an if/else with statement-level `await`, the rail fills correctly.
+    Every other await in this file is a plain assignment, which is why nothing else hit it.
+    The ask: either support `await` in a conditional expression or make it a LINT ERROR — a
+    silent wrong answer in the money/catalogue path is the worst of the three outcomes.
+
+32. **Route params are not readable from a plain `<variable>` initializer, and a bare route
+    listed before its parameterised sibling captures the URL** — NOT YET FILED (both measured
+    2026-08-30 building Browse). Two separate route-table surprises, one screen:
+    (a) `<variable as="active">return vars.genre …</variable>` read EMPTY at mount, so
+        /browse/Revenge server-rendered "All series". The same `vars.genre` interpolates
+        correctly in markup and resolves in a computed — moving the read into a
+        `computed="true"` fixed it outright. AGENTS.md documents params "in markup AND in
+        action bodies"; a plain initializer runs before the param is in scope and nothing
+        says so.
+    (b) With `/browse` declared BEFORE `/browse/:genre`, navigating to /browse/Revenge
+        rendered the RIGHT screen (genre bound, 2 series) but wrote the history URL as
+        `/browse` — so a reload or a shared link showed something different from what the
+        viewer was looking at. Declaring the parameterised route first fixed it. A table
+        whose ORDER changes which URL is written, while the content comes from another
+        route, should be either order-independent or a validation error.
+
+33. **No declared cross-platform key-value storage** — NOT YET FILED (found 2026-08-30 adding
+    recent searches). `global.*` is in-memory and dies with the page; the module catalogue has
+    no `storage`/`prefs`/`kv` scheme, and the skills' "Haptics, storage, camera: everything
+    native is a module call" names a capability that has no module. So anything a template
+    wants to remember across launches — recent searches, a playback-speed preference, an
+    onboarding-seen flag — has no portable home. Reaching for web localStorage would make one
+    renderer behave differently from the other three, which Article 7 forbids without a named
+    degradation. Recent searches are therefore session-scoped and say so in place.

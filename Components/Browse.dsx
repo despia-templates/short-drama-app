@@ -1,0 +1,219 @@
+<!-- Browse — the destination this template was missing. Both category leaders ship it and
+     it is the same shape in each: DramaBox's /genres is a chip row over a result grid,
+     ReelShort reaches the same page from every shelf's "View all" and from the tag chips on
+     a title. Without it a genre is a dead end — you can see ten Romance posters on Home and
+     have nowhere to go for the eleventh.
+
+     The chips are DERIVED from the catalogue (name + count, server-side), never a hardcoded
+     list: a genre appears here the day a show carries it, and the counts are always true.
+
+     Filtering does NOT change the route. The api url interpolates the active genre, so a
+     chip tap is a dep-change refetch — instant, back-button-free, and the URL still carries
+     the genre for a shareable/deep-linked entry (/browse/Revenge). Phones reach this screen
+     by PUSH, so it is full-bleed with a back control and mounts no tab bar (AGENTS.md);
+     wide viewports mount the bar and land here from the nav. -->
+<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <expects variable="nav"/>
+
+    <api as="browse" url="/catalog/browse/{{ dsx.variable.active }}"
+         on:success="global.cacheBrowse = browse.data"/>
+
+    <!-- '' means "follow the route"; a chip tap overrides it without touching history -->
+    <variable as="picked">return ''</variable>
+    <variable as="hovId">return ''</variable>
+    <!-- The route param is read in a COMPUTED, not in a plain variable's initializer: an
+         initializer runs at mount and `vars.genre` was still empty there, so /browse/Revenge
+         rendered "All series" (measured — the same value interpolates correctly in markup).
+         PLAN.md §6.32. A chip beats the route once the viewer has chosen. -->
+    <variable as="active" computed="true">
+      if (dsx.variable.picked != '') { return dsx.variable.picked }
+      const g = vars.genre
+      return g == null || g == '' ? 'all' : g
+    </variable>
+
+    <!-- stale-then-fresh, FILTER-GUARDED (PLAN.md §6.30). The stash holds whichever genre
+         was last fetched, so handing it back while a DIFFERENT genre is selected would show
+         Romance posters under the Revenge chip — the same lie the Show stash guards against.
+         Matching `active` means: re-entering Browse on the genre you left is instant, and
+         switching genres honestly shows the skeleton, because it is different content. -->
+    <variable as="view" computed="true">
+      if (browse.data != null) { return browse.data }
+      const cached = global.cacheBrowse
+      if (cached == null) { return null }
+      return cached.active == dsx.variable.active ? cached : null
+    </variable>
+    <!-- the CHIP ROW is filter-independent, so it is never guarded: the row must not vanish
+         while a new genre loads, or the control you just tapped disappears under your finger -->
+    <variable as="chips" computed="true">
+      if (browse.data != null) { return browse.data.genres }
+      const cached = global.cacheBrowse
+      return cached == null ? null : cached.genres
+    </variable>
+    <variable as="busy" computed="true">
+      return dsx.variable.view == null && browse.error == null
+    </variable>
+
+    <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
+    <variable as="bp" computed="true">
+      const w = dsx.screen.width
+      if (w >= 1120) { return 'desktop' }
+      if (w >= 768) { return 'tablet' }
+      return 'phone'
+    </variable>
+    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="cols" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 5 }
+      if (dsx.variable.bp == 'tablet') { return 4 }
+      return 3
+    </variable>
+    <variable as="gutter" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
+      return 16
+    </variable>
+    <variable as="shell" computed="true">
+      const g = dsx.variable.gutter
+      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+    </variable>
+    <variable as="heading" computed="true">
+      const a = dsx.variable.active
+      return a == 'all' ? 'All series' : a
+    </variable>
+    <!-- the skeleton grid needs a bindable source; 10 cells fills a desktop row twice -->
+    <variable as="skeletonRows" computed="true">
+      return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    </variable>
+    <!-- ONE computed value used as the WHOLE style attribute: `style="{{ chunk }}; extras"`
+         splits on `;` first and silently DROPS the colon-less fragment (AGENTS.md) -->
+    <variable as="allChipFx" computed="true">
+      const bg = dsx.variable.active == 'all' ? '#FF2C55' : 'rgba(255,255,255,0.08)'
+      return 'background: ' + bg + '; border-radius: 18px; padding: 8px 16px; white-space: nowrap; transition: background-color 0.18s ease'
+    </variable>
+    <variable as="countLabel" computed="true">
+      const v = dsx.variable.view
+      if (v == null) { return '' }
+      return v.total == 1 ? '1 series' : v.total + ' series'
+    </variable>
+
+    <formula as="chipFx" name="item.name">
+      const on = dsx.variable.active == name
+      const bg = on ? '#FF2C55' : 'rgba(255,255,255,0.08)'
+      return 'background: ' + bg + '; border-radius: 18px; padding: 8px 16px; white-space: nowrap; transition: background-color 0.18s ease'
+    </formula>
+    <formula as="cardFx" id="item.id">
+      const on = dsx.variable.hovId == id
+      return 'width: 100%; aspect-ratio: 3/4; border-radius: 8px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.03 : 1) + ')'
+    </formula>
+
+    <action as="goBack">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/' }) }
+    </action>
+
+    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="scroller" alignItems="stretch"/>
+    <style as="page" spacing="18" paddingBottom="40" alignItems="stretch"/>
+
+    <style as="crumb" fontSize="13" color="rgba(255,255,255,0.5)"/>
+    <style as="crumbOn" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
+    <style as="crumbRow" spacing="7" alignItems="center"/>
+    <style as="phoneBar" spacing="12" alignItems="center" paddingBottom="2"/>
+    <style as="headRow" spacing="10" alignItems="baseline"/>
+    <style as="h1" fontSize="24" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
+    <style as="count" fontSize="13" color="rgba(255,255,255,0.5)"/>
+
+    <style as="chipRow" spacing="8" alignItems="center"/>
+    <style as="chipLabel" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+
+    <style as="card" spacing="7" alignItems="stretch"/>
+    <!-- TWO lines, not one: at 3 columns on a 375pt phone a single clamped line ellipsised
+         nearly every title ("The CEO's A…"). Both category leaders wrap a card title to two.
+         lineLimit is the native half; the box trio is the web twin (AGENTS.md). -->
+    <style as="cardTitle" fontSize="15" fontWeight="medium" color="rgba(255,255,255,0.95)" lineLimit="2"/>
+    <style as="cardMeta" fontSize="12" color="rgba(255,255,255,0.5)"/>
+    <style as="skelCell" background="#141419" radius="8"/>
+    <style as="statusWrap" alignItems="center" spacing="10" paddingV="48"/>
+    <style as="statusHead" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="statusBody" fontSize="13" color="rgba(255,255,255,0.55)"/>
+    <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="11" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+  </head>
+
+  <TopNav active="browse" visible-if="dsx.variable.wide"/>
+  <scroll class="scroller" style="flex: 1; min-height: 0">
+    <vstack class="page" style="{{ dsx.variable.shell }}" paddingTop="16">
+
+      <hstack class="crumbRow" visible-if="dsx.variable.wide">
+        <text value="Home" class="crumb" a11yTrait="button" on:tap="dsx.module.route.reset({ path: '/' })"/>
+        <text value="/" class="crumb" a11yHidden="true"/>
+        <text value="Browse" class="crumbOn"/>
+      </hstack>
+
+      <!-- a deep-linked phone has no TopNav: the back bar is the only way out -->
+      <hstack class="phoneBar" visible-if="dsx.variable.wide == false">
+        <image icon="chevron.left" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
+               a11yLabel="Back" a11yTrait="button"/>
+        <text value="Browse" class="h1" style="font-size: 20px"/>
+      </hstack>
+
+      <hstack class="headRow">
+        <text value="{{ dsx.variable.heading }}" class="h1"/>
+        <text value="{{ dsx.variable.countLabel }}" class="count"/>
+      </hstack>
+
+      <!-- the chip row scrolls horizontally on a phone and simply wraps when there is room;
+           its TRACK is max-content (a rail capped at `width: 100%` makes its rows shrink) -->
+      <scroll axis="horizontal" visible-if="dsx.variable.chips != null">
+        <hstack class="chipRow" style="width: max-content">
+          <text value="All" class="chipLabel" style="{{ dsx.variable.allChipFx }}"
+                a11yTrait="button" a11yLabel="Show every series"
+                on:tap="dsx.variable.picked = 'all'"/>
+          <list bind="dsx.variable.chips" key="name" axis="horizontal" scroll="false" spacing="8">
+            <text value="{{ item.name }} · {{ item.count }}" class="chipLabel" style="{{ chipFx }}"
+                  a11yTrait="button" a11yLabel="{{ item.name }}, {{ item.count }} series"
+                  on:tap="dsx.variable.picked = item.name"/>
+          </list>
+        </hstack>
+      </scroll>
+
+      <!-- LOADING: a grid of cells in the real shape, so the page does not resize when the
+           posters land (a spinner over a collapsed page is the layout jump we designed out) -->
+      <grid visible-if="dsx.variable.busy" bind="dsx.variable.skeletonRows" key="index"
+            columns="{{ dsx.variable.cols }}" spacing="14" scroll="false">
+        <vstack class="card">
+          <vstack class="skelCell" style="width: 100%; aspect-ratio: 3/4"/>
+          <vstack class="skelCell" style="height: 13px; width: 70%"/>
+        </vstack>
+      </grid>
+
+      <grid visible-if="dsx.variable.view != null && dsx.variable.view.total > 0"
+            bind="dsx.variable.view.items" key="id"
+            columns="{{ dsx.variable.cols }}" spacing="14" scroll="false">
+        <vstack class="card" href="/show/{{ item.id }}"
+                on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
+                a11yGroup="true" a11yLabel="{{ item.title }}, {{ item.episodes }} episodes">
+          <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" style="{{ cardFx }}"/>
+          <vstack spacing="2" alignItems="stretch">
+            <text value="{{ item.title }}" class="cardTitle"
+                  style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+            <text value="{{ item.genre }}  |  EP {{ item.episodes }}" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+          </vstack>
+        </vstack>
+      </grid>
+
+      <vstack class="statusWrap" visible-if="dsx.variable.view != null && dsx.variable.view.total == 0">
+        <image icon="rectangle.stack" iconSize="30" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+        <text value="Nothing in {{ dsx.variable.heading }} yet" class="statusHead"/>
+        <text value="New series land here as they go live." class="statusBody"/>
+        <button label="Show every series" class="retryBtn" on:tap="dsx.variable.picked = 'all'"/>
+      </vstack>
+
+      <vstack class="statusWrap" visible-if="browse.error != null && dsx.variable.view == null">
+        <text value="The catalogue is unavailable." class="statusHead"/>
+        <text value="Check your connection and try again." class="statusBody"/>
+        <button label="Retry" class="retryBtn" on:tap="browse.refresh()"/>
+      </vstack>
+
+    </vstack>
+  </scroll>
+</vstack>

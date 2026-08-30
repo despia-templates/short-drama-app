@@ -66,6 +66,20 @@
       }
     },
     {
+      "path": "/browse/:genre",
+      "component": "shortdrama.Browse",
+      "meta": {
+        "title": "Browse — Short Drama"
+      }
+    },
+    {
+      "path": "/browse",
+      "component": "shortdrama.Browse",
+      "meta": {
+        "title": "Browse — Short Drama"
+      }
+    },
+    {
       "path": "/show/:id",
       "component": "shortdrama.Show",
       "meta": {

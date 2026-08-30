@@ -72,6 +72,48 @@
       }
     </action>
 
+    <!-- BROWSE — the destination every "View all" and every genre chip lands on, and the
+         one structural surface the category leaders have that this template did not:
+         DramaBox ships /genres (a chip row over a result grid) and ReelShort ships
+         /shelf/<name> + /tags/<tag>. One action answers both shapes: the chip row is the
+         genres actually present WITH their counts (never a hardcoded list that can drift
+         from the catalogue), and `genre` filters the grid. 'all' is the unfiltered view. -->
+    <action as="browseCatalog" inputs="genre">
+      const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 100 })
+      const rows = shows.ok ? shows.data : []
+      // the chips are DERIVED from the catalogue, so a new genre appears the day a show
+      // carries it. Value-typed collections: group by WRITE-BACK, never mutate a read.
+      const tally = {}
+      for (const s of rows) {
+        const g = s.genre == null || s.genre === '' ? 'Drama' : s.genre
+        tally[g] = (tally[g] == null ? 0 : tally[g]) + 1
+      }
+      const genres = Object.entries(tally)
+        .map(([name, n]) => ({ name: name, count: n }))
+        .sort((a, b) => b.count - a.count)
+      const want = genre == null || genre === '' ? 'all' : genre
+      const picked = want === 'all'
+        ? rows
+        : rows.filter(row => (row.genre == null || row.genre === '' ? 'Drama' : row.genre) === want)
+      // one bounded episode query per show — the same shape homeShelves uses; a single
+      // unbounded read would be clamped at 100 rows without saying so (PLAN.md §6.20)
+      const counts = {}
+      for (const s of picked) {
+        const eps = await dsx.module.data.episode.list({ filters: { show: s.id, state: 'live' }, limit: 100 })
+        counts[s.id] = eps.ok ? eps.data.length : 0
+      }
+      return {
+        active: want,
+        genres: genres,
+        total: picked.length,
+        items: picked.map(row => ({
+          id: row.id, title: row.title, genre: row.genre, poster: row.poster,
+          synopsis: row.synopsis, free_until: row.free_until,
+          episodes: counts[row.id] == null ? 0 : counts[row.id]
+        }))
+      }
+    </action>
+
     <action as="discoverFeed">
       const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 50 })
       if (!shows.ok) { throw { reason: 'unavailable', message: 'catalogue unavailable' } }
@@ -112,7 +154,30 @@
         free: e.price === 0 || e.idx <= s.data.free_until,
         price: e.price
       }))
-      return { show: s.data, episodes: episodes }
+      // "More like this" — the same-genre neighbours, minus this show. Both category
+      // leaders put a related rail under the episode grid; it is what turns one finished
+      // series into the next one. Bounded like every other read here (LIST_LIMIT is 100
+      // and never says when it clamped), and a show with no genre falls back to the
+      // newest rows rather than returning an empty rail.
+      const genre = s.data.genre == null || s.data.genre === '' ? '' : s.data.genre
+      // `await` is a STATEMENT here, never a ternary branch: every other await in this file
+      // is a plain assignment, and the conditional-await spelling returned a pool whose
+      // `.ok` was false (related came back empty for a genre with two live shows).
+      // `await` is a STATEMENT here, never a ternary branch. ISOLATED 2026-08-30: with the
+      // identical `let pool`, the conditional-await spelling returns a pool whose `.ok` is
+      // falsy and this rail came back EMPTY for a genre with two live shows — no error, no
+      // log, just no data. Statement form works. Upstream: PLAN.md §6.31.
+      let pool = null
+      if (genre === '') {
+        pool = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 100 })
+      } else {
+        pool = await dsx.module.data.show.list({ filters: { state: 'live', genre: genre }, limit: 100 })
+      }
+      const related = (pool.ok ? pool.data : [])
+        .filter(row => row.id !== id)
+        .slice(0, 12)
+        .map(row => ({ id: row.id, title: row.title, genre: row.genre, poster: row.poster }))
+      return { show: s.data, episodes: episodes, related: related }
     </action>
 
     <action as="searchShows" inputs="q">
@@ -144,5 +209,6 @@
   <route method="GET" path="/catalog/home"     action="homeShelves"  auth="none"/>
   <route method="GET" path="/catalog/discover" action="discoverFeed" auth="none"/>
   <route method="GET" path="/catalog/show/:id" action="showDetail"   auth="none"/>
+  <route method="GET" path="/catalog/browse/:genre" action="browseCatalog" auth="none"/>
   <route method="POST" path="/catalog/search"   action="searchShows"  auth="none"/>
 </server>

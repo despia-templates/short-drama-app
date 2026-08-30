@@ -39,6 +39,7 @@
       return [
         { key: 'home',     label: 'Home',    path: '/' },
         { key: 'discover', label: 'For You', path: '/discover' },
+        { key: 'browse',   label: 'Browse',  path: '/browse' },
         { key: 'vip',      label: 'VIP',     path: '/vip' },
         { key: 'rewards',  label: 'Rewards', path: '/rewards' },
         { key: 'list',     label: 'My List', path: '/list' }

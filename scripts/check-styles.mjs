@@ -36,7 +36,16 @@ const say = (f, msg) => { problems++; console.error(`${f}: ${msg}`); };
 
 for (const f of files.sort()) {
   const src = readFileSync(f, "utf8");
-  const declared = new Set([...src.matchAll(/<style\s+as="([^"]+)"/g)].map((m) => m[1]));
+  const names = [...src.matchAll(/<style\s+as="([^"]+)"/g)].map((m) => m[1]);
+  const declared = new Set(names);
+  // A DUPLICATE <style as="x"> is silent: the Set above collapses it, the linter allows it,
+  // and the second declaration quietly re-skins every element already wearing the first.
+  // (Caught the hard way — a new `viewAll` shadowed the existing one on Home.)
+  const seen = new Set();
+  for (const n of names) {
+    if (seen.has(n)) say(f, `<style as="${n}"> is declared twice — the second silently re-skins every class="${n}" in this document`);
+    seen.add(n);
+  }
 
   for (const m of src.matchAll(/<style\s+([^>]*?)\/>/gs)) {
     const name = /as="([^"]+)"/.exec(m[1])?.[1] ?? "?";

@@ -140,6 +140,18 @@ and generated barrel are read once at boot). Schema change → re-apply
   intent (a `<watch>` on `paused`), bound the retries, and give the viewer a tap target when
   the browser is genuinely refusing autoplay (PLAN.md §6.23). `<sheet inset>` is declared and
   ignored on web, so a full-bleed sheet still needs a named bridge (PLAN.md §6.22).
+- **A route param is readable in markup, in a computed and in an action body — NOT in a plain
+  `<variable>` initializer.** An initializer runs before the param is in scope and reads empty,
+  so `/browse/Revenge` server-rendered "All series" with no error anywhere. Seed from a
+  `computed="true"` instead (PLAN.md §6.32a). And declare the PARAMETERISED route before its
+  bare sibling: with `/browse` first, `/browse/Revenge` rendered the right screen but wrote
+  `/browse` into history, so a reload showed something else (§6.32b).
+- **`await` is a STATEMENT, never a ternary branch.** `x = c ? await f() : await g()` returns
+  something whose `.ok` is falsy — silently, in a server action. Isolated against the identical
+  if/else, which works (PLAN.md §6.31).
+- **A repeater row is a DICT, never a scalar.** `item` is the reserved row SCOPE, so a `<list>`
+  bound to an array of strings renders "[object Object]" and collapses to one row under
+  `key="index"`. Store `[{ term: 'x' }]` and read `item.term`.
 - **A data screen paints STALE-THEN-FRESH, never blank.** `<api cache>` is keyed by the
   per-mount store and dies with the screen (PLAN.md §6.30), so a tab revisit refetches from
   zero — measured 103ms of empty rails on localhost, 300–600ms on a real network. Every data

@@ -187,6 +187,8 @@
     <style as="rail" spacing="18" alignItems="flex-start"/>
 
     <style as="card" spacing="8" alignItems="stretch"/>
+    <style as="shelfMore" spacing="4" alignItems="center"/>
+    <style as="shelfMoreLabel" fontSize="13" fontWeight="medium" color="rgba(255,255,255,0.5)"/>
     <style as="cardTitle" fontSize="14" color="rgba(255,255,255,0.8)" lineLimit="1"/>
     <style as="cardMeta" fontSize="14" color="rgba(255,255,255,0.9)" lineLimit="1"/>
     <style as="badge" background="#FF2C55" radius="4" paddingH="8" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
@@ -360,7 +362,7 @@
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="New Release" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           <spacer/>
-          <hstack class="viewAllRow" href="/discover" a11yGroup="true" a11yLabel="View all new releases">
+          <hstack class="viewAllRow" href="/browse" a11yGroup="true" a11yLabel="View all new releases">
             <text value="View all" class="viewAll"/>
             <image icon="chevron.right" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
           </hstack>
@@ -435,8 +437,19 @@
       <list bind="dsx.variable.homeView.shelves" key="genre" scroll="false" spacing="0"
             visible-if="dsx.variable.wide || dsx.variable.homeTab == 'popular'">
         <vstack class="section">
+          <!-- VIEW ALL — the affordance every shelf on ReelShort carries, and the reason
+               Browse exists: a genre rail shows a handful, and the eleventh title had
+               nowhere to live. Only the GENRE shelves get it, because only they have an
+               exact destination; a "View all" on New Release would land on an unfiltered
+               grid whose heading says something else. -->
           <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
             <text value="{{ item.genre }}" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
+            <spacer/>
+            <hstack class="shelfMore" href="/browse/{{ item.genre }}" a11yGroup="true" a11yTrait="button"
+                    a11yLabel="View all {{ item.genre }} series">
+              <text value="View all" class="shelfMoreLabel"/>
+              <image icon="chevron.right" iconSize="10" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
+            </hstack>
           </hstack>
           <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
             <grid bind="item.items" key="id" columns="{{ dsx.variable.shelfCols }}" spacing="18" scroll="false">
