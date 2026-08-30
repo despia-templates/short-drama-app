@@ -492,3 +492,40 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     measures distinctly from both system-ui and serif.
     The remaining ask: `despia build`'s static export assembles heads too, so the same option
     should be reachable from `dsx.config.json` rather than only from a hand-written host.
+
+35. **Only `push` animated: a `replace`/`reset` hard-cut, and a route override could not name
+    the two lanes** — FIXED UPSTREAM in this pass (measured 2026-08-30 from "all route changes
+    should have fade animation on desktop"). Two gaps behind one symptom — a desktop app that
+    cross-dissolved its pushed routes and hard-cut every tab switch.
+    (a) `navigatePath` called `animatePush` for `push` only; `replace` and `reset` discarded
+        the top frame and mounted the next one with no transition at all. Tab bars use
+        `reset`, so the most frequent navigation in the app was the one with no motion. Fix:
+        `discardTop(hold)` keeps the outgoing element painted (already unmounted, so it is a
+        dead painting — `aria-hidden`, `pointer-events: none`, removed on a timer) while the
+        incoming frame runs the neutral opacity animation over it. TRANSFORM families are
+        deliberately excluded: a replace has no spatial story, and iOS push geometry over a
+        discarded stack reads as a glitch.
+    (b) A per-route `motion` was one word for both lanes, and `"none"` always won — so the
+        only way to stop a tab root sliding on a phone (where the tab bar would ride the
+        transition) also killed its desktop crossfade. `motion` now accepts
+        `{ mobile, wide }`; a bare string still means both lanes, a lane left unnamed follows
+        the lane default, and an unknown word follows it too rather than reaching the DOM as
+        a family class. Verified: five tab switches each run one 160ms opacity animation at
+        1440 with `transform: none` on every frame and the bar pinned at [0, 64], and ZERO
+        animations at 375.
+
+### Learned from the FOUR sites the founder rated poorly (2026-08-30) — anti-patterns, audited
+### against this template rather than admired from a distance:
+    · **any-reel** opens straight into a grid with NO hero, ~126px cards seven across, a
+      ragged 7+2 row, an EMOJI in a section heading, a header with no navigation, and a badge
+      on every single card. We had the last one: 14 of 14 demo shows carried a kicker, so the
+      badge was decoration, not signal. Now 6 of 14, each tied to something true.
+    · **flickreels** renders an EMPTY page between header and footer — the client-render-with-
+      no-SSR failure this session already designed out (§6.26/§6.27/§6.30).
+    · **shortly.show** has no hero, no poster art at all, inconsistent heading casing
+      ("Top Series" / "New series"), and two overlays covering content on first paint.
+    · **netshort** is a visual clone of ReelShort — which is why this template measures the
+      category and then makes its own decisions, rather than copying one competitor's skin.
+    The two that landed on us were badge soup and metric drift: the METRICS table was keyed on
+    slugs I invented rather than read, so six shows silently shared one fallback number. Both
+    fixed; the second is a reminder that demo data deserves the same verification as code.

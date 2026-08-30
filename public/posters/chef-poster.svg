@@ -63,6 +63,6 @@
     <rect width="360" height="480" fill="url(#vig)"/>
     <rect width="360" height="480" filter="url(#grain)" opacity="0.5"/>
   <rect width="360" height="480" fill="url(#scrim)"/>
-  <text x="24" y="357.2" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="3.2" fill="#FFD979" opacity="0.95">NEW</text>
+  <text x="24" y="357.2" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="3.2" fill="#FFD979" opacity="0.95"></text>
   <text x="24" y="407.2" font-family="Georgia, Times New Roman, serif" font-size="34" font-weight="700" fill="#FFFFFF"><tspan x="24" dy="0">Kitchen of Second</tspan><tspan x="24" dy="38.8">Chances</tspan></text>
 </svg>

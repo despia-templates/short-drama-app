@@ -24,20 +24,20 @@
 // template increments them, and a real deployment replaces this table with its own counter.
 // Keyed by slug so the numbers stay stable across reseeds.
 const METRICS = {
-  bride:    { views: 5_420_000, rating: "9.6" },
-  alpha:    { views: 4_180_000, rating: "9.4" },
-  heiress:  { views: 3_760_000, rating: "9.5" },
-  midnight: { views: 3_010_000, rating: "9.2" },
-  divorce:  { views: 2_640_000, rating: "9.7" },
-  campus:   { views: 1_880_000, rating: "8.9" },
-  nanny:    { views: 1_540_000, rating: "9.1" },
-  twin:     { views: 1_260_000, rating: "8.8" },
-  wolf:     { views: 980_000,   rating: "9.0" },
-  nurse:    { views: 815_000,   rating: "8.7" },
-  heir:     { views: 640_000,   rating: "9.3" },
-  kitchen:  { views: 512_000,   rating: "8.6" },
-  wife:     { views: 388_000,   rating: "8.9" },
-  nightvale:{ views: 274_000,   rating: "9.1" },
+  bride:      { views: 5_420_000, rating: "9.6" },
+  alpha:      { views: 4_180_000, rating: "9.4" },
+  heiress:    { views: 3_760_000, rating: "9.5" },
+  midnight:   { views: 3_010_000, rating: "9.2" },
+  divorce:    { views: 2_640_000, rating: "9.7" },
+  campus:     { views: 1_880_000, rating: "8.9" },
+  "ceo-nanny":{ views: 1_540_000, rating: "9.1" },
+  twins:      { views: 1_260_000, rating: "8.8" },
+  moonlit:    { views: 980_000,   rating: "9.0" },
+  mafia:      { views: 815_000,   rating: "8.7" },
+  heir:       { views: 640_000,   rating: "9.3" },
+  chef:       { views: 512_000,   rating: "8.6" },
+  amnesia:    { views: 388_000,   rating: "8.9" },
+  vault:      { views: 274_000,   rating: "9.1" },
 };
 
 export const metricsFor = (slug) => METRICS[slug] ?? { views: 120_000, rating: "8.5" };
@@ -59,14 +59,14 @@ export const SHOWS = [
   },
   {
     slug: "heiress", title: "Secret Heiress of Time", genre: "Time Travel",
-    kicker: "ORIGINAL", featured: true, episodes: 26, freeUntil: 4, price: 55, media: "heiress",
+    kicker: "", featured: true, episodes: 26, freeUntil: 4, price: 55, media: "heiress",
     synopsis:
       "An antique pocket watch throws waitress June a century back — into the shoes of the heiress whose disappearance ruined her own family's name.",
     palette: { deep: "#1B0A33", mid: "#7A34C8", glow: "#C79BFF", accent: "#3A0F6B", figure: "#0D0420", spark: "#EBDCFF" },
   },
   {
     slug: "midnight", title: "Midnight CEO: Double Identity", genre: "Romance",
-    kicker: "ORIGINAL", featured: true, episodes: 28, freeUntil: 3, price: 60, media: "bride",
+    kicker: "", featured: true, episodes: 28, freeUntil: 3, price: 60, media: "bride",
     synopsis:
       "By day he signs her paycheque. By night he is the masked stranger who saved her life. Nora is falling for both men — and they are running out of ways to stay two people.",
     palette: { deep: "#120A22", mid: "#C2337A", glow: "#FF9BD0", accent: "#43104A", figure: "#0A0514", spark: "#FFE1F1" },
@@ -80,14 +80,14 @@ export const SHOWS = [
   },
   {
     slug: "mafia", title: "The Don's Forbidden Nurse", genre: "Mafia",
-    kicker: "ORIGINAL", featured: false, episodes: 24, freeUntil: 2, price: 70, media: "alpha",
+    kicker: "", featured: false, episodes: 24, freeUntil: 2, price: 70, media: "alpha",
     synopsis:
       "She patched a bullet wound and asked no questions. Now the most dangerous man in the city has decided she belongs to him — and the man who put the bullet there is still breathing.",
     palette: { deep: "#160A0A", mid: "#8E1420", glow: "#FF7A72", accent: "#3B0A0E", figure: "#0A0404", spark: "#FFD3CB" },
   },
   {
     slug: "twins", title: "Swapped With My Billionaire Twin", genre: "Comedy",
-    kicker: "NEW", featured: false, episodes: 20, freeUntil: 5, price: 45, media: "heiress",
+    kicker: "", featured: false, episodes: 20, freeUntil: 5, price: 45, media: "heiress",
     synopsis:
       "Two identical strangers, one boardroom, and forty-eight hours before the merger vote. Neither of them can afford to blink first.",
     palette: { deep: "#0A2320", mid: "#1E8E7A", glow: "#7BF0D8", accent: "#0D4A3F", figure: "#04120F", spark: "#D8FFF5" },
@@ -101,14 +101,14 @@ export const SHOWS = [
   },
   {
     slug: "heir", title: "The Hidden Heir Returns", genre: "Revenge",
-    kicker: "TRENDING", featured: false, episodes: 31, freeUntil: 3, price: 65, media: "alpha",
+    kicker: "", featured: false, episodes: 31, freeUntil: 3, price: 65, media: "alpha",
     synopsis:
       "Eighteen years ago they threw a boy out into the rain. Yesterday, the family's largest creditor bought their debt. Tonight he is coming to dinner.",
     palette: { deep: "#0B1522", mid: "#2F5F86", glow: "#93CBEF", accent: "#123044", figure: "#050B12", spark: "#DCEEFB" },
   },
   {
     slug: "moonlit", title: "Moonlit Bride of the Wolf King", genre: "Werewolf",
-    kicker: "ORIGINAL", featured: false, episodes: 29, freeUntil: 3, price: 65, media: "alpha",
+    kicker: "", featured: false, episodes: 29, freeUntil: 3, price: 65, media: "alpha",
     synopsis:
       "The treaty says the weakest omega of the losing pack must marry the king who destroyed it. Nobody warned the king that she was never weak.",
     palette: { deep: "#101A2E", mid: "#3F4FA8", glow: "#A9B4FF", accent: "#1C2455", figure: "#070B16", spark: "#E2E6FF" },
@@ -122,21 +122,21 @@ export const SHOWS = [
   },
   {
     slug: "chef", title: "Kitchen of Second Chances", genre: "Drama",
-    kicker: "NEW", featured: false, episodes: 18, freeUntil: 5, price: 45, media: "heiress",
+    kicker: "", featured: false, episodes: 18, freeUntil: 5, price: 45, media: "heiress",
     synopsis:
       "A three-star chef loses her palate and her restaurant in the same week. The only kitchen that will take her belongs to the critic who destroyed her.",
     palette: { deep: "#231604", mid: "#A8781A", glow: "#FFD979", accent: "#4C3008", figure: "#120B02", spark: "#FFF0C4" },
   },
   {
     slug: "vault", title: "The Last Heiress of Nightvale", genre: "Suspense",
-    kicker: "ORIGINAL", featured: false, episodes: 25, freeUntil: 2, price: 70, media: "alpha",
+    kicker: "NEW", featured: false, episodes: 25, freeUntil: 2, price: 70, media: "alpha",
     synopsis:
       "Her grandmother left her a house, a key, and one instruction: never open the east wing. Three days after the funeral, the east wing opens by itself.",
     palette: { deep: "#0C1410", mid: "#2C6B4B", glow: "#8CE0B4", accent: "#123528", figure: "#050A07", spark: "#D9F7E7" },
   },
   {
     slug: "campus", title: "My Cold Campus Prince", genre: "Comedy",
-    kicker: "NEW", featured: false, episodes: 19, freeUntil: 5, price: 40, media: "heiress",
+    kicker: "", featured: false, episodes: 19, freeUntil: 5, price: 40, media: "heiress",
     synopsis:
       "One dorm mix-up, one fake relationship, and one very real scholarship on the line. The rules were simple until somebody forgot they were pretending.",
     palette: { deep: "#0F1B33", mid: "#3C74D6", glow: "#9CC2FF", accent: "#1A3468", figure: "#060C18", spark: "#E0EBFF" },
