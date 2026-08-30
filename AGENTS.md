@@ -169,7 +169,11 @@ and generated barrel are read once at boot). Schema change → re-apply
   `/wallet/state` share a cache. Two rules that come with it: an error branch must also test
   the view is empty (a failed refresh must not throw a dead end over good content), and a
   stash keyed by a route param needs an ID GUARD or show B borrows show A's art.
-- **Global chrome never rides a route transition.** Two halves. (1) `<TopNav>` must be the
+- **Global chrome never rides a route transition.** THREE halves now. (0) Mark the bar
+  `chrome="true"` on its own root (TopNav/TabBar do it once, so no caller can forget): the
+  opacity family then animates the frame's content and leaves the bar alone, walking down to
+  it and animating its siblings at every level — measured, the bar holds opacity 1 while the
+  page goes 0.32 → 1. Nesting is fine; the bar does NOT have to be a direct child. (1) `<TopNav>` must be the
   FIRST child of an UNPADDED wrapper: a `page` style carrying `paddingTop` pushes the bar off
   y=0 (measured 16px on Store, 12px on Notices, against 0 everywhere else), so a route change
   visibly drops the bar — put that padding on the content BELOW the bar, which also leaves the

@@ -5,7 +5,7 @@
 
      A tap is a RESET to that root, never a push — tabs are lateral moves, so the stack
      never grows and the bar never travels with a transition (writing-an-app.md §5). -->
-<hstack class="bar" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.07); justify-content: space-around">
+<hstack chrome="true" class="bar" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.07); justify-content: space-around">
   <head>
     <attribute as="active" default="'home'"/>   <!-- home | foryou | vip | list | profile -->
 

@@ -19,7 +19,7 @@
      Search is an OVERLAY (<SearchOverlay/> owns its trigger and its cover sheet), never
      a route — the storefront stays mounted behind it. Icons resolve per renderer from
      the shared catalog; no emoji anywhere. -->
-<hstack class="nav" style="width: 100%; position: sticky; top: 0; z-index: 50">
+<hstack chrome="true" class="nav" style="width: 100%; position: sticky; top: 0; z-index: 50">
   <head>
     <attribute as="active" default="'home'"/>
 
