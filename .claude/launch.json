@@ -8,7 +8,8 @@
         "run",
         "serve"
       ],
-      "port": 8787
+      "port": 8787,
+      "autoPort": false
     },
     {
       "name": "dsx-dev-shell-only",

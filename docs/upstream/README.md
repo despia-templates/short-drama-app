@@ -45,3 +45,4 @@ retracted in the ledger instead of filed).
 - `38-atomic-style-id-collision.md` — web/ssr: atomic style ids are positional and unversioned → https://github.com/despia-native/despia-framework/issues/273
 - `39-hydrated-scroll-plane.md` — web/ssr: a hydrated <scroll> never gets its scroll plane → https://github.com/despia-native/despia-framework/issues/274
 - `40-open-drop-behind-dev.md` — distribution: the public drop mirrors a branch behind dev → https://github.com/despia-native/despia-framework/issues/275
+- `41-export-native-lane-blockers.md` — export: four defects that make `despia export ios` produce an app that cannot run → https://github.com/despia-native/despia-framework/issues/277

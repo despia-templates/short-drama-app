@@ -1,0 +1,9 @@
+{
+  "_note": "Native identity + the ORIGIN the native lane resolves root-relative <api url=\"/x\"> against. The web lane never needs this: it is same-origin by construction. Ships pointing at the local dev origin so a fresh clone runs on a simulator out of the box — swap `host` for your deployed https origin before shipping, or set per-locale origins in `hosts`. See README, 'The native lane'.",
+  "name": "Short Drama",
+  "host": "http://localhost:8787",
+  "entry": {
+    "root": "/",
+    "surfaces": ["shortdrama.App"]
+  }
+}

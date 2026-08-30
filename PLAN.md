@@ -672,3 +672,52 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     it.
     Bridged in the template: CI builds against `dev` with a read token and SKIPS rather than
     failing when the token is absent; the README says the drop lags and what that costs.
+
+42. → filed: https://github.com/despia-native/despia-framework/issues/277 — **The native lane:
+    four export defects, each of which alone makes `despia export ios` produce an app that
+    cannot run** — all four FIXED UPSTREAM in this pass (`dev@0ea4481e`), measured 2026-08-30
+    taking this template through `despia export ios` for the first time. In sequence:
+    (a) components were collected NON-RECURSIVELY while the web build walks the tree, so
+        `Components/parts/` — nav bar, tab bar, search overlay, ad gate, plans sheet — was
+        silently absent: `despia build` says 18 components, `despia export` said 12;
+    (b) the generated bridging header imports `DSXObjCException.h`, which the export copies
+        into `Kernel/` and never puts on `HEADER_SEARCH_PATHS`, so every export failed to
+        compile;
+    (c) `GENERATE_INFOPLIST_FILE = NO` means the generated plist is the whole plist, and it
+        declared no `CFBundleExecutable` / `CFBundleIdentifier` / `CFBundleName` /
+        `CFBundlePackageType` — an unlaunchable bundle, reported as
+        `AppIntentsSSUTraining … Unable to parse Info.plist`, which points nowhere near it;
+    (d) the generated `AppDelegate` never called `ModuleRegistry.shared.boot()` — the class
+        walk that installs the build tables, documented as "call synchronously at the very top
+        of didFinishLaunching". The component table was therefore empty when the Router
+        resolved frame 0, and EVERY exported app booted to the kernel's red
+        `<scheme.Entry/> failed to render` card. The Android twin does not have this bug: its
+        generated Application registers components explicitly instead of relying on the walk.
+    The diagnostics compound (d): the panel behind that card reports "No issues — every shipped
+    template parsed and registered", which is true and useless, because zero templates failed to
+    parse when zero were ever loaded. Distinguishing "nothing failed" from "nothing was loaded"
+    is a follow-up ask in the filing.
+    Verified after: 18 components exported, `xcodebuild` BUILD SUCCEEDED, the app launches, the
+    entry component mounts, and `<api url="/catalog/home">` resolves against the App.json origin
+    and reaches a live server (observed on an instrumented origin). The template now ships
+    `App.json` — identity plus the origin the native lane resolves root-relative API urls
+    against, which the web lane gets for free from being same-origin.
+
+43. **The template's LAYOUT lives in CSS, so it does not survive the native renderers** — NOT A
+    FRAMEWORK DEFECT; a template debt this pass measured rather than fixed. `style=""` on web has
+    no property whitelist, and this template used that door for STRUCTURE as well as decoration:
+    **252 `style=` attributes across all 18 components carry a structural declaration** — `flex`,
+    `width`, `height`, `min-height`, `position`, `object-fit`, `overflow`, `justify-content`,
+    `aspect-ratio`. AGENTS.md already states the law — "native drops unknown declarations
+    per-declaration, so anything load-bearing still needs an attr/class fallback" — and the web
+    lane being the only target meant it was never enforced.
+    Measured consequence: with the export fixed, the iOS app boots, registers all 18 components,
+    resolves the entry surface and fetches its data, and renders a near-blank screen with two
+    black bands, because the boxes that should carry the layout have no size. The data plane,
+    the routing host and the component table are all fine.
+    The work is a port, not a patch: re-express those 252 declarations as layout ATTRIBUTES
+    (`grow`, `width`, `height`, `padding`, `spacing`, `alignItems`) that every renderer honours,
+    keep the genuinely web-only ones (gradients, `backdrop-filter`, `-webkit-line-clamp`) as
+    progressive enhancement over an attribute fallback, and re-measure the web at 375/1000/1440
+    so the shipped storefront does not regress. Per-screen counts are in the item above's
+    filing; App.dsx (52) and Watch.dsx (51) are two fifths of it on their own.
