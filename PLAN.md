@@ -6,7 +6,7 @@
 > on every change — `lint · check:styles · review · build · verify` — the last of which boots
 > the origin and asserts payload shapes, SSR content and money authority. This file is the
 > spine; every document under `docs/` hangs off it, and §6 below is the measured upstream
-> ledger: 41 entries — 39 measured findings, every one filed upstream, and 2 retracted
+> ledger: 45 entries — 43 measured findings, every one filed upstream, and 2 retracted
 > where they stood rather than quietly deleted. When a decision here conflicts with the
 > framework, the framework wins and this file gets a correction — never the other way around.
 >
@@ -703,8 +703,9 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     `App.json` — identity plus the origin the native lane resolves root-relative API urls
     against, which the web lane gets for free from being same-origin.
 
-43. **The template's LAYOUT lives in CSS, so it does not survive the native renderers** — NOT A
-    FRAMEWORK DEFECT; a template debt this pass measured rather than fixed. `style=""` on web has
+43. **The template's LAYOUT lives in CSS, and does not survive the native renderers** — a
+    template debt, measured rather than fixed. IT IS NOT WHY THE NATIVE APP IS BLANK — see §6.44,
+    which supersedes the conclusion this item originally drew. `style=""` on web has
     no property whitelist, and this template used that door for STRUCTURE as well as decoration:
     **252 `style=` attributes across all 18 components carry a structural declaration** — `flex`,
     `width`, `height`, `min-height`, `position`, `object-fit`, `overflow`, `justify-content`,
@@ -733,3 +734,39 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     Started: `App.dsx`'s root (screen + scroller) carries `grow="true"` now, and the iOS app
     went from near-blank to real full-width boxes. Not finished: the rails, images and text
     columns below it still size in CSS, so the phone lane paints boxes without content.
+
+44. → filed: https://github.com/despia-native/despia-framework/issues/278 — **An exported iOS app
+    renders a BLANK SCREEN for a minimal valid component** — measured 2026-08-30 with a CONTROL,
+    after §6.43 wrongly concluded the blank native screens were this template's CSS debt. They are
+    not. A whole project of three files and one component — `<vstack background="#FF0000"
+    grow="true">` with a text and a coloured box, **no `style=` anywhere** — lints clean, exports,
+    builds, launches, and shows nothing. Reduced to a single `<text/>` as the entire document:
+    also nothing. There is no smaller case.
+    Instrumented in the generated AppDelegate, everything upstream of the render is provably
+    correct: `channel=simulator isTest=yes`, `stackComponents=1 (name=Probe scheme=probe)`,
+    `entry.surfaces=1 view=probe.Probe id=probe.Probe timeoutMs=15000`, and
+    `StackComponents.resolve("probe.Probe") = FOUND`. So the defect is at or after RouterHost's
+    frame-0 mount.
+    What makes it expensive: it is SILENT. No diagnostic card (correctly — the tag resolves, so
+    `flagsUnresolved` never fires), no kernel log despite `isTest`, no router-settle or
+    root.failed trace, and the 15s settle timeout produces nothing at 34s either. Every
+    diagnostic the kernel owns reports healthy while the screen is empty. `Package.swift` declares
+    no `testTarget`, so the Swift kernel has no automated render coverage — and the Android host
+    mounts `StackRootView` directly, bypassing the Router entirely, so the twins never exercise
+    the same path.
+    THE LESSON FOR THIS LEDGER: §6.43 was written from one measurement and no control, which is
+    exactly what "probe before you generalise" exists to prevent. The CSS debt is real and still
+    worth paying — 252 declarations that genuinely do not cross over — but it explains none of
+    the blank.
+
+45. → filed: https://github.com/despia-native/despia-framework/issues/279 — **The export has no
+    ASSET LANE, so a native app cannot ship its own images, fonts or media** — (measured
+    2026-08-30). `despia export` bundles the kernel, `Components/**.dsx`, `App.json`,
+    `EngineConfig.json` and `runtime.js`, and nothing from `public/`. This template's 44 poster
+    and hero SVGs, its bundled Inter face and its demo clips are all invisible to the native
+    lane, so every one is a network fetch and there is no offline first frame.
+    It also forces the origin question: with no bundled art, a simulator or device needs a
+    REACHABLE origin just to draw a poster, and `localhost` is not reachable from a device. The
+    template's `App.json` therefore ships a placeholder https origin rather than a lie, and the
+    README names the LAN-address route for local testing along with the ATS exception the
+    generated Info.plist does not declare.

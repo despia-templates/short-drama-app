@@ -167,8 +167,8 @@ declared actions — UI, AI and HTTP share one contract.
 
 Everything discovered while building this template is filed in [PLAN.md](PLAN.md) §6 —
 per the program's no-hacks law, none of it is worked around silently in template code;
-where a bridge exists it is labeled in place and dies when the upstream lands. **41 ledger
-entries: 39 measured findings, every one filed as an upstream issue, and 2 retracted where
+where a bridge exists it is labeled in place and dies when the upstream lands. **45 ledger
+entries: 43 measured findings, every one filed as an upstream issue, and 2 retracted where
 they stood rather than quietly deleted.** The issue bodies live in `docs/upstream/`, one
 file per finding, each with its repro and its measurement.
 
@@ -181,6 +181,38 @@ transaction seam for a multi-row spend (§6.38), atomic style ids are positional
 unversioned (§6.39), and a hydrated `<scroll>` never gets its scroll plane, so `on:scroll`
 is inert on the page a viewer lands on (§6.40), and the public Apache-2.0 drop mirrors a
 branch behind `dev`, so the documented fallback checkout cannot build this template (§6.41).
+
+## The native lane
+
+`despia export ios` and `despia export android` turn this project into a real Xcode / Android
+Studio project — kernel vendored, all 18 components bundled, nothing withheld. Both build today:
+
+```sh
+npx despia export ios --out ../shortdrama-ios
+npx despia export android --out ../shortdrama-android
+```
+
+**It does not render yet, and that is upstream, not here.** A minimal one-component project with
+no CSS at all exports, builds and launches to a blank screen — while runtime instrumentation
+proves the component table is loaded, the root plan is normalized, and the entry component
+resolves. Filed with the full repro as
+[issue 278](https://github.com/despia-native/despia-framework/issues/278). Until it lands, the
+native lane is "builds and boots", not "ships".
+
+**`App.json` is the native half of the contract.** The web lane is same-origin by construction;
+the native lane has no origin, so `host` is what a root-relative `<api url="/x">` — and every
+`<image src="/posters/…">` — resolves against. Point it at your deployed https origin.
+
+It is deliberately **not** `localhost`: a device cannot reach your laptop by that name, and the
+export ships no assets of its own ([issue 279](https://github.com/despia-native/despia-framework/issues/279)),
+so the origin serves the art as well as the data. To test against a local server, use your
+machine's LAN address (`http://192.168.x.x:8787`) and add an ATS exception — the generated
+Info.plist declares none.
+
+**Tablets are already in scope.** The export builds universal
+(`TARGETED_DEVICE_FAMILY = "1,2"`) with all four iPad orientations, and the app's own breakpoints
+(`phone <768 · tablet <1120 · desktop`) put iPad portrait on the tablet lane and iPad Pro
+landscape on the desktop lane — the same vocabulary the web uses, no second layout.
 
 ## Localisation
 

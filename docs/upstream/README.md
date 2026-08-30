@@ -46,3 +46,5 @@ retracted in the ledger instead of filed).
 - `39-hydrated-scroll-plane.md` — web/ssr: a hydrated <scroll> never gets its scroll plane → https://github.com/despia-native/despia-framework/issues/274
 - `40-open-drop-behind-dev.md` — distribution: the public drop mirrors a branch behind dev → https://github.com/despia-native/despia-framework/issues/275
 - `41-export-native-lane-blockers.md` — export: four defects that make `despia export ios` produce an app that cannot run → https://github.com/despia-native/despia-framework/issues/277
+- `42-native-renders-nothing.md` — ios/render: an exported app renders a blank screen for a minimal valid component → https://github.com/despia-native/despia-framework/issues/278
+- `43-export-no-asset-lane.md` — export: no asset lane, a native app cannot ship its own images/fonts/media → https://github.com/despia-native/despia-framework/issues/279
