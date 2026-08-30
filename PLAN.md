@@ -841,3 +841,20 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     `measure="dsx.variable.seekBox"` on the track, `width="{{ Math.round(seekBox.width * pos) }}"`
     on the fill (Watch). Both render identically on web, so the port is not a fork. The ask
     upstream: a real parent-relative twin, or a loud DEBUG drop.
+
+50. THE SCREEN-ROOT RECIPE, measured on device (2026-08-31) — three findings, one law.
+    (a) `min-height: {{ dsx.screen.height }}` on a native route root forces WINDOW height
+    into the SAFE region: the root demanded 874pt of a 781pt box and the spill carried the
+    tab bar 34pt into the home-indicator zone (captions measured at 840–860pt against a safe
+    bottom of 840). The declaration is the WEB page's body-height mechanism and now rides the
+    `:web` suffix; a native route frame already proposes exactly the safe region, and the
+    root fills it with `grow="true"`. (b) The root vstack's DEFAULT spacing (8 — measured
+    identical on web and native, so no drift filing) plus a zero-size seed child cost a
+    14pt phantom above the scroller the moment the min-height stopped masking it: a 0×0
+    component still pays two inter-child gaps. Screen roots declare `spacing="0"`. (c) The
+    fullscreen contract, all lanes, after the framework's canvas seams (dev@7514f068 native,
+    dev@b9347e81 web): the canvas paints the inset strips in the page's own declared
+    background, content stays inset, and a bar that should visually continue under the home
+    indicator does so BY CANVAS, not by spilling content. Measured end state on iPhone 17
+    Pro: first content 78pt (was 114 double-inset, and before that window-anchored under the
+    island), bar ink 788–812pt, bar bottom = safe bottom 840, black to the physical edge.

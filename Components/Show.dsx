@@ -12,7 +12,7 @@
      Entitlement is ALWAYS the server's opinion: `epLocked` reads /wallet/state, so a lock
      badge is never a client guess. Phones fall back to the stacked layout — a two-column
      detail on a 375pt screen is a desktop layout in a phone's clothes. -->
-<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <!-- the router publishes nav.canPop / nav.depth; back reads it -->
     <expects variable="nav"/>
@@ -188,7 +188,7 @@
       if (r.ok) { dsx.variable.favTouched = r.data.favorite ? 'y' : 'n' }
     </action>
 
-    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="0" paddingBottom="40" alignItems="stretch"/>
     <style as="split" spacing="0" alignItems="flex-start" paddingTop="26"/>

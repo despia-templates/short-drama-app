@@ -17,7 +17,7 @@
      rendered the complete fake economy from its null-defaults — streaks, caps, prizes,
      all invented, every button live — and the viewer's first four taps were four
      consecutive failure toasts. -->
-<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
 
@@ -181,7 +181,7 @@
       dsx.variable.toast = message
     </action>
 
-    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="0" paddingTop="16" paddingBottom="32" alignItems="stretch"/>
     <style as="section" spacing="14" alignItems="stretch" paddingTop="32"/>

@@ -2,7 +2,7 @@
      center (sidebar + content grid, the ReelShort-class shape); phones get the stacked
      rails over the tab bar. Empty states ship with the lists — an empty rail with no
      words is a bug report waiting to happen. -->
-<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="session" url="/dev-session.json" ssr="false"/>
     <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheFavs = favs.data"/>
@@ -87,7 +87,7 @@
       return 'width: 100%; aspect-ratio: 3/4; border-radius: 8px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.03 : 1) + ')'
     </formula>
 
-    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="22" paddingTop="20" paddingBottom="24" alignItems="stretch"/>
     <style as="split" spacing="26" alignItems="flex-start"/>

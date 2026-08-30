@@ -9,7 +9,7 @@
      Entitlement is read from /wallet/state (`vip`), never assumed, and every price comes
      from /store/catalog so an operator changes it without a build. Buying routes to the
      one checkout path in /store. -->
-<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
 
@@ -95,7 +95,7 @@
       return 'width: 100%; aspect-ratio: 3/4; border-radius: 10px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.03 : 1) + ')'
     </formula>
 
-    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="0" paddingBottom="34" alignItems="stretch"/>
     <style as="masthead" alignItems="center" spacing="8" paddingTop="20" paddingBottom="22"/>

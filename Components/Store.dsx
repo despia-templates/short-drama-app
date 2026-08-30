@@ -14,7 +14,7 @@
      idempotent, so retrying is always safe); a signed-out viewer is told to sign in, not
      that checkout is "unavailable". When the deployment has no Stripe keys the server
      refuses with a real reason and this screen shows that reason verbatim. -->
-<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
 
@@ -161,7 +161,7 @@
       }
     </action>
 
-    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <!-- NO paddingTop on `page`: <TopNav> is the first child, so a padded page pushes the
          GLOBAL BAR down — measured at 16px here against 0 everywhere else, which made the

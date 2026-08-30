@@ -4,7 +4,7 @@
      shape as the home hero: a caption bound to the resting index stays still while the
      art moves. Only the resting page's video is active, so a fling never plays three
      soundtracks at once. -->
-<vstack background="#000000" alignItems="stretch" style="min-height: {{ dsx.screen.height }}px">
+<vstack background="#000000" alignItems="stretch" grow="true" spacing="0" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="feed" url="/catalog/discover" on:success="global.cacheDiscover = feed.data"/>
 

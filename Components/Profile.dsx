@@ -10,7 +10,7 @@
      Honest numbers: a wallet that has not answered renders an em dash, never a zero — a
      '0' on a screen about money is a claim, and while loading it is a false one. Signed
      out, the screen says so and offers the reload; it never renders headings over void. -->
-<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="session" url="/dev-session.json" ssr="false"/>
     <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
@@ -116,7 +116,7 @@
       dsx.variable.toast = message
     </action>
 
-    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="22" paddingTop="20" paddingBottom="24" alignItems="stretch"/>
     <style as="split" spacing="26" alignItems="flex-start"/>

@@ -3,7 +3,7 @@
      utility screen: back bar, the list, and honest states. No read receipts — a
      per-viewer receipt is a write per notice per viewer, and this inbox does not earn
      that; the operator's reach is the point, not tracking. -->
-<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
     <api as="inbox" url="/social/notices" on:success="global.cacheInbox = inbox.data"/>
@@ -51,7 +51,7 @@
       else { dsx.module.route.replace({ path: '/profile' }) }
     </action>
 
-    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <!-- NO paddingTop on `page`: it would push <TopNav>, the global bar, off y=0 (see the
          same note in Store.dsx). The 12px moves onto the content below the bar. -->

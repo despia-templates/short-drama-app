@@ -4,7 +4,7 @@
      refuses for anyone without the operator identity — a viewer sees this page render
      and every call answer 404, never data. The MCP card lists the SAME actions the
      admin document serves at /mcp: one declaration, UI + AI + HTTP. -->
-<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <!-- the router publishes nav.canPop / nav.depth; back reads it -->
     <expects variable="nav"/>
@@ -106,7 +106,7 @@
       else { dsx.variable.toast = r.error == null ? 'Notice failed' : r.error.message }
     </action>
 
-    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="13" paddingTop="4" paddingBottom="32" alignItems="stretch"/>
     <style as="head" alignItems="center" paddingBottom="2"/>

@@ -11,7 +11,12 @@
      restyles itself mid-swipe flickers. Hover is a REAL pointer affordance
      (on:hoverStart/End) — on touch it never fires and every card stays a plain link.
      No emoji anywhere: icons come from the shared catalog and have per-platform twins. -->
-<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+<!-- min-height rides the :web suffix: it is the BODY-HEIGHT mechanism of the web page
+     (the .dsx-frame pads the safe areas and flexes its child), while a native route frame
+     already proposes exactly the SAFE region — window height forced 34pt of content under
+     the home indicator (measured: the tab bar's captions at 840–860pt against a safe
+     bottom of 840). The screen class's grow="true" is the cross-platform fill. -->
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="home" url="/catalog/home" on:success="global.cacheHome = home.data"/>
     <api as="session" url="/dev-session.json" ssr="false"/>
@@ -220,7 +225,7 @@
          and its scroller had no box, and the app rendered near-blank with real data behind it
          (measured on an iPhone 17 Pro simulator). `grow` is the cross-platform twin: the
          catalog's own "fill available space" word, honoured by every renderer. PLAN.md §6.43. -->
-    <style as="screen" background="#000000" alignItems="stretch" grow="true"/>
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch" grow="true"/>
     <style as="page" spacing="0" paddingBottom="0" alignItems="stretch" grow="width"/>
     <style as="section" spacing="14" alignItems="stretch" paddingTop="44" grow="width"/>

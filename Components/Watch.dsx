@@ -16,7 +16,7 @@
 
      TRUST SHAPE (spec §3): the client never decides entitlement. `epLocked` reads
      /wallet/state, unlock spends server-side, and a locked episode never mounts a source. -->
-<vstack background="#000000" alignItems="stretch" style="min-height: {{ dsx.screen.height }}px">
+<vstack background="#000000" alignItems="stretch" grow="true" spacing="0" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
 

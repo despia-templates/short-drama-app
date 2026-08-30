@@ -12,7 +12,7 @@
      the genre for a shareable/deep-linked entry (/browse/Revenge). Phones reach this screen
      by PUSH, so it is full-bleed with a back control and mounts no tab bar (AGENTS.md);
      wide viewports mount the bar and land here from the nav. -->
-<vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
 
@@ -131,7 +131,7 @@
       else { dsx.module.route.replace({ path: '/' }) }
     </action>
 
-    <style as="screen" background="#000000" alignItems="stretch"/>
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="18" paddingBottom="40" alignItems="stretch"/>
 

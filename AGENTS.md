@@ -254,6 +254,14 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   `-webkit-line-clamp` box are correct as they stand — they are the web twins of an attribute
   that is already there. PLAN.md §6.43 counts what remains: 252 structural declarations.
 
+- **A SCREEN ROOT is `grow="true" spacing="0"`, and its `min-height` rides `:web`.**
+  `min-height: {{ dsx.screen.height }}px` is the WEB body-height mechanism; on native it
+  forces window height into the safe region and the spill carries the tab bar into the
+  home-indicator zone (measured 34pt). A native route frame already proposes the safe
+  region — `grow="true"` fills it. And the vstack default spacing (8, both lanes) plus a
+  zero-size seed child is a 14pt phantom above the scroller: roots zero their spacing.
+  Safe-area clearance itself belongs to the INSET PLANE on every lane (the native frame,
+  the web `.dsx-frame` env() padding) — never to a screen's own padding.
 - **A progress fill is COMPUTED PX or a MEASURED track — never `width: N%`.** The native
   bridge drops non-100 percent lengths silently (upstream #281): the web shows a 64% fill,
   the device shows an empty track. Statically-sized track → compute the px in the hole
