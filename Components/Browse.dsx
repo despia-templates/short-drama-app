@@ -229,7 +229,7 @@
       </grid>
 
       <vstack class="statusWrap" visible-if="dsx.variable.view != null && dsx.variable.view.total == 0">
-        <image icon="rectangle.stack" iconSize="30" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+        <image icon="rectangle.stack.fill" iconSize="30" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
         <text value="Nothing in {{ dsx.variable.heading }} yet" class="statusHead"/>
         <text value="New series land here as they go live." class="statusBody"/>
         <button label="Show every series" class="retryBtn" on:tap="dsx.variable.picked = 'all'"/>

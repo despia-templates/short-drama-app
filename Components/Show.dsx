@@ -249,7 +249,7 @@
 
       <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.phase == 'empty'" paddingTop="26">
         <vstack class="errCard">
-          <image icon="rectangle.stack" iconSize="30" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+          <image icon="rectangle.stack.fill" iconSize="30" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
           <text value="{{ show == null ? 'This series' : show.title }} has no episodes yet." fontSize="14" color="#FFFFFF"/>
           <text value="It is published but nothing has gone live on it." class="gridAll" textAlign="center"/>
           <hstack spacing="10" alignItems="center">
@@ -329,7 +329,7 @@
           </flow>
 
           <hstack class="metaRow" visible-if="dsx.variable.showViews != ''">
-            <image icon="eye" iconSize="13" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
+            <image icon="play.fill" iconSize="13" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
             <text value="{{ dsx.variable.showViews }}" class="metaTxt"
                   a11yLabel="{{ dsx.variable.showViews }} views"/>
             <text value="·" class="metaTxt" a11yHidden="true"/>

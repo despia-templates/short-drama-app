@@ -339,7 +339,7 @@
 
       <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.phase == 'empty'">
         <vstack class="errCard">
-          <image icon="rectangle.stack" iconSize="30" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+          <image icon="rectangle.stack.fill" iconSize="30" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
           <text value="No series are live yet." fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
           <text value="Published series appear here as they go live." fontSize="13" color="rgba(255,255,255,0.55)"/>
         </vstack>
@@ -368,7 +368,7 @@
                   </list>
                 </hstack>
                 <hstack class="heroMeta" visible-if="dsx.variable.heroViews != ''">
-                  <image icon="eye" iconSize="13" color="rgba(255,255,255,0.55)" a11yHidden="true"/>
+                  <image icon="play.fill" iconSize="13" color="rgba(255,255,255,0.55)" a11yHidden="true"/>
                   <text value="{{ dsx.variable.heroViews }}" class="metaTxt"
                         a11yLabel="{{ dsx.variable.heroViews }} views"/>
                   <text value="·" class="metaTxt" a11yHidden="true"/>

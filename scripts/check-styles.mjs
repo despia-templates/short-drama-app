@@ -16,6 +16,17 @@ const FRAMEWORK = process.env.DSX_FRAMEWORK_DIR
   ?? new URL("../../despia_dsx/despia-framework", import.meta.url).pathname;
 const CATALOG = process.env.DSX_STYLE_CATALOG
   ?? `${FRAMEWORK}/OpenSource/Documentation/reference/stack-style-properties.json`;
+const ICONS = process.env.DSX_ICON_CATALOG
+  ?? `${FRAMEWORK}/OpenSource/Conformance/icons/sf-map.json`;
+
+// EVERY ICON COMES FROM THE SHARED CATALOG, and this is the check that says so. One name
+// resolves to a Boxicon on web, an SF Symbol on iOS and a Material Symbol on Android — a
+// name that is NOT in the catalog has no such twin. On web it may still render (Boxicons
+// has plenty the catalog does not map), which is exactly what makes the defect invisible
+// here: it ships, it looks right in the browser, and the glyph is missing on the two
+// platforms nobody ran. Caught two on this template's own screens — `eye` beside every view
+// count and `rectangle.stack` in three empty states — both rendering fine on web.
+const iconNames = new Set(Object.keys(JSON.parse(readFileSync(ICONS, "utf8")).icons));
 
 const valid = new Set(["as", "class"]);
 for (const g of JSON.parse(readFileSync(CATALOG, "utf8")).groups) {
@@ -51,6 +62,14 @@ for (const f of files.sort()) {
     const name = /as="([^"]+)"/.exec(m[1])?.[1] ?? "?";
     for (const attr of [...m[1].matchAll(/([\w-]+)\s*=/g)].map((x) => x[1])) {
       if (!valid.has(attr)) say(f, `<style as="${name}">: "${attr}" is not in the style catalog — it is dropped silently`);
+    }
+  }
+
+  // interpolated names (icon="{{ … }}") are a runtime value; only literals are checkable
+  for (const m of src.matchAll(/\bicon(?::\w+)?="([^"{}]+)"/g)) {
+    if (!iconNames.has(m[1])) {
+      say(f, `icon="${m[1]}" is not in the shared catalog — it has no per-platform twin, ` +
+             "so it renders on web and is missing on iOS and Android");
     }
   }
 

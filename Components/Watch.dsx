@@ -663,7 +663,7 @@ Please unlock to watch." class="lockHead"/>
               a11yTrait="button" on:tap="dsx.variable.plotOpen = !dsx.variable.plotOpen"/>
 
         <hstack class="panelStats" visible-if="dsx.variable.panelViews != ''">
-          <image icon="eye" iconSize="14" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
+          <image icon="play.fill" iconSize="14" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
           <text value="{{ dsx.variable.panelViews }}" class="panelStat"
                 a11yLabel="{{ dsx.variable.panelViews }} views"/>
           <image icon="star.fill" iconSize="13" color="#F6B63D" a11yHidden="true"/>

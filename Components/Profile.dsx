@@ -170,6 +170,7 @@
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
     <style as="menuRow" alignItems="center" paddingV="12" spacing="11"/>
     <style as="menuLabel" fontSize="13" color="#FFFFFF"/>
+    <style as="menuNote" fontSize="12" color="rgba(255,255,255,0.42)"/>
     <style as="menuValue" fontSize="12" color="rgba(255,255,255,0.42)"/>
   </head>
 
@@ -333,6 +334,32 @@
               <image icon="gift.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
               <text value="Rewards" class="menuLabel" style="flex: 1"/>
               <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+            </hstack>
+            <!-- LANGUAGE IS NAMED, NOT FAKED (Article 7, the Quality-row precedent in
+                 Watch.dsx). Every reference app in the category ships a language picker, and
+                 two different things hide behind that one word:
+
+                 · CONTENT language — the dubbed audio and the subtitle track. Unreachable:
+                   `<video>` can select neither a rendition nor a track today (PLAN.md §6.36),
+                   so a picker here would change nothing about what plays.
+                 · UI language — the app's own chrome. Reachable, and the seam is declared:
+                   `dsx.global.strings.*` is the framework's white-label plane ("defaults ⊕
+                   global.strings ⊕ per-call payload"), so one write re-skins every adopting
+                   module. An adopter localises this template by writing that global at boot
+                   and reading `{{ global.strings.x }}` at each of the ~180 literals here.
+
+                 What this build will not do is ship the picker with one locale behind it. A
+                 dropdown that switches to Spanish and returns a half-Spanish app is the same
+                 defect as the priced quality ladder Phase 1 deleted: a control that promises
+                 something it does not do. The row states what is true and points at the seam.
+                 See README "Localisation". -->
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
+                    a11yGroup="true" a11yLabel="Language: English. This build ships one locale; audio and subtitle tracks need renderer support that is not available yet.">
+              <image icon="globe" iconSize="15" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+              <vstack spacing="2" style="flex: 1" alignItems="stretch">
+                <text value="Language" class="menuLabel" color="rgba(255,255,255,0.4)"/>
+                <text value="English — one locale in this build" class="menuNote"/>
+              </vstack>
             </hstack>
             <hstack class="menuRow" href="/admin" a11yGroup="true" a11yLabel="Manage this app — operator surface">
               <image icon="gearshape" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
