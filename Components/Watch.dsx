@@ -4,9 +4,15 @@
      the EP.n / EP.N pill that raises the episode drawer.
 
      The drawer is the show sheet: poster, title, All N Episodes, Follow, and Synopsis |
-     Episodes tabs with the ranged 6-column grid. The ⋯ opens the options stack —
-     audio/subtitles, quality, speed, PiP, share, help — each its own sheet, exactly as the
-     reference nests them.
+     Episodes tabs with the ranged 6-column grid — and on a window wide enough to hold both,
+     that list is a PERSISTENT right-hand panel beside the clip instead (every reference
+     player does this; the drawer is the narrow-window fallback).
+
+     The ⋯ opens the options stack: subtitles and picture-in-picture (both real — declared
+     <video> booleans), speed (real), and quality as an honest disabled readout, because the
+     renderer has no quality attribute. There is no share or help sheet: Share is a direct
+     call to Core/SocialShare from the rail, and the quality LADDER and language PICKER that
+     used to live here were removed rather than left as controls that changed nothing.
 
      TRUST SHAPE (spec §3): the client never decides entitlement. `epLocked` reads
      /wallet/state, unlock spends server-side, and a locked episode never mounts a source. -->

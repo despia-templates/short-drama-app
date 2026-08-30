@@ -34,6 +34,16 @@
       return { authorization: 'Bearer ' + session.data.operator.token }
     </variable>
 
+    <!-- The stat cards fell back to an em dash and the table to nothing, for BOTH a pending
+         read and a failed one — an operator could not tell "loading" from "the admin routes
+         are refusing me", which on this surface is usually an authority problem worth naming.
+         `stats.error`/`shows.error` were read nowhere in the file. -->
+    <variable as="opsFailed" computed="true">
+      return (stats.error != null || shows.error != null) && stats.data == null && shows.data == null
+    </variable>
+    <variable as="opsLoading" computed="true">
+      return dsx.variable.opsFailed == false && (stats.data == null || shows.data == null)
+    </variable>
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
     <variable as="bp" computed="true">
       const w = dsx.screen.width
@@ -173,9 +183,23 @@
         </vstack>
       </hstack>
 
-      <!-- shows table -->
-      <vstack class="card">
+      <vstack class="card" visible-if="dsx.variable.opsFailed">
+        <text value="The Manage routes are not answering." class="h2"/>
+        <text class="note" value="These routes require operator authority. If you are signed in as a viewer, this build's local session mints an operator token separately — see docs/auth.md."/>
+        <hstack spacing="10" alignItems="center" paddingTop="6">
+          <button label="Retry" class="miniBtn" on:tap="stats.refresh(); shows.refresh()"/>
+        </hstack>
+      </vstack>
+
+      <vstack class="card" visible-if="dsx.variable.opsFailed == false">
+        <text value="About the numbers on the storefront" class="h2"/>
+        <text class="note" value="Every series carries a view count and a rating, shown in the home hero, on the detail screen and under each browse card. In this template they are DEMO VALUES seeded from scripts/catalogue.mjs — nothing increments them, and no telemetry is collected. A real deployment replaces that table with its own counter; the wire shape (show.views, show.rating) does not change."/>
+      </vstack>
+
+      <!-- shows table -->      <!-- shows table -->
+      <vstack class="card" visible-if="dsx.variable.opsFailed == false">
         <text value="Shows" class="h2"/>
+        <text class="empty" visible-if="dsx.variable.opsLoading" value="Loading the catalogue…"/>
         <text class="empty" visible-if="shows.data != null && shows.data.rows.length == 0" value="No shows yet — create the first one below."/>
         <list bind="shows.data.rows" key="id" scroll="false" spacing="0">
           <hstack class="showRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">

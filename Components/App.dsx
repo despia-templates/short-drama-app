@@ -129,6 +129,18 @@
       if (h.views < 1000000) { return Math.round(h.views / 100) / 10 + 'K' }
       return Math.round(h.views / 100000) / 10 + 'M'
     </variable>
+    <!-- THE FIRST VISIT HAD NO STATE. The app-wide stash (above) fixed REVISITS, but a cold
+         first load has nothing to fall back to, so this screen painted section headings over
+         empty rails until the fetch landed — the exact failure the stash comment describes,
+         one case short. `empty` is real too: a fresh deployment with a seeded-but-unpublished
+         catalogue reaches here with zero shows and used to render silent void. -->
+    <variable as="phase" computed="true">
+      const v = dsx.variable.homeView
+      if (v != null) { return v.latest.length == 0 && v.hero.length == 0 ? 'empty' : 'ready' }
+      if (home.error != null) { return 'error' }
+      return 'loading'
+    </variable>
+    <variable as="skelRows" computed="true">return [0, 1, 2, 3, 4, 5]</variable>
     <variable as="heroShow" computed="true">
       if (dsx.variable.homeView == null) { return null }
       const p = Number(dsx.variable.heroPage)
@@ -225,6 +237,7 @@
     <style as="footHead" fontSize="14" fontWeight="bold" color="#FFFFFF" tracking="0.3"/>
     <style as="footLink" fontSize="14" color="rgba(255,255,255,0.55)"/>
 
+    <style as="skelBlock" background="#141419" radius="12"/>
     <style as="errCard" background="#141419" radius="16" spacing="10" paddingH="18" paddingV="20" alignItems="center"/>
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
@@ -265,8 +278,30 @@
         <spacer/>
       </hstack>
 
+      <!-- LOADING: the real shape, not a spinner — a hero band and one rail of poster cells,
+           so the page does not resize under the viewer when the catalogue lands. -->
+      <vstack visible-if="dsx.variable.phase == 'loading'" alignItems="stretch" spacing="18"
+              style="{{ dsx.variable.shell }}" paddingTop="24">
+        <stack class="skelBlock" style="width: 100%; height: {{ dsx.variable.heroH }}px"/>
+        <stack class="skelBlock" style="width: 180px; height: 22px"/>
+        <grid bind="dsx.variable.skelRows" key="index" columns="{{ dsx.variable.shelfCols }}" spacing="18" scroll="false">
+          <vstack spacing="8" alignItems="stretch">
+            <stack class="skelBlock" style="width: 100%; aspect-ratio: 3/4"/>
+            <stack class="skelBlock" style="width: 70%; height: 13px"/>
+          </vstack>
+        </grid>
+      </vstack>
+
+      <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.phase == 'empty'">
+        <vstack class="errCard">
+          <image icon="rectangle.stack" iconSize="30" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+          <text value="No series are live yet." fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+          <text value="Published series appear here as they go live." fontSize="13" color="rgba(255,255,255,0.55)"/>
+        </vstack>
+      </vstack>
+
       <!-- ============ HERO · wide ============ -->
-      <vstack visible-if="dsx.variable.wide && heroShow != null" style="width: 100%; margin-top: -64px" alignItems="stretch">
+      <vstack visible-if="dsx.variable.wide && heroShow != null && dsx.variable.phase == 'ready'" style="width: 100%; margin-top: -64px" alignItems="stretch">
         <zstack>
           <pager bind="dsx.variable.homeView.hero" key="id" height="{{ dsx.variable.heroH }}" dots="false" value="dsx.variable.heroPage">
             <image src="{{ item.hero }}" contentFit="cover" a11yLabel="{{ item.title }}"
@@ -348,7 +383,7 @@
       </vstack>
 
       <!-- ============ Continue Watching ============ -->
-      <vstack class="section" visible-if="(dsx.variable.wide || dsx.variable.homeTab == 'popular') && dsx.variable.continueView != null && dsx.variable.continueView.items.length > 0">
+      <vstack class="section" visible-if="dsx.variable.phase == 'ready' && (dsx.variable.wide || dsx.variable.homeTab == 'popular') && dsx.variable.continueView != null && dsx.variable.continueView.items.length > 0">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="Continue Watching" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
         </hstack>
@@ -381,7 +416,7 @@
       </vstack>
 
       <!-- ============ New Release ============ -->
-      <vstack class="section" visible-if="dsx.variable.wide || dsx.variable.homeTab == 'popular'">
+      <vstack class="section" visible-if="dsx.variable.phase == 'ready' && (dsx.variable.wide || dsx.variable.homeTab == 'popular')">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="New Release" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           <spacer/>
@@ -423,7 +458,7 @@
       </vstack>
 
       <!-- ============ TOP · ranked numerals ============ -->
-      <vstack class="section" visible-if="dsx.variable.wide || dsx.variable.homeTab == 'popular'">
+      <vstack class="section" visible-if="dsx.variable.phase == 'ready' && (dsx.variable.wide || dsx.variable.homeTab == 'popular')">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="TOP" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           <spacer/>
@@ -458,7 +493,7 @@
 
       <!-- ============ genre shelves ============ -->
       <list bind="dsx.variable.homeView.shelves" key="genre" scroll="false" spacing="0"
-            visible-if="dsx.variable.wide || dsx.variable.homeTab == 'popular'">
+            visible-if="dsx.variable.phase == 'ready' && (dsx.variable.wide || dsx.variable.homeTab == 'popular')">
         <vstack class="section">
           <!-- VIEW ALL — the affordance every shelf on ReelShort carries, and the reason
                Browse exists: a genre rail shows a handful, and the eleventh title had
@@ -503,7 +538,7 @@
       </list>
 
       <!-- ============ NEW · phone tab ============ -->
-      <vstack class="section" visible-if="dsx.variable.wide == false && dsx.variable.homeTab == 'new'">
+      <vstack class="section" visible-if="dsx.variable.phase == 'ready' && dsx.variable.wide == false && dsx.variable.homeTab == 'new'">
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <grid bind="dsx.variable.homeView.latest" key="id" columns="3" spacing="12" scroll="false">
             <vstack class="card" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="{{ item.title }}">
@@ -524,7 +559,7 @@
       </vstack>
 
       <!-- ============ RANKING · phone tab: the ranked list ============ -->
-      <vstack class="section" visible-if="dsx.variable.wide == false && dsx.variable.homeTab == 'ranking'">
+      <vstack class="section" visible-if="dsx.variable.phase == 'ready' && dsx.variable.wide == false && dsx.variable.homeTab == 'ranking'">
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <list bind="dsx.variable.homeView.trending" key="id" scroll="false" spacing="0">
             <hstack class="rankRow" href="/show/{{ item.id }}" a11yGroup="true"

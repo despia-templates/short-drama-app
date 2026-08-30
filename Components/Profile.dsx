@@ -41,6 +41,13 @@
       if (session.data == null) { return '' }
       return session.data.viewer.sub.slice(0, 8)
     </variable>
+    <!-- `wallet.error` was read nowhere: a failed /wallet/state left an em dash beside
+         "Coins" forever, which reads as "you have none" rather than "we could not ask".
+         The em dash stays the WAITING answer (PersonalNav's rule — never a fake 0); a
+         FAILURE now says so and offers the retry. -->
+    <variable as="walletFailed" computed="true">
+      return dsx.variable.signedOut == false && wallet.error != null && dsx.variable.walletView == null
+    </variable>
     <variable as="coins" computed="true">
       return dsx.variable.walletView == null ? null : dsx.variable.walletView.coins
     </variable>
@@ -199,7 +206,7 @@
           </vstack>
 
           <!-- phone identity (the sidebar carries this on wide) -->
-          <vstack class="card" visible-if="dsx.variable.wide == false && dsx.variable.signedOut == false">
+          <vstack class="card" visible-if="dsx.variable.wide == false && dsx.variable.signedOut == false && dsx.variable.walletFailed == false">
             <hstack class="idRow">
               <vstack class="avatar" style="justify-content: center">
                 <image icon="person.crop.circle" iconSize="22" color="rgba(255,255,255,0.62)" a11yHidden="true"/>
@@ -233,6 +240,12 @@
               </hstack>
             </vstack>
           </PlansSheet>
+
+          <vstack class="card" visible-if="dsx.variable.walletFailed">
+            <text value="Your wallet is unavailable." class="vipTitle"/>
+            <text value="Balances and VIP status could not be read. Nothing has been spent." class="note"/>
+            <button label="Retry" class="retryBtn" on:tap="wallet.refresh()"/>
+          </vstack>
 
           <!-- wallet: phone card (wide gets the strip below) -->
           <vstack class="card" visible-if="dsx.variable.wide == false && dsx.variable.signedOut == false">

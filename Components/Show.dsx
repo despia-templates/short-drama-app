@@ -67,10 +67,14 @@
       if (dsx.variable.detailView == null) { return 0 }
       return dsx.variable.detailView.episodes.filter(e => e.free).length
     </variable>
+    <!-- `empty` is a real state here: Admin can publish a show before its first episode
+         exists, and this screen then rendered a range that read "1 - 0" over a grid with
+         nothing in it. A series with no episodes is not a broken page, so it says so and
+         offers the way out rather than showing a Play button that cannot play. -->
     <variable as="phase" computed="true">
       if (detail.error != null) { return 'error' }
       if (dsx.variable.detailView == null) { return 'loading' }
-      return 'content'
+      return dsx.variable.detailView.episodes.length == 0 ? 'empty' : 'content'
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
@@ -197,6 +201,18 @@
 
       <TopNav active="" visible-if="dsx.variable.wide"/>
 
+      <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.phase == 'empty'" paddingTop="26">
+        <vstack class="errCard">
+          <image icon="rectangle.stack" iconSize="30" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+          <text value="{{ show == null ? 'This series' : show.title }} has no episodes yet." fontSize="14" color="#FFFFFF"/>
+          <text value="It is published but nothing has gone live on it." class="gridAll" textAlign="center"/>
+          <hstack spacing="10" alignItems="center">
+            <button label="Browse series" class="retryBtn" on:tap="dsx.module.route.reset({ path: '/browse' })"/>
+            <button label="Back" class="backBtn" on:tap="dsx.action.goBack()"/>
+          </hstack>
+        </vstack>
+      </vstack>
+
       <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.phase == 'error'" paddingTop="26">
         <vstack class="errCard">
           <text value="This series could not be loaded." fontSize="14" color="#FFFFFF"/>
@@ -211,7 +227,7 @@
       <!-- the split (stage | panel) is the WIDE layout; the phone block below carries the
            whole story on its own, so this row mounts only wide -->
       <hstack class="split" style="{{ dsx.variable.shell }}" alignItems="flex-start"
-              visible-if="dsx.variable.wide && dsx.variable.phase != 'error'">
+              visible-if="dsx.variable.wide && dsx.variable.phase != 'error' && dsx.variable.phase != 'empty'">
 
         <!-- ===== the key-art stage (left) ===== -->
         <vstack class="stageCol" style="flex: 1; min-width: 0">
@@ -305,7 +321,7 @@
 
       <!-- ===== phone: back bar · compact hero (art + facts + Play) · plot · grid ===== -->
       <vstack style="{{ dsx.variable.shell }}" spacing="16" alignItems="stretch"
-              visible-if="dsx.variable.wide == false && dsx.variable.phase != 'error'">
+              visible-if="dsx.variable.wide == false && dsx.variable.phase != 'error' && dsx.variable.phase != 'empty'">
         <!-- a deep-linked phone has no TopNav: the back bar is the only way out -->
         <hstack class="phoneBar">
           <image icon="chevron.left" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
