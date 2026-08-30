@@ -469,3 +469,26 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     onboarding-seen flag — has no portable home. Reaching for web localStorage would make one
     renderer behave differently from the other three, which Article 7 forbids without a named
     degradation. Recent searches are therefore session-scoped and say so in place.
+
+34. **The bundled face was unreachable: no app could link a stylesheet into its head** —
+    FIXED UPSTREAM in this pass (measured 2026-08-30 against the sites the founder rated
+    GREAT). The framework SHIPS Inter (`OpenSource/Type`, subsetted variable, 124KB, OFL) and
+    `--dsx-font` names "InterVariable" FIRST — but the token sheet is deliberately asset-free
+    (it is inlined into SSR heads, injected at boot, adopted into shadow roots and handed to a
+    WKWebView: four base URLs), so `inter.css` says "a surface links this file once". Every
+    surface could, except an app built by `despia build`: `ShellOptions` carried appName,
+    theme, importMap, mainSrc, lang and manifestHref, and no way to add a `<link>`. Measured
+    on this template: `document.fonts` EMPTY, and a width probe showed "InterVariable" and
+    "Inter" resolving identically to the default serif, i.e. every glyph fell through to
+    system-ui. The type ramp names 400/500/600/700 while the static system faces on Windows 10
+    and the common Linux fontconfig answer cannot draw 500 or 600 — so the app was asking for
+    weights its font did not have, and rendered a different face on every OS (which also makes
+    a template's own screenshots irreproducible). Fix: `ShellOptions.stylesheets?: string[]`,
+    emitted as `<link rel="stylesheet">` before the inline token sheet; every face in the
+    bundled sheet is `font-display: swap`, so a 404 still shows fallback text immediately.
+    Template side: `public/type/` carries the face with its LICENCE and DERIVATION per the OFL,
+    and `scripts/serve.mjs` passes `stylesheets: ["/type/inter.css"]`. Verified after: the
+    latin face reports `loaded`, latin-ext stays deferred by unicode-range, and InterVariable
+    measures distinctly from both system-ui and serif.
+    The remaining ask: `despia build`'s static export assembles heads too, so the same option
+    should be reachable from `dsx.config.json` rather than only from a hand-written host.

@@ -12,7 +12,7 @@
 //  the id: run it as often as you like, and it converges the database onto the manifest.
 //
 import { readFileSync } from "node:fs";
-import { SHOWS, epTitle } from "./catalogue.mjs";
+import { SHOWS, epTitle , metricsFor } from "./catalogue.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:8787";
 const session = JSON.parse(readFileSync("public/dev-session.json", "utf8"));
@@ -50,6 +50,7 @@ for (const s of SHOWS) {
     state: "live",
     freeUntil: s.freeUntil,
     featured: s.featured,
+    ...metricsFor(s.slug),
   };
   const known = showIdByTitle.get(s.title);
   const show = await call("/internal/admin/upsertshow", known ? { ...values, id: known } : values);

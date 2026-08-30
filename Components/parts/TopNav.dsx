@@ -1,5 +1,7 @@
 <!-- TopNav — the wide-viewport bar, built to the category reference measured live at
-     1440×900: 80px tall, TRANSPARENT and sticky so the hero art runs underneath it,
+     1440×900: 64px tall, TRANSPARENT and sticky so the hero art runs underneath it
+     (re-measured 2026-08-30 against my-drama 64 · shortical 64 · flextv 63 — 80 was ours
+     alone, and it cost the hero 16px of stage on every wide screen),
      18px/700 links with the active one in brand red, then the utility cluster and the
      red CTA pill. Phones get <TabBar>; same destinations either way.
 
@@ -53,7 +55,7 @@
       return dsx.variable.off
     </formula>
 
-    <style as="nav" background="rgba(0,0,0,0)" height="80" alignItems="center"/>
+    <style as="nav" background="rgba(0,0,0,0)" height="64" alignItems="center"/>
     <style as="inner" alignItems="center"/>
     <style as="brand" spacing="10" alignItems="center"/>
     <style as="logoBox" background="#FF2C55" radius="9" alignItems="center" width="32" height="32"/>

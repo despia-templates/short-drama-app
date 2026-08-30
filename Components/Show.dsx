@@ -99,6 +99,13 @@
       if (dsx.variable.bp == 'tablet') { return 6 }
       return 5
     </variable>
+    <variable as="showViews" computed="true">
+      const d = dsx.variable.detailView
+      if (d == null || d.show == null || d.show.views == null || d.show.views < 1000) { return '' }
+      const v = d.show.views
+      if (v < 1000000) { return Math.round(v / 100) / 10 + 'K' }
+      return Math.round(v / 100000) / 10 + 'M'
+    </variable>
     <variable as="relCols" computed="true">
       if (dsx.variable.bp == 'desktop') { return 6 }
       if (dsx.variable.bp == 'tablet') { return 4 }
@@ -155,6 +162,8 @@
     <style as="sectionTitle" fontSize="17" fontWeight="bold" color="#FFFFFF" tracking="-0.2"/>
     <style as="relCard" spacing="6" alignItems="stretch"/>
     <style as="relTitle" fontSize="13" color="rgba(255,255,255,0.85)" lineLimit="1"/>
+    <style as="metaRow" spacing="6" alignItems="center" paddingTop="2"/>
+    <style as="metaTxt" fontSize="13" fontWeight="medium" color="rgba(255,255,255,0.6)"/>
     <style as="tag" background="rgba(255,255,255,0.1)" radius="16" paddingH="16" paddingV="7" fontSize="14" color="rgba(255,255,255,0.7)"/>
     <style as="ctaRow" spacing="12" alignItems="center"/>
     <style as="playWhite" background="#FFFFFF" radius="24" paddingH="34" paddingV="13" spacing="9" alignItems="center"/>
@@ -251,6 +260,16 @@
                   href="/browse/{{ show == null ? '' : show.genre }}"/>
             <text value="Series" class="tag"/>
             <text value="EP 1–{{ show == null ? '' : show.free_until }} Free" class="tag"/>
+          </hstack>
+
+          <hstack class="metaRow" visible-if="dsx.variable.showViews != ''">
+            <image icon="eye" iconSize="13" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
+            <text value="{{ dsx.variable.showViews }}" class="metaTxt"
+                  a11yLabel="{{ dsx.variable.showViews }} views"/>
+            <text value="·" class="metaTxt" a11yHidden="true"/>
+            <image icon="star.fill" iconSize="12" color="#F6B63D" a11yHidden="true"/>
+            <text value="{{ show == null ? '' : show.rating }}" class="metaTxt"
+                  a11yLabel="rated {{ show == null ? '' : show.rating }} out of 10"/>
           </hstack>
 
           <hstack class="ctaRow">

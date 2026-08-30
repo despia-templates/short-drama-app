@@ -47,14 +47,14 @@
       if (dsx.variable.bp == 'phone') { return 4096 }
       return Math.round(Math.min(460, dsx.screen.height * 0.52))
     </variable>
-    <!-- The stage leaves room for the chrome above or below it: an 80px TopNav when wide,
+    <!-- The stage leaves room for the chrome above or below it: a 64px TopNav when wide,
          the 70px TabBar on phone (both measured). The bar used to OVERLAY the stage, which
          bought nothing — it paints opaque black, so no video was ever visible behind it —
          and cost this screen a whole class of bug: as a child of the stage's zstack the bar
          inherited the stage's grid column, and while `dsx.screen.*` settles after a tab
          switch that column computed 362, so the bar shrank 375 → 362 → 375 in ~60ms.
          Chrome is a sibling of the stage now, exactly as on every other screen. -->
-    <variable as="chromeH" computed="true">return dsx.variable.wide ? 80 : 70</variable>
+    <variable as="chromeH" computed="true">return dsx.variable.wide ? 64 : 70</variable>
     <variable as="stageH" computed="true">
       return dsx.screen.height - dsx.variable.chromeH
     </variable>

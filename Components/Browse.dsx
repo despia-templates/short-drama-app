@@ -101,6 +101,11 @@
       const bg = on ? '#FF2C55' : 'rgba(255,255,255,0.08)'
       return 'background: ' + bg + '; border-radius: 18px; padding: 8px 16px; white-space: nowrap; transition: background-color 0.18s ease'
     </formula>
+    <formula as="cardViews" v="item.views">
+      if (v == null || v < 1000) { return '' }
+      if (v < 1000000) { return '  ·  ' + Math.round(v / 100) / 10 + 'K' }
+      return '  ·  ' + Math.round(v / 100000) / 10 + 'M'
+    </formula>
     <formula as="cardFx" id="item.id">
       const on = dsx.variable.hovId == id
       return 'width: 100%; aspect-ratio: 3/4; border-radius: 8px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.03 : 1) + ')'
@@ -196,7 +201,7 @@
           <vstack spacing="2" alignItems="stretch">
             <text value="{{ item.title }}" class="cardTitle"
                   style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
-            <text value="{{ item.genre }}  |  EP {{ item.episodes }}" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+            <text value="{{ item.genre }}  ·  EP {{ item.episodes }}{{ cardViews }}" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
           </vstack>
         </vstack>
       </grid>

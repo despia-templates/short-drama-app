@@ -17,6 +17,31 @@
 //     price a flagship above a back-catalogue title.
 //   · `featured` drives the hero pager and the TOP rail; five is the reference count.
 //
+// DEMO SOCIAL PROOF. Every reference app in this category shows a play count and most show
+// a rating — flextv puts a count on every card, my-drama runs "2.6M · 9.67" in the hero
+// meta, ReelShort prints 13.2M/115.5k on the detail. A catalogue with no numbers reads as
+// empty, so the demo carries them. They are DEMO VALUES, not telemetry: nothing in this
+// template increments them, and a real deployment replaces this table with its own counter.
+// Keyed by slug so the numbers stay stable across reseeds.
+const METRICS = {
+  bride:    { views: 5_420_000, rating: "9.6" },
+  alpha:    { views: 4_180_000, rating: "9.4" },
+  heiress:  { views: 3_760_000, rating: "9.5" },
+  midnight: { views: 3_010_000, rating: "9.2" },
+  divorce:  { views: 2_640_000, rating: "9.7" },
+  campus:   { views: 1_880_000, rating: "8.9" },
+  nanny:    { views: 1_540_000, rating: "9.1" },
+  twin:     { views: 1_260_000, rating: "8.8" },
+  wolf:     { views: 980_000,   rating: "9.0" },
+  nurse:    { views: 815_000,   rating: "8.7" },
+  heir:     { views: 640_000,   rating: "9.3" },
+  kitchen:  { views: 512_000,   rating: "8.6" },
+  wife:     { views: 388_000,   rating: "8.9" },
+  nightvale:{ views: 274_000,   rating: "9.1" },
+};
+
+export const metricsFor = (slug) => METRICS[slug] ?? { views: 120_000, rating: "8.5" };
+
 export const SHOWS = [
   {
     slug: "bride", title: "The Billionaire's Contract Bride", genre: "Romance",

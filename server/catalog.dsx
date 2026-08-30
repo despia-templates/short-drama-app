@@ -14,6 +14,8 @@
       <field as="state" type="text"/>          <!-- draft | live -->
       <field as="free_until" type="integer"/>  <!-- episodes 1..N are free -->
       <field as="featured" type="boolean"/>
+      <field as="views" type="integer"/>       <!-- demo social proof; see scripts/catalogue.mjs -->
+      <field as="rating" type="text"/>         <!-- "9.4" — display only, never a gate -->
       <index on="state"/>
     </entity>
 
@@ -47,6 +49,7 @@
       const card = (s, i) => ({
         id: s.id, title: s.title, genre: s.genre, poster: s.poster, hero: s.hero, hero_tall: s.hero_tall,
         synopsis: s.synopsis, free_until: s.free_until, featured: s.featured === true,
+        views: s.views == null ? 0 : s.views, rating: s.rating == null ? '' : s.rating,
         episodes: counts[s.id] == null ? 0 : counts[s.id],
         rank: i + 1
       })
@@ -109,6 +112,7 @@
         items: picked.map(row => ({
           id: row.id, title: row.title, genre: row.genre, poster: row.poster,
           synopsis: row.synopsis, free_until: row.free_until,
+          views: row.views == null ? 0 : row.views, rating: row.rating == null ? '' : row.rating,
           episodes: counts[row.id] == null ? 0 : counts[row.id]
         }))
       }

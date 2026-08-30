@@ -99,6 +99,10 @@ const opsHandlers = {
       state: String(args.state ?? "") || "draft",
       free_until: Number.isFinite(Number(args.freeUntil)) ? Number(args.freeUntil) : 8,
       featured: args.featured === true,
+      // demo social proof — the reference catalogues all carry a play count and a rating,
+      // and a card with neither reads as an empty shelf (scripts/catalogue.mjs METRICS)
+      views: Number.isFinite(Number(args.views)) ? Number(args.views) : 0,
+      rating: String(args.rating ?? ""),
     };
     if (typeof args.id === "string" && args.id !== "") {
       const row = await svc.update("show", args.id, values);
@@ -191,7 +195,16 @@ const mcp = toolRows.length > 0
       onError: (info) => console.error(`[mcp] ${info.tool} failed (${info.correlationId}):`, info.error) })
   : null;
 const registry = JSON.parse(readFileSync(resolve(SITE, "registry.json"), "utf8"));
-const site = createSiteHandler(SITE, registry, { stream: false });
+// THE FACE. The framework bundles Inter (OpenSource/Type) and `--dsx-font` names
+// "InterVariable" FIRST, but the token sheet is deliberately asset-free, so a surface has
+// to link the stylesheet once — and until now no app built by `despia build` could, which
+// is why this template rendered in whatever face the OS supplied and asked for weights
+// (500, 600) that the Windows and common Linux system faces cannot draw. public/type is a
+// copy of that directory, licence and derivation notes included, per the OFL.
+const site = createSiteHandler(SITE, registry, {
+  stream: false,
+  stylesheets: ["/type/inter.css"],
+});
 
 function toWebRequest(req, body) {
   const url = `http://${req.headers.host ?? "localhost"}${req.url ?? "/"}`;
