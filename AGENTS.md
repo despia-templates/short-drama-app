@@ -236,6 +236,24 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   authored for them; a frame of any other ratio takes an untyped asset (`hero_tall`) and lets
   the markup carry the words.
 
+- **Layout in `style=""` is WEB-ONLY, and the fix is ADDITIVE.** The native renderers drop an
+  unmapped declaration per-declaration, so `flex: 1`, `width: 100%`, `min-height: 0` and
+  friends simply do not exist off web: measured on an iPhone 17 Pro, the entry screen booted,
+  registered all 18 components, routed and fetched its data, and rendered near-blank because
+  no box had a size. The catalog has a cross-platform twin for nearly all of it — `grow`
+  (`true`/`width`/`height`), `width`/`height`/`minHeight`/`maxWidth`, `aspectRatio`, `padding*`,
+  `spacing`, `align`/`alignItems`, `gradient*`, `zIndex`, `opacity`, `scale`.
+  **Add the attribute, keep the CSS.** Verified both ways on the same build: with
+  `grow="true"` AND `style="flex: 1; min-height: 0"` on the root scroller, web still measures
+  1440×900 and native finally gets a box. Removing the CSS in favour of the attribute alone
+  REGRESSED the web (the page hugged its content instead of filling the window), so a port
+  that swaps is a port that breaks the shipped lane; a port that adds is free. The two
+  exceptions with no attribute twin today: main-axis centring (`justify-content` — upstream
+  #238) and `position: absolute` overlays, which need a `zstack` + `align` fallback beneath
+  the web enhancement. `lineLimit` already works natively, so the nowrap/ellipsis trio and the
+  `-webkit-line-clamp` box are correct as they stand — they are the web twins of an attribute
+  that is already there. PLAN.md §6.43 counts what remains: 252 structural declarations.
+
 - **Probe before you generalise.** If a property "doesn't work", reproduce it in a throwaway
   one-element component first. Three framework defects were once filed from one bad
   measurement; all three were false.

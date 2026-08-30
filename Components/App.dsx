@@ -214,8 +214,14 @@
       dsx.variable.heroPage = p >= n - 1 ? 0 : p + 1
     </action>
 
-    <style as="screen" background="#000000" alignItems="stretch"/>
-    <style as="scroller" alignItems="stretch"/>
+    <!-- THE ROOT CARRIES ITS SIZE AS ATTRIBUTES, not CSS. `min-height: {{ screen.height }}px`
+         on the root and `flex: 1; min-height: 0` on the scroller are web spellings, and the
+         native renderers drop an unmapped declaration per-declaration — so on iOS the screen
+         and its scroller had no box, and the app rendered near-blank with real data behind it
+         (measured on an iPhone 17 Pro simulator). `grow` is the cross-platform twin: the
+         catalog's own "fill available space" word, honoured by every renderer. PLAN.md §6.43. -->
+    <style as="screen" background="#000000" alignItems="stretch" grow="true"/>
+    <style as="scroller" alignItems="stretch" grow="true"/>
     <style as="page" spacing="0" paddingBottom="0" alignItems="stretch" grow="width"/>
     <style as="section" spacing="14" alignItems="stretch" paddingTop="44" grow="width"/>
 

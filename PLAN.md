@@ -721,3 +721,15 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     progressive enhancement over an attribute fallback, and re-measure the web at 375/1000/1440
     so the shipped storefront does not regress. Per-screen counts are in the item above's
     filing; App.dsx (52) and Watch.dsx (51) are two fifths of it on their own.
+    THE PORT IS ADDITIVE, which is the finding that de-risks it. Measured both ways on one
+    build: `grow="true"` BESIDE `style="flex: 1; min-height: 0"` leaves the web at 1440x900 and
+    finally gives native a box; replacing the CSS with the attribute REGRESSED the web (the page
+    hugged its content instead of filling the window). So the work is "add the attribute, keep
+    the CSS", never a swap — no risk to the shipped storefront on any of the 252 sites. Two have
+    no attribute twin today: main-axis centring (`justify-content`, upstream #238) and
+    `position: absolute` overlays, which need a `zstack` + `align` fallback under the web
+    enhancement. The line-clamp trios are already correct — they are the web twins of
+    `lineLimit`, which native honours.
+    Started: `App.dsx`'s root (screen + scroller) carries `grow="true"` now, and the iOS app
+    went from near-blank to real full-width boxes. Not finished: the rails, images and text
+    columns below it still size in CSS, so the phone lane paints boxes without content.
