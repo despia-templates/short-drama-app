@@ -38,14 +38,31 @@ feed.cards = (feed.cards ?? []).slice(0, 3);
 const catalog = await get("/store/catalog");
 
 // Authenticated shapes carry no secrets worth capturing — they are DEMO values by
-// construction, so the unauthenticated shapes are hand-held to the server's wire shape.
-const wallet = { coins: 320, bonus: 45, vip: false, vipUntil: null };
-const cont = { rows: home.latest.slice(0, 3).map((s, i) => ({
-  show: s.id, idx: i + 1, episode: `${s.id}-ep${i + 1}`, title: s.title, poster: s.poster, pct: [64, 28, 91][i],
+// construction — but their FIELD NAMES are the server's wire shape, held to source:
+// server/viewer.dsx continueWatching returns { items: [{ show, idx, episode, title,
+// poster, pct, eps }] } and favorites { items: [...] }; server/engage.dsx rewardsState
+// returns streak/checkedToday/days/curve/nextReward/freeSpinLeft/spinPrizes/adCap/
+// adsToday/adsLeft/adReward/tasks; the wallet fold returns coins/bonus/vip/vipUntil/
+// unlocked; the ledger and inbox read .rows. (First cut guessed `rows` for continue and
+// Home's rail silently never rendered — a field name is a contract, capture or copy it.)
+const wallet = { coins: 320, bonus: 45, vip: false, vipUntil: null, unlocked: [] };
+const cont = { items: home.latest.slice(0, 3).map((s, i) => ({
+  show: s.id, idx: i + 1, episode: `${s.id}-ep${i + 1}`, title: s.title, poster: s.poster,
+  pct: [64, 28, 91][i], eps: s.episodes,
 })) };
-const favs = { rows: home.latest.slice(0, 4).map((s) => ({ show: s.id, title: s.title, poster: s.poster, genre: s.genre, episodes: s.episodes })) };
-const inbox = { rows: [{ id: "demo-1", title: "The contract ends — but the marriage might not.", at: "2026-08-28", read: false }] };
-const rewards = { streak: 2, checkedToday: false, adsToday: 0, adCap: 10, wheelToday: 0, tasks: [] };
+const favs = { items: home.latest.slice(0, 4).map((s) => ({ show: s.id, title: s.title, poster: s.poster, genre: s.genre })) };
+const inbox = { rows: [
+  { id: "demo-1", kind: "news", title: "The contract ends — but the marriage might not.", message: "Season two of The Billionaire's Contract Bride is live.", at: "2026-08-28" },
+] };
+const rewards = {
+  streak: 2, checkedToday: false, days: [5, 10, 15, 20, 25, 30, 60], curve: [5, 10, 15, 20, 25, 30, 60],
+  nextReward: 15, freeSpinLeft: true, spinPrizes: [10, 15, 20, 25, 40, 60, 80, 100],
+  adCap: 10, adsToday: 0, adsLeft: 10, adReward: 15,
+  tasks: [
+    { id: "t1", title: "Finish any episode", reward: 10, claimed: false },
+    { id: "t2", title: "Add a series to My List", reward: 10, claimed: false },
+  ],
+};
 const ledger = { rows: [
   { id: "d1", kind: "bonus", label: "Daily check-in", amount: 5, at: "2026-08-30", expires: "2026-09-06" },
   { id: "d2", kind: "coin", label: "Episode unlocked", amount: -45, at: "2026-08-30", expires: null },
