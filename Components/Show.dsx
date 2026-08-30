@@ -104,6 +104,12 @@
       return 220
     </variable>
     <variable as="stageH" computed="true">return Math.round(dsx.variable.stageW * 16 / 9)</variable>
+    <variable as="stageArt" computed="true">
+      const sh = dsx.variable.show
+      if (sh == null) { return '' }
+      if (sh.hero_tall == null || sh.hero_tall === '') { return sh.poster }
+      return sh.hero_tall
+    </variable>
     <variable as="epCols" computed="true">
       if (dsx.variable.bp == 'desktop') { return 6 }
       if (dsx.variable.bp == 'tablet') { return 6 }
@@ -281,8 +287,18 @@
                is a broken-image glyph in a 461x820 frame -->
           <stack class="skeleton" visible-if="show == null"
                  style="width: {{ dsx.variable.stageW }}px; height: {{ dsx.variable.stageH }}px"/>
+          <!-- THE STAGE IS 9:16 AND THE POSTER IS 3:4, so `cover` cropped a quarter of the
+               width — and the poster BAKES its title, so what the reader saw was
+               "y Cold Campus Prince" (measured: a 422x750 frame around 360x480 art). The
+               generator's own header records this class of bug being fixed once already
+               when the poster was 2:3 in a 3:4 frame.
+               `hero_tall` is the asset authored for exactly this: no baked type, subject in
+               the upper third, so a crop takes background and nothing else. The title is
+               real text in the panel beside it, where it is selectable and reachable by a
+               screen reader. `poster` remains the fallback for a row seeded before the
+               tall art existed. -->
           <zstack visible-if="show != null">
-            <image src="{{ show == null ? '' : show.poster }}" contentFit="cover" a11yHidden="true"
+            <image src="{{ dsx.variable.stageArt }}" contentFit="cover" a11yHidden="true"
                    shared="poster-{{ vars.id }}" sharedMode="clip" style="{{ dsx.variable.stageBox }}"/>
             <vstack style="{{ dsx.variable.stageOverlayBox }}">
               <vstack class="stageCap">
