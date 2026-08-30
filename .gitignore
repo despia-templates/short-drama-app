@@ -6,3 +6,5 @@ server/generated/
 public/dev-session.json
 .agents/
 .claude/skills/
+public/posters/*.png
+public/assets/*.png

@@ -153,6 +153,19 @@ for (const [path, needle] of [
     "no /fonts/inter.css link — the page will render in whatever face the OS supplies");
 }
 
+// ── 2b · the art negotiation serves each lane a format it can decode ───────────────────
+console.log("\nart negotiation");
+{
+  const poster = card.poster;                       // a real /posters/….svg URL from the payload
+  const asBrowser = await fetch(`${base}${poster}`, { headers: { "user-agent": "Mozilla/5.0 (verify)" } });
+  const asNative = await fetch(`${base}${poster}`, { headers: { "user-agent": "ShortDrama/1 CFNetwork" } });
+  check("a browser gets the SVG", (asBrowser.headers.get("content-type") ?? "").includes("svg"),
+    `browser UA got ${asBrowser.headers.get("content-type")} for ${poster}`);
+  check("a native client gets the PNG twin", (asNative.headers.get("content-type") ?? "").includes("png"),
+    `bare UA got ${asNative.headers.get("content-type")} — iOS <image> cannot decode SVG; ` +
+    "run `node scripts/rasterize-art.mjs` (the twins are build output)");
+}
+
 // ── 3 · money is the SERVER's word ─────────────────────────────────────────────────────
 console.log("\nauthority");
 const unlock = await fetch(`${base}/wallet/unlock`, {

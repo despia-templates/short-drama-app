@@ -282,6 +282,29 @@ const server = createServer((req, res) => {
     const apiShaped = ["/catalog/", "/viewer/", "/wallet/", "/rewards/", "/admin/", "/internal/", "/mcp", "/health"].some((p) => path === p || path.startsWith(p));
     if (!apiShaped) {
       refreshSiteIfRebuilt();
+      // ── ART NEGOTIATION: PNG for native, SVG for the web (founder decision, 2026-08-31).
+      // The key art is authored as SVG (gen-art.mjs) and stays SVG in the DATA — every
+      // payload URL ends .svg — because iOS's <image> decodes through ImageIO, which cannot
+      // read SVG and fails open to a blank placeholder. Rather than fork the data or the
+      // markup per platform, the ORIGIN answers each client with the twin it can decode:
+      // a browser identifies itself with "Mozilla" and keeps the crisp SVG; a native
+      // URLSession does not, and receives the pre-rasterised PNG twin
+      // (scripts/rasterize-art.mjs — run it after gen-art; the twins are build output,
+      // gitignored). In production this is a one-line CDN rule (rewrite *.svg → *.png when
+      // the UA lacks "Mozilla"). A missing twin falls back to the SVG with a warning, so a
+      // clone that skipped the rasterise step degrades visibly, never silently.
+      const wantsArt = /^\/(posters|assets)\/.+\.svg$/.test(path);
+      if (wantsArt && !String(req.headers["user-agent"] ?? "").includes("Mozilla")) {
+        const pngPath = resolve(SITE, "..", "public", path.slice(1).replace(/\.svg$/, ".png"));
+        try {
+          const png = readFileSync(pngPath);
+          res.writeHead(200, { "content-type": "image/png", "cache-control": "no-store" });
+          res.end(png);
+          return;
+        } catch {
+          console.warn(`[serve] no PNG twin for ${path} — run \`node scripts/rasterize-art.mjs\`; serving SVG (blank on native)`);
+        }
+      }
       const served = await site(webReq);
       if (served !== null) { await writeWebResponse(served, res); return; }
     }

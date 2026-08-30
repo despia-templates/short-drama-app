@@ -1,0 +1,58 @@
+{
+  "_note": "The NATIVE half of the type story. The web lane links Type/inter.css (framework-bundled, PLAN.md 6.34); the native lanes register this face via UIAppFonts and resolve `fontFamily=\"Inter\"` through this registry \u2014 the family name here matches the web stylesheet's `font-family: InterVariable, Inter, ...` chain by fallback. The face is the framework's own InterVariable-latin.woff2 decompressed LOSSLESSLY to TTF (woff2 is a compression container; iOS loads ttf/otf only \u2014 ClosedSource/scripts/font_registry.rb names the rule). OFL; LICENSE travels in Type/vendor/inter upstream. Regenerate: scripts/gen-fonts note in README.",
+  "families": {
+    "Inter": {
+      "variable": true,
+      "faces": [
+        {
+          "weight": 400,
+          "file": "Fonts/InterVariable.ttf",
+          "postscriptName": "InterVariable"
+        }
+      ],
+      "axes": {
+        "wght": [
+          100,
+          900
+        ],
+        "opsz": [
+          14,
+          32
+        ]
+      },
+      "defaults": {
+        "opsz": 17
+      },
+      "fallback": [
+        "system"
+      ]
+    },
+    "InterVariable": {
+      "variable": true,
+      "faces": [
+        {
+          "weight": 400,
+          "file": "Fonts/InterVariable.ttf",
+          "postscriptName": "InterVariable"
+        }
+      ],
+      "axes": {
+        "wght": [
+          100,
+          900
+        ],
+        "opsz": [
+          14,
+          32
+        ]
+      },
+      "defaults": {
+        "opsz": 17
+      },
+      "fallback": [
+        "system"
+      ]
+    }
+  },
+  "default": "Inter"
+}

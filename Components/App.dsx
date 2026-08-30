@@ -293,6 +293,9 @@
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- OFFLINE DEMO SEED (native test lanes only — the component gates itself; Article 7:
+       `global.demoSeeded` lights the pill in the phone bar below) -->
+  <DemoSeed/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
 
@@ -327,6 +330,12 @@
           <stack class="tabDash" style="align-self: center" background="{{ dsx.variable.homeTab == 'ranking' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
         </vstack>
         <spacer/>
+      
+        <spacer/>
+        <text value="offline demo" visible-if="global.demoSeeded == true"
+              background="rgba(246,182,61,0.14)" color="#F6B63D" fontSize="11" fontWeight="semibold"
+              radius="9" paddingH="8" paddingV="3"
+              a11yLabel="Offline demo data — no server is connected"/>
       </hstack>
 
       <!-- LOADING: the real shape, not a spinner — a hero band and one rail of poster cells,
