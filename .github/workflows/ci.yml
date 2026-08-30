@@ -32,17 +32,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The `secrets` context is NOT available in a job-level `if` — a workflow that tries it fails
+  # to parse, with no line number and a 0s run. So the probe happens in a STEP, where secrets
+  # are in scope, and the answer travels to the gates job as an output.
   status:
     name: which lane
     runs-on: ubuntu-latest
+    outputs:
+      has_token: ${{ steps.probe.outputs.has_token }}
     steps:
       - name: Report whether the gates can run
+        id: probe
+        env:
+          FRAMEWORK_TOKEN: ${{ secrets.FRAMEWORK_TOKEN }}
         run: |
-          if [ -n "${{ secrets.FRAMEWORK_TOKEN }}" ]; then
+          if [ -n "$FRAMEWORK_TOKEN" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
             echo "FRAMEWORK_TOKEN is set — the gates job runs the full five against dev."
           else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
             echo "::notice::FRAMEWORK_TOKEN is not set, so the gates job is skipped."
-            echo "The DSX packages are not on npm yet and the public Apache-2.0 drop"
+            echo "The DSX packages are not on npm yet, and the public Apache-2.0 drop"
             echo "(despia-native/despia) mirrors a branch behind dev — measured: 30 universal"
             echo "attributes against dev's 38 — so a build from the drop fails on correct markup."
             echo "Add a fine-grained PAT with Contents: read on despia-native/despia-framework"
@@ -51,7 +61,8 @@ jobs:
 
   gates:
     name: lint · check:styles · review · build · verify
-    if: ${{ secrets.FRAMEWORK_TOKEN != '' }}
+    needs: status
+    if: needs.status.outputs.has_token == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
