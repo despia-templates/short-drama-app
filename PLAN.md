@@ -588,3 +588,31 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     block in an action body, or a repo-level `batch([...])`. Until then every multi-row spend
     in every DSX app has to be designed around the absence, and most authors will reach for
     the shape that double-charges.
+
+39. **Atomic style ids are POSITIONAL and UNVERSIONED, so a stale html page silently wears
+    another element's styles** — NOT YET FILED (measured 2026-08-30, from one forgotten
+    server restart while building the hero carousel). A compiled page's styles are emitted as
+    atomic classes numbered by position — `[data-dsx~="a517"] { … }` — and the SAME namespace
+    is written TWICE: once into the SSR html from the server's registry, once at runtime into
+    `<style id="dsx-app-css">` by the client bundle. Nothing ties the two together. Add one
+    styled element anywhere earlier in the app and every id after it shifts by one, at which
+    point the two sheets still agree on the SELECTORS and disagree on what they mean.
+    The failure is silent and total. Measured: `<hstack chrome="true" class="nav"
+    style="width: 100%; …">` rendered **32×64 instead of 1440×64**, because the client's
+    `a517` was the 32px logo square while the SSR sheet's `a517` was the bar — so the nav
+    inherited `width: 32px` from one sheet and `height: 64px` from the other, and the whole
+    top bar collapsed. No console warning, no hydration-mismatch report, no error: the page
+    simply looked broken, and every element after the divergence point was equally wrong.
+    Locally this is a forgotten restart. In production it is the normal state of affairs
+    behind a CDN or a service worker, where a cached html document routinely outlives the
+    bundle it was rendered against — which is the same class of trap as §6.13a, one layer
+    down. `despia build` already emits a precaching SW, so a DSX app can ship into it by
+    default.
+    The ask: give the sheet an identity. Hash the emitted declaration set and stamp it on
+    both faces (`<style id="dsx-app-css" data-dsx-sheet="…">` and a matching attribute in
+    the SSR shell); on mismatch the client re-renders its own sheet and drops the server's
+    rather than merging into it, and says so once in the console. Content-addressed ids
+    (`a-7f3c91`) would remove the class of bug outright at some cost in bytes.
+    Bridged in the template meanwhile: `scripts/serve.mjs` re-reads `dist/registry.json` when
+    its mtime changes and rebuilds the site handler, so the local origin can never serve an
+    html page from an older build than the bundle beside it — and logs when it does.

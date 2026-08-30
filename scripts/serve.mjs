@@ -18,7 +18,7 @@ import { createSiteHandler } from "@despia-native/server";
 // beside the package's own entry (portable on any machine: the path is derived from where
 // @despia-native/server actually resolved, never hardcoded), deliberately loud, and it
 // dies the day the export lands.
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { entities, routes, handlers, spendBudgets, mcpTools } from "../server/generated/index.ts";
 // LOCAL LANE ONLY — the operator side-door, pending upstream role-scoped authority
@@ -196,13 +196,40 @@ const mcp = toolRows.length > 0
   ? createMcpFace({ tools: toolRows, handlers, serverName: "short-drama", serverVersion: "0.1.0",
       onError: (info) => console.error(`[mcp] ${info.tool} failed (${info.correlationId}):`, info.error) })
   : null;
-const registry = JSON.parse(readFileSync(resolve(SITE, "registry.json"), "utf8"));
+const REGISTRY_FILE = resolve(SITE, "registry.json");
+const readRegistry = () => JSON.parse(readFileSync(REGISTRY_FILE, "utf8"));
+let registry = readRegistry();
 // The face is the BUILD's business now: `despia build` resolves the framework's bundled
 // Inter, copies it to dist/fonts, and writes stylesheets:["/fonts/inter.css"] into
 // registry.shell — which this handler already spreads (live.ts), so the live lane and the
 // static export link the same one file. This used to pass its own public/type copy, which
 // worked only here and shipped the face twice.
-const site = createSiteHandler(SITE, registry, { stream: false });
+let site = createSiteHandler(SITE, registry, { stream: false });
+
+// THE SSR SHEET AND THE CLIENT SHEET SHARE ONE ID NAMESPACE, AND NOTHING VERSIONS IT.
+// A compiled page's styles are atomic classes numbered by POSITION — `[data-dsx~="a517"]`
+// — emitted twice: once into the SSR html by this handler's boot-time registry, once at
+// runtime by the client bundle read fresh off disk. When those two disagree the ids still
+// MATCH, so the cascade quietly hands each element somebody else's declarations. Measured
+// here after one forgotten restart: the top nav rendered 32x64 instead of 1440x64, because
+// the client's a517 was the 32px logo square and the SSR sheet's a517 was the bar. No
+// console warning, no hydration mismatch, no error anywhere — the page just looked wrong.
+//
+// That is a two-minute detour locally and a production incident behind a CDN, where a
+// cached html document outlives a fresh bundle by design. The framework ask is upstream
+// (PLAN.md §6.39: hash the sheet and refuse a mismatched pair). What this origin owes its
+// reader is that the trap never fires silently: the registry is re-read the moment the
+// build that produced it changes, and it says so.
+let registryStamp = statSync(REGISTRY_FILE).mtimeMs;
+const refreshSiteIfRebuilt = () => {
+  let stamp;
+  try { stamp = statSync(REGISTRY_FILE).mtimeMs; } catch { return; }   // mid-build write
+  if (stamp === registryStamp) return;
+  try { registry = readRegistry(); } catch { return; }                 // half-written json
+  registryStamp = stamp;
+  site = createSiteHandler(SITE, registry, { stream: false });
+  console.log("[serve] dist/ was rebuilt — SSR registry reloaded (stale sheet ids avoided)");
+};
 
 function toWebRequest(req, body) {
   const url = `http://${req.headers.host ?? "localhost"}${req.url ?? "/"}`;
@@ -254,6 +281,7 @@ const server = createServer((req, res) => {
     // a stale asset can never shadow a route.
     const apiShaped = ["/catalog/", "/viewer/", "/wallet/", "/rewards/", "/admin/", "/internal/", "/mcp", "/health"].some((p) => path === p || path.startsWith(p));
     if (!apiShaped) {
+      refreshSiteIfRebuilt();
       const served = await site(webReq);
       if (served !== null) { await writeWebResponse(served, res); return; }
     }
