@@ -13,11 +13,25 @@
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
-    <api as="ledger" url="/wallet/ledger" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
+    <api as="ledger" url="/wallet/ledger" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheLedger = ledger.data"/>
 
     <variable as="toast">return ''</variable>
 
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read walletView, never wallet.data, or the blank frame returns. -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read ledgerView, never ledger.data, or the blank frame returns. -->
+    <variable as="ledgerView" computed="true">
+      if (ledger.data != null) { return ledger.data }
+      return global.cacheLedger
+    </variable>
+    <variable as="walletView" computed="true">
+      if (wallet.data != null) { return wallet.data }
+      return global.cacheWallet
+    </variable>
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
@@ -28,18 +42,18 @@
       return session.data.viewer.sub.slice(0, 8)
     </variable>
     <variable as="coins" computed="true">
-      return wallet.data == null ? null : wallet.data.coins
+      return dsx.variable.walletView == null ? null : dsx.variable.walletView.coins
     </variable>
     <variable as="bonus" computed="true">
-      return wallet.data == null ? null : wallet.data.bonus
+      return dsx.variable.walletView == null ? null : dsx.variable.walletView.bonus
     </variable>
     <variable as="isVip" computed="true">
-      if (wallet.data == null) { return false }
-      return wallet.data.vip === true
+      if (dsx.variable.walletView == null) { return false }
+      return dsx.variable.walletView.vip === true
     </variable>
     <variable as="vipUntil" computed="true">
-      if (wallet.data == null || wallet.data.vipUntil == null) { return '' }
-      return String(wallet.data.vipUntil).slice(0, 10)
+      if (dsx.variable.walletView == null || dsx.variable.walletView.vipUntil == null) { return '' }
+      return String(dsx.variable.walletView.vipUntil).slice(0, 10)
     </variable>
     <variable as="vipLine" computed="true">
       if (dsx.variable.isVip == false) { return 'Every episode, no coin math, no ads.' }
@@ -49,8 +63,8 @@
     <variable as="ledgerPhase" computed="true">
       if (dsx.variable.signedOut) { return 'signedout' }
       if (ledger.error != null) { return 'error' }
-      if (ledger.data == null) { return 'loading' }
-      if (ledger.data.rows.length == 0) { return 'empty' }
+      if (dsx.variable.ledgerView == null) { return 'loading' }
+      if (dsx.variable.ledgerView.rows.length == 0) { return 'empty' }
       return 'content'
     </variable>
 
@@ -273,7 +287,7 @@
               <text class="empty" value="The ledger could not be loaded."/>
               <button label="Retry" class="retryBtn" on:tap="ledger.refresh()"/>
             </vstack>
-            <list bind="ledger.data.rows" key="id" scroll="false" spacing="0" visible-if="dsx.variable.ledgerPhase == 'content'">
+            <list bind="dsx.variable.ledgerView.rows" key="id" scroll="false" spacing="0" visible-if="dsx.variable.ledgerPhase == 'content'">
               <hstack class="ledgerRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
                 <vstack class="ledgerCol" style="flex: 1; min-width: 0">
                   <text value="{{ rowLabel }}" class="ledgerTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>

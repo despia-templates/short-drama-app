@@ -6,7 +6,7 @@
      soundtracks at once. -->
 <vstack background="#000000" alignItems="stretch" style="min-height: {{ dsx.screen.height }}px">
   <head>
-    <api as="feed" url="/catalog/discover"/>
+    <api as="feed" url="/catalog/discover" on:success="global.cacheDiscover = feed.data"/>
 
     <variable as="page">return 0</variable>
     <variable as="activeShow">return ''</variable>
@@ -26,6 +26,13 @@
     <variable as="muted">return true</variable>
     <!-- a 9:16 feed stretched across a desktop window is a phone layout in a big frame;
          wide viewports get a centered column at the height's own aspect instead -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read feedView, never feed.data, or the blank frame returns. -->
+    <variable as="feedView" computed="true">
+      if (feed.data != null) { return feed.data }
+      return global.cacheDiscover
+    </variable>
     <variable as="bp" computed="true">
       const w = dsx.screen.width
       if (w >= 1120) { return 'desktop' }
@@ -53,10 +60,10 @@
     </variable>
 
     <variable as="card" computed="true">
-      if (feed.data == null) { return null }
+      if (dsx.variable.feedView == null) { return null }
       const p = Number(dsx.variable.page)
-      if (p < 0 || p >= feed.data.cards.length) { return null }
-      return feed.data.cards[p]
+      if (p < 0 || p >= dsx.variable.feedView.cards.length) { return null }
+      return dsx.variable.feedView.cards[p]
     </variable>
 
 
@@ -92,7 +99,7 @@
          mount, so sizing a full-bleed layer from it pins the feed to whatever the window
          was then — on a desktop pane the video ran 959px while the pager stayed 697px.
          Widths are percentages; only the page HEIGHT needs a real number. -->
-    <pager axis="vertical" ignoreSafeArea="true" bind="feed.data.cards" key="show"
+    <pager axis="vertical" ignoreSafeArea="true" bind="dsx.variable.feedView.cards" key="show"
            value="dsx.variable.page" dots="false" on:change="dsx.action.rest()"
            height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto">
       <zstack>
@@ -123,7 +130,7 @@
     <!-- the loading stage is its OWN LAYER (a stage-tall child inside the flex-end caption
          column would fight the spacer): shimmer ground + brand spinner where the video
          will land, so the tab switch opens onto something designed, never a black hole -->
-    <vstack visible-if="feed.data == null && feed.error == null"
+    <vstack visible-if="dsx.variable.feedView == null && feed.error == null"
             height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
             style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center; background: radial-gradient(120% 70% at 50% 30%, #17171C 0%, #0A0A0E 70%)">
       <vstack spacing="14" alignItems="center">
@@ -157,13 +164,16 @@
         </hstack>
       </vstack>
       <vstack class="statusWrap" style="pointer-events: auto"
-              visible-if="feed.data != null && feed.data.cards.length == 0">
+              visible-if="dsx.variable.feedView != null && dsx.variable.feedView.cards.length == 0">
         <image icon="play.rectangle.fill" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
         <text value="Nothing to preview yet" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
         <text value="Trailers appear here as shows go live." fontSize="13" color="rgba(255,255,255,0.55)"/>
         <button label="Browse the catalogue" class="retryBtn" on:tap="dsx.module.route.reset({ path: '/' })"/>
       </vstack>
-      <vstack class="statusWrap" visible-if="feed.error != null" style="pointer-events: auto">
+      <!-- error takes the screen only when there is NOTHING to show: with the stash painted,
+           a failed REFRESH must not throw a dead end over good content (the viewer keeps
+           watching; the next refresh fixes it silently) -->
+      <vstack class="statusWrap" visible-if="feed.error != null && dsx.variable.feedView == null" style="pointer-events: auto">
         <text value="The feed is unavailable." fontSize="13" color="#FFFFFF"/>
         <button label="Retry" class="retryBtn" on:tap="feed.refresh()"/>
       </vstack>

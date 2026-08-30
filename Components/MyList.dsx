@@ -5,11 +5,25 @@
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
-    <api as="continue" url="/viewer/continue" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheFavs = favs.data"/>
+    <api as="continue" url="/viewer/continue" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheContinue = continue.data"/>
 
     <variable as="hovId">return ''</variable>
 
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read favsView, never favs.data, or the blank frame returns. -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read continueView, never continue.data, or the blank frame returns. -->
+    <variable as="continueView" computed="true">
+      if (continue.data != null) { return continue.data }
+      return global.cacheContinue
+    </variable>
+    <variable as="favsView" computed="true">
+      if (favs.data != null) { return favs.data }
+      return global.cacheFavs
+    </variable>
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
@@ -19,7 +33,7 @@
          two headings over void, indistinguishable from a bug -->
     <variable as="signedOut" computed="true">return session.error != null</variable>
     <variable as="listLoading" computed="true">
-      return dsx.variable.signedOut == false && (favs.data == null || continue.data == null)
+      return dsx.variable.signedOut == false && (dsx.variable.favsView == null || dsx.variable.continueView == null)
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
@@ -123,11 +137,11 @@
           <!-- history / continue watching -->
           <vstack class="section" visible-if="dsx.variable.signedOut == false && dsx.variable.listLoading == false">
             <text value="History" class="sectionTitle"/>
-            <text class="empty" visible-if="continue.data != null && continue.data.items.length == 0"
+            <text class="empty" visible-if="dsx.variable.continueView != null && dsx.variable.continueView.items.length == 0"
                   value="Nothing in progress yet — start a show from Home."/>
             <scroll axis="horizontal" indicators="false">
               <hstack class="rail" style="{{ dsx.variable.railShell }}">
-                <list bind="continue.data.items" key="episode" axis="horizontal" scroll="false" spacing="12">
+                <list bind="dsx.variable.continueView.items" key="episode" axis="horizontal" scroll="false" spacing="12">
                   <vstack class="card" style="width: 132px" href="/watch/{{ item.show }}/{{ item.idx }}"
                           on:hoverStart="dsx.variable.hovId = 'h-' + item.episode" on:hoverEnd="dsx.variable.hovId = ''"
                           a11yGroup="true" a11yLabel="Continue {{ item.title }}, episode {{ item.idx }}">
@@ -158,9 +172,9 @@
           <!-- favorites -->
           <vstack class="section" visible-if="dsx.variable.signedOut == false && dsx.variable.listLoading == false">
             <text value="My list" class="sectionTitle"/>
-            <text class="empty" visible-if="favs.data != null && favs.data.items.length == 0"
+            <text class="empty" visible-if="dsx.variable.favsView != null && dsx.variable.favsView.items.length == 0"
                   value="Tap My List on any show to keep it here."/>
-            <grid bind="favs.data.items" key="show" columns="{{ dsx.variable.cols }}" spacing="14" scroll="false">
+            <grid bind="dsx.variable.favsView.items" key="show" columns="{{ dsx.variable.cols }}" spacing="14" scroll="false">
               <vstack class="card" href="/show/{{ item.show }}"
                       on:hoverStart="dsx.variable.hovId = 'f-' + item.show" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}">

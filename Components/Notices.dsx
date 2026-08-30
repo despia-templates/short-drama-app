@@ -6,8 +6,15 @@
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
-    <api as="inbox" url="/social/notices"/>
+    <api as="inbox" url="/social/notices" on:success="global.cacheInbox = inbox.data"/>
 
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read inboxView, never inbox.data, or the blank frame returns. -->
+    <variable as="inboxView" computed="true">
+      if (inbox.data != null) { return inbox.data }
+      return global.cacheInbox
+    </variable>
     <variable as="bp" computed="true">
       const w = dsx.screen.width
       if (w >= 1120) { return 'desktop' }
@@ -26,8 +33,8 @@
     </variable>
     <variable as="phase" computed="true">
       if (inbox.error != null) { return 'error' }
-      if (inbox.data == null) { return 'loading' }
-      if (inbox.data.rows.length == 0) { return 'empty' }
+      if (dsx.variable.inboxView == null) { return 'loading' }
+      if (dsx.variable.inboxView.rows.length == 0) { return 'empty' }
       return 'content'
     </variable>
 
@@ -95,7 +102,7 @@
         </vstack>
 
         <vstack class="card" visible-if="dsx.variable.phase == 'content'">
-          <list bind="inbox.data.rows" key="id" scroll="false" spacing="0">
+          <list bind="dsx.variable.inboxView.rows" key="id" scroll="false" spacing="0">
             <hstack class="row" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
               <vstack class="rowBadge" style="justify-content: center">
                 <image icon="{{ rowIcon }}" iconSize="15" color="#FF2C55" a11yHidden="true"/>

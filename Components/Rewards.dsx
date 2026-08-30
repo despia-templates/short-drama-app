@@ -22,8 +22,8 @@
     <expects variable="nav"/>
 
     <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="state" url="/rewards/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <api as="state" url="/rewards/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheRewards = state.data"/>
+    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
     <api as="checkinCall" url="/rewards/checkin" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
     <api as="spinCall" url="/rewards/spin" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
     <api as="claimCall" url="/rewards/task" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
@@ -33,6 +33,20 @@
     <variable as="spinning">return false</variable>
     <variable as="wheelResult">return ''</variable>  <!-- the hub label after a landing -->
 
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read stateView, never state.data, or the blank frame returns. -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read walletView, never wallet.data, or the blank frame returns. -->
+    <variable as="walletView" computed="true">
+      if (wallet.data != null) { return wallet.data }
+      return global.cacheWallet
+    </variable>
+    <variable as="stateView" computed="true">
+      if (state.data != null) { return state.data }
+      return global.cacheRewards
+    </variable>
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
@@ -41,7 +55,7 @@
     <variable as="phase" computed="true">
       if (dsx.variable.signedOut) { return 'signedout' }
       if (state.error != null) { return 'error' }
-      if (state.data == null) { return 'loading' }
+      if (dsx.variable.stateView == null) { return 'loading' }
       return 'content'
     </variable>
 
@@ -62,14 +76,14 @@
       return 'width: 100%; max-width: 1100px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
     <variable as="balance" computed="true">
-      if (wallet.data == null) { return null }
-      return wallet.data.coins + wallet.data.bonus
+      if (dsx.variable.walletView == null) { return null }
+      return dsx.variable.walletView.coins + dsx.variable.walletView.bonus
     </variable>
     <variable as="canCheckin" computed="true">
-      return state.data != null && state.data.checkedToday == false
+      return dsx.variable.stateView != null && dsx.variable.stateView.checkedToday == false
     </variable>
     <variable as="canSpin" computed="true">
-      return state.data != null && state.data.freeSpinLeft && dsx.variable.spinning == false
+      return dsx.variable.stateView != null && dsx.variable.stateView.freeSpinLeft && dsx.variable.spinning == false
     </variable>
     <variable as="spinLabel" computed="true">
       if (dsx.variable.spinning) { return 'Spinning…' }
@@ -77,8 +91,8 @@
       return 'No spin left today'
     </variable>
     <variable as="spinRange" computed="true">
-      if (state.data == null || state.data.spinPrizes == null) { return '' }
-      const p = state.data.spinPrizes
+      if (dsx.variable.stateView == null || dsx.variable.stateView.spinPrizes == null) { return '' }
+      const p = dsx.variable.stateView.spinPrizes
       return p[0] + '–' + p[p.length - 1]
     </variable>
     <!-- the wheel's whole look is ONE computed string. The transition is ALWAYS declared:
@@ -90,11 +104,11 @@
     </variable>
 
     <formula as="dayState" i="item.i">
-      if (state.data == null) { return 'future' }
-      const pos = state.data.streak % 7
-      const donePos = state.data.checkedToday ? (pos == 0 ? 7 : pos) : pos
+      if (dsx.variable.stateView == null) { return 'future' }
+      const pos = dsx.variable.stateView.streak % 7
+      const donePos = dsx.variable.stateView.checkedToday ? (pos == 0 ? 7 : pos) : pos
       if (i < donePos) { return 'done' }
-      if (i == donePos && !state.data.checkedToday) { return 'next' }
+      if (i == donePos && !dsx.variable.stateView.checkedToday) { return 'next' }
       return 'future'
     </formula>
     <formula as="dayColor" st="dayState">
@@ -103,9 +117,9 @@
       return '#1E1E24'
     </formula>
     <formula as="checkinLabel">
-      if (state.data == null) { return 'Check in' }
-      if (state.data.checkedToday) { return 'Checked in — come back tomorrow' }
-      return 'Check in  ·  +' + state.data.nextReward
+      if (dsx.variable.stateView == null) { return 'Check in' }
+      if (dsx.variable.stateView.checkedToday) { return 'Checked in — come back tomorrow' }
+      return 'Check in  ·  +' + dsx.variable.stateView.nextReward
     </formula>
 
     <action as="goBack">
@@ -290,12 +304,12 @@
             <hstack class="cardHead">
               <text value="Daily check-in" class="h2"/>
               <spacer/>
-              <hstack class="streakRow" a11yGroup="true" a11yLabel="{{ state.data == null ? 0 : state.data.streak }} day streak">
+              <hstack class="streakRow" a11yGroup="true" a11yLabel="{{ dsx.variable.stateView == null ? 0 : dsx.variable.stateView.streak }} day streak">
                 <image icon="flame.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
-                <text value="{{ state.data == null ? 0 : state.data.streak }} day streak" class="streakPill"/>
+                <text value="{{ dsx.variable.stateView == null ? 0 : dsx.variable.stateView.streak }} day streak" class="streakPill"/>
               </hstack>
             </hstack>
-            <grid bind="state.data.days" key="id" columns="7" spacing="5" scroll="false">
+            <grid bind="dsx.variable.stateView.days" key="id" columns="7" spacing="5" scroll="false">
               <vstack class="dayCell" background="{{ dayColor }}" style="transition: background-color 0.3s ease">
                 <image icon="checkmark" iconSize="12" color="#FFFFFF" visible-if="dayState == 'done'" a11yHidden="true"/>
                 <text value="+{{ item.reward }}" class="dayAmt" visible-if="dayState != 'done'"/>
@@ -310,10 +324,10 @@
           <!-- rewarded ads: the capped lane. The component owns the PLATFORM decision
                (`has('admob')` / `os`) and the creative; this screen owns the server facts
                and what to do with the outcome. -->
-          <AdGate left="{{ state.data == null ? 0 : state.data.adsLeft }}"
-                  today="{{ state.data == null ? 0 : state.data.adsToday }}"
-                  cap="{{ state.data == null ? 10 : state.data.adCap }}"
-                  reward="{{ state.data == null ? 15 : state.data.adReward }}"
+          <AdGate left="{{ dsx.variable.stateView == null ? 0 : dsx.variable.stateView.adsLeft }}"
+                  today="{{ dsx.variable.stateView == null ? 0 : dsx.variable.stateView.adsToday }}"
+                  cap="{{ dsx.variable.stateView == null ? 10 : dsx.variable.stateView.adCap }}"
+                  reward="{{ dsx.variable.stateView == null ? 15 : dsx.variable.stateView.adReward }}"
                   headers="{{ dsx.variable.authHeaders }}"
                   on:granted="dsx.action.adGranted()"
                   on:failed="dsx.action.adFailed()"/>
@@ -343,7 +357,7 @@
           <!-- tasks -->
           <vstack class="card">
             <text value="Tasks" class="h2"/>
-            <list bind="state.data.tasks" key="id" scroll="false" spacing="14">
+            <list bind="dsx.variable.stateView.tasks" key="id" scroll="false" spacing="14">
               <hstack class="taskRow">
                 <vstack class="taskCol" style="flex: 1; min-width: 0">
                   <text value="{{ item.title }}" class="taskTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>

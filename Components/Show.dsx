@@ -16,34 +16,60 @@
   <head>
     <!-- the router publishes nav.canPop / nav.depth; back reads it -->
     <expects variable="nav"/>
-    <api as="detail" url="/catalog/show/{{ vars.id }}"/>
+    <api as="detail" url="/catalog/show/{{ vars.id }}" on:success="global.cacheShow = detail.data"/>
     <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
-    <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
+    <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheFavs = favs.data"/>
     <api as="fav" url="/viewer/favorite" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
 
     <variable as="favTouched">return ''</variable>
 
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read walletView, never wallet.data, or the blank frame returns. -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read favsView, never favs.data, or the blank frame returns. -->
+    <!-- stale-then-fresh, ID-GUARDED. The stash is the LAST show viewed, so it may
+         belong to a different one: returning it blindly would paint show B's art and
+         episode grid under show A's title for a frame — a worse lie than a blank. The
+         guard means back-and-forth to the player is instant (same id) while a NEW show
+         still shows its skeleton, which is honest: it is genuinely different content.
+         (PLAN.md §6.30 — the api cache dies with the mount.) -->
+    <variable as="detailView" computed="true">
+      if (detail.data != null) { return detail.data }
+      const cached = global.cacheShow
+      if (cached == null || cached.show == null) { return null }
+      return cached.show.id == vars.id ? cached : null
+    </variable>
+    <variable as="favsView" computed="true">
+      if (favs.data != null) { return favs.data }
+      return global.cacheFavs
+    </variable>
+    <variable as="walletView" computed="true">
+      if (wallet.data != null) { return wallet.data }
+      return global.cacheWallet
+    </variable>
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
     </variable>
     <variable as="show" computed="true">
-      if (detail.data == null) { return null }
-      return detail.data.show
+      if (dsx.variable.detailView == null) { return null }
+      return dsx.variable.detailView.show
     </variable>
     <variable as="favOn" computed="true">
       if (dsx.variable.favTouched != '') { return dsx.variable.favTouched == 'y' }
-      if (favs.data == null) { return false }
-      return favs.data.items.filter(x => x.show == vars.id).length > 0
+      if (dsx.variable.favsView == null) { return false }
+      return dsx.variable.favsView.items.filter(x => x.show == vars.id).length > 0
     </variable>
     <variable as="freeCount" computed="true">
-      if (detail.data == null) { return 0 }
-      return detail.data.episodes.filter(e => e.free).length
+      if (dsx.variable.detailView == null) { return 0 }
+      return dsx.variable.detailView.episodes.filter(e => e.free).length
     </variable>
     <variable as="phase" computed="true">
       if (detail.error != null) { return 'error' }
-      if (detail.data == null) { return 'loading' }
+      if (dsx.variable.detailView == null) { return 'loading' }
       return 'content'
     </variable>
 
@@ -86,8 +112,8 @@
 
     <formula as="epLocked" free="item.free" epid="item.id">
       if (free) { return false }
-      if (wallet.data == null) { return true }
-      return !wallet.data.unlocked.includes(epid)
+      if (dsx.variable.walletView == null) { return true }
+      return !dsx.variable.walletView.unlocked.includes(epid)
     </formula>
 
     <!-- The canonical back (writing-an-app.md §5): POP when there is history, REPLACE
@@ -180,7 +206,7 @@
                    shared="poster-{{ vars.id }}" sharedMode="clip" style="{{ dsx.variable.stageBox }}"/>
             <vstack style="{{ dsx.variable.stageOverlayBox }}">
               <vstack class="stageCap">
-                <text value="EP 1 — {{ detail.data == null ? '' : detail.data.episodes.length }} episodes" class="stageEp"/>
+                <text value="EP 1 — {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.episodes.length }} episodes" class="stageEp"/>
                 <text value="EP 1–{{ show == null ? '' : show.free_until }} free to watch" class="stageFree"/>
               </vstack>
             </vstack>
@@ -225,18 +251,18 @@
             <hstack class="favBtn" on:tap="dsx.module.route.push({ path: '/store' })"
                     a11yGroup="true" a11yTrait="button" a11yLabel="Your coins — get more in the store">
               <image icon="dollarsign.circle.fill" iconSize="17" color="#F6B63D" a11yHidden="true"/>
-              <text value="{{ wallet.data == null ? 0 : wallet.data.coins + wallet.data.bonus }}" class="favLabel"/>
+              <text value="{{ dsx.variable.walletView == null ? 0 : dsx.variable.walletView.coins + dsx.variable.walletView.bonus }}" class="favLabel"/>
             </hstack>
           </hstack>
 
           <hstack class="gridHead" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px">
-            <text value="1 - {{ detail.data == null ? '' : detail.data.episodes.length }}" class="gridRange"/>
+            <text value="1 - {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.episodes.length }}" class="gridRange"/>
             <spacer/>
             <text value="{{ dsx.variable.freeCount }} free" class="gridAll"/>
           </hstack>
 
           <stack class="skeleton" visible-if="detail.loading" style="height: 160px"/>
-          <grid bind="detail.data.episodes" key="id" columns="{{ dsx.variable.epCols }}" spacing="6" scroll="false">
+          <grid bind="dsx.variable.detailView.episodes" key="id" columns="{{ dsx.variable.epCols }}" spacing="6" scroll="false">
             <vstack class="epCell" style="position: relative; justify-content: center" href="/watch/{{ vars.id }}/{{ item.idx }}"
                     a11yLabel="Episode {{ item.idx }}{{ epLocked ? ', locked' : '' }}">
               <text value="{{ item.idx }}" class="epNum"/>
@@ -285,7 +311,7 @@
           </hstack>
           <text value="{{ show == null ? '' : show.synopsis }}" class="plotBody"/>
           <hstack class="gridHead" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px">
-            <text value="1 - {{ detail.data == null ? '' : detail.data.episodes.length }}" class="gridRange"/>
+            <text value="1 - {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.episodes.length }}" class="gridRange"/>
             <spacer/>
             <text value="{{ dsx.variable.freeCount }} free" class="gridAll"/>
           </hstack>
@@ -293,7 +319,7 @@
                grid is deliberately DUPLICATED from the wide panel — an inline <component>
                does not render on web yet (PLAN.md §6.12), so the two copies stay in sync
                by hand until file-component extraction is worth its own state plumbing -->
-          <grid bind="detail.data.episodes" key="id" columns="{{ dsx.variable.epCols }}" spacing="6" scroll="false">
+          <grid bind="dsx.variable.detailView.episodes" key="id" columns="{{ dsx.variable.epCols }}" spacing="6" scroll="false">
             <vstack class="epCell" style="position: relative; justify-content: center" href="/watch/{{ vars.id }}/{{ item.idx }}"
                     a11yLabel="Episode {{ item.idx }}{{ epLocked ? ', locked' : '' }}">
               <text value="{{ item.idx }}" class="epNum"/>

@@ -14,9 +14,9 @@
     <expects variable="nav"/>
 
     <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
-    <api as="catalog" url="/store/catalog"/>
-    <api as="home" url="/catalog/home"/>
+    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
+    <api as="catalog" url="/store/catalog" on:success="global.cacheCatalog = catalog.data"/>
+    <api as="home" url="/catalog/home" on:success="global.cacheHome = home.data"/>
 
     <variable as="hovId">return ''</variable>
     <variable as="benefits">
@@ -26,6 +26,27 @@
         { id: 'b3', icon: 'square.and.arrow.down', label: 'Offline downloads', note: 'High-speed, watch anywhere' },
         { id: 'b4', icon: 'bolt.fill',      label: 'No ads',                   note: 'Nothing between you and the next episode' }
       ]
+    </variable>
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read homeView, never home.data, or the blank frame returns. -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read catalogView, never catalog.data, or the blank frame returns. -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read walletView, never wallet.data, or the blank frame returns. -->
+    <variable as="walletView" computed="true">
+      if (wallet.data != null) { return wallet.data }
+      return global.cacheWallet
+    </variable>
+    <variable as="catalogView" computed="true">
+      if (catalog.data != null) { return catalog.data }
+      return global.cacheCatalog
+    </variable>
+    <variable as="homeView" computed="true">
+      if (home.data != null) { return home.data }
+      return global.cacheHome
     </variable>
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
@@ -59,13 +80,13 @@
       return dsx.variable.shell + '; background: linear-gradient(180deg, rgba(246,182,61,0.16) 0%, rgba(0,0,0,0) 100%)'
     </variable>
     <variable as="isVip" computed="true">
-      if (wallet.data == null) { return false }
-      return wallet.data.vip === true
+      if (dsx.variable.walletView == null) { return false }
+      return dsx.variable.walletView.vip === true
     </variable>
     <variable as="posterW" computed="true">return dsx.variable.bp == 'phone' ? 150 : 186</variable>
     <variable as="phase" computed="true">
       if (catalog.error != null || home.error != null) { return 'error' }
-      if (catalog.data == null || home.data == null) { return 'loading' }
+      if (dsx.variable.catalogView == null || dsx.variable.homeView == null) { return 'loading' }
       return 'content'
     </variable>
 
@@ -131,7 +152,7 @@
           <vstack spacing="4" style="flex: 1">
             <text value="Your wallet" class="watchCap"/>
             <hstack spacing="6" alignItems="flex-end">
-              <text value="{{ wallet.data == null ? '—' : wallet.data.coins + wallet.data.bonus }}" class="watchNum"/>
+              <text value="{{ dsx.variable.walletView == null ? '—' : dsx.variable.walletView.coins + dsx.variable.walletView.bonus }}" class="watchNum"/>
               <text value="coins" class="watchCap" style="padding-bottom: 4px"/>
             </hstack>
           </vstack>
@@ -164,7 +185,7 @@
         <text value="Watch free with VIP" class="sectionTitle"/>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
-            <list bind="home.data.trending" key="id" axis="horizontal" scroll="false" spacing="12">
+            <list bind="dsx.variable.homeView.trending" key="id" axis="horizontal" scroll="false" spacing="12">
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/watch/{{ item.id }}/1"
                       on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}">
@@ -186,7 +207,7 @@
         <text value="Recently added" class="sectionTitle"/>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
-            <list bind="home.data.latest" key="id" axis="horizontal" scroll="false" spacing="12">
+            <list bind="dsx.variable.homeView.latest" key="id" axis="horizontal" scroll="false" spacing="12">
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/show/{{ item.id }}"
                       on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}">

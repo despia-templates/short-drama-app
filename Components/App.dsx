@@ -13,10 +13,10 @@
      No emoji anywhere: icons come from the shared catalog and have per-platform twins. -->
 <vstack class="screen" style="min-height: {{ dsx.screen.height }}px">
   <head>
-    <api as="home" url="/catalog/home"/>
+    <api as="home" url="/catalog/home" on:success="global.cacheHome = home.data"/>
     <api as="session" url="/dev-session.json" ssr="false"/>
     <api as="continue" url="/viewer/continue" ssr="false" needs="session"
-         headers="dsx.variable.authHeaders"/>
+         headers="dsx.variable.authHeaders" on:success="global.cacheContinue = continue.data"/>
 
     <variable as="heroPage">return 0</variable>
     <variable as="hovId">return ''</variable>   <!-- the card under the pointer -->
@@ -26,6 +26,13 @@
 
     <!-- ONE breakpoint vocabulary from the LIVE screen fact (dsx.screen.width is
          reactive — a computed variable re-derives as the window changes). -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read continueView, never continue.data, or the blank frame returns. -->
+    <variable as="continueView" computed="true">
+      if (continue.data != null) { return continue.data }
+      return global.cacheContinue
+    </variable>
     <variable as="bp" computed="true">
       const w = dsx.screen.width
       if (w >= 1120) { return 'desktop' }
@@ -98,11 +105,23 @@
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
     </variable>
+    <!-- CONTENT SURVIVES A REVISIT. `<api cache>` is keyed by the per-MOUNT store
+         (mount.ts makes a new ReactiveStore per component, and the api cache is a WeakMap
+         over it), so leaving a tab and coming back refetches from zero and this screen
+         painted EMPTY RAILS for 103ms on localhost — measured tap-to-content, and far
+         worse on a real network. `global.*` is the app-wide store and outlives the frame,
+         so the last good payload is the first paint while the fresh fetch runs underneath:
+         stale-then-fresh, never blank. Every read below goes through `feed`, never
+         `dsx.variable.homeView`, or the hole comes back. Upstream ask: PLAN.md §6.30. -->
+    <variable as="homeView" computed="true">
+      if (home.data != null) { return home.data }
+      return global.cacheHome
+    </variable>
     <variable as="heroShow" computed="true">
-      if (home.data == null) { return null }
+      if (dsx.variable.homeView == null) { return null }
       const p = Number(dsx.variable.heroPage)
-      if (p < 0 || p >= home.data.hero.length) { return null }
-      return home.data.hero[p]
+      if (p < 0 || p >= dsx.variable.homeView.hero.length) { return null }
+      return dsx.variable.homeView.hero[p]
     </variable>
 
     <!-- ONE computed list: `style="{{ chunk }}; extras"` discards the chunk (the linter
@@ -233,7 +252,7 @@
       <!-- ============ HERO · wide ============ -->
       <vstack visible-if="dsx.variable.wide && heroShow != null" style="width: 100%; margin-top: -80px" alignItems="stretch">
         <zstack>
-          <pager bind="home.data.hero" key="id" height="{{ dsx.variable.heroH }}" dots="false" value="dsx.variable.heroPage">
+          <pager bind="dsx.variable.homeView.hero" key="id" height="{{ dsx.variable.heroH }}" dots="false" value="dsx.variable.heroPage">
             <image src="{{ item.hero }}" contentFit="cover" a11yLabel="{{ item.title }}"
                    style="width: 100%; height: {{ dsx.variable.heroH }}px; object-fit: cover"/>
           </pager>
@@ -259,7 +278,7 @@
           <vstack style="width: 100%; height: {{ dsx.variable.heroH }}px; justify-content: flex-end; pointer-events: none">
             <hstack style="{{ dsx.variable.thumbShellBox }}">
               <hstack class="thumbRow" style="pointer-events: auto">
-                <list bind="home.data.hero" key="id" axis="horizontal" scroll="false" spacing="10">
+                <list bind="dsx.variable.homeView.hero" key="id" axis="horizontal" scroll="false" spacing="10">
                   <image src="{{ item.poster }}" contentFit="cover" a11yLabel="Feature {{ item.title }}" a11yTrait="button"
                          on:tap="dsx.variable.heroPage = item.rank - 1"
                          style="width: 78px; height: 104px; border-radius: 8px; object-fit: cover; border: 2px solid {{ item.rank - 1 == Number(dsx.variable.heroPage) ? '#FFFFFF' : 'rgba(255,255,255,0.16)' }}; transition: border-color 0.2s, transform 0.2s; transform: scale({{ item.rank - 1 == Number(dsx.variable.heroPage) ? 1.06 : 1 }})"/>
@@ -276,7 +295,7 @@
           <!-- the PHONE hero reads the tall asset: this frame is 0.75:1 and the wide one is
                3:1, so `cover` on a single 16:9 file either loses the sides here or magnifies
                the subject into the desktop band -->
-          <pager bind="home.data.hero" key="id" height="{{ dsx.variable.heroH }}" dots="false" value="dsx.variable.heroPage">
+          <pager bind="dsx.variable.homeView.hero" key="id" height="{{ dsx.variable.heroH }}" dots="false" value="dsx.variable.heroPage">
             <image src="{{ item.hero_tall == null || item.hero_tall == '' ? item.hero : item.hero_tall }}"
                    contentFit="cover" a11yLabel="{{ item.title }}"
                    style="width: 100%; height: {{ dsx.variable.heroH }}px; object-fit: cover"/>
@@ -292,7 +311,7 @@
                 <text value="Play" class="playLabel"/>
               </hstack>
               <hstack class="dashRow" a11yHidden="true">
-                <list bind="home.data.hero" key="id" axis="horizontal" scroll="false" spacing="5">
+                <list bind="dsx.variable.homeView.hero" key="id" axis="horizontal" scroll="false" spacing="5">
                   <stack height="4" radius="2"
                          background="{{ item.rank - 1 == Number(dsx.variable.heroPage) ? '#FFFFFF' : 'rgba(255,255,255,0.35)' }}"
                          width="{{ item.rank - 1 == Number(dsx.variable.heroPage) ? 26 : 13 }}"/>
@@ -304,13 +323,13 @@
       </vstack>
 
       <!-- ============ Continue Watching ============ -->
-      <vstack class="section" visible-if="(dsx.variable.wide || dsx.variable.homeTab == 'popular') && continue.data != null && continue.data.items.length > 0">
+      <vstack class="section" visible-if="(dsx.variable.wide || dsx.variable.homeTab == 'popular') && dsx.variable.continueView != null && dsx.variable.continueView.items.length > 0">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="Continue Watching" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
         </hstack>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
-            <list bind="continue.data.items" key="episode" axis="horizontal" scroll="false" spacing="18">
+            <list bind="dsx.variable.continueView.items" key="episode" axis="horizontal" scroll="false" spacing="18">
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/watch/{{ item.show }}/{{ item.idx }}" a11yGroup="true" a11yLabel="Continue {{ item.title }}, episode {{ item.idx }}">
                 <zstack>
                   <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" style="{{ dsx.variable.posterStyle }}"/>
@@ -348,7 +367,7 @@
         </hstack>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
-            <list bind="home.data.latest" key="id" axis="horizontal" scroll="false" spacing="18">
+            <list bind="dsx.variable.homeView.latest" key="id" axis="horizontal" scroll="false" spacing="18">
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/watch/{{ item.id }}/1"
                       on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
                       a11yGroup="true" a11yLabel="{{ item.title }}, {{ item.episodes }} episodes">
@@ -387,7 +406,7 @@
         </hstack>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
-            <list bind="home.data.trending" key="id" axis="horizontal" scroll="false" spacing="12">
+            <list bind="dsx.variable.homeView.trending" key="id" axis="horizontal" scroll="false" spacing="12">
               <vstack class="card" style="width: {{ dsx.variable.posterW + dsx.variable.rankOvl }}px" href="/watch/{{ item.id }}/1" a11yGroup="true" a11yLabel="Number {{ item.rank }}, {{ item.title }}">
                 <zstack>
                   <hstack spacing="0" alignItems="flex-start">
@@ -413,7 +432,7 @@
       </vstack>
 
       <!-- ============ genre shelves ============ -->
-      <list bind="home.data.shelves" key="genre" scroll="false" spacing="0"
+      <list bind="dsx.variable.homeView.shelves" key="genre" scroll="false" spacing="0"
             visible-if="dsx.variable.wide || dsx.variable.homeTab == 'popular'">
         <vstack class="section">
           <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
@@ -450,7 +469,7 @@
       <!-- ============ NEW · phone tab ============ -->
       <vstack class="section" visible-if="dsx.variable.wide == false && dsx.variable.homeTab == 'new'">
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <grid bind="home.data.latest" key="id" columns="3" spacing="12" scroll="false">
+          <grid bind="dsx.variable.homeView.latest" key="id" columns="3" spacing="12" scroll="false">
             <vstack class="card" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="{{ item.title }}">
               <zstack>
                 <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
@@ -471,7 +490,7 @@
       <!-- ============ RANKING · phone tab: the ranked list ============ -->
       <vstack class="section" visible-if="dsx.variable.wide == false && dsx.variable.homeTab == 'ranking'">
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <list bind="home.data.trending" key="id" scroll="false" spacing="0">
+          <list bind="dsx.variable.homeView.trending" key="id" scroll="false" spacing="0">
             <hstack class="rankRow" href="/show/{{ item.id }}" a11yGroup="true"
                     a11yLabel="Number {{ item.rank }}, {{ item.title }}"
                     style="border-bottom: 1px solid rgba(255,255,255,0.05)">
@@ -497,7 +516,8 @@
         </vstack>
       </vstack>
 
-      <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="home.error != null">
+      <!-- only when there is nothing to show — a failed refresh over a painted stash is silent -->
+      <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="home.error != null && dsx.variable.homeView == null">
         <vstack class="errCard">
           <text value="The catalogue is unavailable." fontSize="14" color="#FFFFFF"/>
           <button label="Retry" class="retryBtn" on:tap="home.refresh()"/>

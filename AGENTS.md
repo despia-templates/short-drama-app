@@ -140,6 +140,15 @@ and generated barrel are read once at boot). Schema change → re-apply
   intent (a `<watch>` on `paused`), bound the retries, and give the viewer a tap target when
   the browser is genuinely refusing autoplay (PLAN.md §6.23). `<sheet inset>` is declared and
   ignored on web, so a full-bleed sheet still needs a named bridge (PLAN.md §6.22).
+- **A data screen paints STALE-THEN-FRESH, never blank.** `<api cache>` is keyed by the
+  per-mount store and dies with the screen (PLAN.md §6.30), so a tab revisit refetches from
+  zero — measured 103ms of empty rails on localhost, 300–600ms on a real network. Every data
+  block therefore stashes its payload app-wide (`on:success="global.cacheX = block.data"`) and
+  every READ goes through one computed (`if (block.data != null) { return block.data } return
+  global.cacheX`). One key per ENDPOINT, not per screen, so the five screens reading
+  `/wallet/state` share a cache. Two rules that come with it: an error branch must also test
+  the view is empty (a failed refresh must not throw a dead end over good content), and a
+  stash keyed by a route param needs an ID GUARD or show B borrows show A's art.
 - **Global chrome never rides a route transition.** Two halves. (1) `<TopNav>` must be the
   FIRST child of an UNPADDED wrapper: a `page` style carrying `paddingTop` pushes the bar off
   y=0 (measured 16px on Store, 12px on Notices, against 0 everywhere else), so a route change

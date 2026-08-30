@@ -49,6 +49,18 @@ Production replaces the FETCH of that file with your provider's session:
   production the operator is whoever your IdP says carries `role: service_role` — do
   not ship a static operator token anywhere a viewer can fetch it.
 
+- **clear the viewer-scoped caches when the viewer changes.** Screens keep their last good
+  payload in the app-wide store so a route change never paints a blank frame (`global.cache*`
+  — see PLAN.md §6.30 for why the framework's own `<api cache>` cannot do this: it is keyed
+  by the per-mount store and dies with the screen). The CONTENT keys (`cacheHome`,
+  `cacheDiscover`, `cacheCatalog`, `cacheShow`, `cacheInbox`) are public and safe to keep.
+  The VIEWER keys — `cacheWallet`, `cacheFavs`, `cacheContinue`, `cacheLedger`,
+  `cacheRewards` — belong to one person: whatever signs a viewer out or switches accounts
+  must null them in the same action that drops the token, or the next viewer sees the
+  previous one's coin balance for one frame. This template has no sign-out surface (the dev
+  session is fixed), so there is nothing to wire it to yet — the moment you add one, that
+  action clears these five keys.
+
 ## The two authorities, and where they gate
 
 - **Viewer (no role):** owner-scoped CRUD through RLS (`wallet`, `unlock`, `ledger`,

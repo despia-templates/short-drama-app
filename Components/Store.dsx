@@ -19,8 +19,8 @@
     <expects variable="nav"/>
 
     <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="catalog" url="/store/catalog"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <api as="catalog" url="/store/catalog" on:success="global.cacheCatalog = catalog.data"/>
+    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
     <api as="checkoutCall" url="/store/checkout" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
     <api as="settleCall" url="/store/settle" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
 
@@ -31,6 +31,20 @@
     <variable as="settleFailed">return false</variable>
     <variable as="hovId">return ''</variable>
 
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read catalogView, never catalog.data, or the blank frame returns. -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
+         last good payload lives in the app-wide store and is the FIRST PAINT while the
+         refetch runs. Read walletView, never wallet.data, or the blank frame returns. -->
+    <variable as="walletView" computed="true">
+      if (wallet.data != null) { return wallet.data }
+      return global.cacheWallet
+    </variable>
+    <variable as="catalogView" computed="true">
+      if (catalog.data != null) { return catalog.data }
+      return global.cacheCatalog
+    </variable>
     <variable as="authHeaders" computed="true">
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
@@ -59,17 +73,17 @@
       return 'width: 100%; max-width: 1100px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
     <variable as="balance" computed="true">
-      if (wallet.data == null) { return 0 }
-      return wallet.data.coins + wallet.data.bonus
+      if (dsx.variable.walletView == null) { return 0 }
+      return dsx.variable.walletView.coins + dsx.variable.walletView.bonus
     </variable>
     <variable as="isVip" computed="true">
-      if (wallet.data == null) { return false }
-      return wallet.data.vip === true
+      if (dsx.variable.walletView == null) { return false }
+      return dsx.variable.walletView.vip === true
     </variable>
     <!-- one phase per data source: the catalogue is the screen's content -->
     <variable as="phase" computed="true">
       if (catalog.error != null) { return 'error' }
-      if (catalog.data == null) { return 'loading' }
+      if (dsx.variable.catalogView == null) { return 'loading' }
       return 'content'
     </variable>
 
@@ -203,7 +217,7 @@
           <text value="Store" class="h1"/>
           <text value="VIP" class="vipChip" visible-if="dsx.variable.isVip"/>
           <spacer/>
-          <hstack class="balancePill" visible-if="wallet.data != null">
+          <hstack class="balancePill" visible-if="dsx.variable.walletView != null">
             <image icon="dollarsign.circle.fill" iconSize="15" color="#F6B63D" a11yHidden="true"/>
             <text value="{{ dsx.variable.balance }}" class="balanceNum"/>
           </hstack>
@@ -266,7 +280,7 @@
           <text value="Coins unlock individual episodes. Bonus coins are spent first." class="sectionNote"/>
         </vstack>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <grid bind="catalog.data.packs" key="id" columns="{{ dsx.variable.packCols }}" spacing="12" scroll="false">
+          <grid bind="dsx.variable.catalogView.packs" key="id" columns="{{ dsx.variable.packCols }}" spacing="12" scroll="false">
             <vstack class="packCard" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
                     on:hoverStart="dsx.variable.hovId = 'p-' + item.id" on:hoverEnd="dsx.variable.hovId = ''"
                     a11yLabel="Buy {{ item.coins }} coins plus {{ item.free }} bonus for {{ item.price }}"

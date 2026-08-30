@@ -402,3 +402,35 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     A `page` style carrying `paddingTop` pushes the global bar off y=0 — measured 16px on
     Store and 12px on Notices against 0 everywhere else, so a route change visibly DROPPED
     the bar. The padding belongs below the bar, on the content.
+
+30. **`<api cache="swr(...)">` cannot survive a MOUNT, so the cache's most valuable case is
+    unreachable** — NOT YET FILED (measured 2026-08-30, from "page change reloads data and
+    flashes"). The policy is right and complete: `swr(fresh, stale)` serves the cached body
+    immediately and revalidates in the background (`fire()` → `serveCached(entry)` then
+    `network(req, { refreshing: true })`), `refreshing` is a distinct state from `loading`,
+    and stale data survives a failed refetch. But the cache is
+    `apiCaches: WeakMap<ReactiveStore, Map<key, entry>>`, and `mount.ts` does
+    `const store = new ReactiveStore()` **per component mount** — so the cache is born and
+    dies with the screen. Leaving a tab and coming back therefore refetches from zero no
+    matter what `cache=` says, which is precisely the case a cache exists for. Measured on
+    this app: tab away from Home and back, `/catalog/home` + `/viewer/continue` both hit the
+    network again and the screen painted EMPTY RAILS for **103ms** on localhost (tap to
+    content, MutationObserver — rAF and short timers are throttled while the preview pane is
+    not composited, which cost two false readings before the instrument was validated).
+    On a real network that is a 300–600ms blank.
+    The ask: key the api cache in APP scope (DSXState) rather than the surface store, keeping
+    the per-surface LRU bound and the existing identity key (method+url+headers+body+expect+
+    cookie) — the cookie term already prevents cross-session bleed. It is a cross-platform
+    contract change (`Conformance/api/api-blocks.json` runs the same fixtures on iOS/Android
+    and the header calls the cache "per-surface" deliberately), so it is a framework decision,
+    not a template one — hence filed, not patched.
+    Bridge, loudly, in every data screen: the last good payload is stashed in the app-wide
+    store (`global.cache*`) by `on:success`, and one computed per block (`homeView`,
+    `walletView`, …) returns `block.data` when present and the stash otherwise, so the first
+    paint is stale-then-fresh and never blank. `/wallet/state` is read by five screens and
+    shares ONE key, so a wallet fetched on Profile makes the Store's coin chip instant.
+    Verified by holding every response 1500ms: all five tab screens paint before the response,
+    a failed refresh keeps the content, and no error panel covers good data. The Show stash is
+    ID-GUARDED — a different show must never borrow the last one's art. Viewer-scoped keys
+    must be cleared when the viewer changes (docs/auth.md); the day the cache scope lands
+    upstream, all of this collapses to one `cache=` attribute per block.
