@@ -152,6 +152,10 @@
       if (p < 0 || p >= dsx.variable.homeView.hero.length) { return null }
       return dsx.variable.homeView.hero[p]
     </variable>
+    <variable as="heroCount" computed="true">
+      if (dsx.variable.homeView == null) { return 0 }
+      return dsx.variable.homeView.hero.length
+    </variable>
 
     <!-- ONE computed list: `style="{{ chunk }}; extras"` discards the chunk (the linter
          now says so out loud — that is how this bug was found after shipping). -->
@@ -172,11 +176,43 @@
       if (r == 3) { return '#CE8B5C' }
       return '#43434D'
     </formula>
-    <formula as="topBadge" r="item.rank" f="item.featured">
+<!-- COVERFLOW, the category's shape: the resting title is whole and the ones either side
+         of it recede — measured off shortical (centre card at full opacity, neighbours dimmed
+         and scaled down) rather than the border-only highlight this rail shipped with, which
+         read as five equal thumbnails with one outlined. Scale and opacity both move, because
+         a border alone does not survive against busy poster art. -->
+    <formula as="coverCell" r="item.rank">
+      const on = r - 1 == Number(dsx.variable.heroPage)
+      return 'width: 78px; height: 104px; border-radius: 8px; object-fit: cover; '
+        + 'border: 2px solid ' + (on ? '#FFFFFF' : 'rgba(255,255,255,0.14)') + '; '
+        + 'opacity: ' + (on ? '1' : '0.55') + '; '
+        + 'transform: scale(' + (on ? 1.1 : 0.92) + '); '
+        + 'transition: opacity 0.24s ease, border-color 0.24s ease, transform 0.24s ease'
+    </formula>
+        <formula as="topBadge" r="item.rank" f="item.featured">
       if (r == 1) { return 'Trending' }
       if (f) { return 'Hot' }
       return ''
     </formula>
+
+    <!-- THE WIDE HERO IS A CAROUSEL, NOT A SWIPE SURFACE. `<pager>` advances by drag, which
+         is a touch affordance: on a 1440px window with a mouse there is nothing to tell a
+         reader the hero holds five titles, and dragging a full-bleed image reads as a
+         mis-click. Every reference carousel in the category (my-drama, shortical, flextv)
+         ships chevrons on the wide lane and only the wide lane. These wrap, so the control
+         is never a dead end at either end of the set. -->
+    <action as="heroPrev">
+      const n = dsx.variable.heroCount
+      if (n < 2) { return }
+      const p = Number(dsx.variable.heroPage)
+      dsx.variable.heroPage = p <= 0 ? n - 1 : p - 1
+    </action>
+    <action as="heroNext">
+      const n = dsx.variable.heroCount
+      if (n < 2) { return }
+      const p = Number(dsx.variable.heroPage)
+      dsx.variable.heroPage = p >= n - 1 ? 0 : p + 1
+    </action>
 
     <style as="screen" background="#000000" alignItems="stretch"/>
     <style as="scroller" alignItems="stretch"/>
@@ -208,7 +244,9 @@
     <style as="heroSyn" fontSize="14" color="rgba(255,255,255,0.72)" lineLimit="2" lineSpacing="4"/>
     <style as="playPill" background="#FFFFFF" radius="24" paddingH="34" paddingV="13" spacing="9" alignItems="center"/>
     <style as="playLabel" fontSize="15" fontWeight="bold" color="#111111"/>
-    <style as="thumbRow" spacing="10" alignItems="center"/>
+    <style as="thumbRow" spacing="14" alignItems="center"/>
+    <style as="heroArrow" width="44" height="44" radius="22" alignItems="center"
+           background="rgba(18,18,20,0.55)"/>
     <style as="heroPhoneBlock" spacing="14" alignItems="center" paddingLeading="24" paddingTrailing="24" paddingBottom="24"/>
     <style as="heroPhoneTitle" fontWeight="bold" color="#FFFFFF" lineLimit="2" textAlign="center" tracking="-0.4"/>
     <style as="dashRow" spacing="5" alignItems="center" paddingTop="4"/>
@@ -350,12 +388,26 @@
           <!-- the thumb rail drives the pager (value= is two-way) -->
           <vstack style="width: 100%; height: {{ dsx.variable.heroH }}px; justify-content: flex-end; pointer-events: none">
             <hstack style="{{ dsx.variable.thumbShellBox }}">
-              <hstack class="thumbRow" style="pointer-events: auto">
-                <list bind="dsx.variable.homeView.hero" key="id" axis="horizontal" scroll="false" spacing="10">
+              <hstack class="thumbRow" style="pointer-events: auto; z-index: 3">
+                <vstack class="heroArrow" visible-if="dsx.variable.heroCount > 1" on:tap="dsx.action.heroPrev()"
+                        a11yGroup="true" a11yTrait="button" a11yLabel="Previous feature">
+                  <image icon="chevron.left" iconSize="17" color="rgba(255,255,255,0.92)" a11yHidden="true"/>
+                </vstack>
+                <!-- THE STRIP IS A DESKTOP AFFORDANCE. At 1000px it costs 546px beside a
+                     560px copy column in a 920px stage, and the synopsis box measured a 4px
+                     overlap with the first cell — one longer line and the text runs under the
+                     posters. Tablet keeps the chevrons, which is what the references do at
+                     this width; the copy never has to yield. -->
+                <list bind="dsx.variable.homeView.hero" key="id" axis="horizontal" scroll="false" spacing="10"
+                      visible-if="dsx.variable.bp == 'desktop'">
                   <image src="{{ item.poster }}" contentFit="cover" a11yLabel="Feature {{ item.title }}" a11yTrait="button"
                          on:tap="dsx.variable.heroPage = item.rank - 1"
-                         style="width: 78px; height: 104px; border-radius: 8px; object-fit: cover; border: 2px solid {{ item.rank - 1 == Number(dsx.variable.heroPage) ? '#FFFFFF' : 'rgba(255,255,255,0.16)' }}; transition: border-color 0.2s, transform 0.2s; transform: scale({{ item.rank - 1 == Number(dsx.variable.heroPage) ? 1.06 : 1 }})"/>
+                         style="{{ coverCell }}"/>
                 </list>
+                <vstack class="heroArrow" visible-if="dsx.variable.heroCount > 1" on:tap="dsx.action.heroNext()"
+                        a11yGroup="true" a11yTrait="button" a11yLabel="Next feature">
+                  <image icon="chevron.right" iconSize="17" color="rgba(255,255,255,0.92)" a11yHidden="true"/>
+                </vstack>
               </hstack>
             </hstack>
           </vstack>
