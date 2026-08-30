@@ -129,6 +129,10 @@
       if (thread.data == null) { return 0 }
       return thread.data.count
     </variable>
+    <variable as="stageArt" computed="true">
+      if (detail.data == null || detail.data.show.hero_tall == null) { return '' }
+      return detail.data.show.hero_tall
+    </variable>
     <variable as="commentLabel" computed="true">
       const n = Number(dsx.variable.commentCount)
       if (n == 1) { return '1 comment' }
@@ -363,7 +367,11 @@
                  and pops a bright frame reads as a glitch; booting onto the show's art
                  reads as a curtain. Locked pages keep the art frosted; unlocked pages let
                  the clip (z-index 1, still under the z=2 chrome) cover it as frames land. -->
-            <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+            <!-- the TALL HERO, never the poster: the 3:4 poster bakes its title at card
+                 size, and covered into a full stage that type renders gigantic under the
+                 chrome (the same measured flash the For-You fix names) -->
+            <image src="{{ dsx.variable.stageArt == '' ? item.poster : dsx.variable.stageArt }}"
+                   contentFit="cover" a11yHidden="true"
                    height="{{ dsx.variable.stageH }}" style="{{ stageArtFx }}"/>
             <!-- a locked page never mounts a source: entitlement is the server's word -->
             <video visible-if="gridLocked == false"

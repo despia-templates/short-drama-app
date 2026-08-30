@@ -10,6 +10,16 @@
 
     <variable as="page">return 0</variable>
     <variable as="activeShow">return ''</variable>
+    <!-- Does the RESTING clip have frames? The transport binding is the one instrument
+         that cannot race: `buffering=` is ACTIVE-GUARDED by the renderer ("an inactive
+         pager preload must never overwrite the shared active clip's bindings"), so
+         exactly one clip writes it and no event ordering is involved. null = no clip has
+         spoken yet · true = the resting clip is still buffering · false = frames on
+         glass, lift the cover. (Event-based designs were abandoned unproven either way:
+         the probe used to condemn them was itself sampling the WRONG pager — Home's hero
+         track during the route swap — a reminder that a failing measurement needs the
+         same scrutiny as a passing one.) -->
+    <variable as="buf">return null</variable>
     <variable as="muted">return true</variable>
     <!-- a 9:16 feed stretched across a desktop window is a phone layout in a big frame;
          wide viewports get a centered column at the height's own aspect instead -->
@@ -42,11 +52,18 @@
     </variable>
 
 
+    <formula as="fadeFx" show="item.show">
+      const lifted = dsx.variable.activeShow == show && dsx.variable.buf === false
+      return 'width: 100%; height: ' + dsx.variable.stageH + 'px; object-fit: cover; z-index: 1; pointer-events: none; opacity: ' + (lifted ? 0 : 1) + '; transition: opacity 0.45s ease'
+    </formula>
+
     <action as="rest">
       const c = dsx.variable.card
       if (c == null) { return }
       dsx.variable.activeShow = c.show
     </action>
+
+
 
     <style as="caption" paddingLeading="16" paddingTrailing="16" paddingBottom="84" spacing="8" alignItems="flex-start"/>
     <style as="capGenre" fontSize="11" fontWeight="semibold" color="#F7C948" tracking="0.8" textCase="uppercase"/>
@@ -73,14 +90,25 @@
       <zstack>
         <!-- the art is the FIRST paint: a feed that opens onto a black hole and then pops
              a bright video reads as a glitch; opening onto the key art reads as intent.
-             The clip sits above and simply covers it once frames exist. -->
-        <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+             The TALL HERO, never the poster: a 3:4 poster carries its title BAKED at
+             card size, and covered into an 812px stage that type renders gigantic and
+             collides with the real caption — measured as the "flash" itself. The tall
+             hero is type-free and authored for exactly this frame. -->
+        <image src="{{ item.hero_tall == null || item.hero_tall == '' ? item.poster : item.hero_tall }}"
+               contentFit="cover" a11yHidden="true"
                height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
-               style="width: 100%; object-fit: cover"/>
+               style="width: 100%; height: {{ dsx.variable.stageH }}px; object-fit: cover"/>
         <video src="{{ item.video }}" active="{{ item.show == dsx.variable.activeShow }}"
-               muted="{{ dsx.variable.muted }}" loop="true" gravity="fill"
+               muted="{{ dsx.variable.muted }}" loop="true" gravity="fill" buffering="dsx.variable.buf"
                height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; z-index: 1"
                on:appear="dsx.action.rest()"/>
+        <!-- the fade COVER: same art, above the clip (z ties break by document order, and
+             the outer chrome's z2 still wins), lifting only when this page's clip reports
+             frames — the last place a cut could hide -->
+        <image src="{{ item.hero_tall == null || item.hero_tall == '' ? item.poster : item.hero_tall }}"
+               contentFit="cover" a11yHidden="true"
+               height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+               style="{{ fadeFx }}"/>
       </zstack>
     </pager>
 
