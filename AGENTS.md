@@ -152,6 +152,14 @@ and generated barrel are read once at boot). Schema change → re-apply
 - **A repeater row is a DICT, never a scalar.** `item` is the reserved row SCOPE, so a `<list>`
   bound to an array of strings renders "[object Object]" and collapses to one row under
   `key="index"`. Store `[{ term: 'x' }]` and read `item.term`.
+- **A player is a TWO-COLUMN surface when the window can hold one.** Every reference player
+  (ReelShort · Shortical · Stardust · FlickReels) puts the episode grid in a persistent 416px
+  right panel beside the clip — breadcrumb, episode title, tags, plot, counts, range pills,
+  6-col grid — and collapses to the bottom drawer only when the window cannot fit both. A
+  9:16 clip alone on a 1440px desktop is two black voids and a list nobody can see without
+  opening a sheet. Both lanes render the SAME pieces (`ranges`, `visibleEps`, `gridLocked`)
+  so they cannot drift, and the drawer TRIGGER goes inert in the panel lane rather than
+  opening a duplicate list.
 - **A data screen paints STALE-THEN-FRESH, never blank.** `<api cache>` is keyed by the
   per-mount store and dies with the screen (PLAN.md §6.30), so a tab revisit refetches from
   zero — measured 103ms of empty rails on localhost, 300–600ms on a real network. Every data

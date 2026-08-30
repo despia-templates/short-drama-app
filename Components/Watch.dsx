@@ -48,6 +48,7 @@
     <variable as="unlocking">return false</variable>
     <variable as="toast">return ''</variable>
     <variable as="favTouched">return ''</variable>
+    <variable as="plotOpen">return false</variable>
 
     <!-- the option tables the sheets render from -->
     <variable as="speedOptions">
@@ -86,6 +87,28 @@
       return 'phone'
     </variable>
     <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <!-- THE EPISODE PANEL LANE. Every reference player on desktop — ReelShort, Shortical,
+         Stardust, FlickReels — puts the episode grid in a PERSISTENT right-hand panel beside
+         the clip, with the breadcrumb, title, tags, plot and counts above it. Only when the
+         window cannot hold both does the list collapse into the bottom drawer. Ours hid all
+         of it behind the drawer at every width, so a 1440px window showed a 461px clip
+         between two black voids and no way to see episode 12 without opening a sheet.
+         416 is the measured reference width (PLAN.md's category read: "detail panel 416 with
+         a 6-col episode grid"); 1120 is this app's own desktop breakpoint, and below it the
+         clip plus the panel no longer fit, so the drawer takes over unchanged. -->
+    <variable as="panel" computed="true">return dsx.screen.width >= 1120</variable>
+    <!-- ONE computed value used as the WHOLE style attribute (AGENTS.md): a clamp that
+         toggles cannot be spliced into a static style string. -->
+    <variable as="plotFx" computed="true">
+      if (dsx.variable.plotOpen) { return 'overflow: visible' }
+      return 'display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden'
+    </variable>
+    <variable as="panelViews" computed="true">
+      if (detail.data == null || detail.data.show.views == null || detail.data.show.views < 1000) { return '' }
+      const v = detail.data.show.views
+      if (v < 1000000) { return Math.round(v / 100) / 10 + 'K' }
+      return Math.round(v / 100000) / 10 + 'M'
+    </variable>
     <variable as="stageH" computed="true">
       if (dsx.variable.wide) { return dsx.screen.height - 62 }
       return dsx.screen.height
@@ -305,6 +328,23 @@
     <style as="checkBox" width="20" height="20" radius="6" alignItems="center"/>
     <style as="autoLabel" fontSize="13" color="rgba(255,255,255,0.66)"/>
 
+    <!-- ── the desktop episode panel ── -->
+    <!-- the SAME surface colour as the drawer: the panel and the drawer are one component
+         wearing two layouts, so they must not read as two different materials -->
+    <style as="panelScroll" background="#141414" alignItems="stretch"/>
+    <style as="panelBody" spacing="12" paddingH="20" paddingTop="18" paddingBottom="28" alignItems="stretch"/>
+    <style as="panelCrumbs" spacing="6" alignItems="center"/>
+    <style as="crumb" fontSize="12" color="rgba(255,255,255,0.45)"/>
+    <style as="crumbOn" fontSize="12" fontWeight="medium" color="rgba(255,255,255,0.8)"/>
+    <style as="panelTitle" fontSize="20" fontWeight="bold" color="#FFFFFF" lineLimit="2" tracking="-0.3" lineSpacing="2"/>
+    <style as="panelTags" spacing="8" alignItems="center"/>
+    <style as="panelPlot" fontSize="13" color="rgba(255,255,255,0.62)" lineSpacing="3"/>
+    <style as="panelMore" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="panelStats" spacing="8" alignItems="center" paddingTop="2"/>
+    <style as="panelStat" fontSize="13" fontWeight="medium" color="rgba(255,255,255,0.62)"/>
+    <style as="panelAct" spacing="5" alignItems="center"/>
+    <style as="panelRanges" spacing="16" alignItems="center" paddingTop="6"/>
+
     <!-- ── the episode drawer ── -->
     <style as="drawerHead" spacing="14" alignItems="center" paddingH="16" paddingTop="10" paddingBottom="18"/>
     <style as="drawerTitle" fontSize="17" fontWeight="bold" color="#FFFFFF" lineLimit="2" lineSpacing="3"/>
@@ -445,12 +485,17 @@
                 <stack height="2" radius="1" background="#FFFFFF" style="width: {{ dsx.variable.pos * 100 }}%"/>
               </stack>
             </stack>
-            <hstack class="epPill" on:tap="dsx.variable.drawer = true" a11yGroup="true" a11yTrait="button" a11yLabel="Episodes">
+            <!-- the pill RAISES the drawer only in the lane that has one; with the panel
+                 beside the clip it is a readout, not a control that opens a duplicate list -->
+            <hstack class="epPill" on:tap="dsx.variable.drawer = dsx.variable.panel == false"
+                    a11yGroup="true" a11yTrait="{{ dsx.variable.panel ? 'text' : 'button' }}"
+                    a11yLabel="Episode {{ dsx.variable.cur }} of {{ dsx.variable.total }}">
               <image icon="rectangle.stack.fill" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
               <text value="EP.{{ dsx.variable.cur }}" class="epPillNow"/>
               <text value="/ EP.{{ dsx.variable.total }}" class="epPillAll"/>
               <spacer/>
-              <image icon="chevron.up.chevron.down" iconSize="14" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+              <image icon="chevron.up.chevron.down" iconSize="14" color="rgba(255,255,255,0.7)"
+                     a11yHidden="true" visible-if="dsx.variable.panel == false"/>
             </hstack>
           </vstack>
         </vstack>
@@ -505,6 +550,88 @@ Please unlock to watch." class="lockHead"/>
         </vstack>
       </zstack>
     </vstack>
+    <!-- ══ the DESKTOP episode panel — the shape every reference player uses ══
+         A sibling of the clip column, never an overlay: it owns real estate the video was
+         wasting, and it scrolls on its own so a 60-episode grid never moves the clip. It is
+         the drawer's content, laid out permanently — same ranges, same 6-column grid, same
+         lock and now-playing tells — so the two lanes cannot drift apart in behaviour. -->
+    <scroll class="panelScroll" visible-if="dsx.variable.panel"
+            style="width: 416px; flex: none; height: {{ dsx.variable.stageH }}px">
+      <vstack class="panelBody">
+
+        <hstack class="panelCrumbs">
+          <text value="Home" class="crumb" a11yTrait="button"
+                on:tap="dsx.module.route.reset({ path: '/' })"/>
+          <text value="/" class="crumb" a11yHidden="true"/>
+          <text value="{{ detail.data == null ? '' : detail.data.show.title }}" class="crumb"
+                a11yTrait="button" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
+                on:tap="dsx.module.route.push({ path: '/show/' + dsx.variable.showId })"/>
+          <text value="/" class="crumb" a11yHidden="true"/>
+          <text value="Episode {{ dsx.variable.cur }}" class="crumbOn"/>
+        </hstack>
+
+        <text value="Episode {{ dsx.variable.cur }} — {{ detail.data == null ? '' : detail.data.show.title }}"
+              class="panelTitle"
+              style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+
+        <hstack class="panelTags">
+          <text value="{{ detail.data == null ? '' : detail.data.show.genre }}" class="tag" a11yTrait="button"
+                href="/browse/{{ detail.data == null ? '' : detail.data.show.genre }}"/>
+          <text value="Series" class="tag"/>
+          <text value="EP 1–{{ detail.data == null ? '' : detail.data.show.free_until }} Free" class="tag"/>
+        </hstack>
+
+        <text value="{{ detail.data == null ? '' : detail.data.show.synopsis }}" class="panelPlot"
+              style="{{ dsx.variable.plotFx }}"/>
+        <text value="{{ dsx.variable.plotOpen ? 'Show less' : 'Show more' }}" class="panelMore"
+              a11yTrait="button" on:tap="dsx.variable.plotOpen = !dsx.variable.plotOpen"/>
+
+        <hstack class="panelStats" visible-if="dsx.variable.panelViews != ''">
+          <image icon="eye" iconSize="14" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
+          <text value="{{ dsx.variable.panelViews }}" class="panelStat"
+                a11yLabel="{{ dsx.variable.panelViews }} views"/>
+          <image icon="star.fill" iconSize="13" color="#F6B63D" a11yHidden="true"/>
+          <text value="{{ detail.data == null ? '' : detail.data.show.rating }}" class="panelStat"
+                a11yLabel="rated {{ detail.data == null ? '' : detail.data.show.rating }} out of 10"/>
+          <spacer/>
+          <hstack class="panelAct" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button"
+                  a11yLabel="{{ dsx.variable.favOn ? 'Remove from My List' : 'Save to My List' }}">
+            <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="15"
+                   color="{{ dsx.variable.favOn ? '#FF2C55' : '#FFFFFF' }}" a11yHidden="true"/>
+            <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="panelStat"/>
+          </hstack>
+          <hstack class="panelAct" on:tap="dsx.variable.sheet = ''; dsx.variable.menu = true" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
+            <image icon="square.and.arrow.up" iconSize="15" color="#FFFFFF" a11yHidden="true"/>
+            <text value="Share" class="panelStat"/>
+          </hstack>
+        </hstack>
+
+        <hstack class="panelRanges">
+          <list bind="dsx.variable.ranges" key="id" axis="horizontal" scroll="false" spacing="16">
+            <text value="{{ item.label }}" class="rangeTxt"
+                  color="{{ item.from - 1 == Number(dsx.variable.range) * 30 ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}"
+                  on:tap="dsx.variable.range = (item.from - 1) / 30" a11yTrait="button"/>
+          </list>
+          <spacer/>
+          <text value="{{ dsx.variable.total }} EP" class="panelStat"/>
+        </hstack>
+
+        <!-- the cell is the DIRECT grid child: a wrapper loses the column width (AGENTS.md) -->
+        <grid bind="dsx.variable.visibleEps" key="id" columns="6" spacing="8" scroll="false">
+          <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center; overflow: hidden"
+                  on:tap="dsx.action.go({ target: item.idx })"
+                  background="{{ item.idx == Number(dsx.variable.cur) ? '#FF2C55' : '#2C2C2E' }}"
+                  a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', VIP' : '' }}" a11yTrait="button" a11yGroup="true">
+            <text value="{{ item.idx }}" class="epNum" color="#FFFFFF"/>
+            <text value="VIP" class="cellTag" visible-if="gridLocked"
+                  style="position: absolute; top: 0; right: 0; border-bottom-left-radius: 6px"/>
+            <image icon="waveform" iconSize="11" color="#FFFFFF" visible-if="item.idx == Number(dsx.variable.cur)"
+                   a11yHidden="true" style="position: absolute; top: 4px; right: 5px"/>
+          </vstack>
+        </grid>
+
+      </vstack>
+    </scroll>
   </hstack>
 
   <!-- ══════ the episode drawer ══════ -->
