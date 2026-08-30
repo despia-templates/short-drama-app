@@ -1,5 +1,7 @@
 # Short Drama — the official DSX short-drama template
 
+[![gates](https://github.com/despia-templates/short-drama-app/actions/workflows/ci.yml/badge.svg)](https://github.com/despia-templates/short-drama-app/actions/workflows/ci.yml)
+
 A ReelShort/DramaWave-class vertical drama app in pure DSX: SSR web storefront (Popular /
 New / Ranking), TikTok-style For-You feed, a full-screen vertical player with a
 server-enforced coin paywall, **real Stripe web checkout**, VIP, a rewards loop (check-in
@@ -29,6 +31,20 @@ specified in `docs/` and land with the framework's native template lane.
   A checkout elsewhere: symlink it (`ln -s /path/to/checkout/.. ../despia_dsx`) — the
   preflight's `DSX_FRAMEWORK_DIR` override covers the scripts, but npm's `file:` deps
   read only the relative path.
+
+  **No access to the private framework repo?** The public Apache-2.0 drop
+  (`despia-native/despia`) mirrors the same tree — but it is the *contents* of `OpenSource/`
+  with no wrapping directory, so it is cloned **into** `OpenSource`:
+
+  ```sh
+  git clone https://github.com/despia-native/despia despia_dsx/despia-framework/OpenSource
+  ```
+
+  Cloning it one level higher lands every package where nothing looks for it; the preflight
+  catches that case by name. The drop carries no `ClosedSource/`, so run
+  `node scripts/ci-open-drop.mjs` once to drop the Stripe and SocialShare packages — it
+  prints exactly what that degrades. This is the path CI runs on every push, so it is the
+  path that stays working.
 - **Stripe web checkout** builds against the `Core/Payments/Stripe` module from the full
   Despia distribution (`ClosedSource/`). Without it, drop `"stripe"` from `modules` and
   the `packages` entry in `dsx.config.json`: everything else builds, and the Store shows
@@ -77,13 +93,26 @@ migration and the addendum, re-run `npm run seed`. The seed converges the databa
 `scripts/catalogue.mjs` (idempotent by title), and `scripts/gen-art.mjs` regenerates all
 key art deterministically from the same manifest.
 
-**Gates** (all must pass before a change is done):
+**Gates** (all five must pass before a change is done — CI runs the same five):
 
 ```sh
 npm run lint          # despia lint --strict — zero warnings
+npm run check:styles  # every style property, and every icon, against the framework catalogs
 npm run review        # the design bar (a11y, tap targets, type scale, palette)
-npm run check:styles  # every style property against the framework catalog
+npm run build         # compiles Components/**.dsx AND server/*.dsx
+npm run verify        # BEHAVIOURAL: boots an origin and asserts payloads, SSR content, money authority
 ```
+
+The first three read the source; `verify` runs the thing. It boots its own server on a spare
+port, then asks the questions a human would — does every route answer, does the SSR html carry
+real content, do the payloads still have the fields the screens read, is an anonymous unlock
+refused. Three defects shipped in one week that every static gate passed, because each was a
+runtime disagreement rather than bad source; `scripts/verify.mjs` names all three at the top.
+
+A UI or backend change means **rebuild, then restart `npm run serve`** — the site registry is
+read at boot. (The dev origin now reloads it when `dist/` changes and says so, because a page
+served from an older build than the bundle beside it wears the wrong styles *silently* —
+PLAN.md §6.39.)
 
 ### The two local identities (the auth seam)
 
@@ -131,6 +160,35 @@ declared actions — UI, AI and HTTP share one contract.
 
 Everything discovered while building this template is filed in [PLAN.md](PLAN.md) §6 —
 per the program's no-hacks law, none of it is worked around silently in template code;
-where a bridge exists it is labeled in place and dies when the upstream lands. CI gates
-land the day the packages publish to npm (the sibling-checkout requirement is the only
-thing keeping them out of a public runner).
+where a bridge exists it is labeled in place and dies when the upstream lands. **39 ledger
+entries: 37 measured findings, every one filed as an upstream issue, and 2 retracted where
+they stood rather than quietly deleted.** The issue bodies live in `docs/upstream/`, one
+file per finding, each with its repro and its measurement.
+
+Eight are still open and are the ones a DSX author is most likely to hit: the api cache dies
+with the mount (§6.30), `await` in a ternary silently yields a non-ok result (§6.31), a route
+param is unreadable from a `<variable>` initializer (§6.32), there is no cross-platform
+key-value storage (§6.33), `<video>` can select neither a rendition nor a track (§6.36), a
+declared web package needs `boot: true` to be reachable at all (§6.37), there is no
+transaction seam for a multi-row spend (§6.38), and atomic style ids are positional and
+unversioned (§6.39).
+
+## Localisation
+
+This build ships **one locale**, and the Profile screen says so rather than offering a picker
+that cannot deliver.
+
+Two different things hide behind "language" in this category:
+
+- **Content language** — the dubbed audio and the subtitle track. Unreachable today:
+  `<video>` can select neither a rendition nor a track (PLAN.md §6.36, issue 270), so a picker
+  would change nothing about what plays.
+- **UI language** — the app's own chrome. Reachable, and the seam is declared:
+  `dsx.global.strings.*` is the framework's white-label plane (defaults ⊕ `global.strings` ⊕
+  per-call payload, so one write re-skins every adopting module). To localise this template,
+  write that global at boot and read `{{ global.strings.x }}` at each of the ~180 literals in
+  `Components/`.
+
+What this template will not do is ship the control with one locale behind it. A dropdown that
+switches to Spanish and returns a half-Spanish app is the same defect as the priced quality
+ladder that was deleted from the player: a control that promises something it does not do.

@@ -9,6 +9,11 @@
 //        despia_dsx/despia-framework/     ← the framework checkout
 //        <this repo>/                     ← cloned beside it
 //
+//  The PUBLIC drop (`despia-native/despia`, Apache-2.0) is the contents of OpenSource/ with
+//  no wrapping directory, so it is cloned INTO `OpenSource`:
+//
+//      git clone https://github.com/despia-native/despia despia_dsx/despia-framework/OpenSource
+//
 //  package.json's file: deps, dsx.config.json's `packages` entry and the serve script's
 //  side-door imports all assume exactly that layout, which is why ONE check here covers
 //  all of them. `DSX_FRAMEWORK_DIR` overrides the location (an absolute path to the
@@ -53,13 +58,35 @@ if (older(here, floor)) {
 }
 
 // 2 · the framework checkout, at the sibling path or DSX_FRAMEWORK_DIR
-if (!existsSync(resolve(framework, "OpenSource/Web/packages/cli/package.json"))) {
+//
+// THE OPEN DROP IS THE CONTENTS OF OpenSource/, NOT A COPY OF THE REPO. `despia-native/despia`
+// puts `Web/`, `Documentation/`, `Conformance/` at its ROOT — there is no `OpenSource/`
+// wrapper — so the obvious `git clone … despia_dsx/despia-framework` lands every package one
+// directory above where package.json's `file:` deps look, and npm reports a pile of ENOENT
+// with no hint of the cause. Those deps are literal relative paths and cannot branch, so the
+// drop has to be cloned INTO `OpenSource`. This check names that case specifically rather
+// than repeating the generic "not found".
+if (existsSync(resolve(framework, "Web/packages/cli/package.json"))
+    && !existsSync(resolve(framework, "OpenSource/Web/packages/cli/package.json"))) {
+  problems.push(
+    `The open drop is checked out one level too high at:\n      ${framework}\n` +
+    `    \`despia-native/despia\` is the CONTENTS of OpenSource/ (its root holds Web/,\n` +
+    `    Documentation/, Conformance/), and package.json's file: deps read the literal path\n` +
+    `    OpenSource/Web/packages/*. Fix:\n` +
+    `      mv ${framework} /tmp/dsx-drop && mkdir -p ${framework} \\\n` +
+    `        && mv /tmp/dsx-drop ${resolve(framework, "OpenSource")}\n` +
+    `    or re-clone into place:\n` +
+    `      git clone https://github.com/despia-native/despia despia_dsx/despia-framework/OpenSource`,
+  );
+} else if (!existsSync(resolve(framework, "OpenSource/Web/packages/cli/package.json"))) {
   problems.push(
     `The framework checkout was not found at:\n      ${framework}\n` +
     `    This template resolves @despia-native/* from a sibling checkout (see the header\n` +
     `    of this file). Fix, from the directory ABOVE this repo:\n` +
     `      git clone https://github.com/despia-native/despia-framework despia_dsx/despia-framework\n` +
-    `    (or the public drop: git clone https://github.com/despia-native/despia despia_dsx/despia-framework)\n` +
+    `    or the public Apache-2.0 drop, which is the contents of OpenSource/ and so is cloned\n` +
+    `    INTO it:\n` +
+    `      git clone https://github.com/despia-native/despia despia_dsx/despia-framework/OpenSource\n` +
     `    then build it once:  cd despia_dsx/despia-framework/OpenSource/Web && npm install && npm run build`,
   );
 } else if (!existsSync(resolve(framework, "OpenSource/Web/packages/cli/dist/bin/dsx.js"))) {

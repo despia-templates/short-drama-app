@@ -1,0 +1,123 @@
+#
+#  CI — the five gates, run the way a STRANGER gets this template.
+#
+#  Deliberately built against the PUBLIC Apache-2.0 drop (`despia-native/despia`), not the
+#  private framework repo: that is what someone cloning this template can actually obtain,
+#  so it is what has to keep working. Two consequences, both named rather than hidden:
+#
+#    · the drop is the CONTENTS of OpenSource/, so it is cloned INTO `OpenSource` — the exact
+#      trap scripts/preflight.mjs now catches by name;
+#    · the drop carries no ClosedSource/, so the Stripe and SocialShare module packages are
+#      absent. The job drops them from dsx.config.json and prints what that degrades. The
+#      Store then shows the server's honest refusal instead of a payment sheet, and Share
+#      copies the link instead of opening the system sheet — the same degradation the README
+#      documents for anyone building without the full distribution.
+#
+#  `verify` boots the real origin against a real Postgres with the real migration and the
+#  real seed, so this is a behavioural run, not a compile check.
+#
+name: gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: lint · check:styles · review · build · verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shortdrama_dev
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DSX_DATABASE_URL: postgres://postgres:postgres@localhost:5432/shortdrama_dev
+      DSX_JWT_SECRET: ci-only-secret-not-used-anywhere-else
+      DSX_INTERNAL_KEY: ci-only-internal-key
+      DSX_DEV_NO_SW: "1"
+
+    steps:
+      - name: Check out the template
+        uses: actions/checkout@v4
+        with:
+          path: short-drama-app
+
+      # The sibling convention, exactly as scripts/preflight.mjs documents it:
+      #   <parent>/despia_dsx/despia-framework/OpenSource/...
+      #   <parent>/short-drama-app/
+      - name: Check out the open drop into OpenSource/
+        uses: actions/checkout@v4
+        with:
+          repository: despia-native/despia
+          path: despia_dsx/despia-framework/OpenSource
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.18"
+
+      - name: Build the framework's web packages
+        working-directory: despia_dsx/despia-framework/OpenSource/Web
+        run: |
+          npm install
+          npm run build
+          # the CLI's exec bit does not survive every rebuild
+          chmod +x packages/cli/dist/bin/*.js || true
+
+      - name: Drop the ClosedSource modules (not in the open drop)
+        working-directory: short-drama-app
+        run: node scripts/ci-open-drop.mjs
+
+      - name: Install (preflight runs first)
+        working-directory: short-drama-app
+        run: npm install
+
+      - name: lint
+        working-directory: short-drama-app
+        run: npm run lint
+
+      - name: check:styles
+        working-directory: short-drama-app
+        run: npm run check:styles
+
+      - name: review
+        working-directory: short-drama-app
+        run: npm run review
+
+      - name: build
+        working-directory: short-drama-app
+        run: npm run build
+
+      - name: Apply the migration and the policy addendum
+        working-directory: short-drama-app
+        run: |
+          psql "$DSX_DATABASE_URL" -v ON_ERROR_STOP=1 -f server/generated/migration.sql
+          psql "$DSX_DATABASE_URL" -v ON_ERROR_STOP=1 -f server/policies.local.sql
+
+      - name: Mint the local session and seed the catalogue
+        working-directory: short-drama-app
+        run: |
+          npm run session
+          npm run serve &
+          npx --yes wait-on http://localhost:8787/catalog/home --timeout 60000
+          npm run seed
+
+      - name: verify (boots its own origin and asserts behaviour)
+        working-directory: short-drama-app
+        run: npm run verify
