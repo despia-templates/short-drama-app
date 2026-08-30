@@ -42,6 +42,30 @@ const METRICS = {
 
 export const metricsFor = (slug) => METRICS[slug] ?? { views: 120_000, rating: "8.5" };
 
+// TAGS — the secondary taxonomy. `genre` is ONE primary label and it drives the home
+// shelves; tags are many and they drive discovery. ReelShort runs nine chips on a title,
+// DramaBox's browse is a fifty-chip row, flextv puts five under the hero — a catalogue with
+// one label per show simply cannot be browsed the way this category is browsed.
+// Vocabulary is drawn from what those three actually use, so a fork's own catalogue slots in.
+const TAGS = {
+  bride:      ["Contract Marriage", "CEO", "Billionaire", "Sweet Love", "Marriage Before Love"],
+  alpha:      ["Rebirth", "Revenge", "Alpha", "Fated Lovers", "Betrayal"],
+  heiress:    ["Time Travel", "Hidden Identity", "Strong Female Lead", "Second-chance Love"],
+  midnight:   ["CEO", "Concealed Identity", "Enemies to Lovers", "Urban", "Billionaire"],
+  divorce:    ["Revenge", "Comeback", "Female Empowerment", "Strong Female Lead", "Betrayal"],
+  mafia:      ["Mafia", "Forbidden Love", "Crime Lord", "Suspense", "Love Triangle"],
+  twins:      ["Disguise", "Humor", "Billionaire", "Mistaken Identity", "Sweet Love"],
+  "ceo-nanny":["CEO", "Single Parent", "Sweet Love", "Slow Burn", "Workplace"],
+  heir:       ["Hidden Identity", "Comeback", "Revenge", "Family", "Underdog Rise"],
+  moonlit:    ["Werewolf", "Fated Lovers", "Royalty", "Forbidden Love", "Alpha"],
+  amnesia:    ["Amnesia", "Second-chance Love", "Bitter Love", "Marriage", "Misunderstanding"],
+  chef:       ["Second-chance Love", "Slow Burn", "Family", "Small Town", "Uplifting"],
+  vault:      ["Suspense", "Mystery", "Hidden Identity", "Twisted", "Strong Female Lead"],
+  campus:     ["Campus", "Humor", "Enemies to Lovers", "Slow Burn", "First Love"],
+};
+
+export const tagsFor = (slug) => TAGS[slug] ?? [];
+
 export const SHOWS = [
   {
     slug: "bride", title: "The Billionaire's Contract Bride", genre: "Romance",

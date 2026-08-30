@@ -123,6 +123,11 @@
          in the hero meta, flextv puts a play count on every card, ReelShort prints
          13.2M/115.5k on the detail. A catalogue with no numbers reads as an empty shelf.
          These are DEMO values (scripts/catalogue.mjs) — nothing here increments them. -->
+    <variable as="heroTags" computed="true">
+      const h = dsx.variable.heroShow
+      if (h == null || h.tags == null) { return [] }
+      return h.tags.slice(0, 5).map(t => ({ name: t }))
+    </variable>
     <variable as="heroViews" computed="true">
       const h = dsx.variable.heroShow
       if (h == null || h.views == null || h.views < 1000) { return '' }
@@ -192,6 +197,8 @@
     <style as="wordmark" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
 
     <style as="heroBlock" spacing="16" alignItems="flex-start"/>
+    <style as="heroTagRow" spacing="6" alignItems="center"/>
+    <style as="tagSoft" background="rgba(255,233,168,0.10)" radius="4" paddingH="9" paddingV="4" fontSize="12" color="#FFE9A8"/>
     <style as="heroMeta" spacing="6" alignItems="center"/>
     <style as="metaTxt" fontSize="13" fontWeight="medium" color="rgba(255,255,255,0.62)"/>
     <style as="heroTitle" fontWeight="bold" color="rgba(255,255,255,0.9)" lineLimit="2" tracking="-0.5"/>
@@ -315,6 +322,12 @@
                   <text value="Hot" class="pillHot" visible-if="heroShow != null && heroShow.featured"/>
                   <text value="{{ heroShow == null ? '' : heroShow.genre }}" class="pillTag"/>
                   <text value="EP 1–{{ heroShow == null ? '' : heroShow.free_until }} Free" class="pillTag"/>
+                </hstack>
+                <hstack class="heroTagRow" visible-if="dsx.variable.heroTags.length > 0">
+                  <list bind="dsx.variable.heroTags" key="name" axis="horizontal" scroll="false" spacing="6">
+                    <text value="{{ item.name }}" class="tagSoft" a11yTrait="button"
+                          a11yLabel="Browse {{ item.name }}" href="/browse/{{ item.name }}"/>
+                  </list>
                 </hstack>
                 <hstack class="heroMeta" visible-if="dsx.variable.heroViews != ''">
                   <image icon="eye" iconSize="13" color="rgba(255,255,255,0.55)" a11yHidden="true"/>

@@ -110,6 +110,13 @@
       if (v < 1000000) { return Math.round(v / 100) / 10 + 'K' }
       return Math.round(v / 100000) / 10 + 'M'
     </variable>
+    <!-- The tags a show carries, each a real destination. `flow` wraps rather than scrolls:
+         a title with six tags on a 416px panel must not hide three of them off-screen. -->
+    <variable as="showTags" computed="true">
+      const d = dsx.variable.detailView
+      if (d == null || d.show == null || d.show.tags == null) { return [] }
+      return d.show.tags.map(t => ({ name: t }))
+    </variable>
     <variable as="relCols" computed="true">
       if (dsx.variable.bp == 'desktop') { return 6 }
       if (dsx.variable.bp == 'tablet') { return 4 }
@@ -168,6 +175,8 @@
     <style as="relTitle" fontSize="13" color="rgba(255,255,255,0.85)" lineLimit="1"/>
     <style as="metaRow" spacing="6" alignItems="center" paddingTop="2"/>
     <style as="metaTxt" fontSize="13" fontWeight="medium" color="rgba(255,255,255,0.6)"/>
+    <style as="tagFlow" alignItems="flex-start"/>
+    <style as="tagSoft" background="rgba(255,233,168,0.10)" radius="4" paddingH="10" paddingV="5" fontSize="13" color="#FFE9A8"/>
     <style as="tag" background="rgba(255,255,255,0.1)" radius="16" paddingH="16" paddingV="7" fontSize="14" color="rgba(255,255,255,0.7)"/>
     <style as="ctaRow" spacing="12" alignItems="center"/>
     <style as="playWhite" background="#FFFFFF" radius="24" paddingH="34" paddingV="13" spacing="9" alignItems="center"/>
@@ -274,9 +283,13 @@
             <text value="{{ show == null ? '' : show.genre }}" class="tag" a11yTrait="button"
                   a11yLabel="Browse all {{ show == null ? '' : show.genre }} series"
                   href="/browse/{{ show == null ? '' : show.genre }}"/>
-            <text value="Series" class="tag"/>
             <text value="EP 1–{{ show == null ? '' : show.free_until }} Free" class="tag"/>
           </hstack>
+          <flow class="tagFlow" bind="dsx.variable.showTags" key="name" spacing="8" lineSpacing="8"
+                visible-if="dsx.variable.showTags.length > 0">
+            <text value="{{ item.name }}" class="tagSoft" a11yTrait="button"
+                  a11yLabel="Browse {{ item.name }}" href="/browse/{{ item.name }}"/>
+          </flow>
 
           <hstack class="metaRow" visible-if="dsx.variable.showViews != ''">
             <image icon="eye" iconSize="13" color="rgba(255,255,255,0.5)" a11yHidden="true"/>

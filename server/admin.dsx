@@ -55,7 +55,7 @@
       return { rows: rows }
     </action>
 
-    <action as="adminUpsertShow" inputs="id, title, synopsis, genre, poster, hero, heroTall, state, freeUntil, featured, views, rating">
+    <action as="adminUpsertShow" inputs="id, title, synopsis, genre, poster, hero, heroTall, state, freeUntil, featured, views, rating, tags">
       if (title == null || title === '') { throw { reason: 'invalid', message: 'title is required' } }
       const values = {
         title: title,
@@ -68,7 +68,8 @@
         free_until: freeUntil == null ? 8 : freeUntil,
         featured: featured === true,
         views: views == null ? 0 : views,
-        rating: rating == null ? '' : rating
+        rating: rating == null ? '' : rating,
+        tags: tags == null ? '' : tags
       }
       if (id) {
         const done = await dsx.module.data.show.update({ id: id, values: values })

@@ -105,6 +105,10 @@
       if (dsx.variable.plotOpen) { return 'overflow: visible' }
       return 'display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden'
     </variable>
+    <variable as="showTags" computed="true">
+      if (detail.data == null || detail.data.show.tags == null) { return [] }
+      return detail.data.show.tags.map(t => ({ name: t }))
+    </variable>
     <variable as="panelViews" computed="true">
       if (detail.data == null || detail.data.show.views == null || detail.data.show.views < 1000) { return '' }
       const v = detail.data.show.views
@@ -378,6 +382,8 @@
     <style as="crumb" fontSize="12" color="rgba(255,255,255,0.45)"/>
     <style as="crumbOn" fontSize="12" fontWeight="medium" color="rgba(255,255,255,0.8)"/>
     <style as="panelTitle" fontSize="20" fontWeight="bold" color="#FFFFFF" lineLimit="2" tracking="-0.3" lineSpacing="2"/>
+    <style as="tagFlow" alignItems="flex-start"/>
+    <style as="tagSoft" background="rgba(255,233,168,0.10)" radius="4" paddingH="9" paddingV="4" fontSize="12" color="#FFE9A8"/>
     <style as="panelTags" spacing="8" alignItems="center"/>
     <style as="panelPlot" fontSize="13" color="rgba(255,255,255,0.62)" lineSpacing="3"/>
     <style as="panelMore" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
@@ -643,9 +649,13 @@ Please unlock to watch." class="lockHead"/>
         <hstack class="panelTags">
           <text value="{{ detail.data == null ? '' : detail.data.show.genre }}" class="tag" a11yTrait="button"
                 href="/browse/{{ detail.data == null ? '' : detail.data.show.genre }}"/>
-          <text value="Series" class="tag"/>
           <text value="EP 1–{{ detail.data == null ? '' : detail.data.show.free_until }} Free" class="tag"/>
         </hstack>
+        <flow class="tagFlow" bind="dsx.variable.showTags" key="name" spacing="6" lineSpacing="6"
+              visible-if="dsx.variable.showTags.length > 0">
+          <text value="{{ item.name }}" class="tagSoft" a11yTrait="button"
+                a11yLabel="Browse {{ item.name }}" href="/browse/{{ item.name }}"/>
+        </flow>
 
         <text value="{{ detail.data == null ? '' : detail.data.show.synopsis }}" class="panelPlot"
               style="{{ dsx.variable.plotFx }}"/>

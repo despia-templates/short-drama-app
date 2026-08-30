@@ -16,6 +16,11 @@
       <field as="featured" type="boolean"/>
       <field as="views" type="integer"/>       <!-- demo social proof; see scripts/catalogue.mjs -->
       <field as="rating" type="text"/>         <!-- "9.4" — display only, never a gate -->
+      <!-- MANY tags, one genre. Stored comma-joined in one column rather than a join table:
+           tags are read on every catalogue query and written only by the operator, so a
+           second table would cost a join on the hot path to buy nothing this app needs.
+           Split on read, never trusted for authority — they are discovery labels. -->
+      <field as="tags" type="text"/>
       <index on="state"/>
     </entity>
 
@@ -50,6 +55,7 @@
         id: s.id, title: s.title, genre: s.genre, poster: s.poster, hero: s.hero, hero_tall: s.hero_tall,
         synopsis: s.synopsis, free_until: s.free_until, featured: s.featured === true,
         views: s.views == null ? 0 : s.views, rating: s.rating == null ? '' : s.rating,
+        tags: s.tags == null || s.tags === '' ? [] : s.tags.split(',').map(t => t.trim()).filter(t => t !== ''),
         episodes: counts[s.id] == null ? 0 : counts[s.id],
         rank: i + 1
       })
@@ -94,10 +100,28 @@
       const genres = Object.entries(tally)
         .map(([name, n]) => ({ name: name, count: n }))
         .sort((a, b) => b.count - a.count)
+      // THE TAG CHIPS, counted the same way. A show carries one genre and many tags, and
+      // browse filters on EITHER — a chip is a chip to the viewer, and the reference apps
+      // make no visible distinction. Tags with a single title are dropped: a chip that
+      // narrows to one result is a dead end wearing the clothes of a filter.
+      const tagTally = {}
+      for (const s of rows) {
+        const list = s.tags == null || s.tags === '' ? [] : s.tags.split(',').map(t => t.trim())
+        for (const t of list) {
+          if (t !== '' && tally[t] == null) { tagTally[t] = (tagTally[t] == null ? 0 : tagTally[t]) + 1 }
+        }
+      }
+      const tags = Object.entries(tagTally)
+        .map(([name, n]) => ({ name: name, count: n }))
+        .filter(t => t.count > 1)
+        .sort((a, b) => b.count - a.count)
       const want = genre == null || genre === '' ? 'all' : genre
-      const picked = want === 'all'
-        ? rows
-        : rows.filter(row => (row.genre == null || row.genre === '' ? 'Drama' : row.genre) === want)
+      const matches = (row) => {
+        if ((row.genre == null || row.genre === '' ? 'Drama' : row.genre) === want) { return true }
+        const list = row.tags == null || row.tags === '' ? [] : row.tags.split(',').map(t => t.trim())
+        return list.includes(want)
+      }
+      const picked = want === 'all' ? rows : rows.filter(row => matches(row))
       // one bounded episode query per show — the same shape homeShelves uses; a single
       // unbounded read would be clamped at 100 rows without saying so (PLAN.md §6.20)
       const counts = {}
@@ -108,11 +132,13 @@
       return {
         active: want,
         genres: genres,
+        tags: tags,
         total: picked.length,
         items: picked.map(row => ({
           id: row.id, title: row.title, genre: row.genre, poster: row.poster,
           synopsis: row.synopsis, free_until: row.free_until,
           views: row.views == null ? 0 : row.views, rating: row.rating == null ? '' : row.rating,
+          tags: row.tags == null || row.tags === '' ? [] : row.tags.split(',').map(t => t.trim()).filter(t => t !== ''),
           episodes: counts[row.id] == null ? 0 : counts[row.id]
         }))
       }
@@ -181,7 +207,14 @@
         .filter(row => row.id !== id)
         .slice(0, 12)
         .map(row => ({ id: row.id, title: row.title, genre: row.genre, poster: row.poster }))
-      return { show: s.data, episodes: episodes, related: related }
+      // the ROW carries tags comma-joined; every consumer wants the array, and the card
+      // helper already parses them — the detail payload must not be the one place that
+      // hands back a raw string (the Show and Watch tag rows read `.tags` as a list).
+      const showOut = { ...s.data }
+      showOut.tags = s.data.tags == null || s.data.tags === ''
+        ? []
+        : s.data.tags.split(',').map(t => t.trim()).filter(t => t !== '')
+      return { show: showOut, episodes: episodes, related: related }
     </action>
 
     <action as="searchShows" inputs="q">

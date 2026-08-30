@@ -50,6 +50,15 @@
       const cached = global.cacheBrowse
       return cached == null ? null : cached.genres
     </variable>
+    <!-- TAGS ride the same row after the genres. A show carries one genre and many tags, and
+         to a viewer a chip is just a chip — the server filters on either. Tags that match
+         only one title are dropped server-side: a filter that narrows to one result is a
+         dead end wearing the clothes of a control. -->
+    <variable as="tagChips" computed="true">
+      if (browse.data != null) { return browse.data.tags }
+      const cached = global.cacheBrowse
+      return cached == null ? null : cached.tags
+    </variable>
     <variable as="busy" computed="true">
       return dsx.variable.view == null && browse.error == null
     </variable>
@@ -100,6 +109,12 @@
       const on = dsx.variable.active == name
       const bg = on ? '#FF2C55' : 'rgba(255,255,255,0.08)'
       return 'background: ' + bg + '; border-radius: 18px; padding: 8px 16px; white-space: nowrap; transition: background-color 0.18s ease'
+    </formula>
+    <formula as="tagChipFx" name="item.name">
+      const on = dsx.variable.active == name
+      const bg = on ? '#FF2C55' : 'rgba(255,255,255,0.05)'
+      const fg = on ? '#FFFFFF' : 'rgba(255,255,255,0.72)'
+      return 'background: ' + bg + '; color: ' + fg + '; border-radius: 18px; padding: 8px 16px; white-space: nowrap; transition: background-color 0.18s ease'
     </formula>
     <formula as="cardViews" v="item.views">
       if (v == null || v < 1000) { return '' }
@@ -175,6 +190,13 @@
                 on:tap="dsx.variable.picked = 'all'"/>
           <list bind="dsx.variable.chips" key="name" axis="horizontal" scroll="false" spacing="8">
             <text value="{{ item.name }} · {{ item.count }}" class="chipLabel" style="{{ chipFx }}"
+                  a11yTrait="button" a11yLabel="{{ item.name }}, {{ item.count }} series"
+                  on:tap="dsx.variable.picked = item.name"/>
+          </list>
+          <stack style="width: 1px; height: 20px; background: rgba(255,255,255,0.14); flex: none"
+                 visible-if="dsx.variable.tagChips != null && dsx.variable.tagChips.length > 0"/>
+          <list bind="dsx.variable.tagChips" key="name" axis="horizontal" scroll="false" spacing="8">
+            <text value="{{ item.name }} · {{ item.count }}" class="chipLabel" style="{{ tagChipFx }}"
                   a11yTrait="button" a11yLabel="{{ item.name }}, {{ item.count }} series"
                   on:tap="dsx.variable.picked = item.name"/>
           </list>

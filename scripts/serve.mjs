@@ -103,6 +103,8 @@ const opsHandlers = {
       // and a card with neither reads as an empty shelf (scripts/catalogue.mjs METRICS)
       views: Number.isFinite(Number(args.views)) ? Number(args.views) : 0,
       rating: String(args.rating ?? ""),
+      // tags arrive as an array and are stored comma-joined (see the entity's note)
+      tags: Array.isArray(args.tags) ? args.tags.join(",") : String(args.tags ?? ""),
     };
     if (typeof args.id === "string" && args.id !== "") {
       const row = await svc.update("show", args.id, values);

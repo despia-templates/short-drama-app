@@ -116,6 +116,23 @@ check("the related rail is populated where a genre has siblings", await (async (
   const d = await fetch(`${base}/catalog/show/${list.items[0].id}`).then((r) => r.json());
   return Array.isArray(d.related) && d.related.length > 0;
 })(), "a genre with two live shows produced no related titles — the rail is silently empty");
+// TAGS are parsed in three places (card(), browse rows, showDetail) and the detail copy was
+// the one that shipped a raw comma-joined STRING while the screens read it as a list — the
+// tag row rendered nothing and no gate noticed. Assert the parsed shape everywhere.
+check("home cards carry a tags ARRAY", Array.isArray(card.tags) && card.tags.length > 0,
+  `got ${JSON.stringify(card.tags)} — the card helper is handing back a raw string`);
+check("show detail carries a tags ARRAY", Array.isArray(detail.show.tags) && detail.show.tags.length > 0,
+  `got ${JSON.stringify(detail.show.tags)} — showDetail returns the raw row, which stores tags comma-joined`);
+check("browse offers tag chips beside the genres",
+  Array.isArray(browse.tags) && browse.tags.length > 0 && browse.tags.every((t) => t.count > 1),
+  `${JSON.stringify(browse.tags ?? null).slice(0, 120)} — a chip that narrows to one title is a dead end`);
+check("browse filters by TAG, not just genre", await (async () => {
+  const tag = browse.tags[0];
+  const r = await fetch(`${base}/catalog/browse/${encodeURIComponent(tag.name)}`).then((x) => x.json());
+  return r.active === tag.name && r.total === tag.count
+    && r.items.every((i) => i.tags.includes(tag.name));
+})(), "filtering by a tag did not return exactly the titles carrying it");
+
 check("episodes carry a price and a free flag",
   detail.episodes.length > 0 && detail.episodes[0].price !== undefined && detail.episodes[0].free !== undefined,
   JSON.stringify(detail.episodes[0] ?? null).slice(0, 140));
