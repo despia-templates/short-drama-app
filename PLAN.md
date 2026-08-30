@@ -6,7 +6,7 @@
 > on every change — `lint · check:styles · review · build · verify` — the last of which boots
 > the origin and asserts payload shapes, SSR content and money authority. This file is the
 > spine; every document under `docs/` hangs off it, and §6 below is the measured upstream
-> ledger: 39 entries — 37 measured findings, every one filed upstream, and 2 retracted
+> ledger: 40 entries — 38 measured findings, every one filed upstream, and 2 retracted
 > where they stood rather than quietly deleted. When a decision here conflicts with the
 > framework, the framework wins and this file gets a correction — never the other way around.
 >
@@ -620,3 +620,30 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     Bridged in the template meanwhile: `scripts/serve.mjs` re-reads `dist/registry.json` when
     its mtime changes and rebuilds the site handler, so the local origin can never serve an
     html page from an older build than the bundle beside it — and logs when it does.
+
+40. → filed: https://github.com/despia-native/despia-framework/issues/274 — **A HYDRATED `<scroll>` never gets its scroll plane, so `on:scroll` is inert on the page a
+    viewer LANDS on** — (measured 2026-08-30 giving the top bar a scroll-aware scrim). A
+    server-rendered screen's outermost `<scroll>` comes out of hydration with **no**
+    `applyScrollBehaviour`: no `data-dsx-scroll-axis`, no inline `overflow`, none of the
+    scroll-linked custom properties, and no `on:scroll` / `on:scrollEnd` / `on:reachEnd`
+    dispatch at all. The IDENTICAL component mounted by a client-side route change has every
+    one of them.
+    Measured on one document, both ways. Fresh load of `/`: the root scroller reports
+    `style=""` and `data-dsx-scroll-axis=null`, while every nested rail in the same page
+    reports `overflow: hidden auto; overscroll-behavior: auto; …` and its full plane — so the
+    element factory clearly runs for children and not for the hydrated root. Click a nav link
+    to `/browse` and the root scroller of the incoming screen has the complete plane. Isolated
+    against the obvious suspect: removing `on:scroll` entirely does not change the outcome, so
+    the handler is not what suppresses the attach.
+    Why it is expensive: it is invisible in development. An author adds `on:scroll`, navigates
+    around their running app, sees it work, and ships a feature that is dead on every cold
+    load and every shared link — which is every first impression the app will ever make.
+    Nothing errors, and the same code works on the second navigation.
+    The ask: hydration must run the element factory's post-mount behaviour for a matched
+    element, or `<scroll>` must re-attach on adopt. A conformance row should pin "a
+    server-rendered `<scroll>` publishes its plane on the first frame", since the SSR path is
+    the one no browser test currently covers.
+    Bridged in the template: `<TopNav>` does NOT drive its scrim from scroll. `overArt` is a
+    static per-caller attribute, and the transparent lane carries a gradient scrim so the
+    links stay legible over whatever passes beneath. Three lines to make it scroll-aware the
+    day the plane hydrates.

@@ -192,11 +192,6 @@
         <vstack class="content" style="flex: 1; min-width: 0">
           <text value="Profile" class="h1" visible-if="dsx.variable.wide == false"/>
 
-          <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
-            <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
-            <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
-                   a11yLabel="Dismiss message" a11yTrait="button"/>
-          </hstack>
 
           <!-- signed out: the state has words and a way forward -->
           <vstack class="signCard" visible-if="dsx.variable.signedOut">
@@ -372,5 +367,20 @@
       </hstack>
     </vstack>
   </scroll>
+
+  <!-- THE TOAST LIVES OUTSIDE THE SCROLL. It used to sit inline near the top of the page, so
+       a viewer who had scrolled down to the pack they wanted and pressed Buy got their answer
+       rendered off-screen above them — measured on /store at 1440, where the refusal
+       "Payments are not configured on this deployment" landed 200px out of view. A status
+       message has to reach the person who caused it.
+       As a SIBLING of the scroll it pins to the bottom of the screen on every renderer with
+       no positioning at all: web and native both lay it out after the scroll and before the
+       tab bar, which is where a snackbar belongs anyway. No `position: absolute`, so nothing
+       to degrade. -->
+  <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
+    <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
+    <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+           a11yLabel="Dismiss message" a11yTrait="button"/>
+  </hstack>
   <TabBar active="profile" visible-if="dsx.variable.wide == false"/>
 </vstack>

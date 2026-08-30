@@ -19,9 +19,28 @@
      Search is an OVERLAY (<SearchOverlay/> owns its trigger and its cover sheet), never
      a route — the storefront stays mounted behind it. Icons resolve per renderer from
      the shared catalog; no emoji anywhere. -->
-<hstack chrome="true" class="nav" style="width: 100%; position: sticky; top: 0; z-index: 50">
+<hstack chrome="true" class="nav" style="{{ dsx.variable.navBox }}">
   <head>
     <attribute as="active" default="'home'"/>
+    <!-- A TRANSPARENT BAR IS ONLY CORRECT OVER ART. The bar is transparent so the Home hero
+         runs underneath it — but on every other route that means page TEXT scrolls visibly
+         THROUGH the nav. Measured on /store at 1440: the page's own back row and a toast
+         both rendered across the links, and neither was legible.
+         `overArt` DEFAULTS TO FALSE, so a caller that forgets it gets a readable bar — never
+         a broken one. Only a screen with art behind the bar opts in.
+
+         WHY THIS IS NOT SCROLL-DRIVEN, which is what the category does. The obvious shape is
+         transparent at rest and solid once scrolled, off `on:scroll`'s `atTop`. It does not
+         work on the page a viewer LANDS on: a server-rendered screen's outermost <scroll> is
+         hydrated without `applyScrollBehaviour`, so it has no scroll plane, none of the
+         scroll-linked custom properties, and no `on:scroll` dispatch at all — while the identical component mounted
+         by a client-side route change has every one of them. Measured both ways on the same
+         document (PLAN.md §6.40). A handler that fires only after the viewer navigates away
+         and back is exactly the inert control this template deletes on sight, so the bar is
+         static and the transparent lane carries a gradient scrim instead: over art it reads
+         as the hero's own vignette, and it guarantees the links stay legible against whatever
+         scrolls beneath. Three lines to make it scroll-aware the day the plane hydrates. -->
+    <attribute as="overArt" default="false"/>
 
     <variable as="hov">return ''</variable>
     <variable as="on" computed="true">'#FF2C55'</variable>
@@ -37,6 +56,24 @@
       return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + p + 'px; padding-right: ' + p + 'px; gap: ' + g + 'px'
     </variable>
     <variable as="off" computed="true">'rgba(255,255,255,0.95)'</variable>
+    <!-- A MARKUP ATTRIBUTE ARRIVES AS A STRING unless the caller interpolates a value:
+         `overArt="true"` is the four characters, while `default="false"` is a JSE expression
+         and is the boolean. Comparing one to the other with `== true` is false for the
+         string, so the bar stayed solid on Home with no error anywhere. Accept both
+         spellings rather than making every caller write `overArt="{{ true }}"`. -->
+    <variable as="clear" computed="true">
+      const oa = dsx.attribute.overArt
+      return oa === true || oa === 'true'
+    </variable>
+    <!-- the scrim is the drawer's own #141414 at 0.92 over a hairline, and the blur is a web
+         enhancement that degrades to the flat colour everywhere else -->
+    <variable as="navBox" computed="true">
+      const base = 'width: 100%; position: sticky; top: 0; z-index: 50; '
+      if (dsx.variable.clear) {
+        return base + 'background-image: linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.3) 62%, rgba(0,0,0,0) 100%)'
+      }
+      return base + 'background-color: rgba(20,20,20,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.07)'
+    </variable>
     <variable as="links" computed="true">
       return [
         { key: 'home',     label: 'Home',    path: '/' },

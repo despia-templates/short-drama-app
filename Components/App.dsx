@@ -292,7 +292,7 @@
 
       <!-- the nav rides INSIDE the scroll so the hero art runs under it (measured:
            nav 80px transparent sticky, hero top edge at y≈-8) -->
-      <TopNav active="home" visible-if="dsx.variable.wide"/>
+      <TopNav active="home" overArt="true" visible-if="dsx.variable.wide"/>
 
       <hstack class="phoneBar" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.wide == false">
         <vstack class="logoBox" style="justify-content: center">

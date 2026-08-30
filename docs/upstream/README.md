@@ -43,3 +43,4 @@ retracted in the ledger instead of filed).
 - `36-package-boot-required.md` — packages/runtime: a declared web package is unreachable without boot: true — silently disabled Stripe → https://github.com/despia-native/despia-framework/issues/271
 - `37-no-transaction.md` — server/data: a declared action cannot span a transaction → https://github.com/despia-native/despia-framework/issues/272
 - `38-atomic-style-id-collision.md` — web/ssr: atomic style ids are positional and unversioned → https://github.com/despia-native/despia-framework/issues/273
+- `39-hydrated-scroll-plane.md` — web/ssr: a hydrated <scroll> never gets its scroll plane → https://github.com/despia-native/despia-framework/issues/274

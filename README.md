@@ -160,18 +160,19 @@ declared actions — UI, AI and HTTP share one contract.
 
 Everything discovered while building this template is filed in [PLAN.md](PLAN.md) §6 —
 per the program's no-hacks law, none of it is worked around silently in template code;
-where a bridge exists it is labeled in place and dies when the upstream lands. **39 ledger
-entries: 37 measured findings, every one filed as an upstream issue, and 2 retracted where
+where a bridge exists it is labeled in place and dies when the upstream lands. **40 ledger
+entries: 38 measured findings, every one filed as an upstream issue, and 2 retracted where
 they stood rather than quietly deleted.** The issue bodies live in `docs/upstream/`, one
 file per finding, each with its repro and its measurement.
 
-Eight are still open and are the ones a DSX author is most likely to hit: the api cache dies
+Nine are still open and are the ones a DSX author is most likely to hit: the api cache dies
 with the mount (§6.30), `await` in a ternary silently yields a non-ok result (§6.31), a route
 param is unreadable from a `<variable>` initializer (§6.32), there is no cross-platform
 key-value storage (§6.33), `<video>` can select neither a rendition nor a track (§6.36), a
 declared web package needs `boot: true` to be reachable at all (§6.37), there is no
-transaction seam for a multi-row spend (§6.38), and atomic style ids are positional and
-unversioned (§6.39).
+transaction seam for a multi-row spend (§6.38), atomic style ids are positional and
+unversioned (§6.39), and a hydrated `<scroll>` never gets its scroll plane, so `on:scroll`
+is inert on the page a viewer lands on (§6.40).
 
 ## Localisation
 
