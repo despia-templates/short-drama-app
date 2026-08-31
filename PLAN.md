@@ -926,3 +926,18 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     text-only row. The fallback now asks the children against the real proposal and fills only
     when they echo infinity. The lesson repeated from §6.43: verify a layout fix against the
     screen that DIDN'T motivate it.
+
+58. RESOLVED 2026-08-31 (`despia-framework dev@7d649625` + `dev@38f94bdd`) — **Two "never
+    bridged" rulings fell tonight, both user-visible.** (a) The CSS DISTRIBUTIONS: the tab
+    row's `justify-content: space-around` packed left on device while web stretched it edge to
+    edge — "spacer territory" was the old ruling, but the distributions are mechanically exact
+    in SwiftUI (between = inner spacers; evenly = every slot; around = doubled inner spacers,
+    edge:inner 1:2), carried on a `distribute` attr from the post-pass; hstack/vstack moved to
+    the privileged tier for per-child rendering. Also unblocks Watch's speed row, AdGate and
+    PersonalNav. (b) MARGINS: the bridge always emitted margin*, nothing read them; the new arm
+    applies them OUTSIDE every fill (true margin, never padding), and negative `margin-top` is
+    the PULL-UNDER — the wide hero's backdrop now runs to the page top behind the transparent
+    nav on iPad, the web reference geometry. One lesson with it: a component ROOT's z-index
+    cannot escape its instance natively — the MOUNT TAG carries `zIndex` at the one overlap
+    site (App.dsx), the honest cross-platform spelling; hoisting instance-root z is a filed
+    candidate.

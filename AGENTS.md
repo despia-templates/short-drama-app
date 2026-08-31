@@ -283,6 +283,12 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   "opsz": [14,32]}`) and every `fontWeight`/`font-weight` just works natively; `opsz` tracks the
   point size automatically (CSS `font-optical-sizing: auto` parity) — never pin it in the
   registry. One face file, the whole ramp.
+- **Distributions and margins are BRIDGED now** (dev@7d649625/38f94bdd): `justify-content:
+  space-between|around|evenly` distributes natively with exact CSS ratios, and `margin-*`
+  applies outside fills — negative `margin-top` is the sanctioned pull-under (the hero-
+  under-transparent-nav recipe). Two riders: `auto` margins still center via the parent,
+  and a component root's z-index does not escape its instance natively — when a sibling
+  will overlap a mounted component, put `zIndex` ON THE MOUNT TAG.
 - **Probe before you generalise.** If a property "doesn't work", reproduce it in a throwaway
   one-element component first. Three framework defects were once filed from one bad
   measurement; all three were false.

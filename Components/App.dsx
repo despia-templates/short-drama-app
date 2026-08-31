@@ -306,7 +306,12 @@
 
       <!-- the nav rides INSIDE the scroll so the hero art runs under it (measured:
            nav 80px transparent sticky, hero top edge at y≈-8) -->
-      <TopNav active="home" overArt="true" visible-if="dsx.variable.wide"/>
+      <!-- zIndex ON THE MOUNT TAG: the nav's own z-index: 50 lives on its root INSIDE the
+           component instance, and native sibling paint order at THIS level cannot see it
+           (CSS z crosses the wrapper; SwiftUI does not) — the pulled-under hero painted
+           over the whole bar. A universal attr on the component tag lifts the instance
+           itself; web already stacks via the inner sticky z, so this is additive. -->
+      <TopNav active="home" overArt="true" zIndex="50" visible-if="dsx.variable.wide"/>
 
       <hstack class="phoneBar" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.wide == false">
         <vstack class="logoBox" style="justify-content: center">
