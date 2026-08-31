@@ -1083,3 +1083,25 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     the same box web lays out. The lesson: a renderer's SYSTEM CHROME (sheet wrappers,
     grabbers, header bars) is part of the parity contract too — measuring only the app's
     own markup missed a constant offset the eye reads instantly.
+
+66. RESOLVED 2026-08-31 (`despia-framework dev@6da4c7f7`) — **The scrubber saga: the web depth
+    stack had no placement area, and `anim=` never animated a change on any lane.** The
+    "seekbar fully broken on web" report measured out to two web-engine holes: `.dsx-zstack`
+    laid its layers in an implicit max-content column centered by `justify-content`, so no
+    child could reach an edge whatever its alignment said — and a grown EMPTY layer was 0px
+    wide, so the track literally did not exist (fill + thumb floated mid-bar over nothing).
+    The grid is one full-size cell now (`grid-template: 100% / 100%`), `align=` speaks the
+    native 9-anchor vocabulary, and `data-dsx-grow` children cover their axis — the
+    CoverZStackLayout law, ported. Then the jumps: custom-ux.md §3 has always promised that
+    `anim=` "animates the change" of the bindable transforms, and NEITHER renderer implemented
+    it — anim only eased visibility. Native now attaches a value-keyed animation over
+    width/height/offset/scale/rotation/opacity; web arms a persistent CSS transition that
+    visibility's temporary in/out restores afterwards. `anim`/`animDuration` interpolate and
+    `none` retires the tween, so the scrubber's gate — `anim="{{ scrubbing ? 'none' :
+    'linear' }}"` — tracks the finger instantly while playback GLIDES linearly between the
+    player's 4 Hz ticks. Measured both lanes: web thumb 299.7 → 304.3 → 308.6 across 240ms,
+    native fill-end 1100 → 1157 → 1184 across ~150ms — continuous, not stepped. Template
+    half: the Watch scrubber carries the tween + the `scrubbing` two-way (the reference
+    recipe in custom-ux.md now shows the glide spelling). One unit lesson for the ledger:
+    `animDuration` is SECONDS (the catalog says so) — "250" produced a four-minute tween
+    on web before the probe caught it.

@@ -42,6 +42,7 @@
     <variable as="wMuted">return true</variable>
     <variable as="pos">return 0</variable>
     <variable as="seekBox">return { width: 0, height: 0 }</variable>
+    <variable as="scrubbing">return false</variable>   <!-- true while the finger owns the bar -->
     <variable as="time">return 0</variable>
     <variable as="duration">return 0</variable>
     <variable as="speed">return 1</variable>
@@ -497,6 +498,7 @@
                    src="{{ item.video }}" active="{{ item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false }}"
                    muted="{{ dsx.variable.wMuted }}" paused="dsx.variable.paused"
                    bind="dsx.variable.pos" time="dsx.variable.time" duration="dsx.variable.duration"
+                   scrubbing="dsx.variable.scrubbing"
                    speed="{{ dsx.variable.speed }}" gravity="fill" audio="playback" loop="false"
                    pip="{{ dsx.variable.pip }}" subtitles="{{ dsx.variable.captions }}"
                    height="{{ dsx.variable.stageH }}" style="width: 100%; z-index: 1"
@@ -561,6 +563,7 @@
           <vstack class="bottomBar" paddingBottom="{{ dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0) }}" style="pointer-events: auto">
             <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
             <stack height="26" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
+                   on:dragStart="dsx.variable.scrubbing = true" on:dragEnd="dsx.variable.scrubbing = false"
                    a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
                    on:adjust="dsx.variable.pos = dsx.variable.pos + (dsx.this.direction == 'increment' ? 0.05 : -0.05)">
               <!-- THE REFERENCE SCRUBBER (custom-ux.md, PlayerScrubber): track + fill +
@@ -568,10 +571,16 @@
                    through the shared <video bind>. One markup, every renderer. -->
               <zstack grow="width" height="22" align="leading" measure="dsx.variable.seekBox">
                 <vstack grow="width" height="4" radius="2" background="rgba(255,255,255,0.28)"/>
+                <!-- the GLIDE: playback ticks position 4×/s and anim= tweens the change
+                     linearly between ticks (custom-ux.md §3 — both renderers), so the fill
+                     and thumb TRAVEL instead of stepping. While the finger owns the bar the
+                     tween stands down — a scrub must track the touch, not lag it. -->
                 <vstack width="{{ Math.max(4, Math.round(dsx.variable.pos * (dsx.variable.seekBox.width || 1))) }}"
-                        height="4" radius="2" background="#FFFFFF"/>
+                        height="4" radius="2" background="#FFFFFF"
+                        anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.25"/>
                 <vstack width="14" height="14" radius="7" background="#FFFFFF" shadow="3"
-                        offsetX="{{ Math.round(dsx.variable.pos * (dsx.variable.seekBox.width || 1)) - 7 }}"/>
+                        offsetX="{{ Math.round(dsx.variable.pos * (dsx.variable.seekBox.width || 1)) - 7 }}"
+                        anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.25"/>
               </zstack>
             </stack>
             <!-- the pill RAISES the drawer only in the lane that has one; with the panel
