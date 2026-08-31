@@ -1012,3 +1012,34 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     the offline-demo chip the moment a real payload lands (the Article-7 chip must never lie),
     and the 12h dev-session tokens are re-minted with `npm run session` when /viewer/* starts
     answering 401 — the wallet numbers matching the demo seed's 320/45 disguised the outage.
+
+63. RESOLVED 2026-08-31 (`despia-framework dev@04a42576`) — **The drawer complaint that turned
+    out to be four engine laws and one flight recorder.** The user filed three defects: the
+    episode grid "not 1:1 at all", the comments drawer padding, and a cheap-looking seek bar.
+    Fixing them surfaced a chain no static gate could see. (a) GRID ITEMS STRETCH TO THEIR
+    TRACK — CSS `justify-items: stretch` — via a `bound(adding:)` door handing every row
+    `growSynthetic width`; an explicit width retires it per the definite-size rule. The
+    tiles had been hugging their numerals as ~30pt circles. (b) `aspect-ratio` IS
+    AXIS-DRIVEN: `.aspectRatio(.fit)` collapses to the content hug inside ideal-height rows,
+    so a grown-width element now sizes h = w/ratio through a two-line Layout, and aspect +
+    grow-width fills the height so fills and radius paint the whole box. (c) THE ABSOLUTE
+    PLANE completed four rules in one pass: inset VALUES interpolate (`top: {{ safeTop +
+    14 }}px` — the paywall ✕ now clears the status bar), unitless zero parses (the corner
+    tag anchored top-LEADING because the parser demanded "px"), overlays SHRINK-TO-FIT like
+    CSS absolutes ("VIP" had wrapped to "VI/V/…" down a collapsed cell), and an explicit
+    `overflow: hidden` clips overlays to the radius box — the web corner-tab crop — while
+    default overflow keeps the poke-past-the-corner law. (d) The comments empty state
+    centers because `text-align` on a width-filling text now anchors its frame (a hugging
+    single line ignores multilineTextAlignment). (e) The seek bar publishes every tick that
+    moved — the old 2% gate advanced a 67s episode's fill once every ~1.3s in a visible jump.
+    THE TWO SYSTEMIC DISEASES the flight recorder caught while everything above was being
+    verified: sheets presented from a store-computed Binding never completed while a playing
+    video published 4 Hz (presentation now rides identity-stable local @State, synced both
+    ways), and a PARAM-ONLY `route.replace` re-minted the frame — a full player remount plus
+    a duplicate wallet/favs/thread api wave on EVERY episode advance, with a presented
+    drawer dismissed by its own screen's teardown (the router now updates the frame record
+    and surface vars IN PLACE when the new path resolves to the same component — the exact
+    history.replaceState semantic; frame ids stopped incrementing per episode). Lesson for
+    the ledger: the user's screenshots were both taken on the LOCKED page — the one page
+    where nothing ticks — which is why the sheets looked healthy while every unlocked page
+    had them dead. Verify interactive chrome ON a playing page, not the quiet one.

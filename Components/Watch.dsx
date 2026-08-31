@@ -595,7 +595,10 @@
              the paywall's own way out — a wall the viewer cannot leave is a refund. -->
         <vstack class="lockedLayer" visible-if="dsx.variable.epLocked" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                 style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center; backdrop-filter: blur(22px) saturate(1.15); -webkit-backdrop-filter: blur(22px) saturate(1.15)" background="rgba(0,0,0,0.45)">
-          <vstack class="lockClose" style="position: absolute; top: 14px; right: 14px; justify-content: center; z-index: 1"
+          <!-- THE SAFE-AREA LAW: the stage is full-bleed, so a corner control pays the top
+               inset back through the FACT — 0 in a browser tab and on the wide lane (the
+               nav consumed it), real on a notched phone and in a standalone PWA. -->
+          <vstack class="lockClose" style="position: absolute; top: {{ (dsx.variable.wide ? 0 : (dsx.screen.safeTop || 0)) + 14 }}px; right: 14px; justify-content: center; z-index: 1"
                   on:tap="dsx.action.goBack()" a11yTrait="button" a11yLabel="Close and go back">
             <image icon="xmark" iconSize="15" color="rgba(255,255,255,0.9)" a11yHidden="true"/>
           </vstack>
