@@ -1340,3 +1340,15 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     the grabber. THE PATTERN WORTH NAMING: every one of these was the web lane being handed a
     box by the document model that native had to be told about — when an author says "it
     works on web", that is usually the sentence underneath it.
+
+78. RESOLVED 2026-08-31 (`despia-framework dev@686acf39`) — **The player takes the reference
+    letterbox, and a pager page learns to grant its box.** The category (ReelShort, Shortical,
+    FlickReels) CENTRES a 16:9 master in a black stage and pins the chrome to the SCREEN's
+    edges — the clip floats, the transport does not follow it. Top-aligning the clip with the
+    controls tucked beneath it (the shape §6.76 first built) reads as a web page, not a
+    player. The engine half: on web the pager page is a BLOCK, so a child's flex `grow` had
+    nothing to grow inside — measured, the page box stood 844 tall while its `grow="true"`
+    root hugged its 219pt clip band and the picture sat at the top, where native (whose pager
+    proposes the page box to its child) centred it. Same markup, two lanes, two layouts. The
+    page now grants its box to a child that asked to fill it, which is the CSS spelling of
+    the proposal native already makes. Both lanes verified centred against the same source.

@@ -505,11 +505,13 @@
                value="dsx.variable.page" dots="false" dismissEdge="left" on:change="dsx.action.rest()"
                height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                style="width: 100%; margin-left: auto; margin-right: auto">
-          <!-- the page is the full stage (black) and the clip band sits at its TOP.
-               grow="true" is load-bearing: a depth stack sizes from its non-greedy
-               children, so once the clip became a 226pt band the PAGE became 226pt too and
-               the pager showed three of them at once (measured on device). -->
-          <zstack align="top" grow="true" on:tap="dsx.variable.paused = dsx.variable.paused == false">
+          <!-- THE CLIP IS CENTRED IN A BLACK STAGE — the reference letterbox (ReelShort,
+               Shortical, FlickReels all do this): a 16:9 master sits mid-screen at full
+               width with black above and below, and the CHROME stays pinned to the screen's
+               own edges rather than following the picture. grow="true" is load-bearing: a
+               depth stack sizes from its non-greedy children, so once the clip became a
+               226pt band the PAGE became 226pt too and the pager showed three at once. -->
+          <zstack grow="true" on:tap="dsx.variable.paused = dsx.variable.paused == false">
             <!-- the KEY ART is every page's first paint — an episode that boots onto black
                  and pops a bright frame reads as a glitch; booting onto the show's art
                  reads as a curtain. Locked pages keep the art frosted; unlocked pages let
@@ -558,7 +560,7 @@
         <!-- ══ chrome: top bar · right rail · bottom ══ -->
         <vstack class="chromeLayer" visible-if="dsx.variable.phase == 'ready'"
                 height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
-                style="width: 100%; margin-left: auto; margin-right: auto; justify-content: flex-start; pointer-events: none">
+                style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
           <hstack class="topBar" paddingTop="{{ dsx.variable.wide ? 0 : (dsx.screen.safeTop || 0) }}" style="pointer-events: auto">
             <image icon="chevron.left" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
             <text value="EP.{{ dsx.variable.cur }}" class="epLabel"/>
@@ -572,14 +574,46 @@
                    a11yLabel="More options" a11yTrait="button"/>
           </hstack>
 
-          <!-- THE CLIP'S OWN BAND, reserved: the bar floats over the picture and every
-               control below flows in the black, the way the category lays it out. -->
-          <stack height="{{ dsx.variable.clipH - 56 }}" passthrough="true"/>
-          <!-- BELOW THE CLIP, not at the screen's edge: the seek sits just under the
-               picture and the episode selector under it, both on black. The old
-               space-between pinned them to the bottom of a 9:16 stage, which left the
-               controls stranded a screen away from the thing they control. -->
-          <vstack class="bottomBar" style="pointer-events: auto">
+          <!-- the rail sits mid-screen on the trailing edge, over the clip and its
+               letterbox alike — the reference's own placement -->
+          <hstack style="width: 100%; align-items: flex-end; pointer-events: none">
+            <spacer/>
+            <vstack class="rail" style="pointer-events: auto">
+              <vstack class="railItem" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button" a11yLabel="Save to My List">
+                <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="27"
+                       color="{{ dsx.variable.favOn ? '#FF2C55' : '#FFFFFF' }}" a11yHidden="true"/>
+                <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="railCap"/>
+              </vstack>
+              <!-- the shared catalog has no speech-bubble glyph (upstream #235); note.text
+                   is the closest three-way match until one lands -->
+              <vstack class="railItem" on:tap="dsx.action.openComments()" a11yGroup="true" a11yTrait="button" a11yLabel="Comments">
+                <image icon="note.text" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
+                <text value="{{ dsx.variable.commentCount }}" class="railCount"/>
+              </vstack>
+              <vstack class="railItem" on:tap="dsx.action.doShare()" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
+                <image icon="square.and.arrow.up" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
+                <text value="Share" class="railCap"/>
+              </vstack>
+              <vstack class="railItem" on:tap="dsx.module.route.push({ path: '/vip' })" a11yGroup="true" a11yTrait="button" a11yLabel="Download — VIP">
+                <!-- `align-self: center` is load-bearing: a column stack nested in a column
+                     stack is handed `align-self: stretch` by the web sheet, and a stretch
+                     with a definite cross size behaves as flex-start — so this anchor grew
+                     to the rail's full 51px and the icon inside it sat at the LEFT edge
+                     while "Download" under it stayed centred (measured, PLAN.md §6.21).
+                     The badge is sized and offset to stay inside the rail: at `right: -14`
+                     off a stretched anchor it ran to x=377 on a 375pt screen and clipped. -->
+                <stack style="align-self: center; position: relative">
+                  <image icon="square.and.arrow.down" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
+                  <text value="VIP" class="vipCorner" style="position: absolute; top: -6px; right: -11px"/>
+                </stack>
+                <text value="Download" class="railCap"/>
+              </vstack>
+            </vstack>
+          </hstack>
+
+          <!-- pinned to the screen's bottom edge, over the letterbox — the reference
+               keeps the transport at the edge, not tucked under the picture -->
+          <vstack class="bottomBar" paddingBottom="{{ dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0) }}" style="pointer-events: auto">
             <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
             <!-- grow="width" on the SURFACE, not just the track: web gives a block-level
                  stack the full row for free, native hugs it — so the track's own
@@ -630,44 +664,6 @@
                      a11yHidden="true" visible-if="dsx.variable.panel == false"/>
             </hstack>
           </vstack>
-          <!-- THE ENGAGEMENT RAIL lives in the BLACK, not over the picture: four 60pt
-               items do not fit beside a 219pt clip band (measured — "Saved" clipped off
-               the top of the screen), and the category puts them in the letterbox anyway. -->
-          <hstack style="width: 100%; align-items: flex-start; pointer-events: none" paddingTop="18">
-            <spacer/>
-            <vstack class="rail" style="pointer-events: auto">
-              <vstack class="railItem" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button" a11yLabel="Save to My List">
-                <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="27"
-                       color="{{ dsx.variable.favOn ? '#FF2C55' : '#FFFFFF' }}" a11yHidden="true"/>
-                <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="railCap"/>
-              </vstack>
-              <!-- the shared catalog has no speech-bubble glyph (upstream #235); note.text
-                   is the closest three-way match until one lands -->
-              <vstack class="railItem" on:tap="dsx.action.openComments()" a11yGroup="true" a11yTrait="button" a11yLabel="Comments">
-                <image icon="note.text" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
-                <text value="{{ dsx.variable.commentCount }}" class="railCount"/>
-              </vstack>
-              <vstack class="railItem" on:tap="dsx.action.doShare()" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
-                <image icon="square.and.arrow.up" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
-                <text value="Share" class="railCap"/>
-              </vstack>
-              <vstack class="railItem" on:tap="dsx.module.route.push({ path: '/vip' })" a11yGroup="true" a11yTrait="button" a11yLabel="Download — VIP">
-                <!-- `align-self: center` is load-bearing: a column stack nested in a column
-                     stack is handed `align-self: stretch` by the web sheet, and a stretch
-                     with a definite cross size behaves as flex-start — so this anchor grew
-                     to the rail's full 51px and the icon inside it sat at the LEFT edge
-                     while "Download" under it stayed centred (measured, PLAN.md §6.21).
-                     The badge is sized and offset to stay inside the rail: at `right: -14`
-                     off a stretched anchor it ran to x=377 on a 375pt screen and clipped. -->
-                <stack style="align-self: center; position: relative">
-                  <image icon="square.and.arrow.down" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
-                  <text value="VIP" class="vipCorner" style="position: absolute; top: -6px; right: -11px"/>
-                </stack>
-                <text value="Download" class="railCap"/>
-              </vstack>
-            </vstack>
-          </hstack>
-
         </vstack>
 
         <!-- ══ the locked stage ══ The dim is the BASE read on every renderer; the frost
