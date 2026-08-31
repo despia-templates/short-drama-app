@@ -1126,3 +1126,28 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     content wrapper's bottom inset carries the fade height — fully-scrolled content RESTS
     above the fade (measured: the drawer's last row clears it by 28px). PiP was already real
     on both lanes (AVPictureInPictureController + the menu toggle) — verified, not rebuilt.
+
+68. RESOLVED 2026-08-31 (`despia-framework dev@ad026517`) — **"Web is not centered, and the
+    seek bar is not positioned correctly" — two CSS-cascade defects, both parity breaks the
+    native lane had already closed.** (a) THE DEPTH STACK LOST ITS OWN DEFAULTS: `.dsx-zstack`
+    and the generic `.dsx-stack { align-items: start }` carry EQUAL specificity, so the winner
+    was emission order — and a page carries two copies of the element sheet (the SSR critical
+    inline + the client bundle), which interleaves them. Measured: `align-items` computed
+    `start` on the scrubber's depth stack, so the 14pt thumb top-aligned with its 4pt track
+    instead of centering on it. The depth-stack rules are TWO-CLASS now
+    (`.dsx-stack.dsx-zstack`) so cascade order cannot decide them, and a grown layer takes
+    `auto` on its other axis — a zstack also carries `.dsx-stack`, so the generic
+    `> [data-dsx-grow]` rule stretched layers on BOTH axes and a stretch with a definite cross
+    size behaves as flex-start (that is what pinned the `grow="width"` track to the top).
+    After: track 362 full-span, fill and thumb all centered at cy 774.5. (b) BLOCK-STRETCH
+    DEFEATED AUTHORED CENTERING: the sheet's "a form is a block" allowlist sets
+    `align-self: stretch` on a nested column, and in CSS a child's align-self always beats a
+    parent's align-items — so the pause badge rendered 390pt wide inside a column that
+    declares `align-items: center`, while native hugged it to 84pt. The declaration is
+    invisible to any runtime selector (the compiler folds inline CSS into an ATOMIC CLASS —
+    the element carried only `data-dsx=c364`), so the marker had to be COMPILED: `css.ts` sets
+    `__steers` when the fold contains `align-items`, SSR and mount stamp `data-dsx-steers`
+    (the `__row` precedent), and the allowlist excludes those parents. After: badge 84×84
+    centered, with Profile's cards and ledger still filling their shell. THE LESSON: when two
+    sheets ship the same rules, equal specificity is not a tie — it is a coin flip decided by
+    bundling; a renderer's own element defaults must outrank its generic ones by construction.
