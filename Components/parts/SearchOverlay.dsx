@@ -198,9 +198,13 @@
                   <text value="{{ item.title }}" class="hotTitle" style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                 </hstack>
                 <hstack class="pills">
-                  <text value="{{ item.genre }}" class="pill"/>
-                  <text value="Series" class="pill"/>
-                  <text value="EP {{ item.episodes }}" class="pill" visible-if="item.episodes > 0"/>
+                  <!-- a pill is ONE line: a two-word genre ("Time Travel") wrapped inside
+                       its own capsule when the row got tight. lineLimit is the native twin,
+                       nowrap the web one — the pill keeps its intrinsic width and the row
+                       gives way instead. -->
+                  <text value="{{ item.genre }}" class="pill" lineLimit="1" style="white-space: nowrap"/>
+                  <text value="Series" class="pill" lineLimit="1" style="white-space: nowrap"/>
+                  <text value="EP {{ item.episodes }}" class="pill" lineLimit="1" style="white-space: nowrap" visible-if="item.episodes > 0"/>
                 </hstack>
               </vstack>
               <image icon="chevron.right" iconSize="13" color="rgba(255,255,255,0.3)" a11yHidden="true"/>

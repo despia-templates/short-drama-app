@@ -1180,3 +1180,24 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     sheet whose scrolling is owned by a `<list>` or a scrolling `<grid>` will not arm the
     native fade yet. THE LESSON: reserving space for a decoration is a smell — if the
     decoration knows when it matters, it needs no reservation at all.
+
+70. RESOLVED 2026-08-31 (`despia-framework dev@759a4901`) — **The web lane never knew about
+    `design: "custom"`, and the sheet fade was anchored 34pt too high.** (a) THE DESIGN MODE
+    IS A ROOT-PLAN KEY THE WEB BUILD SIMPLY DID NOT READ: `config.ts` took only `consts` from
+    App.json, so a custom-design app got the library input well on web while native (which
+    has honoured `AppManifest.designMode` since §6.60) painted exactly the authored styles.
+    Measured: the comment and search fields wore the web well — its recessed fill, radius and
+    0.5px inset ring — INSIDE the pill the author drew, two nested wells deep. The key now
+    travels config → build (both the boot call and the baked document shell) → `boot.ts`
+    stamping `data-dsx-design` on the root → `page-render.ts` stamping the SSR `<html>` so
+    the first paint matches hydration → `theme.ts` standing the field chrome down. The focus
+    RING stays: a custom design owns the resting look, never the accessibility affordance.
+    (b) THE FADE ANCHORED THE SAFE-INSET BOTTOM: an overlay inside a sheet presentation
+    aligns to the inset bounds and `.ignoresSafeArea` does NOT move that anchor (verified
+    twice on device — the band covered 784–840pt while un-faded rows stayed bright to 874, so
+    the home-indicator strip showed hard-cut content under a fade that had already finished).
+    Negative bottom padding is the fix — the sanctioned pull the margin arm already uses for
+    the hero — so the fade's bottom edge lands where web pins it. Template half: the drawer's
+    tab underline spans its LABEL (`grow="width"`, was a guessed `width="26"`), and the search
+    overlay's meta pills are one line (`lineLimit` + the nowrap web twin) so a two-word genre
+    like "Time Travel" stops wrapping inside its own capsule.
