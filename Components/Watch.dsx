@@ -129,6 +129,15 @@
       if (dsx.variable.wide) { return dsx.screen.height - 62 }
       return dsx.screen.height
     </variable>
+    <!-- THE CLIP BAND. The category plays a 16:9 master on a 9:16 stage: the clip is
+         WIDTH 100% at its own ratio, pinned to the TOP under the transparent bar, and the
+         black below it is where the chrome lives (seek, then the episode selector). Cover-
+         cropping a landscape master into a portrait stage is what made every frame a
+         zoomed-in detail with no composition left. -->
+    <variable as="clipH" computed="true">
+      const w = dsx.variable.wide ? Math.min(dsx.variable.stageMax, dsx.screen.width) : dsx.screen.width
+      return Math.round(w * 9 / 16)
+    </variable>
     <variable as="stageMax" computed="true">
       if (dsx.variable.bp == 'phone') { return 4096 }
       return Math.round(Math.min(461, dsx.screen.height * 0.56))
@@ -219,7 +228,7 @@
          frost their art, unlocked pages show it plain until the clip covers it -->
     <formula as="stageArtFx" locked="gridLocked">
       const frost = locked ? '; filter: blur(16px) brightness(0.4)' : ''
-      return 'width: 100%; height: ' + dsx.variable.stageH + 'px; object-fit: cover' + frost
+      return 'width: 100%; height: ' + dsx.variable.clipH + 'px; object-fit: cover' + frost
     </formula>
 
     <action as="boot" show="vars.show" idx="vars.idx">
@@ -494,7 +503,11 @@
                value="dsx.variable.page" dots="false" dismissEdge="left" on:change="dsx.action.rest()"
                height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                style="width: 100%; margin-left: auto; margin-right: auto">
-          <zstack on:tap="dsx.variable.paused = dsx.variable.paused == false">
+          <!-- the page is the full stage (black) and the clip band sits at its TOP.
+               grow="true" is load-bearing: a depth stack sizes from its non-greedy
+               children, so once the clip became a 226pt band the PAGE became 226pt too and
+               the pager showed three of them at once (measured on device). -->
+          <zstack align="top" grow="true" on:tap="dsx.variable.paused = dsx.variable.paused == false">
             <!-- the KEY ART is every page's first paint — an episode that boots onto black
                  and pops a bright frame reads as a glitch; booting onto the show's art
                  reads as a curtain. Locked pages keep the art frosted; unlocked pages let
@@ -502,21 +515,27 @@
             <!-- the TALL HERO, never the poster: the 3:4 poster bakes its title at card
                  size, and covered into a full stage that type renders gigantic under the
                  chrome (the same measured flash the For-You fix names) -->
-            <image src="{{ dsx.variable.stageArt == '' ? item.poster : dsx.variable.stageArt }}"
-                   contentFit="cover" a11yHidden="true"
-                   height="{{ dsx.variable.stageH }}" style="{{ stageArtFx }}"/>
-            <!-- a locked page never mounts a source: entitlement is the server's word -->
-            <video visible-if="gridLocked == false"
-                   src="{{ item.video }}" active="{{ item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false }}"
-                   muted="{{ dsx.variable.wMuted }}" paused="dsx.variable.paused"
-                   bind="dsx.variable.pos" time="dsx.variable.time" duration="dsx.variable.duration"
-                   scrubbing="dsx.variable.scrubbing"
-                   speed="{{ dsx.variable.speed }}" gravity="fill" audio="playback" loop="false"
-                   pip="{{ dsx.variable.pip }}" subtitles="{{ dsx.variable.captions }}"
-                   height="{{ dsx.variable.stageH }}" style="width: 100%; z-index: 1"
-                   on:ready="dsx.variable.paused = false" on:ended="dsx.action.onEnded()"
-                   on:error="dsx.variable.toast = 'This episode would not play — try another.'"
-                   on:appear="dsx.action.boot()"/>
+            <!-- THE CLIP BAND is its own box: art and clip share it, and it CLIPS. The
+                 key art carries the show's own 3:4 ratio, so at full width it stood 536pt
+                 tall and spilled a third of a screen of poster below the 226pt clip
+                 (measured on device). One band, one height, overflow hidden. -->
+            <zstack height="{{ dsx.variable.clipH }}" grow="width" style="overflow: hidden">
+              <image src="{{ dsx.variable.stageArt == '' ? item.poster : dsx.variable.stageArt }}"
+                     contentFit="cover" a11yHidden="true"
+                     height="{{ dsx.variable.clipH }}" style="{{ stageArtFx }}"/>
+              <!-- a locked page never mounts a source: entitlement is the server's word -->
+              <video visible-if="gridLocked == false"
+                     src="{{ item.video }}" active="{{ item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false }}"
+                     muted="{{ dsx.variable.wMuted }}" paused="dsx.variable.paused"
+                     bind="dsx.variable.pos" time="dsx.variable.time" duration="dsx.variable.duration"
+                     scrubbing="dsx.variable.scrubbing"
+                     speed="{{ dsx.variable.speed }}" gravity="fill" audio="playback" loop="false"
+                     pip="{{ dsx.variable.pip }}" subtitles="{{ dsx.variable.captions }}"
+                     height="{{ dsx.variable.clipH }}" style="width: 100%; z-index: 1"
+                     on:ready="dsx.variable.paused = false" on:ended="dsx.action.onEnded()"
+                     on:error="dsx.variable.toast = 'This episode would not play — try another.'"
+                     on:appear="dsx.action.boot()"/>
+            </zstack>
             <!-- TAP-TO-PAUSE, the category standard: any tap on the stage toggles playback
                  (the zstack's on:tap above), and the paused stage wears the big center
                  glyph every reference app shows. passthrough keeps the glyph decorative —
@@ -537,7 +556,7 @@
         <!-- ══ chrome: top bar · right rail · bottom ══ -->
         <vstack class="chromeLayer" visible-if="dsx.variable.phase == 'ready'"
                 height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
-                style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
+                style="width: 100%; margin-left: auto; margin-right: auto; justify-content: flex-start; pointer-events: none">
           <hstack class="topBar" paddingTop="{{ dsx.variable.wide ? 0 : (dsx.screen.safeTop || 0) }}" style="pointer-events: auto">
             <image icon="chevron.left" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
             <text value="EP.{{ dsx.variable.cur }}" class="epLabel"/>
@@ -551,7 +570,68 @@
                    a11yLabel="More options" a11yTrait="button"/>
           </hstack>
 
-          <hstack style="width: 100%; align-items: flex-end; pointer-events: none">
+          <!-- THE CLIP'S OWN BAND, reserved: the bar floats over the picture and every
+               control below flows in the black, the way the category lays it out. -->
+          <stack height="{{ dsx.variable.clipH - 56 }}" passthrough="true"/>
+          <!-- BELOW THE CLIP, not at the screen's edge: the seek sits just under the
+               picture and the episode selector under it, both on black. The old
+               space-between pinned them to the bottom of a 9:16 stage, which left the
+               controls stranded a screen away from the thing they control. -->
+          <vstack class="bottomBar" style="pointer-events: auto">
+            <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
+            <!-- grow="width" on the SURFACE, not just the track: web gives a block-level
+                 stack the full row for free, native hugs it — so the track's own
+                 grow="width" had nothing to fill and the rail never painted (measured on
+                 device: no 4pt band anywhere right of the pin, while web read 362px). -->
+            <stack height="26" grow="width" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
+                   on:dragStart="dsx.variable.scrubbing = true" on:dragEnd="dsx.variable.scrubbing = false"
+                   a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
+                   on:adjust="dsx.variable.pos = dsx.variable.pos + (dsx.this.direction == 'increment' ? 0.05 : -0.05)">
+              <!-- THE REFERENCE SCRUBBER (custom-ux.md, PlayerScrubber): track + fill +
+                   thumb off one measured box, drag/tap = seek, playback moves the fill
+                   through the shared <video bind>. One markup, every renderer. -->
+              <zstack grow="width" height="22" align="leading" measure="dsx.variable.seekBox">
+                <vstack grow="width" height="4" radius="2" background="rgba(255,255,255,0.28)"/>
+                <!-- the GLIDE: playback ticks position 4×/s and anim= tweens the change
+                     linearly between ticks (custom-ux.md §3 — both renderers), so the fill
+                     and thumb TRAVEL instead of stepping. While the finger owns the bar the
+                     tween stands down — a scrub must track the touch, not lag it. -->
+                <!-- BOTH ON THE COMPOSITOR, which is what keeps them welded AND smooth.
+                     Animating the fill's `width` is a layout pass on the main thread while
+                     an offsetX pin is a transform on the compositor: two pipelines, two
+                     rates, and the pin visibly drifted from the edge (measured on web: an
+                     11px sawtooth). Parenting the pin to the fill welded them but left the
+                     motion itself steppy, because layout animation is what it is. `scaleX`
+                     on a full-width bar is the CSS answer and is now a real DSX primitive
+                     (transformOrigin picks the anchor) — fill and pin are both transforms,
+                     so they share one pipeline, one rate, and the GPU. The right cap's
+                     squash under scale is exactly where the pin sits, so it never shows.
+                     The tween outruns the player's 250ms tick so motion never waits. -->
+                <vstack grow="width" height="4" radius="2" background="#FFFFFF"
+                        scaleX="{{ dsx.variable.pos }}" transformOrigin="leading"
+                        anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.32"/>
+                <vstack width="14" height="14" radius="7" background="#FFFFFF" shadow="3"
+                        offsetX="{{ (dsx.variable.pos * (dsx.variable.seekBox.width || 1)) - 7 }}"
+                        anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.32"/>
+              </zstack>
+            </stack>
+            <!-- the pill RAISES the drawer only in the lane that has one; with the panel
+                 beside the clip it is a readout, not a control that opens a duplicate list -->
+            <hstack class="epPill" on:tap="dsx.variable.drawer = dsx.variable.panel == false"
+                    a11yGroup="true" a11yTrait="{{ dsx.variable.panel ? 'text' : 'button' }}"
+                    a11yLabel="Episode {{ dsx.variable.cur }} of {{ dsx.variable.total }}">
+              <image icon="rectangle.stack.fill" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
+              <text value="EP.{{ dsx.variable.cur }}" class="epPillNow"/>
+              <text value="/ EP.{{ dsx.variable.total }}" class="epPillAll"/>
+              <spacer/>
+              <image icon="chevron.up.chevron.down" iconSize="14" color="rgba(255,255,255,0.7)"
+                     a11yHidden="true" visible-if="dsx.variable.panel == false"/>
+            </hstack>
+          </vstack>
+          <!-- THE ENGAGEMENT RAIL lives in the BLACK, not over the picture: four 60pt
+               items do not fit beside a 219pt clip band (measured — "Saved" clipped off
+               the top of the screen), and the category puts them in the letterbox anyway. -->
+          <hstack style="width: 100%; align-items: flex-start; pointer-events: none" paddingTop="18">
             <spacer/>
             <vstack class="rail" style="pointer-events: auto">
               <vstack class="railItem" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button" a11yLabel="Save to My List">
@@ -586,58 +666,6 @@
             </vstack>
           </hstack>
 
-          <vstack class="bottomBar" paddingBottom="{{ dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0) }}" style="pointer-events: auto">
-            <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
-            <!-- grow="width" on the SURFACE, not just the track: web gives a block-level
-                 stack the full row for free, native hugs it — so the track's own
-                 grow="width" had nothing to fill and the rail never painted (measured on
-                 device: no 4pt band anywhere right of the pin, while web read 362px). -->
-            <stack height="26" grow="width" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
-                   on:dragStart="dsx.variable.scrubbing = true" on:dragEnd="dsx.variable.scrubbing = false"
-                   a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
-                   on:adjust="dsx.variable.pos = dsx.variable.pos + (dsx.this.direction == 'increment' ? 0.05 : -0.05)">
-              <!-- THE REFERENCE SCRUBBER (custom-ux.md, PlayerScrubber): track + fill +
-                   thumb off one measured box, drag/tap = seek, playback moves the fill
-                   through the shared <video bind>. One markup, every renderer. -->
-              <zstack grow="width" height="22" align="leading" measure="dsx.variable.seekBox">
-                <vstack grow="width" height="4" radius="2" background="rgba(255,255,255,0.28)"/>
-                <!-- the GLIDE: playback ticks position 4×/s and anim= tweens the change
-                     linearly between ticks (custom-ux.md §3 — both renderers), so the fill
-                     and thumb TRAVEL instead of stepping. While the finger owns the bar the
-                     tween stands down — a scrub must track the touch, not lag it. -->
-                <!-- THE THUMB RIDES THE FILL. Two tweens can never stay welded: the fill
-                     animates `width` (layout, main thread) while an offsetX thumb animates
-                     `transform` (compositor), and the two progress at different rates
-                     inside the same 320ms — measured on web, the fill edge and the pin
-                     centre disagreed by up to 11px in a sawtooth, which is the "unlinked,
-                     slight stutter" read. Making the pin an absolute child of the fill
-                     leaves ONE animated property driving both: the pin cannot drift from
-                     an edge it is pinned to. `right: -7` hangs it half-off that edge (the
-                     badge idiom), `top: -5` centres its 14pt on the 4pt bar.
-                     No rounding either — sub-pixel keeps the travel continuous, and the
-                     tween runs slightly longer than the player's 250ms tick so motion
-                     never arrives and waits. -->
-                <vstack width="{{ Math.max(4, dsx.variable.pos * (dsx.variable.seekBox.width || 1)) }}"
-                        height="4" radius="2" background="#FFFFFF" style="position: relative"
-                        anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.32">
-                  <vstack width="14" height="14" radius="7" background="#FFFFFF" shadow="3"
-                          style="position: absolute; right: -7px; top: -5px"/>
-                </vstack>
-              </zstack>
-            </stack>
-            <!-- the pill RAISES the drawer only in the lane that has one; with the panel
-                 beside the clip it is a readout, not a control that opens a duplicate list -->
-            <hstack class="epPill" on:tap="dsx.variable.drawer = dsx.variable.panel == false"
-                    a11yGroup="true" a11yTrait="{{ dsx.variable.panel ? 'text' : 'button' }}"
-                    a11yLabel="Episode {{ dsx.variable.cur }} of {{ dsx.variable.total }}">
-              <image icon="rectangle.stack.fill" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
-              <text value="EP.{{ dsx.variable.cur }}" class="epPillNow"/>
-              <text value="/ EP.{{ dsx.variable.total }}" class="epPillAll"/>
-              <spacer/>
-              <image icon="chevron.up.chevron.down" iconSize="14" color="rgba(255,255,255,0.7)"
-                     a11yHidden="true" visible-if="dsx.variable.panel == false"/>
-            </hstack>
-          </vstack>
         </vstack>
 
         <!-- ══ the locked stage ══ The dim is the BASE read on every renderer; the frost

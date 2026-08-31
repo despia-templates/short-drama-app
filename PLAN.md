@@ -1299,3 +1299,28 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     whole layer and closes exactly on the panel's bottom edge. THE LESSON: "it works on web"
     usually means the web lane got a box for free that native has to be told about — a
     block-level element, a scroller's own padding, a stack that fills its row.
+
+76. RESOLVED 2026-08-31 (`despia-framework dev@5149665f`) — **The player becomes the category's
+    real shape, and three missing CSS primitives fall out of building it.** THE LAYOUT: the
+    masters are 16:9 and the stage is 9:16, so the clip is WIDTH 100% at its own ratio pinned
+    to the TOP, and the black below it carries the chrome — seek directly under the picture,
+    the episode selector under that, the engagement rail beneath. Cover-cropping a landscape
+    master into a portrait stage had made every frame a zoomed-in detail with no composition
+    left. THE THREE PRIMITIVES, each found because the app tried to say something CSS says
+    plainly: (a) `scaleX`/`scaleY` + `transformOrigin` — the uniform `scale` cannot say "fill
+    this bar to 62%", so the progress fill animated `width` (layout, main thread) while its
+    pin animated `transform` (compositor): two pipelines, two rates, an 11px sawtooth of
+    drift, and parenting the pin to the fill welded them but left the motion steppy because
+    layout animation is what it is. With an axis scale both members are transforms — one
+    pipeline, the GPU, disagreement exactly 0 and the fill interpolating sub-pixel. (b)
+    `overflow: hidden` → `.clipped()`, the program's own P0 row: only `radius` clipped
+    natively, so the key art's 3:4 ratio stood 536pt tall inside a 226pt band and spilled a
+    third of a screen of poster below the picture. (c) A depth stack that declares `grow`
+    takes the proposed box (§6.75) turned out to be load-bearing here too: once the clip
+    became a band, the PAGE zstack sized to it and the pager showed three pages at once until
+    the page said `grow="true"`. Also: the sheet's edge fade no longer animates its FIRST
+    arrival — the edge state resolves while the sheet is still sliding up, so the fade
+    animated in mid-flight and read as a flash on every open; it is held until the
+    presentation settles and adopted without animation. THE LESSON: three engine gaps in one
+    screen, and every one of them surfaced as "the app looks wrong", never as an error — the
+    catalog gate is what turned the third into a conversation instead of a silent drop.
