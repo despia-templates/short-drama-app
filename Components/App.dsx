@@ -319,7 +319,11 @@
         <vstack class="logoBox" style="justify-content: center">
           <image icon="play.fill" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
         </vstack>
-        <SearchOverlay pill="true"/>
+        <!-- grow ON THE MOUNT TAG (the zIndex-on-mount sibling rule): the pill's own
+             flex:1 lives inside the instance, and the row cannot see through the
+             component boundary — the tag's grow makes the INSTANCE the flexible child;
+             the engine's flex-fill then stretches the pill within it. -->
+        <SearchOverlay pill="true" grow="width"/>
         <image icon="person.crop.circle" iconSize="23" color="#FFFFFF" a11yLabel="Profile" a11yTrait="button"
                on:tap="dsx.module.route.reset({ path: '/profile' })"/>
       </hstack>

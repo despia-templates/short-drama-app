@@ -974,3 +974,14 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     DESCRIPTION — literal "<null>" as ledger text; null renders empty on every lane now. The
     full gap census and execution order live in the framework's
     `OpenSource/Documentation/pixel-parity-program.md`.
+
+61. RESOLVED 2026-08-31 (`despia-framework dev@bff4c16d`) — **`flex: 1` fills natively.** The
+    most common web fill spelling was never-bridged (the tag-blind bridge cannot know the
+    parent's axis) — the PARENT can: privileged stacks sniff each direct child's raw `flex: 1`
+    / `flex-grow: n` and re-render it with a synthetic `grow` on their own main axis. The
+    re-render matters: an outer frame expands EMPTY SPACE around a hug-sized box (probed — an
+    empty flex spacer rendered invisible at 0pt inside an expanded frame); the synthetic attr
+    runs through the child's own styled pipeline so backgrounds and radii widen with the box.
+    Through a component boundary the parent sees only the mount tag — `grow` ON THE TAG is the
+    documented spelling there (the zIndex-on-mount sibling; SearchOverlay's pill mount carries
+    it). Measured: the phone home's search pill spans logo → avatar, the web row exactly.

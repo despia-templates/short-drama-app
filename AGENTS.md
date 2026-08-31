@@ -301,6 +301,11 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   image placeholders paint CLEAR (an img without pixels paints nothing on web — no white
   boxes over transparent art). The seek bar is the reference scrubber
   (custom-ux.md PlayerScrubber): track/fill/thumb off one `measure=` box, drag = seek.
+- **`flex: 1` fills natively now** (dev@bff4c16d) — a DIRECT stack child's raw inline
+  `flex: 1`/`flex-grow: n` re-renders with a synthetic grow on the parent's axis, own
+  fills expanding with the box. Two riders: only raw literals (a computed flex hugs —
+  spell `grow=` there), and a component boundary hides the inner flex from the row — put
+  `grow="width"` ON THE MOUNT TAG (the zIndex-on-mount sibling rule).
 - **Probe before you generalise.** If a property "doesn't work", reproduce it in a throwaway
   one-element component first. Three framework defects were once filed from one bad
   measurement; all three were false.
