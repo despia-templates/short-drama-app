@@ -1043,3 +1043,30 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     the ledger: the user's screenshots were both taken on the LOCKED page — the one page
     where nothing ticks — which is why the sheets looked healthy while every unlocked page
     had them dead. Verify interactive chrome ON a playing page, not the quiet one.
+
+64. RESOLVED 2026-08-31 (`despia-framework dev@ef5e4eef`) — **The acceptance pass: align is
+    per-tag vocabulary, glass frosts for real, sheets fade their scroll edge.** Three user
+    filings, four engine truths. (a) THE ALIGN OVERLOAD, both directions: `align` on a row
+    is the VERTICAL word, so CSS `align-items` now lands on `align` for every stack — the
+    old geometric-alignY carrier left rows unsteered, and once the unsteered row default
+    became flex-start, the Watch top bar's 44pt chevron rode low beside its 20pt title.
+    Then the mirror bug: flexFrame read a row's align="center" as a HORIZONTAL anchor and
+    centered the wide Home's section heads page-wide; and `justify-content: flex-end` had
+    been riding the same key, so suppressing it dropped the hero arrows to the leading
+    edge. Rows now keep justify on its own resolved key, flexFrame anchors the main axis
+    from it, and align steers only the element's cross axis. One key, three collisions,
+    all measured. (b) `backdrop-filter: blur(N)` FROSTS FOR REAL — the nearest system
+    material samples everything painted behind the element, art AND chrome: the paywall
+    scrim now frosts the rail icons beneath it exactly like web. The paused-animator
+    arbitrary-radius trick renders NO blur on current iOS (measured: sharp icons under a
+    declared blur(22px)); the material rung is a NAMED approximation and exact-radius
+    stays on the program's open list. (c) THE SCROLL-EDGE FADE ships with the sheet on
+    BOTH lanes, like the grabber: content dissolves into the sheet surface instead of
+    guillotining at the bottom corner radius — iOS overlays a 34pt gradient of the sheet's
+    own background, the web renderer appends the identical fade tinted from the panel's
+    resolved surface. Zero app markup. (d) The transparent-image report could not be
+    reproduced on this build: coin, chest and poster twins all render alpha-true (the
+    morning's clear-placeholder arm covered the loading hint); if a surface still paints
+    white, it needs a screen name. Verification note for the ledger: the media files were
+    temporarily looped to 300s to hold the player still — restored to the shipped 10s
+    demos after the pass.
