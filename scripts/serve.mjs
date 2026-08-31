@@ -252,6 +252,9 @@ async function writeWebResponse(webRes, res) {
 }
 
 const server = createServer((req, res) => {
+  // DSX_DEV_LOG_REQUESTS=1 — one line per request, for tracing what a DEVICE actually
+  // asked the origin (CFNetwork's device-side summaries omit URLs).
+  if (process.env.DSX_DEV_LOG_REQUESTS) console.log("[req]", req.method, req.url);
   void (async () => {
     const chunks = [];
     let size = 0;

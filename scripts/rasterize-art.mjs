@@ -60,7 +60,10 @@ try {
       const context = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: scale });
       const page = await context.newPage();
       await page.goto(`file://${file}`);
-      await page.screenshot({ path: file.replace(/\.svg$/, ".png") });
+      // omitBackground: an SVG with transparency (the coin, the chest, any chip art) must
+      // keep it — the default screenshot paints white behind the viewport, and the white
+      // square shipped: measured as a white box behind the VIP coin on device.
+      await page.screenshot({ path: file.replace(/\.svg$/, ".png"), omitBackground: true });
       await context.close();
       n += 1;
     }
