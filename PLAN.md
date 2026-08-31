@@ -1352,3 +1352,30 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     proposes the page box to its child) centred it. Same markup, two lanes, two layouts. The
     page now grants its box to a child that asked to fill it, which is the CSS spelling of
     the proposal native already makes. Both lanes verified centred against the same source.
+
+79. RESOLVED 2026-08-31 (`despia-framework dev@ca2b0c78`) — **The native value-tween was
+    never firing, because its trigger key was the AUTHORED string.** `anim=` builds the
+    animation and attaches it with `.animation(tween, value: motionKey)`, where `motionKey`
+    is documented as "the RESOLVED values" — but it was assembled straight out of `attrs`,
+    which carries the authored attribute, and every animated value in practice is a hole
+    (`scaleX="{{ pos }}"`). The key was therefore the literal `{{ dsx.variable.pos }}`,
+    constant for the life of the screen: SwiftUI got a correct 0.32s linear animation with a
+    value that said nothing had changed, and a 4Hz binding stepped exactly as though no
+    `anim=` had been declared. `declaredAnimation` two lines below already resolved its own
+    `anim`/`animDuration` holes — the same door, half-open. Web never had the bug because a
+    CSS transition is declared once and the browser applies it to the COMPUTED value.
+    MEASURED, iPhone 17 Pro Release vs the same markup on web, frame-exact off a 60fps
+    capture: before, the seek thumb was frozen 54% of the wall clock and teleported between
+    ticks (median 1464 px/s); after, frozen 5%, gliding at a median 90 px/s. The web lane was
+    run through the SAME pixel profiler as a control (0 snaps, 0 stalls, and quantization
+    alone accounts for its jitter band) so the instrument could not be what was being read.
+
+    KNOWN RESIDUAL, named rather than papered over: about one frame per 250ms tick still
+    carries an outsized share of the step (~30% of travel). It is NOT the curve, the
+    duration, the attachment point, or the outer visibility animation — all four were
+    A/B'd on device by env-gated lanes in one build and none moved the number. It tracks
+    RENDER LATENCY at the tick: SwiftUI starts the animation's clock at commit, and the
+    first frame paints after the screen has re-evaluated, by which time the curve has already
+    advanced — Debug (a slower re-evaluation) loses 48% of each step this way, Release ~18–30%.
+    The deep cause is that a position tick invalidates the whole screen, and `attrs` has no
+    per-render result cache. Fixing that is a scoped performance item, not a motion item.
