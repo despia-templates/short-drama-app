@@ -278,6 +278,11 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   twin. The cap now bounds grow (dev@0c73f390), and `align:native` folds (the gate once
   probed only style:/class: keys). Web keeps `margin: auto` + `flex: 1`; the suffix keeps it
   byte-true. Probe-measured: 0..199 → 101..301 in a 402 viewport.
+- **A variable font's weights live on `wght`, and the engine drives it from CSS now**
+  (dev@1c251901): declare the axes in `Fonts/DSXFontRegistry.json` (`"axes": {"wght": [100,900],
+  "opsz": [14,32]}`) and every `fontWeight`/`font-weight` just works natively; `opsz` tracks the
+  point size automatically (CSS `font-optical-sizing: auto` parity) — never pin it in the
+  registry. One face file, the whole ramp.
 - **Probe before you generalise.** If a property "doesn't work", reproduce it in a throwaway
   one-element component first. Three framework defects were once filed from one bad
   measurement; all three were false.

@@ -20,9 +20,6 @@
           32
         ]
       },
-      "defaults": {
-        "opsz": 17
-      },
       "fallback": [
         "system"
       ]
@@ -45,9 +42,6 @@
           14,
           32
         ]
-      },
-      "defaults": {
-        "opsz": 17
       },
       "fallback": [
         "system"

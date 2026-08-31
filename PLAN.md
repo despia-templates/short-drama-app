@@ -906,3 +906,23 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     `margin: auto` — and the iPad Watch now shows the reference shape: a 461pt stage, centered,
     letterboxed, chrome bound to the stage edges, clip playing under TopNav. Probe ledger:
     0..199 → 101..301 in a 402 viewport.
+
+56. RESOLVED 2026-08-31 (`despia-framework dev@1c251901`) — **Native type ignored CSS weight on a
+    variable family, and it read as "day and night".** DSXFontBook selected FACES by weight —
+    correct for per-weight files, silently wrong for a single-file variable font, which carries
+    its weights on the `wght` axis: the 700 hero title, 700 section heads, 500 tab captions and
+    800 rank numerals ALL rendered Inter's 400 default instance while web was bold ("weight never
+    synthesises" had nothing to synthesize from). The engine now maps CSS semantics onto the
+    declared axes in cascade order — font-weight → `wght` clamped; `font-optical-sizing: auto`
+    (the CSS default) → `opsz` = point size clamped — with the author's font-variation-settings
+    still winning. The registry's hand-pinned `opsz: 17` default is gone (auto owns it, as on
+    web). Verified both devices: the flat-foot Inter "2" at 800 in the TOP band is the tell.
+
+57. RESOLVED 2026-08-31 (`despia-framework dev@1c251901`) — **The cover layout's fill fallback
+    zeroed an UNSPECIFIED axis** (a same-day regression of §6.48's fix, caught by the genre
+    grids): a poster cell sized purely by `width: 100%` + `aspect-ratio: 3/4` probes greedy on
+    both axes yet answers the grid's real proposal with (colW, colW·4/3) — the old fallback
+    replaced the unspecified height with zero and every genre-grid poster collapsed to a
+    text-only row. The fallback now asks the children against the real proposal and fills only
+    when they echo infinity. The lesson repeated from §6.43: verify a layout fix against the
+    screen that DIDN'T motivate it.
