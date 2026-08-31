@@ -45,6 +45,13 @@
     <variable as="seekBox">return { width: 0, height: 0 }</variable>
     <variable as="tabSynBox">return { width: 0, height: 0 }</variable>
     <variable as="tabEpBox">return { width: 0, height: 0 }</variable>
+    <!-- `measure` writes an element's live BORDER box (getBoundingClientRect on web, the
+         StackMeasure contract natively). segBox is the segmented control's TRACK — the
+         padded inside of the trough, so the quarters are exact — and the two pane boxes
+         keep the drawer's depth stack exactly as tall as the pane you are looking at. -->
+    <variable as="segBox">return { width: 0, height: 0 }</variable>
+    <variable as="synPaneBox">return { width: 0, height: 0 }</variable>
+    <variable as="epPaneBox">return { width: 0, height: 0 }</variable>
     <variable as="scrubbing">return false</variable>   <!-- true while the finger owns the bar -->
     <variable as="time">return 0</variable>
     <variable as="duration">return 0</variable>
@@ -65,13 +72,22 @@
     <variable as="favTouched">return ''</variable>
     <variable as="plotOpen">return false</variable>
 
-    <!-- the option tables the sheets render from -->
+    <!-- FOUR RUNGS, and the same four on every surface that offers speed.
+         The ladder used to carry seven (0.5 … 3.0), which cannot fit a phone sheet, so
+         the control was a horizontal SCROLLER with a visible scrollbar — a picker you
+         have to drag past its own edge is not a picker. Four is what fits as a real
+         segmented control at every supported width: at the narrowest supported viewport
+         (320pt) the track measures 320 − 32 (sheet inset) − 28 (menu-card padding)
+         − 8 (trough inset) = 252pt, so a segment is 63pt against a ~38pt label.
+         ONE table drives BOTH the ⋯ menu's segment and the chip's Playback Speed list,
+         so the two surfaces can never offer different ladders. Note the consequence:
+         0.5×, 2.0× and 3.0× are gone from the app, and `holdStart` below (press-and-hold
+         to 2×, declared but wired to no element today) therefore sets an OFF-TABLE speed
+         — `speedIdx` parks the pill on 1.0× rather than off the end if it ever fires. -->
     <variable as="speedOptions">
       return [
-        { id: 's05', v: 0.5, label: '0.5x' }, { id: 's075', v: 0.75, label: '0.75x' },
-        { id: 's1', v: 1, label: '1.0x' }, { id: 's125', v: 1.25, label: '1.25x' },
-        { id: 's15', v: 1.5, label: '1.5x' }, { id: 's2', v: 2, label: '2.0x' },
-        { id: 's3', v: 3, label: '3.0x' }
+        { id: 's075', v: 0.75, label: '0.75x' }, { id: 's1', v: 1, label: '1.0x' },
+        { id: 's125', v: 1.25, label: '1.25x' }, { id: 's15', v: 1.5, label: '1.5x' }
       ]
     </variable>
 
@@ -131,6 +147,23 @@
     <variable as="speedLabel" computed="true">
       const match = dsx.variable.speedOptions.filter(o => o.v == dsx.variable.speed)
       return match.length == 0 ? '1.0x' : match[0].label
+    </variable>
+    <!-- WHICH SEGMENT THE PILL SITS ON. Equal segments are what let the indicator be pure
+         arithmetic off ONE measured track — no per-segment measurement, no layout
+         animation, and no `width: N%` (the native bridge drops non-100 percent lengths —
+         upstream #281): the pill is `width = round(track/4)` at
+         `offsetX = round(track/4 * index)`. An off-table speed falls back to the 1.0×
+         rung so the pill can never park past the end of the trough. -->
+    <variable as="speedIdx" computed="true">
+      const opts = dsx.variable.speedOptions
+      const v = dsx.variable.speed
+      let found = 1
+      let i = 0
+      while (i < opts.length) {
+        if (opts[i].v == v) { found = i }
+        i = i + 1
+      }
+      return found
     </variable>
     <!-- ONE computed value used as the WHOLE style attribute (AGENTS.md): a clamp that
          toggles cannot be spliced into a static style string. -->
@@ -238,6 +271,30 @@
       if (i < 0 || i >= rs.length) { return detail.data.episodes }
       const r = rs[i]
       return detail.data.episodes.filter(e => e.idx >= r.from && e.idx <= r.to)
+    </variable>
+    <!-- THE SLIDING UNDERLINE. ONE rule in a coordinate space both labels share, never
+         one rule per tab toggled by visible-if: a toggle JUMPS, a travelling rule reads
+         as a tab bar. The width is the active label's own measured box — the same
+         `measure` the two labels already published for the static rule — and the x is
+         that label's leading edge inside the rail: 0 for the first, the first label's
+         width plus the row's gap for the second. THE 28 IS `tabRow`'s OWN `spacing`:
+         they are the same gap seen from two elements, and nothing but this line holds
+         them together — change one, change the other. -->
+    <variable as="tabUnderW" computed="true">
+      if (dsx.variable.drawerTab == 'synopsis') { return Math.round(dsx.variable.tabSynBox.width || 0) }
+      return Math.round(dsx.variable.tabEpBox.width || 0)
+    </variable>
+    <variable as="tabUnderX" computed="true">
+      if (dsx.variable.drawerTab == 'synopsis') { return 0 }
+      return Math.round(dsx.variable.tabSynBox.width || 0) + 28
+    </variable>
+    <!-- and the pane stack is exactly as tall as the ACTIVE pane. Both panes stay MOUNTED
+         (that is what lets them cross-fade and travel instead of popping), and a depth
+         stack is as tall as its tallest child — so without this a 60-episode grid would
+         hang most of a screen of dead scroll under the synopsis. -->
+    <variable as="paneH" computed="true">
+      if (dsx.variable.drawerTab == 'synopsis') { return Math.round(dsx.variable.synPaneBox.height || 0) }
+      return Math.round(dsx.variable.epPaneBox.height || 0)
     </variable>
 
     <formula as="gridLocked" free="item.free" epid="item.id">
@@ -439,12 +496,22 @@
     <style as="panelRanges" spacing="16" alignItems="center" paddingTop="6"/>
 
     <!-- ── the episode drawer ── -->
-    <style as="drawerHead" spacing="14" alignItems="center" paddingH="16" paddingTop="10" paddingBottom="18"/>
+    <!-- 15, not 18: the tab labels now sit inside a `tabHit` column that carries 3pt of
+         its own top padding for the tap target, and the two together hold the measured
+         18pt gap the head had before. -->
+    <style as="drawerHead" spacing="14" alignItems="center" paddingH="16" paddingTop="10" paddingBottom="15"/>
     <style as="drawerTitle" fontSize="17" fontWeight="bold" color="#FFFFFF" lineLimit="2" lineSpacing="3"/>
     <style as="drawerSub" fontSize="13" color="rgba(255,255,255,0.5)"/>
     <style as="followBtn" radius="24" paddingH="24" paddingV="13" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="tabRow" spacing="28" alignItems="center" paddingH="16" paddingBottom="4"/>
+    <style as="tabRow" spacing="28" alignItems="center" paddingH="16"/>
+    <!-- the tap target, unchanged in size: the label used to share its column with the
+         rule (spacing 5 + a 3pt rule = 8pt of extra target), and 3 + 5 here restores
+         exactly that 8pt now that the rule has moved out into its own rail -->
+    <style as="tabHit" alignItems="center" paddingTop="3" paddingBottom="5"/>
     <style as="tabTxt" fontSize="16" fontWeight="semibold"/>
+    <!-- THE RAIL is the underline's coordinate space, and it carries the SAME 16pt gutter
+         as the label row so that x=0 here is the first label's leading edge. -->
+    <style as="tabRail" paddingH="16" paddingBottom="4"/>
     <!-- THE RULE IS ITS LABEL'S WIDTH, measured. A guessed 26pt was too short and
          grow="width" was too long — a greedy child makes the tab column greedy too, so
          the column ate the row and the rule ran past the word. `measure` writes the
@@ -473,8 +540,16 @@
     <style as="menuValue" fontSize="15" color="rgba(255,255,255,0.5)"/>
     <style as="menuHead" fontSize="20" fontWeight="bold" color="#FFFFFF" paddingH="4" paddingBottom="8" paddingTop="2"/>
     <style as="pauseBadge" padding="25" radius="42" background="rgba(0,0,0,0.45)" alignItems="center"/>
-    <style as="speedSeg" background="rgba(255,255,255,0.08)" radius="10" paddingH="4" paddingV="4" spacing="0" alignItems="center"/>
-    <style as="speedOpt" radius="8" paddingH="12" paddingV="8" fontSize="14"/>
+    <!-- THE SEGMENTED CONTROL. Trough 10 · inset 4 · pill 6 is the CONCENTRIC-RADIUS rule
+         (an inner radius is the outer radius minus the inset), the same rule the platform
+         segmented control follows at 9 · 2 · 7. The segment's 45pt height is MEASURED,
+         not chosen: a 14pt label's line box is 14 × the sheet's 1.5 body leading (the
+         `dsx-type-body-leading` token) = 21pt, and 12 above and below carries it to 45 —
+         the 44pt tap floor of designing-an-app §7, rather than the platform control's
+         tighter 32pt, because this one is hand-rolled and carries no system hit-slop. -->
+    <style as="speedSeg" background="rgba(255,255,255,0.08)" radius="10" padding="4" spacing="0" alignItems="stretch"/>
+    <style as="speedPill" background="rgba(255,255,255,0.16)" radius="6"/>
+    <style as="speedOpt" paddingV="12" fontSize="14" textAlign="center"/>
     <style as="optRow" spacing="12" alignItems="center" paddingV="13" paddingH="12" radius="10"/>
     <style as="optLabel" fontSize="17"/>
     <style as="optNote" fontSize="13" color="rgba(255,255,255,0.5)"/>
@@ -865,65 +940,138 @@ Please unlock to watch." class="lockHead"/>
                   background="{{ dsx.variable.favOn ? '#8E1637' : '#FF2C55' }}" on:tap="dsx.action.toggleFav()"/>
         </hstack>
 
-        <hstack class="tabRow">
-          <vstack spacing="5" alignItems="center" on:tap="dsx.variable.drawerTab = 'synopsis'" a11yTrait="button" a11yLabel="Synopsis">
-            <text value="Synopsis" class="tabTxt" measure="dsx.variable.tabSynBox"
-                  color="{{ dsx.variable.drawerTab == 'synopsis' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
-            <stack class="tabUnderline" width="{{ Math.round(dsx.variable.tabSynBox.width || 0) }}"
-                   visible-if="dsx.variable.drawerTab == 'synopsis'"/>
-          </vstack>
-          <vstack spacing="5" alignItems="center" on:tap="dsx.variable.drawerTab = 'episodes'" a11yTrait="button" a11yLabel="Episodes">
-            <text value="Episodes" class="tabTxt" measure="dsx.variable.tabEpBox"
-                  color="{{ dsx.variable.drawerTab == 'episodes' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
-            <stack class="tabUnderline" width="{{ Math.round(dsx.variable.tabEpBox.width || 0) }}"
-                   visible-if="dsx.variable.drawerTab == 'episodes'"/>
-          </vstack>
-        </hstack>
+        <!-- THE TABS ARE A TAB BAR, so the rule TRAVELS. Each label used to own a rule
+             that visible-if switched on and off, which is a jump cut — the ink vanished
+             under one word and reappeared under the other. The rule now lives once, in
+             its own rail below the labels, and moves between them on offsetX (a
+             compositor transform) while its width morphs to the label it lands on. Both
+             are bindable transforms the value-tween carries on every renderer:
+             web through a CSS transition, iOS through StackNodeView's anim tween
+             (dev@ca2b0c78). -->
+        <!-- labels and rail are ONE band with `spacing="0"`: they are two children where
+             there used to be one, and the drawer column's default 8pt gap would otherwise
+             float the rule 13pt under its label instead of the measured 5. -->
+        <vstack spacing="0" alignItems="stretch">
+          <hstack class="tabRow">
+            <vstack class="tabHit" on:tap="dsx.variable.drawerTab = 'synopsis'" a11yTrait="button"
+                    a11yLabel="Synopsis{{ dsx.variable.drawerTab == 'synopsis' ? ', selected' : '' }}">
+              <text value="Synopsis" class="tabTxt" measure="dsx.variable.tabSynBox"
+                    color="{{ dsx.variable.drawerTab == 'synopsis' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
+            </vstack>
+            <vstack class="tabHit" on:tap="dsx.variable.drawerTab = 'episodes'" a11yTrait="button"
+                    a11yLabel="Episodes{{ dsx.variable.drawerTab == 'episodes' ? ', selected' : '' }}">
+              <text value="Episodes" class="tabTxt" measure="dsx.variable.tabEpBox"
+                    color="{{ dsx.variable.drawerTab == 'episodes' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
+            </vstack>
+          </hstack>
+          <zstack class="tabRail" grow="width" align="leading" style="width: 100%">
+            <stack class="tabUnderline" width="{{ dsx.variable.tabUnderW }}"
+                   offsetX="{{ dsx.variable.tabUnderX }}" anim="easeOut" animDuration="0.2"/>
+          </zstack>
+        </vstack>
         <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
 
-        <!-- Synopsis -->
-        <vstack class="synopsisWrap" visible-if="dsx.variable.drawerTab == 'synopsis'">
-          <hstack class="tagRow">
-            <text value="{{ detail.data == null ? '' : detail.data.show.genre }}" class="tag"/>
-            <text value="Series" class="tag"/>
-          </hstack>
-          <text value="{{ detail.data == null ? '' : detail.data.show.synopsis }}" class="synopsisTxt"/>
-        </vstack>
+        <!-- ══ THE TWO PANES CROSS-FADE — they do not swap ══
+             Both stay MOUNTED in one depth stack and change only opacity and offsetX,
+             the two things that tween identically on both lanes (a CSS transition on
+             web, StackNodeView's anim value-tween on iOS — dev@ca2b0c78). The travel is
+             16pt in the DIRECTION of the switch: Synopsis is the LEFT tab, so it leaves
+             to the left and Episodes arrives from the right. 16 is not a taste number —
+             it is the framework's own declared slide distance (element-motion.ts
+             `motionFrom`, the web twin of SwiftUI `.move(edge:)`).
 
-        <!-- Episodes -->
-        <vstack visible-if="dsx.variable.drawerTab == 'episodes'" alignItems="stretch">
-          <hstack class="rangeRow">
-            <list bind="dsx.variable.ranges" key="id" axis="horizontal" scroll="false" spacing="18">
-              <text value="{{ item.label }}" class="rangeTxt"
-                    color="{{ item.from - 1 == Number(dsx.variable.range) * 30 ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}"
-                    on:tap="dsx.variable.range = (item.from - 1) / 30" a11yTrait="button"/>
-            </list>
-            <spacer/>
-            <hstack spacing="6" alignItems="center" on:tap="dsx.module.route.push({ path: '/vip' })"
-                    a11yGroup="true" a11yTrait="button" a11yLabel="Download episodes — VIP">
-              <image icon="square.and.arrow.down" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
-              <text value="VIP" class="vipTag"/>
-            </hstack>
-          </hstack>
-          <vstack class="epGridWrap">
-            <!-- the cell is the DIRECT grid child: a wrapper here loses the column width
-                 (AGENTS.md). The VIP tag overlays by position, flow-fallback on native. -->
-            <grid bind="dsx.variable.visibleEps" key="id" columns="6" spacing="8" scroll="false">
-              <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center; overflow: hidden"
-                      on:tap="dsx.action.go({ target: item.idx })"
-                      background="{{ item.idx == Number(dsx.variable.cur) ? '#FF2C55' : '#2C2C2E' }}"
-                      a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', VIP' : '' }}" a11yTrait="button" a11yGroup="true">
-                <text value="{{ item.idx }}" class="epNum" color="#FFFFFF"/>
-                <!-- the corner tab: flush to the cell's own corner, never over the numeral -->
-                <text value="VIP" class="cellTag" visible-if="gridLocked"
-                      style="position: absolute; top: 0; right: 0; border-bottom-left-radius: 6px"/>
-                <!-- the now-playing tell the reference puts on the current cell -->
-                <image icon="waveform" iconSize="11" color="#FFFFFF" visible-if="item.idx == Number(dsx.variable.cur)"
-                       a11yHidden="true" style="position: absolute; top: 4px; right: 5px"/>
-              </vstack>
-            </grid>
+             `keep="true"` is what makes a mounted-but-hidden pane HONEST, and it is the
+             only spelling that does it on both lanes: the framework fades it on the
+             curve declared here, turns hit-testing off (`allowsHitTesting(false)` /
+             `pointer-events: none`) and marks it aria-hidden + inert. Without it, 60
+             invisible episode cells sit over the synopsis and swallow the genre chip's
+             tap. (`passthrough=` cannot do this job: both renderers read it as a RAW
+             literal `=== "true"`, so it is not bindable.)
+
+             WHY NOT `transition=`: an insert/remove cannot cross-fade — the outgoing
+             pane is already gone when the incoming one paints — and `transition="slide-*"`
+             is the one token whose lanes genuinely differ (native moves the whole
+             container edge, web moves 16px; documented in element-motion.ts).
+             WHY THE MEASURED HEIGHT: a depth stack is as tall as its tallest child and
+             both children are always mounted, so `paneH` holds the stack to the pane you
+             are looking at. `position: absolute` would be the other way to keep the idle
+             pane out of the box and it CANNOT be used here: the native detacher is a
+             raw-literal sniff (StackAbsolutePlane.isAbsolute), so a computed
+             `position: absolute` stays in flow on iOS and Android and only web collapses.
+             `overflow: hidden` is the WEB half of that height: a fixed native frame
+             already reports its own size to the scroller, but a CSS box lets an
+             overflowing child extend the SCROLLER's extent, so the idle pane would put
+             its full height back as dead scroll. The native twin is the frame itself. -->
+        <zstack height="{{ dsx.variable.paneH }}" grow="width" align="topLeading"
+                style="width: 100%; overflow: hidden">
+
+          <!-- Synopsis -->
+          <vstack keep="true" visible-if="dsx.variable.drawerTab == 'synopsis'"
+                  anim="easeOut" animDuration="0.2" grow="width" alignItems="stretch"
+                  measure="dsx.variable.synPaneBox" style="width: 100%">
+            <vstack class="synopsisWrap" grow="width" style="width: 100%"
+                    offsetX="{{ dsx.variable.drawerTab == 'synopsis' ? 0 : -16 }}"
+                    anim="easeOut" animDuration="0.2">
+              <hstack class="tagRow">
+                <!-- THE GENRE CHIP IS A ROUTE, the same one the desktop panel's chip
+                     takes: /browse/:genre is declared in dsx.config.json and the Browse
+                     screen filters on genre OR tag, so "Revenge" lands on a real result
+                     set. `href` is the link idiom for a chip whose text stays plain
+                     (a <button> is for a CTA that owns its background).
+                     "Series" stays INERT deliberately: it is a FORMAT, not a genre and
+                     not a tag, so /browse/Series would route to an empty Browse — a
+                     control that reaches nothing is worse than a label. -->
+                <text value="{{ detail.data == null ? '' : detail.data.show.genre }}" class="tag"
+                      a11yTrait="button"
+                      a11yLabel="Browse {{ detail.data == null ? '' : detail.data.show.genre }}"
+                      href="/browse/{{ detail.data == null ? '' : detail.data.show.genre }}"/>
+                <text value="Series" class="tag"/>
+              </hstack>
+              <text value="{{ detail.data == null ? '' : detail.data.show.synopsis }}" class="synopsisTxt"/>
+            </vstack>
           </vstack>
-        </vstack>
+
+          <!-- Episodes -->
+          <vstack keep="true" visible-if="dsx.variable.drawerTab == 'episodes'"
+                  anim="easeOut" animDuration="0.2" grow="width" alignItems="stretch"
+                  measure="dsx.variable.epPaneBox" style="width: 100%">
+            <vstack alignItems="stretch" grow="width" style="width: 100%"
+                    offsetX="{{ dsx.variable.drawerTab == 'episodes' ? 0 : 16 }}"
+                    anim="easeOut" animDuration="0.2">
+              <hstack class="rangeRow">
+                <list bind="dsx.variable.ranges" key="id" axis="horizontal" scroll="false" spacing="18">
+                  <text value="{{ item.label }}" class="rangeTxt"
+                        color="{{ item.from - 1 == Number(dsx.variable.range) * 30 ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}"
+                        on:tap="dsx.variable.range = (item.from - 1) / 30" a11yTrait="button"/>
+                </list>
+                <spacer/>
+                <hstack spacing="6" alignItems="center" on:tap="dsx.module.route.push({ path: '/vip' })"
+                        a11yGroup="true" a11yTrait="button" a11yLabel="Download episodes — VIP">
+                  <image icon="square.and.arrow.down" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
+                  <text value="VIP" class="vipTag"/>
+                </hstack>
+              </hstack>
+              <vstack class="epGridWrap">
+                <!-- the cell is the DIRECT grid child: a wrapper here loses the column width
+                     (AGENTS.md). The VIP tag overlays by position, flow-fallback on native. -->
+                <grid bind="dsx.variable.visibleEps" key="id" columns="6" spacing="8" scroll="false">
+                  <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center; overflow: hidden"
+                          on:tap="dsx.action.go({ target: item.idx })"
+                          background="{{ item.idx == Number(dsx.variable.cur) ? '#FF2C55' : '#2C2C2E' }}"
+                          a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', VIP' : '' }}" a11yTrait="button" a11yGroup="true">
+                    <text value="{{ item.idx }}" class="epNum" color="#FFFFFF"/>
+                    <!-- the corner tab: flush to the cell's own corner, never over the numeral -->
+                    <text value="VIP" class="cellTag" visible-if="gridLocked"
+                          style="position: absolute; top: 0; right: 0; border-bottom-left-radius: 6px"/>
+                    <!-- the now-playing tell the reference puts on the current cell -->
+                    <image icon="waveform" iconSize="11" color="#FFFFFF" visible-if="item.idx == Number(dsx.variable.cur)"
+                           a11yHidden="true" style="position: absolute; top: 4px; right: 5px"/>
+                  </vstack>
+                </grid>
+              </vstack>
+            </vstack>
+          </vstack>
+        </zstack>
       </vstack>
     </scroll>
   </sheet>
@@ -964,19 +1112,39 @@ Please unlock to watch." class="lockHead"/>
               <image icon="arrow.clockwise" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
               <text value="Speed" class="menuLabel"/>
             </hstack>
-            <!-- seven pills never fit a 390 sheet (measured: 3.0x ran 27px past the
-                 viewport on web) — the segment is a RAIL: max-content track inside a
-                 horizontal scroll, the same recipe as every poster row -->
-            <scroll axis="horizontal">
-              <hstack class="speedSeg" style="width: max-content">
-                <list bind="dsx.variable.speedOptions" key="id" axis="horizontal" scroll="false" spacing="0">
-                  <text value="{{ item.label }}" class="speedOpt"
+            <!-- A REAL SEGMENTED CONTROL, AND IT MOVES LIKE ONE.
+                 Seven pills never fit a 390 sheet (measured: 3.0x ran 27px past the
+                 viewport), so this was a horizontal SCROLLER — a control with a
+                 scrollbar through it, and a selection that only REPAINTED: tap a rung
+                 and the highlight teleported. Four rungs fit the row at every supported
+                 width, so the scroller is gone and the segments are equal quarters
+                 (`flex: 1` = `1 1 0%`, which divides the track EVENLY — the catalog's
+                 `grow="width"` alone is `flex-grow: 1` with an auto basis, so "0.75x"
+                 would take more room than "1.0x"; both spellings are written, the
+                 attribute for the native lane and the raw literal for the web sheet).
+                 THE INDICATOR IS ONE ELEMENT that travels: a constant width and an
+                 offsetX computed off the measured track, both compositor transforms on
+                 one element, so they cannot drift from each other and the same markup
+                 tweens on web and on iOS (dev@ca2b0c78). Never `width: N%` — the native
+                 bridge drops non-100 percent lengths (upstream #281).
+                 zIndex ON THE LABEL ROW is load-bearing: the pill carries a transform,
+                 and a transformed sibling paints ABOVE later plain siblings (the
+                 badgeWrap law) — without it the pill covers the labels it sits under. -->
+            <vstack class="speedSeg">
+              <zstack grow="width" align="leading" measure="dsx.variable.segBox" style="width: 100%">
+                <vstack class="speedPill" grow="height" style="height: 100%"
+                        width="{{ Math.round((dsx.variable.segBox.width || 0) / 4) }}"
+                        offsetX="{{ Math.round((dsx.variable.segBox.width || 0) / 4 * dsx.variable.speedIdx) }}"
+                        anim="easeOut" animDuration="0.22"/>
+                <list bind="dsx.variable.speedOptions" key="id" axis="horizontal" scroll="false"
+                      spacing="0" grow="width" zIndex="1" style="width: 100%">
+                  <text value="{{ item.label }}" class="speedOpt" grow="width" style="flex: 1"
                         color="{{ item.v == dsx.variable.speed ? '#FFFFFF' : 'rgba(255,255,255,0.55)' }}"
-                        background="{{ item.v == dsx.variable.speed ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0)' }}"
-                        on:tap="dsx.variable.speed = item.v" a11yTrait="button" a11yLabel="{{ item.label }} speed"/>
+                        on:tap="dsx.variable.speed = item.v" a11yTrait="button"
+                        a11yLabel="{{ item.label }} speed{{ item.v == dsx.variable.speed ? ', selected' : '' }}"/>
                 </list>
-              </hstack>
-            </scroll>
+              </zstack>
+            </vstack>
           </vstack>
           <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
           <hstack class="menuRow" a11yGroup="true" a11yLabel="Picture in picture">
