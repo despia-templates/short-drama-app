@@ -439,7 +439,10 @@
 
   <TopNav active="" visible-if="dsx.variable.wide"/>
   <hstack alignItems="stretch" style="flex: 1; min-height: 0; width: 100%">
-    <vstack alignItems="stretch" style="flex: 1; min-width: 0">
+    <!-- the stage centers its CAPPED pager: web spells it margin:auto on the pager; the
+         native twin is the column's own cross alignment, platform-suffixed so the web
+         sheet keeps stretch (align-self has no native bridge — the §6.21/§6.43 fork) -->
+    <vstack alignItems="stretch" align:native="center" grow="width" style="flex: 1; min-width: 0">
       <zstack>
         <vstack visible-if="dsx.variable.phase != 'ready'" class="stateWrap"
                 height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"

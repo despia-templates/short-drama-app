@@ -893,3 +893,16 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     a mouse target on a touch screen). Template: the back chevrons carry paddingV/H 11 (44pt
     targets). Upstream asks: a review rule for sub-44pt tap handlers, and `hitSlop=` (or an
     automatic floor) so the fix stops costing layout.
+
+55. RESOLVED 2026-08-31 (`despia-framework dev@0c73f390`) — **The iPad player rendered full-bleed
+    because three small truths compounded.** (a) `grow` swallowed an explicit cap: `width: 100%`
+    bridges to grow, the markup `maxWidth` rode beside it, and flexFrame resolved grow to
+    .infinity — a maxWidth="200" pager measured 402pt. Grow now resolves to (cap ?? ∞) per axis.
+    (b) The platform fold's hot-path gate probed only `style:`/`class:` keys, so
+    `align:native="center"` never resolved on the platform it addresses; the gate now recognizes
+    any suffixed key. (c) Both linters' suffix vocabularies lacked `native`/`wear`, so the fork
+    word censused as a typo. Template half: the stage column carries the §6.43 recipe —
+    `grow="width"` beside the dead `flex: 1`, `align:native="center"` for the web's
+    `margin: auto` — and the iPad Watch now shows the reference shape: a 461pt stage, centered,
+    letterboxed, chrome bound to the stage edges, clip playing under TopNav. Probe ledger:
+    0..199 → 101..301 in a 402 viewport.

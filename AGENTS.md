@@ -273,6 +273,11 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   its NON-greedy children only, so a `height:100%` scrim covers the band instead of
   inflating it 2.2×. If an overlay drifts on device, rebuild the export before porting
   anything — the recipe itself is sound.
+- **A CAPPED, CENTERED column is `grow="width"` + `maxWidth` + `align:native="center"`.**
+  `flex: 1` is dead natively (never-bridged) — the column HUGS and sits leading; grow is its
+  twin. The cap now bounds grow (dev@0c73f390), and `align:native` folds (the gate once
+  probed only style:/class: keys). Web keeps `margin: auto` + `flex: 1`; the suffix keeps it
+  byte-true. Probe-measured: 0..199 → 101..301 in a 402 viewport.
 - **Probe before you generalise.** If a property "doesn't work", reproduce it in a throwaway
   one-element component first. Three framework defects were once filed from one bad
   measurement; all three were false.
