@@ -412,7 +412,9 @@
     <style as="tabUnderline" background="#FF2C55" height="3" radius="2" width="26"/>
     <style as="rangeRow" spacing="20" alignItems="center" paddingH="16" paddingTop="18" paddingBottom="12"/>
     <style as="rangeTxt" fontSize="14" fontWeight="semibold"/>
-    <style as="epGridWrap" paddingH="12" paddingBottom="28"/>
+    <!-- the sheet supplies the bottom inset (and folds the safe area into it); 28 here
+         was a third layer solving the same problem — PLAN.md §6.69 -->
+    <style as="epGridWrap" paddingH="12" paddingBottom="8"/>
     <style as="epCell" radius="11" alignItems="center" background="#2C2C2E"/>
     <style as="epNum" fontSize="16" fontWeight="semibold"/>
     <style as="synopsisWrap" paddingH="18" paddingTop="14" paddingBottom="26" spacing="12" alignItems="flex-start"/>

@@ -1151,3 +1151,32 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     centered, with Profile's cards and ledger still filling their shell. THE LESSON: when two
     sheets ship the same rules, equal specificity is not a tie — it is a coin flip decided by
     bundling; a renderer's own element defaults must outrank its generic ones by construction.
+
+69. RESOLVED 2026-08-31 (`despia-framework dev@2614b750`) — **"Cutoff, too much gap, what is
+    this?" — the scroll-end clearance was three bugs wearing one number.** Measured under the
+    episode drawer's last row: **118pt** of dead space on iOS, 102px on web. It was the
+    author's own `epGridWrap paddingBottom="28"`, PLUS the 40pt "fade clearance" §6.67 added
+    with the edge fade, PLUS the home-indicator safe area — three layers solving one problem
+    at the same box bottom. Two deeper findings came out of the inventory: (a) THE CLEARANCE
+    SAT OUTSIDE THE SCROLLER on both lanes — native pads the slot AROUND the author's
+    `<scroll>`, and web's `.dsx-sheet-content` IS the scroll viewport, so the padding shrank
+    the viewport instead of travelling with the content. It could never be scroll clearance;
+    it was a permanent band, which is exactly why it read as flat unscrollable colour. (b)
+    NATIVE DOUBLE-COUNTED THE SAFE AREA: web folds base and inset into one `max()`, native
+    applied a flat 56 and let the OS add 34 on top — 16pt taller than its web twin from
+    identical markup. THE FIX IS THE AFFORDANCE DONE PROPERLY: a fade that means "there is
+    more below" must not paint when there is nothing below, and then it needs no reserved
+    space at all, because overlapping the content it hints at is the whole point. Web toggles
+    it from the sheet viewport's own scroll state (rAF-coalesced listener + a ResizeObserver
+    on the viewport AND its inner box, because sheet rows land asynchronously); iOS publishes
+    ONE Bool up the tree from `<scroll>` (`DSXScrollEdgeKey`) — a Bool, never the offset, so
+    the reader re-renders twice per scroll session instead of once per frame — with an
+    environment gate arming the probe only inside a sheet, and the fade's state in its own
+    view rather than on `SheetAnchor` (whose presentation churn once killed every sheet on
+    this screen, §6.62). Template: `epGridWrap paddingBottom` 28 → 8, since the sheet supplies
+    the inset. Measured after: web gap 84px → **24px**, fade opacity 0 at the end and 1
+    mid-scroll; the non-scrolling comments sheet shows no fade and no void on either lane;
+    the content-detent menu still hugs. Named gap: only `<scroll>` publishes on iOS, so a
+    sheet whose scrolling is owned by a `<list>` or a scrolling `<grid>` will not arm the
+    native fade yet. THE LESSON: reserving space for a decoration is a smell — if the
+    decoration knows when it matters, it needs no reservation at all.
