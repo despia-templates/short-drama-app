@@ -439,7 +439,9 @@
     <style as="synopsisTxt" fontSize="15" color="rgba(255,255,255,0.8)" lineSpacing="6"/>
 
     <!-- ── the options stack ── -->
-    <style as="menuBody" paddingH="12" paddingTop="0" paddingBottom="14" spacing="0" alignItems="stretch"/>
+    <!-- the sheet already insets its content 16 a side; 12 more made the card read
+         narrow and the header sat flush against the grabber -->
+    <style as="menuBody" paddingH="0" paddingTop="8" paddingBottom="14" spacing="0" alignItems="stretch"/>
     <style as="menuCard" background="#1C1C1E" radius="14" paddingH="14" spacing="0" alignItems="stretch"/>
     <style as="menuRow" spacing="13" alignItems="center" paddingV="13"/>
     <style as="menuLabel" fontSize="16" color="#FFFFFF"/>

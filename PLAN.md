@@ -1324,3 +1324,19 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     presentation settles and adopted without animation. THE LESSON: three engine gaps in one
     screen, and every one of them surfaced as "the app looks wrong", never as an error — the
     catalog gate is what turned the third into a conversation instead of a silent drop.
+
+77. RESOLVED 2026-08-31 (`despia-framework dev@7eb4fc6b`) — **"width 100% does not render on
+    native" — the third member of one family.** The playback-speed sheet's option rows shrank
+    to the width of their own labels on iOS while the web twin spanned the card, so the
+    selected pill and its tap target were a third of the size they should be. Cause: a
+    `<list>` row is a block child of a column on web and stretches for free; native hugged.
+    `<list>` now hands its rows the same `growSynthetic` default `<grid>` got in §6.67,
+    through the same `bound(adding:)` door — a DEFAULT, so a row declaring its own width or
+    grow keeps it, and horizontal rails are untouched because there the row's intrinsic width
+    IS the layout. Three members landed this session, all the same shape: grid cells stretch
+    to their track (§6.67), column children stretch on the cross axis (§6.62), list rows fill
+    their list (here). Template half: the menu sheet dropped its own 12pt side padding (the
+    sheet already insets 16, and 28 read narrow) and gained 8pt on top so the header clears
+    the grabber. THE PATTERN WORTH NAMING: every one of these was the web lane being handed a
+    box by the document model that native had to be told about — when an author says "it
+    works on web", that is usually the sentence underneath it.
