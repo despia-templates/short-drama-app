@@ -985,3 +985,30 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     Through a component boundary the parent sees only the mount tag — `grow` ON THE TAG is the
     documented spelling there (the zIndex-on-mount sibling; SearchOverlay's pill mount carries
     it). Measured: the phone home's search pill spans logo → avatar, the web row exactly.
+
+62. RESOLVED 2026-08-31 (`despia-framework dev@1066c5c5`) — **The five-truth batch: the day the
+    boot data pipeline turned out to be the real "rendering" bug.** (a) THE ABSOLUTE PLANE
+    DETACHES AT THE NODE: overlays re-attach AFTER every styled arm, so a badge anchors the
+    host's FINAL box and a host `radius` can no longer clip it — the VIP dot first floated off
+    the gem's content hug, then vanished entirely under the corner clip; CSS never clips
+    absolutely-positioned children under default overflow. The builder-side partition is gone.
+    (b) CSS CROSS-AXIS STRETCH is the unsteered default (vstack stretches child width; hstack
+    anchors flex-start) — Profile's Viewer/GoVIP/wallet/ledger cards fill the shell like web;
+    hstack deliberately does NOT height-stretch (a greedy frame under a scroll's unbounded
+    proposal inflated the row — the wallet card clipped mid-pill; CSS stretch fills the
+    CONTENT-FORMED row height, filed open). (c) SYNTHETIC GROW IS A DEFAULT THAT UNIONS:
+    `growSynthetic` folds in only against the child's own resolved grow — a raw-sniffed
+    synthetic `grow` attr had clobbered the hero column's computed `height:100%` and pinned
+    the copy to the band top under the iPad nav while the static spelling centered (probed
+    both ways in one screen). (d) STORED NULL IS NULL: `truthy(NSNull)` is false and a
+    `return null` initializer seeds NSNull, never "" — the search overlay's `results` was ""
+    at mount, `results != null` took the wrong branch, and the overlay opened onto its
+    zero-hits message instead of the Hot list. (e) API CLAIMS HAND OFF: SwiftUI replaces view
+    identities new-before-old, and the outgoing identity's dispose was cancelling all three
+    boot requests ~1.4s in after the incoming claim had been refused — no owner left to
+    refire, every screen on the offline demo seed forever, WHILE ALL FIVE STATIC GATES WERE
+    GREEN. Claims are refcounted now; the block survives the churn. Found by NSLog flight
+    recorder (fire/apply/dispose), not by reading source. Template half: `homeLanded` retires
+    the offline-demo chip the moment a real payload lands (the Article-7 chip must never lie),
+    and the 12h dev-session tokens are re-minted with `npm run session` when /viewer/* starts
+    answering 401 — the wallet numbers matching the demo seed's 320/45 disguised the outage.

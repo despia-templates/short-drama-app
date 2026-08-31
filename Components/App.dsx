@@ -18,7 +18,7 @@
      bottom of 840). The screen class's grow="true" is the cross-platform fill. -->
 <vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
-    <api as="home" url="/catalog/home" on:success="global.cacheHome = home.data"/>
+    <api as="home" url="/catalog/home" on:success="dsx.action.homeLanded()"/>
     <api as="session" url="/dev-session.json" ssr="false"/>
     <api as="continue" url="/viewer/continue" ssr="false" needs="session"
          headers="dsx.variable.authHeaders" on:success="global.cacheContinue = continue.data"/>
@@ -206,6 +206,15 @@
          mis-click. Every reference carousel in the category (my-drama, shortical, flextv)
          ships chevrons on the wide lane and only the wide lane. These wrap, so the control
          is never a dead end at either end of the set. -->
+    <!-- A REAL payload retires the offline-demo degradation: the chip names "you are
+         looking at captured data" (Article 7), so the moment the origin answers, the
+         flag — and the chip — must drop. Latched forever, it lied on every dev boot
+         where the seed merely won the mount race against a live fetch. -->
+    <action as="homeLanded">
+      global.cacheHome = home.data
+      global.demoSeeded = false
+    </action>
+
     <action as="heroPrev">
       const n = dsx.variable.heroCount
       if (n < 2) { return }
