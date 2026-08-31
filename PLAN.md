@@ -1105,3 +1105,24 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     recipe in custom-ux.md now shows the glide spelling). One unit lesson for the ledger:
     `animDuration` is SECONDS (the catalog says so) — "250" produced a four-minute tween
     on web before the probe caught it.
+
+67. RESOLVED 2026-08-31 (`despia-framework dev@96563323` + template) — **The player interaction
+    batch: tap-to-pause, the VIP entitlement hole, the speed rail, and the sheet's scroll-end
+    contract.** (a) TAP-TO-PAUSE, the category standard: any stage tap toggles playback and the
+    paused stage wears the big center glyph — one zstack `on:tap` plus a badge on a GREEDY
+    centering layer, verified on web (video.paused flips, badge appears, second tap resumes)
+    and device. The badge itself re-taught the cover law the hard way: a bare 84pt child SIZED
+    the depth stack and the whole page collapsed to an 84pt strip — a width/height-100%
+    wrapper is a covering layer and cannot (the recipe now spells it). The circle is built by
+    construction (34pt glyph + 25pt padding), because main-axis centring still has no class
+    twin (#238). (b) THE VIP HOLE: epLocked, gridLocked and onEnded's nextLocked all ignored
+    `wallet.data.vip` — a paying subscriber hit the coin paywall on every non-free episode and
+    autoplay stopped at EP.4. All three gates now honor VIP, so VIP rides straight through and
+    auto-unlock keeps spending only when the viewer opted in. (c) THE SPEED SEGMENT IS A RAIL:
+    seven pills never fit a 390 sheet (measured: 3.0x ran 27px past the viewport on web) — the
+    house max-content track inside a horizontal scroll, verified scrollable with 3.0x
+    reachable. (d) THE SCROLL-END CONTRACT, both lanes: the sheet edge fade grows to 56px with
+    eased stops (web: color-mix of the panel's own surface; iOS: the same ramp), and the
+    content wrapper's bottom inset carries the fade height — fully-scrolled content RESTS
+    above the fade (measured: the drawer's last row clears it by 28px). PiP was already real
+    on both lanes (AVPictureInPictureController + the menu toggle) — verified, not rebuilt.

@@ -151,6 +151,7 @@
       if (ep == null) { return false }
       if (ep.free) { return false }
       if (wallet.data == null) { return true }
+      if (wallet.data.vip == true) { return false }
       return !wallet.data.unlocked.includes(ep.id)
     </variable>
     <variable as="balance" computed="true">
@@ -208,6 +209,7 @@
     <formula as="gridLocked" free="item.free" epid="item.id">
       if (free) { return false }
       if (wallet.data == null) { return true }
+      if (wallet.data.vip == true) { return false }
       return !wallet.data.unlocked.includes(epid)
     </formula>
     <!-- the whole style is ONE formula (a {{ }} hole spanning a ';' inside a compound
@@ -290,7 +292,7 @@
       const n = Number(dsx.variable.cur) + 1
       if (n > detail.data.episodes.length) { dsx.variable.paused = true; return }
       const nxt = detail.data.episodes[n - 1]
-      const nextLocked = nxt.free === false && wallet.data != null && !wallet.data.unlocked.includes(nxt.id)
+      const nextLocked = nxt.free === false && wallet.data != null && wallet.data.vip != true && !wallet.data.unlocked.includes(nxt.id)
       if (nextLocked && dsx.variable.autoUnlock && dsx.variable.balance >= nxt.price) {
         dsx.variable.page = n - 1
         dsx.action.syncUrl()
@@ -425,6 +427,7 @@
     <style as="menuLabel" fontSize="16" color="#FFFFFF"/>
     <style as="menuValue" fontSize="15" color="rgba(255,255,255,0.5)"/>
     <style as="menuHead" fontSize="20" fontWeight="bold" color="#FFFFFF" paddingH="4" paddingBottom="8" paddingTop="2"/>
+    <style as="pauseBadge" padding="25" radius="42" background="rgba(0,0,0,0.45)" alignItems="center"/>
     <style as="speedSeg" background="rgba(255,255,255,0.08)" radius="10" paddingH="4" paddingV="4" spacing="0" alignItems="center"/>
     <style as="speedOpt" radius="8" paddingH="12" paddingV="8" fontSize="14"/>
     <style as="optRow" spacing="12" alignItems="center" paddingV="13" paddingH="12" radius="10"/>
@@ -482,7 +485,7 @@
                value="dsx.variable.page" dots="false" dismissEdge="left" on:change="dsx.action.rest()"
                height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                style="width: 100%; margin-left: auto; margin-right: auto">
-          <zstack>
+          <zstack on:tap="dsx.variable.paused = dsx.variable.paused == false">
             <!-- the KEY ART is every page's first paint — an episode that boots onto black
                  and pops a bright frame reads as a glitch; booting onto the show's art
                  reads as a curtain. Locked pages keep the art frosted; unlocked pages let
@@ -505,6 +508,20 @@
                    on:ready="dsx.variable.paused = false" on:ended="dsx.action.onEnded()"
                    on:error="dsx.variable.toast = 'This episode would not play — try another.'"
                    on:appear="dsx.action.boot()"/>
+            <!-- TAP-TO-PAUSE, the category standard: any tap on the stage toggles playback
+                 (the zstack's on:tap above), and the paused stage wears the big center
+                 glyph every reference app shows. passthrough keeps the glyph decorative —
+                 the tap lands on the stage and toggles back. -->
+            <!-- the badge rides a GREEDY centering layer: a bare 84pt child would SIZE the
+                 depth stack (the cover law — non-greedy children form the box; measured:
+                 the whole page collapsed to an 84pt strip), while a width/height-100%
+                 wrapper is a covering layer that cannot. -->
+            <vstack visible-if="dsx.variable.paused && item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false"
+                    passthrough="true" style="width: 100%; height: 100%; justify-content: center; align-items: center; pointer-events: none; z-index: 2">
+              <vstack class="pauseBadge" enter="fade" anim="spring">
+                <image icon="play.fill" iconSize="34" color="rgba(255,255,255,0.95)" a11yHidden="true"/>
+              </vstack>
+            </vstack>
           </zstack>
         </pager>
 
@@ -851,14 +868,19 @@ Please unlock to watch." class="lockHead"/>
               <image icon="arrow.clockwise" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
               <text value="Speed" class="menuLabel"/>
             </hstack>
-            <hstack class="speedSeg" style="justify-content: space-between">
-              <list bind="dsx.variable.speedOptions" key="id" axis="horizontal" scroll="false" spacing="0">
-                <text value="{{ item.label }}" class="speedOpt"
-                      color="{{ item.v == dsx.variable.speed ? '#FFFFFF' : 'rgba(255,255,255,0.55)' }}"
-                      background="{{ item.v == dsx.variable.speed ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0)' }}"
-                      on:tap="dsx.variable.speed = item.v" a11yTrait="button" a11yLabel="{{ item.label }} speed"/>
-              </list>
-            </hstack>
+            <!-- seven pills never fit a 390 sheet (measured: 3.0x ran 27px past the
+                 viewport on web) — the segment is a RAIL: max-content track inside a
+                 horizontal scroll, the same recipe as every poster row -->
+            <scroll axis="horizontal">
+              <hstack class="speedSeg" style="width: max-content">
+                <list bind="dsx.variable.speedOptions" key="id" axis="horizontal" scroll="false" spacing="0">
+                  <text value="{{ item.label }}" class="speedOpt"
+                        color="{{ item.v == dsx.variable.speed ? '#FFFFFF' : 'rgba(255,255,255,0.55)' }}"
+                        background="{{ item.v == dsx.variable.speed ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0)' }}"
+                        on:tap="dsx.variable.speed = item.v" a11yTrait="button" a11yLabel="{{ item.label }} speed"/>
+                </list>
+              </hstack>
+            </scroll>
           </vstack>
           <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
           <hstack class="menuRow" a11yGroup="true" a11yLabel="Picture in picture">
