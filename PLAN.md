@@ -1241,3 +1241,22 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     a gap IS the documented spelling. Verified against this template: the full-bleed paywall
     close button is exactly that exempt case and is correctly not flagged, and the gate stays
     at 0 failures.
+
+73. RESOLVED 2026-08-31 (`despia-framework dev@eb15c7a3`) — **"Move the fade down, ignore the
+    safe area for IT only" — and the SwiftUI law that took four measured passes to see:
+    `.ignoresSafeArea` only expands a view that FILLS.** A fixed-height, bottom-aligned
+    overlay keeps its container's safe-inset anchor no matter what is applied to it. Each
+    attempt failed differently, and each one was measured on device rather than eyeballed:
+    anchored 36pt left badges at FULL brightness (163) from 834pt to the panel's edge at 866;
+    growing the box to 36+inset only extended it UPWARD from the same anchor, so the strip
+    stayed bright; pulling it with negative padding slid the entire ramp down and left the
+    rows above it crisp. The shape that works is a FULL-SIZE VStack that ignores the bottom
+    container inset with the gradient at ITS bottom — the layer expands to the panel's real
+    bounds, so the ramp finishes exactly where the web twin's `bottom: 0` does. Measured
+    after: the trailing badges dissolve 163 → ~124 across the strip instead of showing
+    through it, and the rows above stay crisp. The content's own scroll-content inset (§6.72)
+    is untouched: content pays the indicator once, only the DECORATION ignores it — which is
+    exactly what was asked for. THE LESSON, now three ledger entries deep on one 36pt
+    gradient: on iOS, whether a view can paint into the safe area is decided by whether it
+    FILLS, not by what modifier you attach to it — and a pixel probe answers that question in
+    one build where reasoning about it cost four.
