@@ -1277,3 +1277,25 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     CENTRE columns only — the panel's rounded corners expose the video underneath, and that
     video reads as "residue" in any full-width sample. Two of the earlier "still bleeding"
     readings were the corners, not the fade.
+
+75. RESOLVED 2026-08-31 (`despia-framework dev@c22d5a07`) — **The scrubber's two truths, and
+    the fade's last one.** (a) THE PIN RIDES THE FILL. Two tweens can never stay welded: the
+    fill animates `width` (layout, main thread) while an `offsetX` thumb animates `transform`
+    (compositor), and the two progress at different rates inside the same tween — measured on
+    web, the fill edge and the pin centre disagreed by up to **11px in a sawtooth**, which is
+    the "unlinked, slight stutter" read. The pin is an absolute child of the fill now, so ONE
+    animated property drives both and it cannot drift from an edge it is pinned to (measured
+    after: disagreement exactly 0 on every sample). Neither is rounded any more — rounding
+    them separately was worth a pixel of disagreement on its own — and the tween runs 320ms
+    against the player's 250ms tick, because a tween that finishes exactly as the next value
+    lands has to wait, and that wait IS the stutter. (b) A DEPTH STACK THAT DECLARES `grow`
+    TAKES THE PROPOSED BOX: CoverZStackLayout sized from non-greedy children even when the
+    element itself said fill, so the outer frame widened the VIEW while the layout still
+    placed layers in the content-sized box. The scrubber's 28% track therefore spanned only
+    the white fill and was invisible beneath it — no 4pt band anywhere right of the pin —
+    while web, where a block-level stack gets the row for free, painted the rail. After:
+    track 162 against video 118, the full rail. (c) The fade's solid tail is gone: holding
+    the indicator strip opaque was a black bar you could see, so the eased ramp spans the
+    whole layer and closes exactly on the panel's bottom edge. THE LESSON: "it works on web"
+    usually means the web lane got a box for free that native has to be told about — a
+    block-level element, a scroller's own padding, a stack that fills its row.

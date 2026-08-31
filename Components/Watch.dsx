@@ -588,7 +588,11 @@
 
           <vstack class="bottomBar" paddingBottom="{{ dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0) }}" style="pointer-events: auto">
             <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
-            <stack height="26" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
+            <!-- grow="width" on the SURFACE, not just the track: web gives a block-level
+                 stack the full row for free, native hugs it — so the track's own
+                 grow="width" had nothing to fill and the rail never painted (measured on
+                 device: no 4pt band anywhere right of the pin, while web read 362px). -->
+            <stack height="26" grow="width" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
                    on:dragStart="dsx.variable.scrubbing = true" on:dragEnd="dsx.variable.scrubbing = false"
                    a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
                    on:adjust="dsx.variable.pos = dsx.variable.pos + (dsx.this.direction == 'increment' ? 0.05 : -0.05)">
@@ -601,12 +605,24 @@
                      linearly between ticks (custom-ux.md §3 — both renderers), so the fill
                      and thumb TRAVEL instead of stepping. While the finger owns the bar the
                      tween stands down — a scrub must track the touch, not lag it. -->
-                <vstack width="{{ Math.max(4, Math.round(dsx.variable.pos * (dsx.variable.seekBox.width || 1))) }}"
-                        height="4" radius="2" background="#FFFFFF"
-                        anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.25"/>
-                <vstack width="14" height="14" radius="7" background="#FFFFFF" shadow="3"
-                        offsetX="{{ Math.round(dsx.variable.pos * (dsx.variable.seekBox.width || 1)) - 7 }}"
-                        anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.25"/>
+                <!-- THE THUMB RIDES THE FILL. Two tweens can never stay welded: the fill
+                     animates `width` (layout, main thread) while an offsetX thumb animates
+                     `transform` (compositor), and the two progress at different rates
+                     inside the same 320ms — measured on web, the fill edge and the pin
+                     centre disagreed by up to 11px in a sawtooth, which is the "unlinked,
+                     slight stutter" read. Making the pin an absolute child of the fill
+                     leaves ONE animated property driving both: the pin cannot drift from
+                     an edge it is pinned to. `right: -7` hangs it half-off that edge (the
+                     badge idiom), `top: -5` centres its 14pt on the 4pt bar.
+                     No rounding either — sub-pixel keeps the travel continuous, and the
+                     tween runs slightly longer than the player's 250ms tick so motion
+                     never arrives and waits. -->
+                <vstack width="{{ Math.max(4, dsx.variable.pos * (dsx.variable.seekBox.width || 1)) }}"
+                        height="4" radius="2" background="#FFFFFF" style="position: relative"
+                        anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.32">
+                  <vstack width="14" height="14" radius="7" background="#FFFFFF" shadow="3"
+                          style="position: absolute; right: -7px; top: -5px"/>
+                </vstack>
               </zstack>
             </stack>
             <!-- the pill RAISES the drawer only in the lane that has one; with the panel
