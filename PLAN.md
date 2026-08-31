@@ -1070,3 +1070,16 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     white, it needs a screen name. Verification note for the ledger: the media files were
     temporarily looped to 300s to hold the player still — restored to the shipped 10s
     demos after the pass.
+
+65. RESOLVED 2026-08-31 (`despia-framework dev@289f2c24`) — **Every native sheet was ~16px
+    tighter than its web twin, on all four edges.** The web sheet's own content wrapper
+    (`.dsx-sheet-content`) pads the slot 12 top / 16 sides / 16 bottom — measured live: the
+    comments title sits 32 from the panel edge on web (wrapper 16 + the app's cHead 16),
+    52 below the panel top. The native sheet rendered the slot bare, so the same title sat
+    at 16/24 and every drawer read subtly cramped ("padding still off on native sheets").
+    The native slot now wraps in the same EdgeInsets on every mode — drawer, card, cover,
+    and the chrome variants, with the bar OUTSIDE the wrapper exactly like the web header —
+    and the content-detent measuring pass sees the padded slot, so fit-content sheets hug
+    the same box web lays out. The lesson: a renderer's SYSTEM CHROME (sheet wrappers,
+    grabbers, header bars) is part of the parity contract too — measuring only the app's
+    own markup missed a constant offset the eye reads instantly.
