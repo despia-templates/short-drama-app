@@ -1260,3 +1260,20 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     gradient: on iOS, whether a view can paint into the safe area is decided by whether it
     FILLS, not by what modifier you attach to it — and a pixel probe answers that question in
     one build where reasoning about it cost four.
+
+74. RESOLVED 2026-08-31 (`despia-framework dev@1404d9c3`) — **The fade's curve, settled: eight
+    eased stops over 64pt, closed before the edge.** Two opposite complaints landed back to
+    back and the answer was neither extreme. FOUR stops ending at the layer's last pixel left
+    RESIDUE — trailing badges still readable at the panel's bottom, because the fully-opaque
+    stop sat where there was nothing left to cover. Closing that same ramp EARLY, over 36pt,
+    killed the residue and read as abrupt: a dissolve you can watch start. The ramp is 64pt
+    of content now, eased across eight stops (0 · .04 · .13 · .28 · .48 · .70 · .90 · 1) so
+    no band is perceptible, reaching full opacity at the top of the indicator strip and
+    holding solid through it. iOS scales the stop LOCATIONS by the strip it must also cover
+    (`rampEnd`); web spans its 64px straight to the panel edge it already reaches — one
+    curve, two geometries. Measured through the ramp on device: 125 → 92 → (row gap) → 94 →
+    25 in even steps, then pure surface (20) to the bottom edge with ZERO content pixels in
+    the centre columns. The measurement lesson, after four passes on this gradient: probe the
+    CENTRE columns only — the panel's rounded corners expose the video underneath, and that
+    video reads as "residue" in any full-width sample. Two of the earlier "still bleeding"
+    readings were the corners, not the fade.
