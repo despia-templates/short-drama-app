@@ -1,9 +1,12 @@
 {
-  "_note": "NATIVE IDENTITY + ORIGIN. The web lane never needs this file: it is same-origin by construction. The native lane has no origin of its own, so `host` is what a root-relative <api url=\"/x\"> and every <image src=\"/posters/…\"> resolve against. Set it to YOUR deployed https origin before building the native lane. It is deliberately not `localhost`: a device cannot reach your laptop by that name, and the export ships no assets of its own (upstream 279), so the origin serves the art as well as the data. To test on a simulator or a device against a local server, use your machine's LAN address — `http://192.168.x.x:8787` — and note that cleartext needs an ATS exception the generated Info.plist does not declare. See README, 'The native lane'.",
+  "_note": "NATIVE IDENTITY + ORIGIN. The web lane never needs this file: it is same-origin by construction. The native lane has no origin of its own, so `host` is what a root-relative <api url=\"/x\"> and every <image src=\"/posters/\u2026\"> resolve against. Set it to YOUR deployed https origin before building the native lane. It is deliberately not `localhost`: a device cannot reach your laptop by that name, and the export ships no assets of its own (upstream 279), so the origin serves the art as well as the data. To test on a simulator or a device against a local server, use your machine's LAN address \u2014 `http://192.168.x.x:8787` \u2014 and note that cleartext needs an ATS exception the generated Info.plist does not declare. See README, 'The native lane'.",
   "name": "Short Drama",
   "host": "https://shortdrama.example.com",
   "entry": {
     "root": "/",
-    "surfaces": ["shortdrama.App"]
-  }
+    "surfaces": [
+      "shortdrama.App"
+    ]
+  },
+  "icons": "unified"
 }

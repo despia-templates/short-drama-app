@@ -16,7 +16,13 @@
 
      TRUST SHAPE (spec §3): the client never decides entitlement. `epLocked` reads
      /wallet/state, unlock spends server-side, and a locked episode never mounts a source. -->
-<vstack background="#000000" alignItems="stretch" grow="true" spacing="0" style:web="min-height: {{ dsx.screen.height }}px">
+<!-- FULL-BLEED PLAYER ROOT (the safe-area LAW, §6.50's sibling): the stage owns the
+     whole window — ignoreSafeArea anchors it at y=0 so a screen-height stage cannot
+     spill past the safe region — and the CHROME pays the insets back through the
+     published facts (topBar pads safeTop, bottomBar pads safeBottom). In a browser the
+     insets are 0, so the web page is byte-true; a standalone PWA and both native lanes
+     get the same balanced clearances from one spelling. -->
+<vstack background="#000000" alignItems="stretch" grow="true" spacing="0" ignoreSafeArea="true" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
 
@@ -504,7 +510,7 @@
         <vstack class="chromeLayer" visible-if="dsx.variable.phase == 'ready'"
                 height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                 style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
-          <hstack class="topBar" style="pointer-events: auto">
+          <hstack class="topBar" paddingTop="{{ dsx.variable.wide ? 0 : (dsx.screen.safeTop || 0) }}" style="pointer-events: auto">
             <image icon="chevron.left" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
             <text value="EP.{{ dsx.variable.cur }}" class="epLabel"/>
             <spacer/>
@@ -552,16 +558,21 @@
             </vstack>
           </hstack>
 
-          <vstack class="bottomBar" style="pointer-events: auto">
+          <vstack class="bottomBar" paddingBottom="{{ dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0) }}" style="pointer-events: auto">
             <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
-            <stack height="18" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
+            <stack height="26" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
                    a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
                    on:adjust="dsx.variable.pos = dsx.variable.pos + (dsx.this.direction == 'increment' ? 0.05 : -0.05)">
-              <!-- fill sized from the MEASURED track (the reference's own seek idiom):
-                   percent lengths have no native twin today, and this track is fluid -->
-              <stack height="2" radius="1" background="rgba(255,255,255,0.28)" style="width: 100%" measure="dsx.variable.seekBox">
-                <stack height="2" radius="1" background="#FFFFFF" width="{{ Math.round(dsx.variable.seekBox.width * dsx.variable.pos) }}"/>
-              </stack>
+              <!-- THE REFERENCE SCRUBBER (custom-ux.md, PlayerScrubber): track + fill +
+                   thumb off one measured box, drag/tap = seek, playback moves the fill
+                   through the shared <video bind>. One markup, every renderer. -->
+              <zstack grow="width" height="22" align="leading" measure="dsx.variable.seekBox">
+                <vstack grow="width" height="4" radius="2" background="rgba(255,255,255,0.28)"/>
+                <vstack width="{{ Math.max(4, Math.round(dsx.variable.pos * (dsx.variable.seekBox.width || 1))) }}"
+                        height="4" radius="2" background="#FFFFFF"/>
+                <vstack width="14" height="14" radius="7" background="#FFFFFF" shadow="3"
+                        offsetX="{{ Math.round(dsx.variable.pos * (dsx.variable.seekBox.width || 1)) - 7 }}"/>
+              </zstack>
             </stack>
             <!-- the pill RAISES the drawer only in the lane that has one; with the panel
                  beside the clip it is a readout, not a control that opens a duplicate list -->

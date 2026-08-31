@@ -256,7 +256,9 @@
     <style as="playPill" background="#FFFFFF" radius="24" paddingH="34" paddingV="13" spacing="9" alignItems="center"/>
     <style as="playLabel" fontSize="15" fontWeight="bold" color="#111111"/>
     <style as="thumbRow" spacing="14" alignItems="center"/>
-    <style as="heroArrow" width="44" height="44" radius="22" alignItems="center"
+    <!-- alignY: the chevron CENTERS in the circle — measured, the glyph sat at the box
+         top on BOTH lanes (web iconTop was 0; the class never declared the vertical) -->
+    <style as="heroArrow" width="44" height="44" radius="22" alignItems="center" alignY="center"
            background="rgba(18,18,20,0.55)"/>
     <style as="heroPhoneBlock" spacing="14" alignItems="center" paddingLeading="24" paddingTrailing="24" paddingBottom="24"/>
     <style as="heroPhoneTitle" fontWeight="bold" color="#FFFFFF" lineLimit="2" textAlign="center" tracking="-0.4"/>

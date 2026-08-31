@@ -941,3 +941,23 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     cannot escape its instance natively — the MOUNT TAG carries `zIndex` at the one overlap
     site (App.dsx), the honest cross-platform spelling; hoisting instance-root z is a filed
     candidate.
+
+59. RESOLVED 2026-08-31 (`despia-framework dev@37e1c82c`) — **The pixel-parity batch**, five
+    engine arms from one review pass, each device-verified against web:
+    (a) `position: absolute` + edge insets now lift a child into its parent stack's overlay —
+    the paywall ✕ (top:14/right:14) anchored mid-panel in flow before; the whole
+    absolutely-positioned badge class renders now. (b) `filter: blur(N)` bridges to the blur
+    attr — the locked poster frosts natively. (c) THE SAFE-AREA FACTS:
+    `dsx.screen.safeTop/safeBottom/safeLeft/safeRight` on iOS (window insets) AND web (resolved
+    env() probe; zero in a browser tab, real in a standalone PWA) — one spelling pads full-bleed
+    chrome everywhere, and Watch uses it (root `ignoreSafeArea`, topBar + safeTop, bottomBar +
+    safeBottom; the screen-height stage no longer spills the EP pill off-screen). (d) UNIFIED
+    ICONS: App.json `icons: "unified"` draws the web's own 24×24 Boxicons paths natively — same
+    geometry, same em-box, so glyphs and spacing match web exactly (tab bar, engagement rail,
+    chevrons all verified); default stays "platform". (e) image placeholders paint CLEAR
+    (web-true) — the 6% white loading/no-source hints read as white boxes over transparent art
+    (the coin chip). Template half: the Watch scrubber is now the reference recipe (custom-ux.md
+    PlayerScrubber — track/fill/THUMB off one measured box, drag = seek, `<video bind>` ticks
+    the fill), and heroArrow declares `alignY="center"` — measured, the chevron sat at the box
+    top on BOTH lanes (web iconTop was 0): parity held, the design had never declared the
+    vertical.

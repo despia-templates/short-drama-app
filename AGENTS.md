@@ -289,6 +289,18 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   under-transparent-nav recipe). Two riders: `auto` margins still center via the parent,
   and a component root's z-index does not escape its instance natively — when a sibling
   will overlap a mounted component, put `zIndex` ON THE MOUNT TAG.
+- **THE SAFE-AREA LAW: full-bleed surfaces pay the insets back through the FACTS.** A
+  screen that owns the whole window (`ignoreSafeArea="true"` root) pads its chrome with
+  `{{ dsx.screen.safeTop + N }}` / `safeBottom` — published on every lane (iOS window
+  insets; web resolved env(), 0 in a browser tab, real in a standalone PWA). Never a
+  device constant, never window-height stages inside the safe region (the EP pill spilled
+  off-screen). Overlays and paywalls balance their inner padding the same way.
+- **Icons are UNIFIED here** (App.json `icons: "unified"`, dev@37e1c82c): native draws the
+  web's own 24×24 Boxicons paths — same geometry, same em-box, so icon spacing is
+  pixel-true. `position: absolute` + edge insets and `filter: blur(N)` are bridged now;
+  image placeholders paint CLEAR (an img without pixels paints nothing on web — no white
+  boxes over transparent art). The seek bar is the reference scrubber
+  (custom-ux.md PlayerScrubber): track/fill/thumb off one `measure=` box, drag = seek.
 - **Probe before you generalise.** If a property "doesn't work", reproduce it in a throwaway
   one-element component first. Three framework defects were once filed from one bad
   measurement; all three were false.
