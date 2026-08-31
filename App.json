@@ -8,5 +8,6 @@
       "shortdrama.App"
     ]
   },
-  "icons": "unified"
+  "icons": "unified",
+  "design": "custom"
 }

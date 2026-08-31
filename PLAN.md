@@ -961,3 +961,16 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     the fill), and heroArrow declares `alignY="center"` — measured, the chevron sat at the box
     top on BOTH lanes (web iconTop was 0): parity held, the design had never declared the
     vertical.
+
+60. RESOLVED 2026-08-31 (`despia-framework dev@80f6b16c` + `dev@f0c80ef0`) — **The search
+    overlay exposed the DESIGN-MODE seam.** Two defects in one screenshot: the cover sheet's
+    declared `background="#000000"` parsed and was never applied (content floated on
+    systemBackground white), and the custom pill's transparent input wore the LIBRARY-GRADE
+    FIELD WELL — secondary-fill capsule plus the 2pt accent focus ring — chrome the author
+    never wrote. The cover paints its background now, and `App.json "design": "custom"`
+    declares the app its own design system: every system-skin embellishment stands down,
+    engine-wide (the per-element sniff cannot always see authorship — the styled arm consumes
+    `style` before elements read it). Bonus kill from the same sweep: NSNull interpolated its
+    DESCRIPTION — literal "<null>" as ledger text; null renders empty on every lane now. The
+    full gap census and execution order live in the framework's
+    `OpenSource/Documentation/pixel-parity-program.md`.
