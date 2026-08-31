@@ -1221,3 +1221,23 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     legible. Both lanes carry identical stops and height. THE LESSON: "safe area" is not one
     number to add everywhere — it is a question of WHICH BOX owns the edge, and the answer
     differs per lane even when the intent is identical.
+
+72. RESOLVED 2026-08-31 (`despia-framework dev@325547bd`) — **"It works on web, why not iOS?"
+    — because web's padding is INSIDE the scroller and native's was around it.** The drawer
+    still showed a half-faded row cut by a hairline with flat surface beneath: that hairline
+    was the SCROLL VIEWPORT'S CLIP EDGE. Web's `.dsx-sheet-content` IS the scroller, so its
+    bottom padding travels with the content — a row scrolls to the panel's bottom edge and
+    dissolves under the fade there. Native padded the slot AROUND the author's `<scroll>`, so
+    the viewport stopped short, content was clipped at that line, and the ramp painted the
+    inset's empty surface below it. The bottom inset is now a `.safeAreaInset` on the slot —
+    the SwiftUI spelling of "inset the scroll's CONTENT, not its viewport" — so the viewport
+    reaches the panel edge (the ramp always falls on real rows) while the last row still
+    rests 16pt clear at the end. Third and final correction to one 36pt gradient, and the
+    through-line of all three is the same sentence: A PADDING OUTSIDE A SCROLLER IS NOT
+    SCROLL SPACE, it is a dead band the content can never reach. Also shipped: REVIEW R9,
+    the mechanical half of the safe-area contract — a safe-area fact ADDED to a constant is
+    flagged (fold it with `max(base, fact)` or let the frame's inset stand), inert in a
+    source that opted out with `ignoreSafeArea`/`fullBleed`, where paying the fact back plus
+    a gap IS the documented spelling. Verified against this template: the full-bleed paywall
+    close button is exactly that exempt case and is correctly not flagged, and the gate stays
+    at 0 failures.
