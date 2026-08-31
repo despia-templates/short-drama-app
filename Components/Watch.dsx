@@ -42,6 +42,8 @@
     <variable as="wMuted">return true</variable>
     <variable as="pos">return 0</variable>
     <variable as="seekBox">return { width: 0, height: 0 }</variable>
+    <variable as="tabSynBox">return { width: 0, height: 0 }</variable>
+    <variable as="tabEpBox">return { width: 0, height: 0 }</variable>
     <variable as="scrubbing">return false</variable>   <!-- true while the finger owns the bar -->
     <variable as="time">return 0</variable>
     <variable as="duration">return 0</variable>
@@ -409,9 +411,12 @@
     <style as="followBtn" radius="24" paddingH="24" paddingV="13" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="tabRow" spacing="28" alignItems="center" paddingH="16" paddingBottom="4"/>
     <style as="tabTxt" fontSize="16" fontWeight="semibold"/>
-    <!-- the rule spans its LABEL, never a guessed 26pt: the tab column hugs its text,
-         so grow="width" is exactly the label's measure on every renderer -->
-    <style as="tabUnderline" background="#FF2C55" height="3" radius="2" grow="width"/>
+    <!-- THE RULE IS ITS LABEL'S WIDTH, measured. A guessed 26pt was too short and
+         grow="width" was too long — a greedy child makes the tab column greedy too, so
+         the column ate the row and the rule ran past the word. `measure` writes the
+         text's live box (custom-ux.md §2), which is the only spelling that tracks the
+         label on every renderer and at every type size. -->
+    <style as="tabUnderline" background="#FF2C55" height="3" radius="2"/>
     <style as="rangeRow" spacing="20" alignItems="center" paddingH="16" paddingTop="18" paddingBottom="12"/>
     <style as="rangeTxt" fontSize="14" fontWeight="semibold"/>
     <!-- the sheet supplies the bottom inset (and folds the safe area into it); 28 here
@@ -779,12 +784,16 @@ Please unlock to watch." class="lockHead"/>
 
         <hstack class="tabRow">
           <vstack spacing="5" alignItems="center" on:tap="dsx.variable.drawerTab = 'synopsis'" a11yTrait="button" a11yLabel="Synopsis">
-            <text value="Synopsis" class="tabTxt" color="{{ dsx.variable.drawerTab == 'synopsis' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
-            <stack class="tabUnderline" visible-if="dsx.variable.drawerTab == 'synopsis'"/>
+            <text value="Synopsis" class="tabTxt" measure="dsx.variable.tabSynBox"
+                  color="{{ dsx.variable.drawerTab == 'synopsis' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
+            <stack class="tabUnderline" width="{{ Math.round(dsx.variable.tabSynBox.width || 0) }}"
+                   visible-if="dsx.variable.drawerTab == 'synopsis'"/>
           </vstack>
           <vstack spacing="5" alignItems="center" on:tap="dsx.variable.drawerTab = 'episodes'" a11yTrait="button" a11yLabel="Episodes">
-            <text value="Episodes" class="tabTxt" color="{{ dsx.variable.drawerTab == 'episodes' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
-            <stack class="tabUnderline" visible-if="dsx.variable.drawerTab == 'episodes'"/>
+            <text value="Episodes" class="tabTxt" measure="dsx.variable.tabEpBox"
+                  color="{{ dsx.variable.drawerTab == 'episodes' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
+            <stack class="tabUnderline" width="{{ Math.round(dsx.variable.tabEpBox.width || 0) }}"
+                   visible-if="dsx.variable.drawerTab == 'episodes'"/>
           </vstack>
         </hstack>
         <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>

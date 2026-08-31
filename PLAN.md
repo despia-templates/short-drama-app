@@ -1201,3 +1201,23 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     tab underline spans its LABEL (`grow="width"`, was a guessed `width="26"`), and the search
     overlay's meta pills are one line (`lineLimit` + the nowrap web twin) so a two-word genre
     like "Time Travel" stops wrapping inside its own capsule.
+
+71. RESOLVED 2026-08-31 (`despia-framework dev@877184be`) — **The tab rule and the fade, both
+    measured twice before they were right.** (a) THE UNDERLINE IS A MEASURED WIDTH: a guessed
+    `width="26"` was too short, and `grow="width"` was too long for a reason worth writing
+    down — a greedy child makes its PARENT greedy, so the tab column filled the row and the
+    rule ran past the word. `measure="dsx.variable.tabEpBox"` on the label plus
+    `width="{{ box.width }}"` on the rule is the only spelling that tracks the label on every
+    renderer and at every type size (custom-ux.md §2). Verified web: rule 69px = label 69px.
+    (b) THE FADE ENDS WHERE CONTENT ENDS, and iOS was paying the home-indicator inset TWICE
+    in the opposite direction from §6.69: an iOS sheet is NOT edge-to-edge — the presentation
+    already floats the panel above the indicator — so `max(16, safeBottom)` pushed content
+    ~42pt up from the panel's own bottom edge, and a fade anchored to the PANEL painted its
+    entire ramp over empty surface while the last row was clipped hard above it. The bottom
+    inset is a flat 16 on iOS (web keeps `max(base, env())` because its panel DOES reach the
+    screen edge — same intent, each lane paying once), and the fade aligns to the content
+    edge. (c) THE RAMP WAS AN ERASER: 56pt closing at 92% swallowed a whole tile under a flat
+    band; 36pt closing only at the very edge dissolves the last few points and keeps the row
+    legible. Both lanes carry identical stops and height. THE LESSON: "safe area" is not one
+    number to add everywhere — it is a question of WHICH BOX owns the edge, and the answer
+    differs per lane even when the intent is identical.
