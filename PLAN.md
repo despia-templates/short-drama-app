@@ -858,3 +858,38 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     indicator does so BY CANVAS, not by spilling content. Measured end state on iPhone 17
     Pro: first content 78pt (was 114 double-inset, and before that window-anchored under the
     island), bar ink 788–812pt, bar bottom = safe bottom 840, black to the physical edge.
+
+51. RESOLVED 2026-08-31 (`despia-framework dev@7a459406`) — **Navigation was dead on every
+    exported app with a route table, and the symptom lied.** A tab tap ran the verb, built the
+    destination surface, fired its api blocks — and the screen "did nothing", because the export
+    shipped no `routes.json`, so the kernel Router resolved EVERY path to the entry fallback and
+    each navigation re-mounted Home wearing the new path. One trace line told the truth
+    (`routerhost body — root view=shortdrama.App path=/vip`). The export now ships the bundled
+    route floor (dsx.config.json `routes` → routes.json beside App.json, both platforms) — the
+    file Router.bundledTable has always read. Same commit: exported Debug builds now define
+    DEBUG (every `#if DEBUG` diagnostic was silently compiled out), and the router traces its
+    verbs. The lesson upstreamed as the traces; the lesson HERE: when "nothing happened", find
+    which half of the state/view pair moved.
+
+52. RESOLVED 2026-08-31 (`despia-framework dev@9952e1a6`) — **Route params died at the component
+    boundary.** The router seeds `vars` on the surface store; every component instance is born
+    with a fresh store; so a route-mounted component read `{{ vars.show }}` as nothing and the
+    Watch detail block stayed gated on vars:missing-value forever — two ObjectIdentifiers in one
+    trace line. Instances now inherit the consumer's `vars` at store birth (pre-observation, so
+    no mid-update publish), params flow down through every boundary exactly like the web scope
+    chain. Same commit: the site handler learned the media rows and RFC 9110 single ranges —
+    an octet-stream, range-less mp4 plays in every lenient browser and "would not play" in
+    AVFoundation (206/content-range/416 now; accept-ranges advertised).
+
+53. RESOLVED 2026-08-31 (`despia-framework dev@e7f77604`) — **A same-URL `route.replace` re-minted
+    the native frame.** history.replaceState semantics on web; on native the Watch screen's
+    mount-time URL sync looped mint → mount → sync → mint at ~10 frames/s (a thousand frame ids,
+    the screen frozen on its loading branch). Same-URL replace is now a no-op; a changed path
+    still remounts — which is what an episode change wants.
+
+54. → filed: https://github.com/despia-native/despia-framework/issues/282 — **A 22pt icon tap
+    passes review, and no hit-slop primitive exists.** The Watch back chevron hit-tested its bare
+    glyph; a tap 2pt outside fell through to the pager (A/B probed: no hit-stealing anywhere —
+    a mouse target on a touch screen). Template: the back chevrons carry paddingV/H 11 (44pt
+    targets). Upstream asks: a review rule for sub-44pt tap handlers, and `hitSlop=` (or an
+    automatic floor) so the fix stops costing layout.

@@ -444,7 +444,7 @@
         <vstack visible-if="dsx.variable.phase != 'ready'" class="stateWrap"
                 height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                 style="width: 100%; margin-left: auto; margin-right: auto; z-index: 3">
-          <image icon="chevron.left" iconSize="22" color="#FFFFFF" on:tap="dsx.action.goBack()"
+          <image icon="chevron.left" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()"
                  a11yLabel="Back" a11yTrait="button" style="align-self: flex-start"/>
           <spacer/>
           <spinner color="#FF2C55" visible-if="dsx.variable.phase == 'loading'"/>
@@ -502,7 +502,7 @@
                 height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                 style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
           <hstack class="topBar" style="pointer-events: auto">
-            <image icon="chevron.left" iconSize="22" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
+            <image icon="chevron.left" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
             <text value="EP.{{ dsx.variable.cur }}" class="epLabel"/>
             <spacer/>
             <hstack class="speedChip" on:tap="dsx.variable.sheet = 'speed'; dsx.variable.menu = true"
@@ -846,7 +846,7 @@ Please unlock to watch." class="lockHead"/>
       <!-- speed -->
       <vstack visible-if="dsx.variable.sheet == 'speed'" alignItems="stretch">
         <hstack alignItems="center" paddingBottom="8">
-          <image icon="chevron.left" iconSize="19" color="#FFFFFF" on:tap="dsx.variable.sheet = ''" a11yLabel="Back" a11yTrait="button"/>
+          <image icon="chevron.left" iconSize="19" paddingV="12" paddingH="12" color="#FFFFFF" on:tap="dsx.variable.sheet = ''" a11yLabel="Back" a11yTrait="button"/>
           <text value="Playback Speed" class="menuHead"/>
         </hstack>
         <list bind="dsx.variable.speedOptions" key="id" scroll="false" spacing="2">
