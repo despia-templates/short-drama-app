@@ -156,6 +156,12 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
 - **`await` is a STATEMENT, never a ternary branch.** `x = c ? await f() : await g()` returns
   something whose `.ok` is falsy — silently, in a server action. Isolated against the identical
   if/else, which works (PLAN.md §6.31).
+- **JSE `+` is TOTAL ARITHMETIC, so `'' + n` is the NUMBER n, not a string.** Building a
+  zero-pad the JS way (`let ss = '' + sec; if (sec < 10) { ss = '0' + ss }`) yields 4, not
+  "04", and the clock renders "0:4" — on BOTH lanes, so it is a language law and not a
+  renderer bug. Grow the string from an anchor that can never parse as a number
+  (`let out = m + ':'` then `out = out + '0'` then `out + sec`); every later `+` is then a
+  concatenation. Same family as the ternary rule below — prefer statements.
 - **A repeater row is a DICT, never a scalar.** `item` is the reserved row SCOPE, so a `<list>`
   bound to an array of strings renders "[object Object]" and collapses to one row under
   `key="index"`. Store `[{ term: 'x' }]` and read `item.term`.

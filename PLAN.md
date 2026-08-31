@@ -1379,3 +1379,39 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     advanced — Debug (a slower re-evaluation) loses 48% of each step this way, Release ~18–30%.
     The deep cause is that a position tick invalidates the whole screen, and `attrs` has no
     per-render result cache. Fixing that is a scoped performance item, not a motion item.
+
+80. RESOLVED 2026-09-01 (`despia-framework dev@f1d8b588`) — **`attrs` is memoised per
+    render pass, and the transport's residual is now MEASURED rather than inferred.** §6.79
+    named "render latency at the tick" as the residual's cause from the outside; this pass
+    instrumented it. On the Watch screen, one 4Hz position tick re-renders **237 nodes** (947
+    `body` evaluations per second) for ~21ms of MAIN-THREAD work — and `attrs`, a computed
+    property whose own comment admitted it "runs many times per render", was re-running the
+    full cascade (dict merges, a class Set, JSE interpolation of `class`/`style`, two sheet
+    lookups) **30 times per node per body**. It is now memoised in a reference box scoped to
+    exactly one render (`begin()` at the top of `body`), which is what makes it safe: the
+    cascade interpolates and may read ANY store, global or cookie value, so no revision token
+    could be trusted to cover it, but a memo that cannot outlive its render needs no such
+    proof. Measured live: 28,038 cache hits against 947 computes, `attrs` down to 4ms/s.
+    Transport profile went from 5% of the wall clock frozen to 0–3%.
+
+    WHAT REMAINS, and the honest shape of it: `StackStyle.apply` is now the dominant cost
+    (55ms/s of the 86ms/s body time), and the real defect is architectural — every
+    `StackNodeView` holds `@ObservedObject store`, so ONE variable ticking re-renders all 237
+    nodes whether or not they read it. Until that is fine-grained, ~20–30% of each step still
+    arrives in a single frame, because SwiftUI starts an animation's clock at commit while the
+    first frame paints after the re-render. Web has the same 4Hz tick and no such artifact:
+    a CSS transition is compositor-driven and immune to main-thread work.
+
+    TRIED AND REVERTED, recorded so it is not re-attempted blind: expressing playback as ONE
+    long ramp (target the END, `animDuration` = the time actually left) so nothing restarts
+    4×/s. It is the right idea and the category's own technique, and it needs ARMING — with
+    no previous value at mount, `scaleX="1"` paints a FULL bar on frame one (measured: the
+    fill sat at 100% from the first frame of a fresh launch). Arming it needs a latch that is
+    provably set after the transport has painted the true position, plus disarm on episode
+    change and on non-scrub seeks. Worth doing deliberately; not worth half-shipping.
+
+81. LANGUAGE LAW 2026-09-01 — **JSE `+` is total arithmetic: `'' + 4` is the NUMBER 4.** The
+    scrub clock rendered "0:3" for three seconds on BOTH lanes because the idiomatic JS
+    zero-pad (`'' + sec`, then `'0' + ss`) never produced a string to concatenate onto. Grow
+    the string from an anchor that cannot parse as a number (`m + ':'`). Added to AGENTS.md.
+

@@ -39,6 +39,7 @@
     <variable as="page">return 0</variable>   <!-- 0-based; the vertical pager owns it -->
     <variable as="showId">return ''</variable>
     <variable as="paused">return false</variable>
+    <variable as="buffering">return false</variable>
     <variable as="wMuted">return true</variable>
     <variable as="pos">return 0</variable>
     <variable as="seekBox">return { width: 0, height: 0 }</variable>
@@ -75,6 +76,28 @@
     </variable>
 
     <variable as="cur" computed="true">return Number(dsx.variable.page) + 1</variable>
+    <!-- the scrub readout: elapsed / total, mm:ss. `pos` is the 0-1 fraction the
+         <video bind> publishes, `duration` the seconds it reports. -->
+    <!-- mm:ss, and the zero-pad has to be built on a NON-NUMERIC anchor. JSE `+` is total
+         arithmetic, so `'' + 4` is the NUMBER 4, not "4", and `'0' + that` is 4 again —
+         three seconds rendered as "0:3" on both lanes. Growing the string from `m + ':'`
+         (which can never parse as a number) keeps every later `+` a concatenation. -->
+    <variable as="posLabel" computed="true">
+      const t = Math.floor(dsx.variable.pos * dsx.variable.duration)
+      const m = Math.floor(t / 60)
+      const sec = t - m * 60
+      let out = m + ':'
+      if (sec < 10) { out = out + '0' }
+      return out + sec
+    </variable>
+    <variable as="durLabel" computed="true">
+      const t = Math.floor(dsx.variable.duration)
+      const m = Math.floor(t / 60)
+      const sec = t - m * 60
+      let out = m + ':'
+      if (sec < 10) { out = out + '0' }
+      return out + sec
+    </variable>
     <variable as="bp" computed="true">
       const s = dsx.screen.width
       if (s >= 1120) { return 'desktop' }
@@ -377,6 +400,8 @@
     <style as="epPillNow" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="epPillAll" fontSize="15" color="rgba(255,255,255,0.55)"/>
     <style as="toastLine" fontSize="12" color="#F6B63D"/>
+    <style as="seekTimeNow" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="seekTimeAll" fontSize="13" color="rgba(255,255,255,0.62)"/>
     <style as="speedToast" background="rgba(0,0,0,0.72)" radius="18" paddingH="14" paddingV="8" spacing="7" alignItems="center"/>
     <style as="speedToastLabel" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
 
@@ -532,6 +557,7 @@
                      src="{{ item.video }}" active="{{ item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false }}"
                      muted="{{ dsx.variable.wMuted }}" paused="dsx.variable.paused"
                      bind="dsx.variable.pos" time="dsx.variable.time" duration="dsx.variable.duration"
+                     buffering="dsx.variable.buffering"
                      scrubbing="dsx.variable.scrubbing"
                      speed="{{ dsx.variable.speed }}" gravity="fill" audio="playback" loop="false"
                      pip="{{ dsx.variable.pip }}" subtitles="{{ dsx.variable.captions }}"
@@ -619,6 +645,21 @@
                  stack the full row for free, native hugs it — so the track's own
                  grow="width" had nothing to fill and the rail never painted (measured on
                  device: no 4pt band anywhere right of the pin, while web read 362px). -->
+            <!-- THE SCRUB READOUT. Always mounted, never inserted: it rises and fades on
+                 the tween (opacity + offsetY + scale off `scrubbing`), so it arrives the way
+                 the reference players do instead of popping in on an insertion transition —
+                 and because it holds its row at opacity 0, the transport never shifts under
+                 the finger when it appears. -->
+            <hstack spacing="4" align="center" height="18" style="justify-content: center"
+                    opacity="{{ dsx.variable.scrubbing ? 1 : 0 }}"
+                    offsetY="{{ dsx.variable.scrubbing ? 0 : 7 }}"
+                    scale="{{ dsx.variable.scrubbing ? 1 : 0.94 }}"
+                    anim="easeOut" animDuration="0.22"
+                    a11yHidden="{{ dsx.variable.scrubbing ? 'false' : 'true' }}">
+              <text value="{{ dsx.variable.posLabel }}" class="seekTimeNow"/>
+              <text value="/" class="seekTimeAll"/>
+              <text value="{{ dsx.variable.durLabel }}" class="seekTimeAll"/>
+            </hstack>
             <stack height="26" grow="width" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
                    on:dragStart="dsx.variable.scrubbing = true" on:dragEnd="dsx.variable.scrubbing = false"
                    a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
