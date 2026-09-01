@@ -732,9 +732,9 @@ One source. Native on iOS, Android, web and desktop." class="footCopy"/>
                `route.reset` is also the honest verb: going Home from a footer is not deeper. -->
           <vstack class="footCol">
             <text value="BROWSE" class="footHead"/>
-            <text value="Home" class="footLink" on:tap="dsx.module.route.reset({ path: '/' })" a11yTrait="link" a11yLabel="Home"/>
-            <text value="Discover" class="footLink" on:tap="dsx.module.route.reset({ path: '/discover' })" a11yTrait="link" a11yLabel="Discover"/>
-            <text value="My List" class="footLink" on:tap="dsx.module.route.reset({ path: '/list' })" a11yTrait="link" a11yLabel="My List"/>
+            <text value="Home" class="footLink" href="/"/>
+            <text value="Discover" class="footLink" href="/discover"/>
+            <text value="My List" class="footLink" href="/list"/>
           </vstack>
           <vstack class="footCol">
             <text value="EARN" class="footHead"/>
@@ -744,7 +744,7 @@ One source. Native on iOS, Android, web and desktop." class="footCopy"/>
           </vstack>
           <vstack class="footCol">
             <text value="ACCOUNT" class="footHead"/>
-            <text value="Wallet" class="footLink" on:tap="dsx.module.route.reset({ path: '/profile' })" a11yTrait="link" a11yLabel="Wallet"/>
+            <text value="Wallet" class="footLink" href="/profile"/>
             <text value="Manage this app" class="footLink" href="/admin"/>
           </vstack>
         </hstack>

@@ -432,7 +432,13 @@
                   <text value="The app's own words. Audio and subtitle tracks are a separate control the renderer cannot offer yet." class="menuNote"/>
                 </vstack>
               </hstack>
+              <!-- CAPPED, because a menu is not a paragraph. The card runs to 910px on a
+                   1440 desktop and a `<select>` stretched across all of it reads as a text
+                   field; 320 is the phone width the control was designed at, and the phone
+                   lane (326 available) is unaffected. Attribute AND CSS: the attribute is
+                   the cross-platform twin, the declaration is what the web sheet reads. -->
               <picker bind="global.locale" optionsKey="dsx.variable.langRows"
+                      maxWidth="320" style="max-width: 320px"
                       a11yLabel="App language" on:change="dsx.action.localePicked()"/>
               <text value="Remembered until you quit the app — this build has no durable preference store." class="menuNote"/>
             </vstack>

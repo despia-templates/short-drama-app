@@ -5,6 +5,7 @@
   "routes": [
     {
       "path": "/",
+      "tabRoot": true,
       "component": "shortdrama.App",
       "meta": {
         "title": "Short Drama — binge-worthy vertical series"
@@ -16,6 +17,7 @@
     },
     {
       "path": "/discover",
+      "tabRoot": true,
       "component": "shortdrama.Discover",
       "meta": {
         "title": "Discover — Short Drama"
@@ -27,6 +29,7 @@
     },
     {
       "path": "/vip",
+      "tabRoot": true,
       "component": "shortdrama.Vip",
       "meta": {
         "title": "VIP — Short Drama"
@@ -53,6 +56,7 @@
     },
     {
       "path": "/list",
+      "tabRoot": true,
       "component": "shortdrama.MyList",
       "meta": {
         "title": "My List — Short Drama"
@@ -64,6 +68,7 @@
     },
     {
       "path": "/profile",
+      "tabRoot": true,
       "component": "shortdrama.Profile",
       "meta": {
         "title": "Profile — Short Drama"

@@ -2019,3 +2019,103 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     The general lesson, and it is the third time this ledger has written a version of it:
     a write on a teardown path has no reader, and a framework that publishes it anyway is
     paying a crash for a value nobody will ever read.
+
+98. **THE LOCALIZATION SEAM DOES NOT REACH A CHOICE CONTROL'S OPTIONS, and JSE has no
+    `localize()` — so an app cannot translate the words inside a `<picker>`, a
+    `<segmented>`, a `<combobox>` or a `<wheelpicker>`** (found 2026-09-01 building this
+    template's language switcher; measured on the web lane, source-read on both native).
+
+    The seam is wired at the DISPLAY points and only there: `dom/src/mount.ts bindDisplay`
+    is called from `elements.ts` for `<text value=>` / inner text and the button family's
+    `label=`, and from the field family for `placeholder=`. `native-controls.ts` — the file
+    that builds every choice control on web — never calls it: `bindOptions` goes through
+    `api.bindText` / `api.bindValue`, and `choiceControl` sets the option's `textContent`
+    from the raw label. `Picker.swift` and `PickerElements.kt` build their menus from the
+    same raw strings. So `<picker options="Weekly,Monthly,Yearly">` renders three English
+    words in a German app, silently, with a 100% coverage report beside it.
+
+    There is no second door either. `DSXStrings.localize` is exported from the kernel and
+    consumed by exactly one caller (`mount.ts:415`); it is not in the JSE builtin table, so
+    an author cannot reach it from a computed, a formula or an action to translate the rows
+    before handing them over.
+
+    **WHY THIS ONE IS SHARP RATHER THAN THEORETICAL.** The control that the localization
+    plane most obviously exists to enable — an in-app LANGUAGE SWITCHER — is a choice
+    control whose options are language names. Twelve of this template's fourteen rows are
+    fine, because a language row must be an ENDONYM and an endonym is never translated (a
+    Japanese reader hunting for German is looking for `Deutsch`). The fourteenth is
+    "Device language", which is a sentence rather than a name, and it is now a hand-kept
+    thirteen-entry map in `Components/parts/Theme.dsx deviceRowLabel()` — a second copy of
+    thirteen table entries, in an app whose whole localization story is "you never write a
+    key". `npm run verify` asserts the map covers every shipped locale, because the failure
+    mode is one English row inside an otherwise translated menu.
+
+    **THE ASK.** Run `labelField`-resolved option labels through `DSXStrings.localize` in
+    all three builders, exactly as `bindDisplay` does — the label is display copy by
+    construction, and the VALUE (`valueField`) must not be touched. `options=` CSV and
+    `optionsKey=` rows both. A `<picker>` label/placeholder is display copy too. The
+    corpus (`Conformance/strings/cases.json`) can pin it: one case per control, one row
+    translated, one row absent, asserting the value is unchanged and the miss is identity.
+    Secondary and cheaper: expose `localize(s)` in the JSE builtin table, which also gives
+    the interpolated-composite tier a manual escape hatch until the Translate module lands.
+
+99. **THE STRING-TABLE LADDER TRIES [FULL TAG, BARE LANGUAGE] AND NOTHING BETWEEN, so a
+    script- or region-qualified table is unreachable from the DEVICE step** (found
+    2026-09-01 shipping `pt-br` and `zh-hant`; `kernel/src/strings.ts load()`, and the same
+    two candidates in `DSXStrings.swift` / `Strings.kt`).
+
+        for (const candidate of [lang, bare]) …          // lang = "zh-tw", bare = "zh"
+
+    A device set to Traditional Chinese reports `zh-TW`, `zh-HK` or `zh-Hant-TW`. None of
+    those is `zh-hant`, and the bare fallback is `zh`, which we deliberately do not ship
+    (`zh` would catch Simplified devices and hand them Traditional text). A Portuguese
+    device reports `pt-PT`; we ship `pt-br` and, again deliberately, not `pt`. Both
+    locales are therefore reachable only through the in-app picker, which writes
+    `global.locale` explicitly — the device step skips straight past them to English.
+
+    Bare-language tables are unaffected (`de-AT` → `de`, `fr-CA` → `fr` both resolve), which
+    is why this is invisible until an app ships its first script-qualified locale.
+
+    **THE ASK**, in the order BCP-47 itself implies: try the full tag, then progressively
+    truncated subtag chains (`zh-hant-tw` → `zh-hant` → `zh`), and — the part that actually
+    matters here — consult `Intl.Locale`'s maximize/minimize (or `Locale.canonicalize` on
+    Swift, `ULocale.addLikelySubtags` on Android) so `zh-TW` LIKELY-EXPANDS to
+    `zh-Hant-TW` and matches a `zh-hant` table. That is one library call per platform and
+    it is the difference between "we ship Traditional Chinese" and "we ship Traditional
+    Chinese to anyone who finds the menu". Until then the template names the limitation in
+    its README rather than pretending the device path works.
+
+100. **THERE IS STILL NOWHERE DURABLE TO PUT A PREFERENCE, and the one cross-platform place
+     that exists cannot express durability: `dsx.cookie.*` writes a SESSION cookie on web,
+     with no way to say otherwise** (found 2026-09-01 persisting the language choice; the
+     sibling of §6.33, which is still open).
+
+     §6.33 asked for a key-value plane and got none, so this pass reached for the only
+     declared cross-platform storage grammar there is — the cookie jar, one spelling over
+     `document.cookie` on web and `DSXCookies` on both native lanes. It works, and it is
+     the right seam. But `dom/src/boot.ts wireCookies` writes:
+
+         document.cookie = `${name}=${encodeURIComponent(string(value))}; path=/`
+
+     — no `max-age`, no `expires`, no `SameSite`, no `Secure`, and no author-facing way to
+     supply any of them, because the write grammar is a bare assignment to a name. So the
+     choice survives a reload, a deep link and a tab restore, and dies when the browser
+     does. Measured on a live origin: `uiLocale=es` present after `location.reload()`,
+     absent after a fresh browsing session. The template names the limitation in the
+     Language row itself rather than letting a viewer discover it.
+
+     One more sharp edge on the way, and it is the reason this entry exists at all rather
+     than a one-line note: **`dsx.cookie.x = null` is honoured, but a JSE value that is
+     NSNull rather than a literal `null` is written as the four-character string
+     `<null>`.** The writer's guard is `value === null || value === undefined`, and the
+     scope sentinel (`jse/values.ts NSNull`) is neither — it stringifies. Any path where a
+     null arrives through a variable rather than as a literal therefore stores `<null>` and
+     the next read gets a truthy garbage tag. Probed: literal `null` deletes the cookie;
+     an NSNull-valued local writes `uiLocale=%3Cnull%3E`.
+
+     **THE ASK.** (a) `isNSNull(value)` in the cookie writer's guard, on all three lanes —
+     one line, and it removes a class of silently-corrupt state. (b) An attribute or a
+     second argument for cookie durability (`dsx.cookie.set('k', v, { days: 365 })`), or
+     better, close §6.33 with a real preferences plane and let cookies go back to being
+     about credentials. A language choice is not a credential and should not have been
+     riding the auth plane's storage in the first place.

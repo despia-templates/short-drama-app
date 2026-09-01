@@ -755,12 +755,12 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
     "listReports must return `threshold` — the Manage screen renders WITHHELD against it, and a hard-coded 3 on the client is the second copy this template exists to avoid");
 
   // ── EVERY SHIPPED LOCALE IS COMPLETE, OR IT DOES NOT SHIP ────────────────────────────
-  // Profile renders a language chip per locale the build carries, and the objection the
-  // earlier version raised against a picker was exactly right: "a dropdown that switches to
-  // Spanish and returns a half-Spanish app is a control that promises something it does not
-  // do." That objection is answered by COVERAGE rather than by argument, and only if
-  // something enforces the coverage — so this is the enforcement. A locale table with one
-  // viewer string missing fails the build, and the chip cannot reach a release half-filled.
+  // Profile offers a language per locale the build carries, and the objection the earliest
+  // version raised against a picker was exactly right: "a dropdown that switches to Spanish
+  // and returns a half-Spanish app is a control that promises something it does not do."
+  // That objection is answered by COVERAGE rather than by argument, and only if something
+  // enforces the coverage — so this is the enforcement. A locale table with one viewer
+  // string missing fails the build, and the picker cannot reach a release half-filled.
   //
   // The build folds every Strings.<tag>.json at the app root into the registry, so the
   // assertion reads the SHIPPED artefact and not the source: a table that failed to parse
@@ -780,6 +780,56 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
       const missing = viewer.filter((k) => typeof shipped[tag][k] !== "string" || shipped[tag][k] === "");
       check(`the ${tag} locale carries every viewer string (${viewer.length})`, missing.length === 0,
         `${missing.length} missing, e.g. ${missing.slice(0, 3).map((k) => JSON.stringify(k.slice(0, 44))).join(" · ")} — run node scripts/strings.mjs --write ${tag}`);
+    }
+
+    // ── AND THE PICKER OFFERS EXACTLY WHAT SHIPPED ─────────────────────────────────────
+    // The completeness gate above says a shipped table is whole. It says nothing about the
+    // CONTROL, and the control is a second list: `Theme.dsx languageRows()` is data, so a
+    // row whose table nobody wrote is a language the viewer can select that answers English
+    // in every string — the exact defect the coverage gate exists to prevent, arriving
+    // through the other door. Both directions are asserted, because a table with no row is
+    // dead weight an adopter will never find.
+    //
+    // Read out of the SOURCE by regex rather than by evaluating the block: `<functions>` is
+    // the app's JSE tier, there is no node in this repo that runs it, and a parser here
+    // would be a third copy of the list. A regex over three well-known shapes is the cheap
+    // honest read, and it fails loudly (empty match → the assertion below fails) rather
+    // than quietly agreeing with whatever it found.
+    const themeSrc = readFileSync(resolve(root, "Components/parts/Theme.dsx"), "utf8");
+    const tagsBody = /function localeTags\(\)\s*\{([\s\S]*?)\}/.exec(themeSrc)?.[1] ?? "";
+    const pickerTags = [...tagsBody.matchAll(/'([a-z][a-z0-9-]*)'/g)].map((m) => m[1]);
+    const rowsBody = /function languageRows\(\)\s*\{([\s\S]*?)\n      \}/.exec(themeSrc)?.[1] ?? "";
+    const rowIds = [...rowsBody.matchAll(/\{ id: '([a-z0-9-]*)'/g)].map((m) => m[1]);
+    const deviceBody = /function deviceRowLabel\(\)\s*\{([\s\S]*?)\n      \}/.exec(themeSrc)?.[1] ?? "";
+    const deviceTags = [...deviceBody.matchAll(/l == '([a-z][a-z0-9-]*)'/g)].map((m) => m[1]);
+
+    // `en` is the SOURCE language: it is a row in the picker and it never has a table,
+    // because a table mapping English to English is 215 keys of nothing.
+    const offered = pickerTags.filter((t) => t !== "en");
+    check(`the language picker offers exactly the locales that shipped (${offered.length})`,
+      offered.length > 0 && offered.every((t) => shipped[t] !== undefined) && Object.keys(shipped).every((t) => offered.includes(t)),
+      `picker offers ${JSON.stringify(offered)} · build folded ${JSON.stringify(Object.keys(shipped))} — a row with no table is a language that silently answers English; a table with no row is a language nobody can reach`);
+    check("...and its rows and its tag list are the same list",
+      rowIds.length === pickerTags.length + 1 && pickerTags.every((t) => rowIds.includes(t)) && rowIds[0] === "",
+      `localeTags ${JSON.stringify(pickerTags)} · languageRows ${JSON.stringify(rowIds)} — the first row is the DEVICE row (empty tag) and every other row must be a declared tag`);
+    check("...and every offered locale names the device row in its own language",
+      offered.every((t) => deviceTags.includes(t)),
+      `deviceRowLabel covers ${JSON.stringify(deviceTags)} — a locale missing from that map gets an English "Device language" row inside an otherwise translated menu (PLAN.md §6.98)`);
+
+    // ── A TABLE THAT COPIED ENGLISH THROUGH IS NOT A TRANSLATION ──────────────────────
+    // Completeness is a count, and a count is satisfiable by pasting the key into the
+    // value 215 times. Some identity IS correct — VIP, ShortDrama, the `·` and `/`
+    // separators, Bonus in five of these languages — so the gate is a RATIO with a lot of
+    // headroom rather than a per-string rule that would need a per-locale allowlist to
+    // maintain. Measured on the finished tables: es 6.0%, and the Germanic and Malay
+    // families sit highest because they genuinely share more words with English. 30% is
+    // roughly five times the observed worst case and nowhere near a real translation.
+    for (const tag of Object.keys(shipped)) {
+      const rows = viewer.map((k) => [k, shipped[tag][k]]);
+      const identical = rows.filter(([k, v]) => k === v);
+      const pct = Math.round((identical.length / rows.length) * 1000) / 10;
+      check(`the ${tag} locale is a translation and not a copy (${pct}% identical to English)`, pct < 30,
+        `${identical.length}/${rows.length} values are byte-identical to their English key — e.g. ${identical.slice(0, 5).map(([k]) => JSON.stringify(k.slice(0, 24))).join(" · ")}`);
     }
   }
 
