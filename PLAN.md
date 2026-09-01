@@ -2637,7 +2637,18 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      paths, both bridges with `css-bridge.json` rows, and the web `borderDecls` emitter. (a) LANDED upstream the same night (dev@6c5f185a): Android's fixed frames anchor per axis and
      the three words reach the Compose arrangement — Play pill at 71.0% of screen height vs iOS 73.1%
      (the residual is the two lanes' status/home bars). One iOS follow-up filed with it: a fixed-WIDTH
-     `hstack` under `justify-content: center` still sits leading on iOS. (b) LANDED upstream the same
+     `hstack` under `justify-content: center` still sits leading on iOS. THAT FOLLOW-UP LANDED
+     (dev@a45729a8): iOS's fixed frame (`Stack.swift boxGeometry`) kept its own reading of the anchor
+     words — tag-blind `align` as the horizontal anchor, no `justifyContent` at all — so a fixed-width
+     row ignored the three words and read a row's `align="center"` (the VERTICAL word, §6.64a) as a
+     horizontal one. Measured with a throwaway probe on the iPhone 17 Pro simulator, a 50pt child in
+     a 300pt row: x 0 / 0 / 0 → 0 / 125 / 250 for flex-start / center / flex-end; the `align="center"`
+     row x 125, y 0 → x 0, y 20 (leading, vertically centred); the fixed-height column control unchanged
+     at y 60. One ladder (`steerH/steerV` → `fixedFrameAnchorH/V` + `frameAnchor`) now answers both
+     frames on both native lanes, pinned two-lane by `Conformance/style-semantics/main-axis-anchor.json`
+     (11 placement + 28 anchor rows; Swift red against the former reading `x got 0.0 want 125.0`,
+     Kotlin red on a mutated expectation). The template changes nothing — the markup already says
+     the right thing. (b) LANDED upstream the same
      night (dev@3ecc0b7e): `borderEdges` is the catalogued key (border group, multiEnum, ejects), one
      decision on three renderers pinned by `Conformance/style-semantics/border-edges.json` (parse ·
      rects · web; each executor shown red on a mutated corpus first), both native pipelines fill the
