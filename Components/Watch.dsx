@@ -284,13 +284,17 @@
       if (session.data == null) { return {} }
       return { authorization: 'Bearer ' + session.data.viewer.token }
     </variable>
-    <!-- the drawer's range pills: 1-30 · 31-60 · … built from the real episode count -->
+    <!-- The drawer's range pills, chunked at FIFTY. Measured live 2026-09-01 on two
+         references: ReelShort renders "1 - 50" / "51 - 62" for a 62-episode show, and
+         ShortMax renders "1-50" / "All Episodes". The 30 that used to be here matched
+         neither and was never sourced — the house law is that a design number comes from
+         measurement, so it goes. -->
     <variable as="ranges" computed="true">
       const n = dsx.variable.total
       const out = []
       let start = 1
       while (start <= n) {
-        const end = Math.min(start + 29, n)
+        const end = Math.min(start + 49, n)
         out.push({ id: 'r' + start, from: start, to: end, label: start + '-' + end })
         start = end + 1
       }
@@ -568,7 +572,10 @@
     <!-- the sheet supplies the bottom inset (and folds the safe area into it); 28 here
          was a third layer solving the same problem — PLAN.md §6.69 -->
     <style as="epGridWrap" paddingH="12" paddingBottom="8"/>
-    <style as="epCell" radius="11" alignItems="center" background="#2C2C2E"/>
+    <!-- radius 8: ReelShort's 64.33x46 cells and ShortMax's 40x40 cells both measure 8,
+         and AGENTS.md has recorded 8 since the first pass — the code had drifted to 11
+         against the project's own reference. -->
+    <style as="epCell" radius="8" alignItems="center" background="#2C2C2E"/>
     <style as="epNum" fontSize="16" fontWeight="semibold"/>
     <style as="synopsisWrap" paddingH="18" paddingTop="14" paddingBottom="26" spacing="12" alignItems="flex-start"/>
     <style as="tagRow" spacing="8" alignItems="center"/>

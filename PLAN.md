@@ -1415,3 +1415,35 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     zero-pad (`'' + sec`, then `'0' + ss`) never produced a string to concatenate onto. Grow
     the string from an anchor that cannot parse as a number (`m + ':'`). Added to AGENTS.md.
 
+82. MEASURED 2026-09-01 — **Three numbers in AGENTS.md were wrong, and one claim was
+    overstated.** A live re-measure of the category (ReelShort, ShortMax, GoodShort, DramaBox
+    web players; 13 App Store listings; iPad screenshots) against what this template records:
+      · the reference right panel is `30% / max 480 / min 320`, not a fixed **416**;
+      · its collapse breakpoint is **1024**, not 1120;
+      · range pills chunk at **50**, not 30 — the 30 in Watch.dsx matched no reference and
+        was never sourced. Fixed.
+      · episode cells are **radius 8** on both references, and AGENTS.md had said 8 since the
+        first pass — the CODE had drifted to 11 against the project's own measurement. Fixed.
+    And the overstatement: "every reference player puts the episode grid in a persistent 416px
+    right panel" is true of the WEB players and false of tablets — ReelShort's and DramaWave's
+    iPad builds are the phone player stretched into a 4:3 frame. Our two-column tablet lane
+    stays, because it is better than what the category ships, but it is our choice and not
+    something the category authorises.
+
+    NOT COPIED, deliberately. The category never labels the free/paid boundary — the reader
+    infers it from where the padlocks begin. We print "EP 1–N Free". That stays: a paywall the
+    viewer can see coming is the honest version, and this template is training data.
+
+    NOT A CONVENTION, worth knowing before anyone "fixes" it: comments do not exist in this
+    category. ReelShort's, DramaBox's and GoodShort's players have no comment affordance at
+    all (tested against the rendered DOM of every surface, and against the action rails in
+    their store screenshots); the only instance found anywhere is DramaWave's danmaku overlay.
+    Our comment sheet puts us AHEAD of the reference, not level with it. The rail the category
+    actually ships is Bookmark (count) · Like (count) · Share (no count) · More — with SAVE
+    outranking likes, and both counts scoped to the SHOW, not the episode.
+
+    Two assumptions that turned out false and should stop being repeated: offline download is
+    NOT rare — five apps advertise it in first-party store copy (ShortMax, NetShort, DramaWave,
+    MoboReels, GoodShort) and it is the two market leaders that are silent; and no app in the
+    set ships a TV app or casting, with DramaBox actively refusing to cast citing copyright.
+

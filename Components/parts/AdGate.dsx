@@ -41,7 +41,50 @@
      nothing, and grant a coin anyway — which is worse than a named gap.
 
      The server is the only thing that grants. Every lane ends at the same POST, and the
-     daily cap lives there; the client only reports which creative it managed to show. -->
+     daily cap lives there; the client only reports which creative it managed to show.
+
+     ── WHAT VIP DOES TO THIS COMPONENT ──────────────────────────────────────────────────
+     "No ads" is a benefit /vip SELLS, so it has to be a benefit this file DELIVERS — a
+     paywall whose promise is not implemented anywhere is the one thing a monetisation
+     reference must never demonstrate (the same rule that deleted the priced 1080p ladder,
+     PLAN.md §36). `vip="true"` therefore switches the whole placement off: `canPlay` is
+     false, so `play` refuses in the ACTION and the sheet can never open, and the card
+     renders a member state that CONFIRMS the purchased benefit at the one place in the app
+     where it applies. It is deliberately not blank: a benefit the viewer paid for should be
+     visible where it takes effect, not merely absent.
+
+     Note what this app's "no ads" honestly is. There are no pre-rolls, no interstitials and
+     no banners anywhere — the single ad surface in the product is the OPT-IN rewarded clip
+     below. So VIP does not remove an interruption the viewer was suffering; it removes the
+     reason to sit through one, because a VIP unlocks every episode at 0 coins and has
+     nothing left to earn coins for. The copy says exactly that rather than implying the app
+     was ever ad-infested.
+
+     ── APP STORE RULES THIS SURFACE IS BOUND BY ─────────────────────────────────────────
+     A rewarded placement is one of the most heavily specified surfaces in App Review, and
+     three rules land ON THIS FILE rather than on a policy document somewhere:
+
+       5.1.2(i) — a reward may NOT be conditioned on the viewer enabling a system
+                  permission (ATT, notifications, location). Nothing here asks for one, and
+                  nothing may: the lane pick reads `has('scheme')`, which is a BUILD fact,
+                  never a user grant. The rule is restated on `playNetwork` because that is
+                  the seam where a real mediation SDK — and its ATT prompt — will land.
+       2.5.18   — an ad must be labelled as an ad, must not trick the viewer into tapping
+                  it, and must carry an easily accessible, visible close/skip control large
+                  enough to dismiss it. Hence: the "AD" tag, and a 44pt close button that is
+                  present from the FIRST FRAME rather than appearing once the reward is
+                  earned. The early-close branch in `close` was written from the start and
+                  was unreachable until now, because the only control that could fire it was
+                  hidden behind `complete`. A countdown the viewer cannot escape is not a
+                  skip control.
+       2.5.18   — "Apps that contain ads must also include the ability for users to report
+                  any inappropriate or age-inappropriate ads." Hence `report`, and the
+                  `reported` event, which is the single seam an adopter POSTs from. What the
+                  control does in THIS build is named in the UI rather than implied: the
+                  creative is suppressed for the rest of the session on this device, and
+                  there is no moderation inbox to send it to yet, because no report route is
+                  declared server-side. Article 7 — the degradation is named where the
+                  viewer reads it. -->
 <vstack alignItems="stretch">
   <head>
     <attribute as="left" default="0"/>          <!-- ad views remaining today (a server fact) -->
@@ -50,9 +93,20 @@
     <attribute as="reward" default="15"/>
     <attribute as="headers" default="{}"/>      <!-- the caller's auth headers -->
     <attribute as="creative" default="'/media/heiress.mp4'"/>
+    <!-- the viewer's entitlement, passed in by the screen that owns the wallet read. A
+         markup attribute arrives as a STRING and `default=` is a JSE expression, so the
+         consumer accepts BOTH spellings (AGENTS.md) — a component cannot make its callers
+         remember which one it wanted, and the cost of getting this wrong is showing ads to
+         someone who paid not to see them. -->
+    <attribute as="vip" default="false"/>
 
     <event as="granted" payload="reward left"/>
     <event as="failed" payload="message"/>
+    <!-- 2.5.18's report requirement, as a SEAM rather than a guess: this component knows
+         which creative offended and nothing else. The host screen decides what to do with
+         it, and an adopter with a moderation route POSTs from there — the same shape as
+         `playNetwork` for the mediation call. -->
+    <event as="reported" payload="lane creative"/>
 
     <api as="adCall" url="/rewards/ad" method="POST" auto="false" headers="dsx.attribute.headers"/>
 
@@ -97,10 +151,30 @@
       return 'Served by ' + dsx.variable.laneLabel + '. The server verifies the view before a coin is granted.'
     </variable>
 
+    <!-- BOTH SPELLINGS, on purpose (see the attribute). `vip="{{ x }}"` interpolates a real
+         boolean; `vip="true"` is four characters of string. Accepting one and silently
+         ignoring the other is how a paying member ends up looking at an ad. -->
+    <variable as="isVip" computed="true">
+      const v = dsx.attribute.vip
+      return v === true || v === 'true'
+    </variable>
+    <!-- the viewer used the 2.5.18 report control. App-wide rather than per-mount so it
+         survives leaving and re-entering the Rewards tab: `<api cache>` and `<variable>`
+         both die with the mount (PLAN.md §6.30), and an opt-out that forgets itself the
+         moment you navigate away is not an opt-out. It is a SESSION fact, not a stored
+         preference — §6.33 (no cross-platform KV) means there is nowhere durable to put it —
+         and the card says "this session" rather than implying it is remembered. -->
+    <variable as="optedOut" computed="true">return global.adOptOut == true</variable>
+
+    <!-- DISABLED MEANS DISABLED: `play` refuses through this, so the VIP branch and the
+         report branch are guards in the ACTION, not just a grey button. -->
     <variable as="canPlay" computed="true">
+      if (dsx.variable.isVip) { return false }
+      if (dsx.variable.optedOut) { return false }
       return Number(dsx.attribute.left) > 0 && dsx.variable.playing == false
     </variable>
     <variable as="btnLabel" computed="true">
+      if (dsx.variable.optedOut) { return 'Ads off — you reported this one' }
       if (Number(dsx.attribute.left) <= 0) { return 'Daily ad limit reached' }
       return 'Watch an ad  ·  +' + dsx.attribute.reward
     </variable>
@@ -123,6 +197,31 @@
       if (dsx.variable.complete) { return 'Claim +' + dsx.attribute.reward }
       return 'Reward in ' + dsx.variable.secsLeft + 's'
     </variable>
+    <!-- 2.5.18: the close control is present from the first frame, so its label has to say
+         what closing COSTS at the moment it is read — a skip button that silently forfeits
+         a reward is exactly the trick the rule exists to prevent. -->
+    <variable as="closeLabel" computed="true">
+      if (dsx.variable.complete) { return 'Close ad and claim your reward' }
+      return 'Close ad — the reward needs the full clip'
+    </variable>
+
+    <!-- THE CARD'S HEADLINE, which is a different sentence for each of the three states this
+         placement can be in. A member must never read "Watch ads, earn coins". -->
+    <variable as="cardTitle" computed="true">
+      if (dsx.variable.isVip) { return 'Ads are off' }
+      if (dsx.variable.optedOut) { return 'Ads are off' }
+      return 'Watch ads, earn coins'
+    </variable>
+    <!-- What VIP actually buys here, said precisely. The other three earn lanes are named
+         because switching the ad off must not read as "your earning stopped". -->
+    <variable as="memberNote" computed="true">
+      return 'Your VIP pass covers the one ad this app shows — the rewarded clip that normally sits here. Check-in, the wheel and tasks still pay, and none of them show an ad.'
+    </variable>
+    <!-- Article 7, named where the viewer reads it: the half that works and the half that
+         does not, in that order, with the seam pointed at. -->
+    <variable as="optedOutNote" computed="true">
+      return 'Thanks — this creative will not play again for the rest of this session on this device. It is not sent anywhere yet: no moderation route is declared on this backend, so an adopter wires the report POST to the `reported` event this card emits.'
+    </variable>
 
     <!-- ── the lanes ───────────────────────────────────────────────────────────────── -->
 
@@ -135,7 +234,17 @@
     <!-- THE MEDIATION LANE. One place, deliberately empty, so the day Core/AdMob declares a
          rewarded action this is a one-line change and nothing else in the app moves. It is
          unreachable today because `networkReady` is false — a fact the card states out loud
-         rather than a branch that quietly never runs. -->
+         rather than a branch that quietly never runs.
+
+         WHOEVER FILLS THIS IN: App Store 5.1.2(i) — "Your app may not require users to
+         enable system functionalities (e.g. push notifications, location services, tracking)
+         in order to access functionality, content, use the app, or receive monetary or other
+         compensation". A mediation SDK will want ATT. Asking is fine; CONDITIONING THE COIN
+         ON THE ANSWER IS NOT. A viewer who declines tracking must still be able to watch a
+         (non-personalised) rewarded ad and still be granted the reward — or, if the network
+         genuinely returns no fill without consent, the lane must fall through to `playHouse`
+         rather than refuse the reward. Nothing in this build asks for a permission today,
+         and the daily cap plus the server grant are the only gates on the coin. -->
     <action as="playNetwork">
       dsx.event('failed', { message: dsx.variable.laneLabel + ' has no declared rewarded action yet' })
     </action>
@@ -183,6 +292,20 @@
       dsx.variable.playing = false
       if (done) { dsx.action.grant() }
       else { dsx.event('failed', { message: 'Ad closed early — no reward' }) }
+    </action>
+
+    <!-- 2.5.18's report control. It does the two things it CAN do honestly — dismiss the ad
+         with no penalty (the impression never reaches the server, so the daily cap is
+         untouched) and suppress the creative for the rest of the session — and it emits the
+         seam an adopter POSTs from. It grants nothing, so it cannot be farmed; and it is
+         deliberately not wired to `broke`, because "this ad is inappropriate" and "this ad
+         failed to load" are different facts and a moderation queue needs to tell them
+         apart. -->
+    <action as="report">
+      global.adOptOut = true
+      dsx.variable.paused = true
+      dsx.variable.playing = false
+      dsx.event('reported', { lane: dsx.variable.lane, creative: dsx.attribute.creative })
     </action>
 
     <!-- Every lane ends here. The client reports that an impression completed; the SERVER

@@ -165,9 +165,23 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
 - **A repeater row is a DICT, never a scalar.** `item` is the reserved row SCOPE, so a `<list>`
   bound to an array of strings renders "[object Object]" and collapses to one row under
   `key="index"`. Store `[{ term: 'x' }]` and read `item.term`.
-- **A player is a TWO-COLUMN surface when the window can hold one.** Every reference player
-  (ReelShort · Shortical · Stardust · FlickReels) puts the episode grid in a persistent 416px
-  right panel beside the clip — breadcrumb, episode title, tags, plot, counts, range pills,
+- **A player is a TWO-COLUMN surface when the window can hold one — ON THE WEB.** Re-measured
+  live 2026-09-01, and two claims here were wrong. (1) The panel is not a fixed 416: ShortMax's
+  web player computes `width: 30%; max-width: 480px; min-width: 320px`, and its collapse
+  breakpoint is **1024px**, not 1120. (2) "Every reference player" overstated it — ReelShort's
+  and DramaWave's **iPad** builds are the phone player STRETCHED into a 4:3 frame, same rail,
+  same title row, no second column. The two-column pattern is a WEB pattern; on tablets the
+  category mostly does not bother. Keep our tablet lane two-column because it is better, but
+  do not cite the category as authority for it. The panel content order IS confirmed live:
+  breadcrumb → episode title → creator → counts → plot → tag pills → range pills → grid.
+  Cell geometry has TWO idioms, not one: ReelShort draws 64.33×46 numeric cells, 6 columns,
+  gap 6; ShortMax draws 40×40 cells, 5 columns, gap 4. Both at **radius 8**. The current cell
+  is never a flat fill — ReelShort paints a radial gradient of #FF3D5D at 34% anchored to the
+  cell's bottom-right (96% 92%), ShortMax a #0006 wash with a 1px hairline and an orange glow.
+  Range pills chunk at **50** on both. A "free until ep N" caption appears nowhere in the
+  category: the reader infers the boundary from where the padlocks start (ours labels it —
+  a deliberate, honest divergence, not a miss). The old text put the episode grid in a
+  persistent 416px right panel beside the clip — breadcrumb, episode title, tags, plot, counts, range pills,
   6-col grid — and collapses to the bottom drawer only when the window cannot fit both. A
   9:16 clip alone on a 1440px desktop is two black voids and a list nobody can see without
   opening a sheet. Both lanes render the SAME pieces (`ranges`, `visibleEps`, `gridLocked`)
