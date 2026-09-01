@@ -1,13 +1,24 @@
 <!-- admin.dsx — the Manage View's backend: operator verbs over the catalogue, stats and
      the notice board, each also served as an MCP tool (the <tool> rows), so the same
      declared action answers the bridge UI, ChatGPT/Claude, and curl.
-     AUTHORITY: the platform's own model, nothing custom. show/episode/notice are
-     ownership="public-read", whose write policies admit only the service scope — so these
-     routes are auth="required" and succeed only for a caller whose JWT carries a
-     service role claim (the Supabase shape). A viewer token passes the door and is then
-     refused at the seam by RLS: fail-closed at the seam, never at the dialog.
-     When role-scoped auth (auth="role:operator") lands upstream (PLAN.md §6.2), these
-     rows change one attribute and a finer-than-service operator role becomes possible. -->
+     AUTHORITY: the platform's own model, nothing custom, in TWO planes — and it is worth
+     being exact, because the first version of this header was wrong in a way that shipped a
+     draft leak.
+       · THE ROUTE GATEWAY reads the JWT's `role` claim. `reach=""` (see the route rows)
+         makes a row internal: service-role identity or DSX_INTERNAL_KEY, everyone else 404.
+         This is what actually keeps a viewer out.
+       · POSTGRES RLS reads the database role. show/episode/notice are
+         ownership="public-read": SELECT is `using (true)`, and there is NO write policy, so
+         writes deny by default. Crucially, `runAs` sets `set local role authenticated` for
+         EVERY user-scope query regardless of the token's `role` claim — a declared action
+         never runs as service_role — so these write actions fail closed for the operator
+         too. That is PLAN.md §6.7, and it is why scripts/serve.mjs carries hand-written
+         internal twins that reach `serviceRepo()` directly.
+     The header used to say the reads "succeed only for a caller whose JWT carries a service
+     role claim". They did not: auth="required" admits any signed-in viewer, and `using
+     (true)` then handed them the unpublished catalogue. Fixed at the gateway, below.
+     When role-scoped auth (auth="role:operator") lands upstream (PLAN.md §6.2), these rows
+     change one attribute and a finer-than-service operator role becomes possible. -->
 <server>
   <head>
     <entity as="notice" ownership="public-read">
@@ -124,13 +135,45 @@
     </action>
   </head>
 
-  <route method="POST" path="/admin/stats"    action="adminStats"         auth="required"/>
-  <route method="POST" path="/admin/shows"    action="adminListShows"     auth="required"/>
-  <route method="POST" path="/admin/show"     action="adminUpsertShow"    auth="required"/>
-  <route method="POST" path="/admin/episode"  action="adminUpsertEpisode" auth="required"/>
-  <route method="POST" path="/admin/publish"  action="adminPublish"       auth="required"/>
-  <route method="POST" path="/admin/feature"  action="adminFeature"       auth="required"/>
-  <route method="POST" path="/admin/notice"   action="adminNotice"        auth="required"/>
+  <!-- ══ WHY EVERY ROW BELOW CARRIES `reach=""` ══════════════════════════════════════════
+       THE DEFECT. `auth="required"` was the whole door, and for the two READS that was no
+       door at all. `show`, `episode` and `notice` are ownership="public-read", whose SELECT
+       policy is literally `using (true)` — so a plain viewer token passed the route's auth
+       gate and then passed RLS, and `POST /admin/stats` returned the DRAFT COUNT while
+       `POST /admin/shows` returned every unpublished title, its artwork and its free-episode
+       window. The public reads filter `state: 'live'` in APPLICATION code (catalog.dsx), not
+       in a policy, so the admin reads simply do not run that filter. Embargoed content was
+       one authenticated request away, and the file header above claimed the opposite.
+       (The WRITES were never exposed the same way — RLS has no write policy for public-read,
+       so they fail closed for everyone. Including, today, the operator: `runAs` sets
+       `set local role authenticated` for every user-scope query regardless of the token's
+       `role` claim, so a declared action cannot write these tables at all. That is §6.7, and
+       it is why scripts/serve.mjs carries the hand-written internal twins.)
+
+       THE FIX, in the declared grammar. `reach=""` makes a row INTERNAL: host.ts's gateway
+       admits only a caller whose verified identity carries a service role, or one presenting
+       DSX_INTERNAL_KEY, and answers everyone else 404 — never 403, which would confirm to a
+       prober that the endpoint exists. A viewer token now gets the same answer as a typo.
+       Note this is the ROUTE gateway (the JWT's `role` claim), which is a different plane
+       from the Postgres role RLS sees; the reads still run as `authenticated` and still work.
+
+       WHAT THIS DOES NOT CLOSE, said out loud: the `<tool>` rows below. createMcpFace checks
+       `auth === "required"` and a non-null identity and nothing else — it has no notion of
+       `reach` and no role check — so the same two reads are still reachable over /mcp by any
+       authenticated caller. scripts/serve.mjs, which owns the local /mcp mount, now gates the
+       whole face on the same service-role-or-internal-key test. The upstream ask (a `<tool>`
+       row needs the route gateway's authority model) is PLAN.md §6.84.
+
+       RATE: the writes are not held to a human cadence because a legitimate operator bulk-
+       imports — the seeder writes 352 episode rows in one run. 600/m is ten a second, which
+       admits any import and still bounds a runaway agent holding an operator token. -->
+  <route method="POST" path="/admin/stats"    action="adminStats"         auth="required" reach="" rate="600/m"/>
+  <route method="POST" path="/admin/shows"    action="adminListShows"     auth="required" reach="" rate="600/m"/>
+  <route method="POST" path="/admin/show"     action="adminUpsertShow"    auth="required" reach="" rate="600/m"/>
+  <route method="POST" path="/admin/episode"  action="adminUpsertEpisode" auth="required" reach="" rate="600/m"/>
+  <route method="POST" path="/admin/publish"  action="adminPublish"       auth="required" reach="" rate="600/m"/>
+  <route method="POST" path="/admin/feature"  action="adminFeature"       auth="required" reach="" rate="600/m"/>
+  <route method="POST" path="/admin/notice"   action="adminNotice"        auth="required" reach="" rate="600/m"/>
 
   <tool action="adminStats"         description="Catalogue and operations counters for this deployment." auth="required"/>
   <tool action="adminListShows"     description="List every show with state, episode count and pricing window." auth="required"/>

@@ -8,7 +8,15 @@
      shelf of ordinary trending shows is a lie on the one screen whose job is trust.
      Entitlement is read from /wallet/state (`vip`), never assumed, and every price comes
      from /store/catalog so an operator changes it without a build. Buying routes to the
-     one checkout path in /store. -->
+     one checkout path in /store.
+
+     THE SAME RULE APPLIES TO THE BENEFIT LIST, and for a while it did not. This card sold
+     "1080p", "Offline downloads" and "No ads" against a build that could render none of
+     them — the first two are impossible here and are now deleted, the third is now
+     implemented in <AdGate>. The list below is derived from what `server/*.dsx` grants and
+     nothing else; every row names the action that makes it true. A benefit list on a paid
+     screen is a contract, and this file is the reference thousands of apps will copy. -->
+
 <vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
@@ -19,12 +27,45 @@
     <api as="home" url="/catalog/home" on:success="global.cacheHome = home.data"/>
 
     <variable as="hovId">return ''</variable>
+    <!-- ══ THE BENEFIT LIST IS A CONTRACT, AND IT IS READ OFF THE SERVER ═══════════════
+         This list used to sell four things. Two of them did not exist:
+
+         · "1080p high quality" — DELETED, not deferred. `<video>` has no quality attribute
+           on any renderer (upstream #270 / PLAN.md §36), so there is no rendition to sell.
+           This template already made this exact call once: Phase 1 deleted the 240p–1080p
+           ladder from the player's options sheet, and the comment it left behind
+           (Components/Watch.dsx:1172-1175) says why — "it priced 1080p behind VIP, which
+           made it a paywall on a no-op". Selling it here was the same paywall, re-erected
+           one screen away from where it was removed. The player still names the gap where
+           quality lives ("Adaptive — one rendition in this build"); a purchase screen is
+           not the place to re-advertise it, because a "coming soon" beside a price is still
+           a reason to pay today for something undated.
+         · "Offline downloads" — DELETED. Nothing in this app downloads anything: no file
+           plane, no offline store, no queue, no settings. The player's Download rail control
+           routed to /vip, so the feature's only implementation was a link to the screen
+           selling it — that control has since been deleted too, along with the drawer's
+           second copy of it. Inventing a fake download would have been worse than either.
+
+         What remains is what `server/*.dsx` actually grants, and each row can be checked:
+
+           unlocked   `unlockEpisode` prices at 0 when the wallet's `vip_until` is in the
+                      future — server/wallet.dsx:190-192. It has no catalogue exceptions, so
+                      it covers shows added after the pass was bought.
+           coins      because that price is 0, the spend path never runs: no ledger row, no
+                      wallet debit (server/wallet.dsx:194-210). The balance survives the pass.
+           no ads     TRUE AS OF THIS PASS, not before. <AdGate> now takes `vip=` and refuses
+                      in its own action (Components/parts/AdGate.dsx), and Rewards.dsx passes
+                      the entitlement. Implementing it was cheaper than deleting it, and it
+                      is the benefit a member actually notices.
+
+         THREE ROWS, NOT FOUR. The list is shorter than the design that preceded it because
+         the backend grants two things and the client adds one. Padding it back to four would
+         re-create the defect this pass removed. -->
     <variable as="benefits">
       return [
-        { id: 'b1', icon: 'lock.open.fill', label: 'Unlimited viewing',        note: 'Every series, every episode' },
-        { id: 'b2', icon: 'sparkles',       label: '1080p high quality',       note: 'The best available master' },
-        { id: 'b3', icon: 'square.and.arrow.down', label: 'Offline downloads', note: 'High-speed, watch anywhere' },
-        { id: 'b4', icon: 'bolt.fill',      label: 'No ads',                   note: 'Nothing between you and the next episode' }
+        { id: 'b1', icon: 'lock.open.fill',        label: 'Every episode unlocked', note: 'Paid episodes open at 0 coins, on every series in the catalogue — including the ones added while your pass runs' },
+        { id: 'b2', icon: 'dollarsign.circle.fill', label: 'Your coins stay yours',  note: 'A VIP unlock debits nothing, so the balance you bought is still there when the pass ends' },
+        { id: 'b3', icon: 'bolt.fill',             label: 'No ads',                 note: 'The one rewarded ad this app shows is switched off while your pass is active' }
       ]
     </variable>
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
@@ -83,6 +124,55 @@
       if (dsx.variable.walletView == null) { return false }
       return dsx.variable.walletView.vip === true
     </variable>
+    <!-- THE SERVER GRANTS A DATED PASS AND THIS SCREEN NEVER SAID SO. `walletState` returns
+         `vipUntil` (server/wallet.dsx:46) and the only thing read here was the boolean —
+         so a member could not find out when their access ended on the screen that sold it.
+         Same ISO slice as Components/Profile.dsx:61-64, which is this app's one date idiom
+         until real formatting lands (G18). -->
+    <variable as="vipUntil" computed="true">
+      if (dsx.variable.walletView == null || dsx.variable.walletView.vipUntil == null) { return '' }
+      return String(dsx.variable.walletView.vipUntil).slice(0, 10)
+    </variable>
+    <variable as="statusLine" computed="true">
+      if (dsx.variable.vipUntil == '') { return 'VIP active' }
+      return 'VIP active through ' + dsx.variable.vipUntil
+    </variable>
+    <!-- WHAT A PLAN ACTUALLY IS ON THIS BACKEND, derived from the same table the tiers are
+         priced from rather than typed in here. `createCheckout` opens a ONE-OFF Stripe
+         PaymentIntent (server/store.dsx:88-95) and `settleOrder` stamps
+         `vip_until = now + days` (server/store.dsx:150-151). There is no Stripe Subscription
+         object, no renewal, no cancel path — so a pass runs its term and stops.
+
+         THIS CONTRADICTS THE TIER CARDS BELOW, ON PURPOSE. `storeCatalog` ships
+         `note: 'Auto-renew. Cancel anytime.'` on two tiers and 'then $14.99/week' on the
+         third (server/store.dsx:34-36), and <PlansSheet> renders those strings verbatim.
+         Those notes are false and they live in a document this pass does not own; the fix
+         is filed as a handoff. Until it lands, the screen whose stated job is trust states
+         what the build does rather than repeating a claim it cannot back — the contradiction
+         being visible is the point of a loud bridge (Article 7). -->
+    <variable as="termLine" computed="true">
+      const c = dsx.variable.catalogView
+      const tail = ' When the date passes VIP simply stops — your coins are not affected.'
+      if (c == null || c.vip == null || c.vip.length == 0) {
+        return 'Every plan is a one-time charge for a pass that runs a fixed number of days.' + tail
+      }
+      let days = ''
+      for (const t of c.vip) { days = days == '' ? String(t.days) : days + ', ' + String(t.days) }
+      return 'Every plan is a one-time charge for a dated pass — ' + days + ' days. This build has no auto-renewal.' + tail
+    </variable>
+    <!-- RESTORE, honestly. Apple requires "a way for current subscribers to sign in or
+         restore purchases" on a subscription sign-up screen. Entitlement here is not a
+         StoreKit receipt — it is a column on the caller's wallet row, so the real restore is
+         "re-read this account", which is exactly what this does and all it can do. The half
+         that is missing is the OTHER half of Apple's sentence: there is no sign-in anywhere
+         in this app (the session is a static JSON file — docs/auth.md), so a member on a new
+         device cannot reach their account to restore onto it. The row says both. -->
+    <variable as="restoreLine" computed="true">
+      if (wallet.loading) { return 'Checking this account…' }
+      if (dsx.variable.walletView == null) { return 'Could not read this account. Try again.' }
+      if (dsx.variable.isVip) { return 'Found: ' + dsx.variable.statusLine + '.' }
+      return 'No active pass on this account.'
+    </variable>
     <variable as="posterW" computed="true">return dsx.variable.bp == 'phone' ? 150 : 186</variable>
     <variable as="phase" computed="true">
       if (catalog.error != null || home.error != null) { return 'error' }
@@ -119,7 +209,11 @@
 
     <style as="benefitRow" spacing="14" alignItems="center" paddingV="14"/>
     <style as="benefitLabel" fontSize="16" color="#FFFFFF"/>
-    <style as="benefitNote" fontSize="13" color="rgba(255,255,255,0.45)"/>
+    <style as="benefitNote" fontSize="13" color="rgba(255,255,255,0.45)" lineSpacing="3"/>
+    <!-- the disclosure rows: same rhythm as a benefit row, deliberately not the same voice —
+         no gold icon, no white headline unless the row is itself a control -->
+    <style as="discRow" spacing="14" alignItems="flex-start" paddingV="12"/>
+    <style as="restoreBtn" background="#26262C" radius="18" paddingH="16" paddingV="12" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
 
     <style as="tierCard" radius="14" paddingH="18" paddingV="18" spacing="8" alignItems="flex-start"/>
     <style as="tierName" fontSize="15" fontWeight="semibold" color="#3A2A08"/>
@@ -143,7 +237,7 @@
         <text value="Enjoy Your VIP Access and Privileges" class="mastheadTitle"/>
         <hstack class="statusPill" visible-if="dsx.variable.isVip">
           <image icon="crown.fill" iconSize="13" color="#F6B63D" a11yHidden="true"/>
-          <text value="VIP active" class="statusTxt"/>
+          <text value="{{ dsx.variable.statusLine }}" class="statusTxt"/>
         </hstack>
       </vstack>
 
@@ -219,7 +313,8 @@
         </scroll>
       </vstack>
 
-      <!-- benefits -->
+      <!-- benefits — three rows, each one a thing server/*.dsx actually does. See the
+           `benefits` variable in the head for what was removed and why. -->
       <vstack class="section" visible-if="dsx.variable.phase != 'error'">
         <text value="Your Benefits" class="sectionTitle"/>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
@@ -232,6 +327,42 @@
               </vstack>
             </hstack>
           </list>
+
+          <!-- THE TERM. A disclosure, not a perk — so it sits under the list in the quiet
+               style rather than wearing a gold icon and pretending to be a fourth benefit.
+               Apple's sign-up-screen rules want the duration and what the period provides
+               stated on this screen; this is the duration half. -->
+          <hstack class="discRow">
+            <image icon="clock.fill" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
+            <text value="{{ dsx.variable.termLine }}" class="benefitNote" style="flex: 1; min-width: 0"/>
+          </hstack>
+
+          <!-- RESTORE PURCHASES — required on a subscription sign-up screen, and here it is
+               the real (small) thing this backend supports: re-read the account's
+               entitlement. The second line names the half that is missing rather than
+               letting the button imply a device-to-device restore it cannot do. -->
+          <hstack class="discRow">
+            <image icon="arrow.clockwise" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
+            <vstack spacing="3" style="flex: 1; min-width: 0">
+              <text value="Restore purchases" class="benefitLabel"/>
+              <text value="{{ dsx.variable.restoreLine }}" class="benefitNote"/>
+              <text value="VIP is held on your account, not on this device, so restoring re-reads the account you are signed in to. This build has no sign-in yet, so a pass bought on another account cannot be reached from here." class="benefitNote"/>
+            </vstack>
+            <button label="Restore" class="restoreBtn" on:tap="wallet.refresh()"/>
+          </hstack>
+
+          <!-- TERMS AND PRIVACY — required in-app beside a subscription, and genuinely
+               absent: no URL exists in App.json, dsx.json or dsx.config.json, and there is
+               no legal surface anywhere in Components/. A placeholder link would be worse
+               than nothing, so the row states the gap the way the player's Quality row and
+               Profile's Language row state theirs (Article 7). This app cannot be submitted
+               to either store until an adopter fills it in, and now that fact is visible in
+               the product instead of only in an audit. -->
+          <hstack class="discRow" a11yGroup="true"
+                  a11yLabel="Terms of Use and Privacy Policy: this build ships no legal links. An adopter must add them before submitting to a store.">
+            <image icon="lock.shield" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
+            <text value="Terms of Use and Privacy Policy — not set in this build. Both stores require them in-app beside a paid plan; an adopter points these at their own URLs before submitting." class="benefitNote" style="flex: 1; min-width: 0"/>
+          </hstack>
         </vstack>
       </vstack>
 

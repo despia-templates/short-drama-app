@@ -52,6 +52,19 @@
       return { authorization: 'Bearer ' + session.data.viewer.token }
     </variable>
     <variable as="signedOut" computed="true">return session.error != null</variable>
+    <!-- ENTITLEMENT, read from the wallet — never assumed, never remembered. It drives two
+         things on this screen: the ad lane switches off (VIP is sold as "no ads", so it has
+         to BE no ads) and the sell card stops pitching a pass the viewer already holds.
+         UNKNOWN RESOLVES TO false, deliberately. `walletView` is null on a cold direct load
+         until /wallet/state answers, and the alternative — hiding the earn lane from
+         everyone until the wallet lands — would blank a section for every non-member on
+         every visit to spare a member a sub-second flash. The stale-then-fresh stash
+         (§6.30) closes even that: a member who has opened any wallet screen this session has
+         `global.cacheWallet` warm, so this is true on the first frame. -->
+    <variable as="isVip" computed="true">
+      if (dsx.variable.walletView == null) { return false }
+      return dsx.variable.walletView.vip === true
+    </variable>
     <variable as="phase" computed="true">
       if (dsx.variable.signedOut) { return 'signedout' }
       if (state.error != null) { return 'error' }
@@ -89,6 +102,27 @@
       if (dsx.variable.spinning) { return 'Spinning…' }
       if (dsx.variable.canSpin) { return 'Spin — 1 free today' }
       return 'No spin left today'
+    </variable>
+    <!-- the four earn lanes, named for the viewer who actually has them. A VIP has three:
+         listing an ad they cannot be shown would contradict the card two rows below. -->
+    <variable as="earnLanes" computed="true">
+      if (dsx.variable.isVip) { return 'Check in daily, spin the wheel, finish tasks.' }
+      return 'Check in daily, spin the wheel, watch a short ad, finish tasks.'
+    </variable>
+    <!-- THE SELL CARD, which must not sell what the viewer already owns. For an active
+         member the door still goes to /store — coins are still buyable and still useful
+         after the pass ends — but the pitch says so instead of offering VIP to a VIP. -->
+    <variable as="sellTitle" computed="true">
+      if (dsx.variable.isVip) { return 'Get coins' }
+      return 'Get coins or go VIP'
+    </variable>
+    <variable as="sellNote" computed="true">
+      if (dsx.variable.isVip) { return 'Your VIP pass already covers every unlock — coins are for when it ends.' }
+      return 'Buy a coin pack, or unlock every series with VIP.'
+    </variable>
+    <variable as="sellA11y" computed="true">
+      if (dsx.variable.isVip) { return 'Open the store to buy coins' }
+      return 'Open the store to buy coins or VIP'
     </variable>
     <variable as="spinRange" computed="true">
       if (dsx.variable.stateView == null || dsx.variable.stateView.spinPrizes == null) { return '' }
@@ -146,7 +180,21 @@
     <!-- The wheel SPINS the moment it is asked (2.4s of eased rotation), the server
          answers during the ride, and the hub shows the landing. The rotation is
          DECORATIVE — the prize is the server's alone, so a reduced-motion viewer who
-         sees no ride still gets the result in the hub and the toast. -->
+         sees no ride still gets the result in the hub and the toast.
+
+         NOT A LOOT BOX, and it must stay that way. App Store 3.1.1 requires published odds
+         for a randomised reward that can be obtained with purchased currency, and declaring
+         loot boxes forces 18+ on the Brazil storefront and 16+ in Australia. This wheel is
+         FREE: `spinWheel` (server/engage.dsx:113-128) refuses a second spin the same day and
+         never debits a wallet — the only gate is `freeSpinLeft`, and the only write is a
+         grant. Purchased coins cannot buy a spin because nothing sells one.
+         THE LINE TO NOT CROSS: the moment a "spin again for 50 coins" button exists, this
+         becomes a loot box, and the odds must be published to the customer BEFORE the
+         purchase. The prize TABLE already travels in /rewards/state (`spinPrizes`); the
+         DISTRIBUTION does not, and this screen deliberately does not assert one — a uniform
+         pick is `spinWheel`'s current implementation detail, not a fact the payload carries,
+         and a client-side odds claim would be exactly the unbacked promise this pass exists
+         to remove. Publish the weights server-side first. -->
     <action as="spin">
       if (dsx.variable.canSpin == false) { return }
       dsx.variable.spinning = true
@@ -179,6 +227,16 @@
     </action>
     <action as="adFailed" message="event.message">
       dsx.variable.toast = message
+    </action>
+    <!-- THE REPORT SEAM (App Store 2.5.18 requires the affordance; <AdGate> presents it).
+         This is the one place an adopter POSTs a report from — a `POST /social/report` with
+         the lane and the creative, once such a route is declared. It is not declared today:
+         server/social.dsx carries comments and notices and no report entity of any kind, so
+         this handler does the honest half — it acknowledges the viewer, and <AdGate> has
+         already suppressed the creative for the session. What it must never do is say
+         "reported" as if something was filed. -->
+    <action as="adReported" lane="event.lane">
+      dsx.variable.toast = 'Ad hidden for this session. Nothing is sent to a moderator on this build — see the card.'
     </action>
 
     <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
@@ -276,10 +334,10 @@
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <hstack class="sellCard" on:tap="dsx.module.route.push({ path: '/store' })"
-                  a11yGroup="true" a11yTrait="button" a11yLabel="Open the store to buy coins or VIP">
+                  a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.variable.sellA11y }}">
             <vstack spacing="4" style="flex: 1; min-width: 0">
-              <text value="Get coins or go VIP" class="sellTitle"/>
-              <text value="Buy a coin pack, or unlock every series with VIP." class="sellNote"/>
+              <text value="{{ dsx.variable.sellTitle }}" class="sellTitle"/>
+              <text value="{{ dsx.variable.sellNote }}" class="sellNote"/>
             </vstack>
             <image icon="chevron.right" iconSize="14" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
           </hstack>
@@ -290,7 +348,7 @@
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
           <text value="Earn free coins" class="sectionTitle"/>
-          <text value="Check in daily, spin the wheel, watch a short ad, finish tasks." class="sectionNote"/>
+          <text value="{{ dsx.variable.earnLanes }}" class="sectionNote"/>
         </vstack>
 
         <vstack style="{{ dsx.variable.shell }}" spacing="14" alignItems="stretch">
@@ -317,15 +375,24 @@
           </vstack>
 
           <!-- rewarded ads: the capped lane. The component owns the PLATFORM decision
-               (`has('admob')` / `os`) and the creative; this screen owns the server facts
-               and what to do with the outcome. -->
+               (`has('admob')` / `os`), the creative, and the App Store 2.5.18 ad chrome;
+               this screen owns the server facts and what to do with the outcome.
+
+               `vip=` IS THE FIX FOR A SOLD-BUT-UNBUILT BENEFIT. /vip lists "No ads" as a
+               reason to pay, and this mount was unconditional — so a member paid and was
+               shown the ad anyway, which is the same product lie as selling a feature that
+               does not exist, just pointed the other way. The entitlement is read from
+               /wallet/state like every other money fact on this screen; the component
+               refuses in its `play` action, not merely in its styling. -->
           <AdGate left="{{ dsx.variable.stateView == null ? 0 : dsx.variable.stateView.adsLeft }}"
                   today="{{ dsx.variable.stateView == null ? 0 : dsx.variable.stateView.adsToday }}"
                   cap="{{ dsx.variable.stateView == null ? 10 : dsx.variable.stateView.adCap }}"
                   reward="{{ dsx.variable.stateView == null ? 15 : dsx.variable.stateView.adReward }}"
                   headers="{{ dsx.variable.authHeaders }}"
+                  vip="{{ dsx.variable.isVip }}"
                   on:granted="dsx.action.adGranted()"
-                  on:failed="dsx.action.adFailed()"/>
+                  on:failed="dsx.action.adFailed()"
+                  on:reported="dsx.action.adReported()"/>
 
           <!-- spin -->
           <vstack class="card">

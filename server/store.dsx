@@ -49,6 +49,26 @@
     <!-- Open ONE checkout: a Stripe PaymentIntent created here, plus the order row that
          will be granted when it settles. The client gets the publishable key and its own
          client_secret — nothing else. -->
+    <!-- OPENING A CHECKOUT IS EXPENSIVE AND WAS UNBOUNDED. Every tap of "buy" created a
+         Stripe PaymentIntent, abandoned or not, against a 25,000/day egress ceiling shared
+         by every customer of the deployment (`<egress host="api.stripe.com"/>` above) — so
+         one authenticated viewer in a loop could take payments down for everyone. Three
+         things fix that together, and they are three different mechanisms on purpose:
+
+           1 · `rate="6/h"` on the route (below) — the ceiling on how often ONE caller may
+               ask at all.
+           2 · REUSE of the caller's own open order for the same sku (here) — the ceiling on
+               how many INTENTS a legitimate retry can create. A viewer who taps buy, gets
+               distracted, and taps again gets the same intent back, not a second one.
+           3 · `Idempotency-Key` on the Stripe POST (here) — the ceiling on what a TRANSPORT
+               retry can create. A timeout that was actually delivered returns the original
+               intent instead of charging a second time. Stripe keys are honoured for 24h.
+
+         The key is the ORDER ROW ID, which is why the row is now created BEFORE the Stripe
+         call rather than after it: an idempotency key has to exist before the request it
+         protects. The row is created with an empty `intent` and updated with the real one;
+         the partial unique index in policies.local.sql is written `where intent <> ''`
+         precisely so those pre-intent rows do not all collide with each other. -->
     <action as="createCheckout" inputs="sku">
       // The price table is inlined here on purpose: this lookup decides what the customer
       // is charged, and it must not depend on a cross-action hop.
@@ -82,43 +102,122 @@
       if (!key.ok || key.data == null || key.data === '') {
         throw { reason: 'unavailable', message: 'Payments are not configured on this deployment — set STRIPE_KEY and STRIPE_PUBLISHABLE.' }
       }
+      const publishable = pub.ok && pub.data != null ? pub.data : ''
+
+      // 2 · REUSE. An order this viewer opened for this sku in the last 15 minutes and never
+      // settled is the SAME purchase attempt; hand back its intent instead of minting
+      // another. `list` is owner-scoped by RLS, so this can only ever see the caller's own
+      // rows, and it is bounded at the platform's 100 (PLAN.md §6.20) — which is far more
+      // open orders than any real buyer accumulates.
+      const OPEN_MS = 15 * 60000
+      const mineOpen = await dsx.module.data.order.list({ filters: { sku: sku, status: 'created' }, limit: 100 })
+      let reuse = null
+      for (const row of (mineOpen.ok ? mineOpen.data : [])) {
+        if (row.intent == null || row.intent === '') { continue }
+        if (row.amount_cents !== picked.cents) { continue }   // the price changed under them — open a fresh one
+        if (Date.now() - new Date(row.created_at).getTime() > OPEN_MS) { continue }
+        if (reuse == null || row.created_at > reuse.created_at) { reuse = row }
+      }
+      if (reuse != null) {
+        const back = await fetch('https://api.stripe.com/v1/payment_intents/' + reuse.intent, {
+          method: 'GET', headers: { authorization: 'Bearer ' + key.data }
+        })
+        // Only reuse an intent Stripe still considers open. A cancelled or already-succeeded
+        // one falls through and a fresh checkout is opened, which is the honest answer — the
+        // alternative is handing the client a client_secret that its payment sheet refuses.
+        if (back.ok && back.data != null && back.data.client_secret != null
+            && back.data.status !== 'canceled' && back.data.status !== 'succeeded') {
+          return {
+            order: reuse.id, label: picked.label, amount_cents: reuse.amount_cents,
+            publishable_key: publishable, client_secret: back.data.client_secret, reused: true
+          }
+        }
+      }
+
+      // The ORDER ROW FIRST, so there is something to key the idempotent charge on. `intent`
+      // is deliberately omitted rather than passed as null (house rule: never `field: null`
+      // in create values) and lands as the column default.
+      const row = await dsx.module.data.order.create({
+        sku: sku, kind: picked.kind, amount_cents: picked.cents,
+        coins: picked.coins, bonus: picked.bonus, days: picked.days,
+        status: 'created'
+      })
+      if (!row.ok) { throw { reason: 'conflict', message: 'could not open the order' } }
 
       const body = 'amount=' + picked.cents + '&currency=usd&automatic_payment_methods[enabled]=true'
-        + '&metadata[sku]=' + sku
+        + '&metadata[sku]=' + sku + '&metadata[order]=' + row.data.id
       const res = await fetch('https://api.stripe.com/v1/payment_intents', {
         method: 'POST',
         headers: {
           authorization: 'Bearer ' + key.data,
-          'content-type': 'application/x-www-form-urlencoded'
+          'content-type': 'application/x-www-form-urlencoded',
+          // 3 · the transport guard. Same key ⇒ same intent, for 24h, even if this request
+          // is delivered twice because the first response was lost.
+          'idempotency-key': 'dsx-order-' + row.data.id
         },
         body: body
       })
       if (!res.ok || res.data == null || res.data.client_secret == null) {
+        // the order row is left `created` with no intent: settleOrder refuses it, restore
+        // skips it, and reuse ignores it (the `intent === ''` guard above). It is a
+        // recorded failed attempt, not a dangling charge.
         throw { reason: 'upstream', message: 'the payment provider refused the checkout' }
       }
 
-      const row = await dsx.module.data.order.create({
-        sku: sku, kind: picked.kind, amount_cents: picked.cents,
-        coins: picked.coins, bonus: picked.bonus, days: picked.days,
-        status: 'created', intent: res.data.id
-      })
-      if (!row.ok) { throw { reason: 'conflict', message: 'could not open the order' } }
+      const stamped = await dsx.module.data.order.update({ id: row.data.id, values: { intent: res.data.id } })
+      if (!stamped.ok) {
+        // The charge exists at Stripe and we cannot record which one it is. Refuse loudly
+        // rather than return a client_secret we could never settle — the idempotency key
+        // means the viewer's retry lands on the SAME intent, so no second charge is created.
+        throw { reason: 'unavailable', message: 'the order could not be recorded — please try again' }
+      }
 
       return {
         order: row.data.id,
         label: picked.label,
         amount_cents: picked.cents,
-        publishable_key: pub.ok ? pub.data : '',
+        publishable_key: publishable,
         client_secret: res.data.client_secret
       }
     </action>
 
-    <!-- Settle: ask STRIPE what happened, never the client. The grant is idempotent — a
-         replayed settle finds status 'paid' and returns without granting twice. -->
+    <!-- SETTLE: ask STRIPE what happened, never the client. Three things this used to get
+         wrong, all of them ways to grant twice or grant wrongly:
+
+         (a) THE REPLAY. `status === 'paid'` was a read-then-write with nothing behind it —
+             two settles that arrived together both read 'created' and both granted. There is
+             no transaction seam in a declared action (PLAN.md §6.38) and no compare-and-swap
+             in `data.update`, so the lock has to be a UNIQUE INSERT, and the right row to
+             insert is the one this grant already had to write: the LEDGER row. It carries
+             `ref = <order id>` (it used to carry the sku, which repeats across purchases),
+             and policies.local.sql puts a partial unique index on
+             (owner_id, kind, source, ref) for source in ('pack','vip'). So the ledger — the
+             thing this document already claims is the single source of truth for money — is
+             now literally the exactly-once record it claimed to be. Write it FIRST; if it
+             refuses, someone already granted this order.
+             The residual, named: ledger written, wallet update failed ⇒ the fold under-
+             reports and the ledger over-reports. That direction is recoverable by replaying
+             the fold; the other direction is money created from nothing.
+
+         (b) THE AMOUNT. Nothing checked that the intent Stripe confirmed was for the amount
+             this order recorded. An intent can be modified after creation, and the grant is
+             sized from the ORDER row — so without this check a 499-cent confirmation could
+             be presented against a 9,999-cent order. Currency is checked with it: `usd` is
+             hardcoded in createCheckout (the audit's H3), and a mismatch here means the two
+             have drifted.
+
+         (c) THE OTHER VIEWER'S ORDER. `order.get` is owner-scoped by RLS, so this was never
+             actually reachable — but the check below is written anyway, because "RLS makes
+             it impossible" is exactly the sentence that stops being true when someone moves
+             an entity to public-read. -->
     <action as="settleOrder" inputs="order">
+      if (order == null || order === '') { throw { reason: 'invalid', message: 'order is required' } }
       const row = await dsx.module.data.order.get({ id: order })
-      if (!row.ok) { throw { reason: 'not_found', message: 'no such order' } }
+      if (!row.ok || row.data == null) { throw { reason: 'not_found', message: 'no such order' } }
       if (row.data.status === 'paid') { return { granted: false, already: true } }
+      if (row.data.intent == null || row.data.intent === '') {
+        throw { reason: 'conflict', message: 'this checkout never reached the payment provider' }
+      }
 
       const key = await dsx.module.secret.read({ name: 'STRIPE_KEY' })
       if (!key.ok) { throw { reason: 'unavailable', message: 'payments are not configured' } }
@@ -131,31 +230,155 @@
         await dsx.module.data.order.update({ id: order, values: { status: 'failed' } })
         throw { reason: 'conflict', message: 'the payment did not complete' }
       }
-
-      await dsx.module.data.order.update({ id: order, values: { status: 'paid' } })
+      // (b) — what was CONFIRMED must be what was ORDERED, or nothing is granted
+      if (res.data.amount !== row.data.amount_cents || res.data.currency !== 'usd') {
+        await dsx.module.data.order.update({ id: order, values: { status: 'failed' } })
+        throw { reason: 'conflict', message: 'the confirmed payment does not match this order' }
+      }
 
       // the grant, inlined for the same reason as the price table (#242)
       const mine = await dsx.module.data.wallet.list({ limit: 1 })
-      if (!mine.ok || mine.data.length === 0) { throw { reason: 'conflict', message: 'no wallet' } }
-      const w = mine.data[0]
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) {
+        const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (made.ok) { w = made.data } else {
+          const again = await dsx.module.data.wallet.list({ limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+      }
+      if (w == null) { throw { reason: 'conflict', message: 'no wallet' } }
       const o = row.data
       if (o.kind === 'coins') {
-        await dsx.module.data.wallet.update({ id: w.id, values: { coins: w.coins + o.coins, bonus: w.bonus + o.bonus } })
-        await dsx.module.data.ledger.create({ kind: 'coin', amount: o.coins, source: 'pack', ref: o.sku })
+        // (a) — THE LOCK. `kind` is part of the unique key, which is why the two rows of a
+        // pack (purchased coins + the pack's free bonus) do not collide with each other.
+        const lc = await dsx.module.data.ledger.create({ kind: 'coin', amount: o.coins, source: 'pack', ref: o.id })
+        if (!lc.ok) { return { granted: false, already: true } }
+        await dsx.module.data.order.update({ id: order, values: { status: 'paid' } })
         if (o.bonus > 0) {
-          await dsx.module.data.ledger.create({ kind: 'bonus', amount: o.bonus, source: 'pack', ref: o.sku })
+          await dsx.module.data.ledger.create({ kind: 'bonus', amount: o.bonus, source: 'pack', ref: o.id })
         }
+        const paid = await dsx.module.data.wallet.update({ id: w.id, values: { coins: w.coins + o.coins, bonus: w.bonus + o.bonus } })
+        if (!paid.ok) { throw { reason: 'unavailable', message: 'the balance could not be updated — contact support with this order id' } }
         return { granted: true, coins: o.coins, bonus: o.bonus }
       }
-      const until = new Date(Date.now() + o.days * 86400000).toISOString()
-      await dsx.module.data.wallet.update({ id: w.id, values: { vip_until: until } })
-      await dsx.module.data.ledger.create({ kind: 'coin', amount: 0, source: 'vip', ref: o.sku })
+      const lv = await dsx.module.data.ledger.create({ kind: 'coin', amount: 0, source: 'vip', ref: o.id })
+      if (!lv.ok) { return { granted: false, already: true } }
+      await dsx.module.data.order.update({ id: order, values: { status: 'paid' } })
+      // VIP EXTENDS, it never truncates: a member who buys a second pass mid-term must not
+      // lose the days they already hold. (Stamping `now + days` did exactly that.)
+      const from = w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
+        ? new Date(w.vip_until).getTime()
+        : Date.now()
+      const until = new Date(from + o.days * 86400000).toISOString()
+      const paid = await dsx.module.data.wallet.update({ id: w.id, values: { vip_until: until } })
+      if (!paid.ok) { throw { reason: 'unavailable', message: 'the membership could not be updated — contact support with this order id' } }
       return { granted: true, vipUntil: until, days: o.days }
+    </action>
+
+    <!-- RESTORE. App Store 3.1.1: "you should make sure you have a restore mechanism for any
+         restorable in-app purchases." Most of it is already true by construction — VIP and
+         every unlock are SERVER-side, account-scoped rows, so a reinstall that signs back in
+         has its entitlements without asking. The gap this closes is the other one: an order
+         the provider CHARGED and this backend never granted, because the app was closed or
+         offline between the payment sheet's success and the settle call. That money is taken
+         and invisible, and the viewer has no way to ask for it.
+         This walks the caller's own unsettled orders, asks Stripe about each, and settles the
+         ones that succeeded. It is exactly-once for the same reason settleOrder is: the same
+         ledger unique index refuses a second grant.
+         NOT COVERED, and named rather than implied: the NATIVE store lanes. A purchase made
+         through StoreKit or Play Billing never creates one of these rows, so there is nothing
+         here to restore — that receiver is a hosted-lane integration this template does not
+         have (no <webhook> tag in the standalone compiler; see the wallet.dsx header and
+         PLAN.md §6.86). An adopter shipping to the App Store must wire it before submitting. -->
+    <action as="restoreOrders">
+      const open = await dsx.module.data.order.list({ filters: { status: 'created' }, limit: 100 })
+      const rows = open.ok ? open.data : []
+      if (rows.length === 0) { return { checked: 0, restored: 0, coins: 0, orders: [] } }
+      const key = await dsx.module.secret.read({ name: 'STRIPE_KEY' })
+      if (!key.ok) { throw { reason: 'unavailable', message: 'payments are not configured' } }
+
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) {
+        const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (made.ok) { w = made.data } else {
+          const again = await dsx.module.data.wallet.list({ limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+      }
+      if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
+
+      let coins = 0
+      let bonus = 0
+      let vipDays = 0
+      let restored = 0
+      let checked = 0
+      const done = []
+      // Bounded by the ACTION CALL CAP (actions.ts ACTION_CALL_CAP = 64) as much as by the
+      // list: a viewer with dozens of abandoned checkouts gets the oldest ones on the next
+      // call rather than a deadline error on this one.
+      for (const o of rows.slice(0, 20)) {
+        if (o.intent == null || o.intent === '') { continue }
+        checked = checked + 1
+        const res = await fetch('https://api.stripe.com/v1/payment_intents/' + o.intent, {
+          method: 'GET', headers: { authorization: 'Bearer ' + key.data }
+        })
+        if (!res.ok || res.data == null) { continue }
+        if (res.data.status !== 'succeeded') { continue }
+        if (res.data.amount !== o.amount_cents || res.data.currency !== 'usd') { continue }
+        if (o.kind === 'coins') {
+          const lc = await dsx.module.data.ledger.create({ kind: 'coin', amount: o.coins, source: 'pack', ref: o.id })
+          if (!lc.ok) { continue }                       // already granted — the ledger said so
+          await dsx.module.data.order.update({ id: o.id, values: { status: 'paid' } })
+          if (o.bonus > 0) {
+            await dsx.module.data.ledger.create({ kind: 'bonus', amount: o.bonus, source: 'pack', ref: o.id })
+          }
+          coins = coins + o.coins
+          bonus = bonus + o.bonus
+        } else {
+          const lv = await dsx.module.data.ledger.create({ kind: 'coin', amount: 0, source: 'vip', ref: o.id })
+          if (!lv.ok) { continue }
+          await dsx.module.data.order.update({ id: o.id, values: { status: 'paid' } })
+          vipDays = vipDays + o.days
+        }
+        restored = restored + 1
+        done.push({ order: o.id, sku: o.sku, kind: o.kind })
+      }
+      if (restored === 0) { return { checked: checked, restored: 0, coins: 0, bonus: 0, vipDays: 0, orders: [] } }
+      let vipUntil = w.vip_until
+      if (vipDays > 0) {
+        const from = w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
+          ? new Date(w.vip_until).getTime()
+          : Date.now()
+        vipUntil = new Date(from + vipDays * 86400000).toISOString()
+      }
+      // ONE fold write for the whole restore: the ledger rows above are the record, and the
+      // wallet is the cache being brought back into agreement with them.
+      const values = { coins: w.coins + coins, bonus: w.bonus + bonus }
+      if (vipDays > 0) { values.vip_until = vipUntil }
+      const paid = await dsx.module.data.wallet.update({ id: w.id, values: values })
+      if (!paid.ok) { throw { reason: 'unavailable', message: 'the balance could not be updated — contact support' } }
+      return { checked: checked, restored: restored, coins: coins, bonus: bonus, vipDays: vipDays, vipUntil: vipUntil, orders: done }
     </action>
 
   </head>
 
-  <route method="GET"  path="/store/catalog"  action="storeCatalog"   auth="none"/>
-  <route method="POST" path="/store/checkout" action="createCheckout" auth="required"/>
-  <route method="POST" path="/store/settle"   action="settleOrder"    auth="required"/>
+  <!-- RATE CEILINGS on the money lane. Each number answers "what does one call COST, and how
+       many can a real customer need?", never "what feels safe":
+         · catalog   120/m — a public read of a constant table; SSR hits it too, and
+                     anonymous callers share a bucket per address (scripts/serve.mjs supplies
+                     clientAddress), so this must clear a whole household behind one NAT.
+         · checkout    6/h — each call can create a Stripe PaymentIntent against the
+                     deployment-wide 25,000/day egress ceiling. Six an hour means one
+                     credential needs 170 days to exhaust it, so no single caller can take
+                     payments down for every customer. A real buyer opens one or two.
+         · settle     20/h — a read-back plus a grant. The Store's recovery card retries on
+                     purpose, and a viewer may settle several orders in a session; twenty
+                     covers every legitimate case and bounds a replay loop.
+         · restore     6/h — up to twenty Stripe reads per call. It is a deliberate,
+                     user-initiated action, not something a screen polls. -->
+  <route method="GET"  path="/store/catalog"  action="storeCatalog"   auth="none"     rate="120/m"/>
+  <route method="POST" path="/store/checkout" action="createCheckout" auth="required" rate="6/h"/>
+  <route method="POST" path="/store/settle"   action="settleOrder"    auth="required" rate="20/h"/>
+  <route method="POST" path="/store/restore"  action="restoreOrders"  auth="required" rate="6/h"/>
 </server>

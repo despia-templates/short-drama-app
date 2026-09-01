@@ -2,7 +2,34 @@
      Numbers follow docs/product/spec.md and are deliberately visible here: the curve,
      the prize table and the caps are server facts an admin surface can render, never
      client constants. Grants write the ledger + wallet fold directly (sibling actions
-     return void, so the fold is inlined, same as wallet.dsx). -->
+     return void, so the fold is inlined, same as wallet.dsx).
+
+     ── EVERY ONCE-PER-DAY GUARD IS A UNIQUE CONSTRAINT, NOT AN `if` ─────────────────────
+     Each grant below used to read "did I already do this today?" and then write. A
+     declared action has no transaction seam (PLAN.md §6.38) and the emitter has no
+     `unique` word for `<index>` (PLAN.md §6.83), so two requests that arrived together
+     both read "no" and both granted: two check-ins, two spins, two claims of the same
+     task, all on the same day. The read is kept — it produces the friendly message — but
+     the AUTHORITY is now the unique index in server/policies.local.sql, and the pattern is
+     the same in all four: WRITE THE MARKER FIRST, check `.ok`, and only grant coins if the
+     marker was actually ours. The loser of a race gets `conflict`, not coins.
+
+     ── NOTHING HERE EXPIRES ─────────────────────────────────────────────────────────────
+     These three grants used to stamp a 7-day `expires` on their ledger rows. App Store
+     3.1.1 forbids expiring purchased currency, and `bonus` is not a purely-granted bucket
+     (a coin pack's "+5% free" lands there — store.dsx settleOrder), so an expiry sweeper on
+     it would expire money someone paid for. The column is gone from the entity, not merely
+     unread. See the compliance note at the top of wallet.dsx.
+
+     ── THE SPIN IS FREE, AND THAT IS A COMPLIANCE RULE ──────────────────────────────────
+     `spinWheel` costs nothing: one free spin per day, granted, never purchased. That is
+     what keeps it outside App Store 3.1.1's loot-box rule — a randomised reward obtainable
+     with PURCHASED currency requires published odds before purchase and forces an 18+
+     rating in Brazil and 16+ in Australia. If a future "buy another spin" ever lands here,
+     that whole regime lands with it. The odds are published in `rewardsState` anyway
+     (`spinPrizes` plus `spinOdds`), because a viewer is entitled to know them whether or
+     not Apple compels it. -->
+
 <server>
   <head>
     <entity as="checkin" ownership="owner">
@@ -29,6 +56,13 @@
       <field as="day" type="text"/>
       <field as="reward" type="integer"/>
       <field as="lane" type="text"/>   <!-- house | admob | metaads — which lane showed it -->
+      <!-- `seq` is the 1..AD_CAP position of this impression WITHIN the day, and it exists
+           for exactly one reason: the cap is 10/day, so `unique (owner_id, day)` — the
+           obvious constraint, and the one the audit proposed — would be WRONG here. It
+           would cap the lane at one ad a day and silently break the declared AD_CAP. The
+           right constraint is `unique (owner_id, day, seq)`: ten legitimate rows, and two
+           concurrent grants that both computed seq = n collide so only one is written. -->
+      <field as="seq" type="integer"/>
       <index on="day"/>
     </entity>
 
@@ -75,10 +109,17 @@
         { id: 'p5000',  coins: 5000,  free: 2500,  price: '$49.99', bonus: '+50%' },
         { id: 'p10000', coins: 10000, free: 10000, price: '$99.99', bonus: '+100%' }
       ]
+      // ODDS, PUBLISHED. The wheel picks uniformly from `spinPrizes`, so every prize is
+      // 1/N. It is a server fact rather than a client assumption because the client must be
+      // able to SHOW it (App Store 3.1.1's loot-box disclosure applies the moment a
+      // randomised reward can be bought — this one cannot, see the header, and the odds are
+      // published regardless). `spinCost: 0` is the fact that keeps it out of that regime.
+      const spinPrizes = [10, 15, 20, 25, 40, 60, 80, 100]
+      const spinOdds = spinPrizes.map(p => ({ prize: p, chance: Math.round(10000 / spinPrizes.length) / 100 }))
       return {
         today: today, checkedToday: checkedToday, streak: streak, curve: curve, days: days, nextReward: nextReward,
         freeSpinLeft: spinsToday === 0,
-        spinPrizes: [10, 15, 20, 25, 40, 60, 80, 100],
+        spinPrizes: spinPrizes, spinOdds: spinOdds, spinCost: 0,
         adsToday: adsToday, adCap: AD_CAP, adReward: AD_REWARD, adsLeft: Math.max(0, AD_CAP - adsToday),
         vipTiers: vipTiers, coinPacks: coinPacks,
         tasks: [
@@ -99,14 +140,26 @@
       const streak = (last !== null && last.day === yesterday ? last.streak : 0) + 1
       const curve = [5, 10, 15, 20, 25, 30, 60]
       const reward = curve[(streak - 1) % 7]
-      await dsx.module.data.checkin.create({ day: today, streak: streak })
+      // THE MARKER IS THE LOCK — `unique (owner_id, day)` on dsx_checkin. The `dup` read
+      // above is the friendly path; this is the authoritative one. A second concurrent
+      // check-in fails here and is refused BEFORE any coin moves.
+      const marked = await dsx.module.data.checkin.create({ day: today, streak: streak })
+      if (!marked.ok) { throw { reason: 'conflict', message: 'already checked in today' } }
 
       const mine = await dsx.module.data.wallet.list({ limit: 1 })
       let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
-      if (w == null) { const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 }); w = made.data }
-      const expires = new Date(Date.now() + 7 * 86400000).toISOString()
-      await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'checkin', ref: today, expires: expires })
-      await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
+      if (w == null) {
+        const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (made.ok) { w = made.data } else {
+          const again = await dsx.module.data.wallet.list({ limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+      }
+      if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
+      const led = await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'checkin', ref: today })
+      if (!led.ok) { throw { reason: 'unavailable', message: 'the grant could not be recorded' } }
+      const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
+      if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
       return { streak: streak, reward: reward }
     </action>
 
@@ -116,15 +169,27 @@
       if (spins.ok && spins.data.length > 0) { throw { reason: 'conflict', message: 'no free spin left today' } }
       const prizes = [10, 15, 20, 25, 40, 60, 80, 100]
       const prize = prizes[Math.floor(Math.random() * prizes.length)]
-      await dsx.module.data.spin.create({ day: today, prize: prize })
+      // THE MARKER IS THE LOCK — `unique (owner_id, day)` on dsx_spin. The wheel is FREE
+      // (no coin is debited anywhere in this action, deliberately — see the header's
+      // loot-box note), so the only thing to protect is the once-a-day grant.
+      const marked = await dsx.module.data.spin.create({ day: today, prize: prize })
+      if (!marked.ok) { throw { reason: 'conflict', message: 'no free spin left today' } }
 
       const mine = await dsx.module.data.wallet.list({ limit: 1 })
       let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
-      if (w == null) { const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 }); w = made.data }
-      const expires = new Date(Date.now() + 7 * 86400000).toISOString()
-      await dsx.module.data.ledger.create({ kind: 'bonus', amount: prize, source: 'spin', ref: today, expires: expires })
-      await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + prize } })
-      return { prize: prize, prizes: prizes }
+      if (w == null) {
+        const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (made.ok) { w = made.data } else {
+          const again = await dsx.module.data.wallet.list({ limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+      }
+      if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
+      const led = await dsx.module.data.ledger.create({ kind: 'bonus', amount: prize, source: 'spin', ref: today })
+      if (!led.ok) { throw { reason: 'unavailable', message: 'the grant could not be recorded' } }
+      const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + prize } })
+      if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
+      return { prize: prize, prizes: prizes, cost: 0 }
     </action>
 
     <action as="claimTask" inputs="task">
@@ -141,15 +206,25 @@
         const favs = await dsx.module.data.favorite.list({ limit: 1 })
         if (!favs.ok || favs.data.length < 1) { throw { reason: 'conflict', message: 'add a favorite first' } }
       }
-      await dsx.module.data.taskclaim.create({ day: today, task: task })
+      // THE MARKER IS THE LOCK — `unique (owner_id, day, task)` on dsx_taskclaim.
+      const marked = await dsx.module.data.taskclaim.create({ day: today, task: task })
+      if (!marked.ok) { throw { reason: 'conflict', message: 'already claimed today' } }
       const reward = rewards[task]
 
       const mine = await dsx.module.data.wallet.list({ limit: 1 })
       let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
-      if (w == null) { const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 }); w = made.data }
-      const expires = new Date(Date.now() + 7 * 86400000).toISOString()
-      await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'task', ref: task, expires: expires })
-      await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
+      if (w == null) {
+        const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (made.ok) { w = made.data } else {
+          const again = await dsx.module.data.wallet.list({ limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+      }
+      if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
+      const led = await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'task', ref: today + ':' + task })
+      if (!led.ok) { throw { reason: 'unavailable', message: 'the grant could not be recorded' } }
+      const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
+      if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
       return { claimed: task, reward: reward }
     </action>
     <!-- The client reports WHICH lane showed the impression (see Components/parts/AdGate.dsx);
@@ -164,23 +239,43 @@
         throw { reason: 'invalid', message: 'unknown ad lane' }
       }
       const today = new Date().toISOString().slice(0, 10)
+      const AD_CAP = 10
+      const AD_REWARD = 15
       const seen = await dsx.module.data.adview.list({ filters: { day: today }, limit: 40 })
       const count = seen.ok ? seen.data.length : 0
-      if (count >= 10) { throw { reason: 'conflict', message: 'daily ad limit reached — come back tomorrow' } }
-      const reward = 15
-      await dsx.module.data.adview.create({ day: today, reward: reward, lane: shown })
+      if (count >= AD_CAP) { throw { reason: 'conflict', message: 'daily ad limit reached — come back tomorrow' } }
+      // THE MARKER IS THE LOCK, and here the marker needs a SEQUENCE. The cap is ten a day,
+      // so uniqueness cannot be (owner, day) — it has to be (owner, day, seq), with seq the
+      // position this grant believes it is taking. Two concurrent grants both read count = n
+      // and both try seq = n + 1; exactly one row lands and the other is refused, so the cap
+      // is a real cap instead of "ten, or twenty if you tap twice".
+      const seq = count + 1
+      const marked = await dsx.module.data.adview.create({ day: today, reward: AD_REWARD, lane: shown, seq: seq })
+      if (!marked.ok) { throw { reason: 'conflict', message: 'that reward was already counted — try again' } }
       const mine = await dsx.module.data.wallet.list({ limit: 1 })
       if (!mine.ok || mine.data.length === 0) { throw { reason: 'conflict', message: 'no wallet' } }
       const w = mine.data[0]
-      await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
-      await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'ad', ref: 'ad-' + shown + '-' + today + '-' + (count + 1) })
-      return { reward: reward, left: 10 - (count + 1), lane: shown }
+      const led = await dsx.module.data.ledger.create({ kind: 'bonus', amount: AD_REWARD, source: 'ad', ref: today + ':' + shown + ':' + seq })
+      if (!led.ok) { throw { reason: 'unavailable', message: 'the grant could not be recorded' } }
+      const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + AD_REWARD } })
+      if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
+      return { reward: AD_REWARD, left: AD_CAP - seq, lane: shown }
     </action>
   </head>
 
-  <route method="GET"  path="/rewards/state"   action="rewardsState" auth="required"/>
-  <route method="POST" path="/rewards/checkin" action="checkinNow"   auth="required"/>
-  <route method="POST" path="/rewards/spin"    action="spinWheel"    auth="required"/>
-  <route method="POST" path="/rewards/task"    action="claimTask"    auth="required"/>
-  <route method="POST" path="/rewards/ad"      action="grantAdReward" auth="required"/>
+  <!-- RATE CEILINGS on the four grants. Each is already bounded per DAY by a unique
+       constraint, so the limit is not the entitlement gate — it is the cost gate: a grant
+       that is refused still costs a read, a write attempt and a rate-counter upsert, and a
+       client in a retry loop can run that thousands of times a minute against the
+       `data:writes` and `requests` ceilings. The numbers are "every legitimate retry, and
+       nothing like a loop":
+         · checkin/spin  10/h — genuinely once a day; ten covers a flaky network.
+         · task          20/h — two tasks exist, so ten retries each.
+         · ad            20/h — the cap is ten a day, so twenty admits a retry per grant.
+         · state        120/m — the Rewards screen refetches on mount (§6.30). -->
+  <route method="GET"  path="/rewards/state"   action="rewardsState" auth="required" rate="120/m"/>
+  <route method="POST" path="/rewards/checkin" action="checkinNow"   auth="required" rate="10/h"/>
+  <route method="POST" path="/rewards/spin"    action="spinWheel"    auth="required" rate="10/h"/>
+  <route method="POST" path="/rewards/task"    action="claimTask"    auth="required" rate="20/h"/>
+  <route method="POST" path="/rewards/ad"      action="grantAdReward" auth="required" rate="20/h"/>
 </server>

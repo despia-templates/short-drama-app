@@ -62,7 +62,15 @@
     </action>
   </head>
 
-  <route method="GET"  path="/social/comments/:episode" action="listComments"  auth="none"/>
-  <route method="GET"  path="/social/notices"            action="listNotices"   auth="none"/>
-  <route method="POST" path="/social/comment"           action="postComment"   auth="required"/>
+  <!-- RATE CEILINGS.
+         · comments 120/m — a public read the player opens per episode; anonymous callers
+           share a bucket per address (scripts/serve.mjs supplies clientAddress).
+         · notices   60/m — a public read of one small table.
+         · comment   10/m — the write. Nobody types ten distinct comments a minute, and this
+           is the app's only UGC surface, so the ceiling is the first line of spam defence
+           until the moderation set lands (the audit's G15: no filter, no report, no block,
+           no delete-own — all four are App Store 1.2 requirements and none of them exist). -->
+  <route method="GET"  path="/social/comments/:episode" action="listComments"  auth="none"     rate="120/m"/>
+  <route method="GET"  path="/social/notices"            action="listNotices"   auth="none"     rate="60/m"/>
+  <route method="POST" path="/social/comment"           action="postComment"   auth="required" rate="10/m"/>
 </server>

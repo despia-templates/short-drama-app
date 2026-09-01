@@ -193,7 +193,12 @@
         </hstack>
         <hstack class="perk">
           <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
-          <text value="1080p, no ads" class="perkText"/>
+          <!-- was "1080p, no ads". 1080p is a paywall on a no-op: the quality ladder was
+               deleted in Phase 1 because <video> has no quality attribute on any renderer
+               (upstream #270), and selling it here re-erected the same paywall one screen
+               from where it was removed. This row now names what the server actually
+               grants — unlockEpisode prices at 0 while vip_until is in the future. -->
+          <text value="Every episode at 0 coins, no ads" class="perkText"/>
         </hstack>
         <text value="{{ tierBusy }}" class="busyLine" visible-if="tierBusy != ''"/>
       </vstack>

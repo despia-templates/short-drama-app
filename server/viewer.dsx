@@ -10,22 +10,38 @@
       <field as="position" type="real"/>   <!-- seconds into the episode -->
       <field as="day" type="text"/>        <!-- YYYY-MM-DD of the last watch, for daily tasks -->
       <index on="show"/>
+      <index on="episode"/>
     </entity>
 
     <entity as="favorite" ownership="owner">
       <field as="show" type="uuid"/>
+      <index on="show"/>
     </entity>
 
+    <!-- ONE ROW PER EPISODE, ENFORCED. This is a read-then-write like every other guard in
+         the backend, and it races the same way: the player saves on episode change and the
+         swipe path can fire twice, so two creates both passed the "do I have a row?" check
+         and the viewer ended up with two progress rows for one episode. That is not just
+         untidy — `rewardsState` counts progress rows to drive the "watch 3 episodes today"
+         task, so a duplicate row is a free task claim. `unique (owner_id, episode)` in
+         policies.local.sql makes the second create fail; the loser re-reads and updates,
+         which is what it wanted to do in the first place. -->
     <action as="saveProgress" inputs="episode, show, idx, position">
       if (episode == null || episode === '' || show == null || show === '') { throw { reason: 'invalid', message: 'episode and show are required' } }
       const day = new Date().toISOString().slice(0, 10)
       const mine = await dsx.module.data.progress.list({ filters: { episode: episode }, limit: 1 })
       if (mine.ok && mine.data.length > 0) {
-        await dsx.module.data.progress.update({ id: mine.data[0].id, values: { position: position, day: day, idx: idx } })
+        const done = await dsx.module.data.progress.update({ id: mine.data[0].id, values: { position: position, day: day, idx: idx } })
+        if (!done.ok) { throw { reason: 'unavailable', message: 'progress could not be saved' } }
         return { updated: true }
       }
-      await dsx.module.data.progress.create({ episode: episode, show: show, idx: idx, position: position, day: day })
-      return { created: true }
+      const made = await dsx.module.data.progress.create({ episode: episode, show: show, idx: idx, position: position, day: day })
+      if (made.ok) { return { created: true } }
+      const again = await dsx.module.data.progress.list({ filters: { episode: episode }, limit: 1 })
+      if (!again.ok || again.data.length === 0) { throw { reason: 'unavailable', message: 'progress could not be saved' } }
+      const done = await dsx.module.data.progress.update({ id: again.data[0].id, values: { position: position, day: day, idx: idx } })
+      if (!done.ok) { throw { reason: 'unavailable', message: 'progress could not be saved' } }
+      return { updated: true }
     </action>
 
     <action as="continueWatching">
@@ -58,14 +74,20 @@
       return { items: items }
     </action>
 
+    <!-- A DOUBLE-TAP USED TO STICK. Two concurrent adds both passed the "do I have one?"
+         read and wrote two rows; the next tap deleted one, so the heart stayed filled and no
+         amount of tapping could clear it. `unique (owner_id, show)` in policies.local.sql
+         makes the second create fail, and the loser reports the state that is actually true. -->
     <action as="toggleFavorite" inputs="show">
       if (show == null || show === '') { throw { reason: 'invalid', message: 'show is required' } }
       const mine = await dsx.module.data.favorite.list({ filters: { show: show }, limit: 1 })
       if (mine.ok && mine.data.length > 0) {
-        await dsx.module.data.favorite.delete({ id: mine.data[0].id })
+        const gone = await dsx.module.data.favorite.delete({ id: mine.data[0].id })
+        if (!gone.ok) { throw { reason: 'unavailable', message: 'could not update My List' } }
         return { favorite: false }
       }
-      await dsx.module.data.favorite.create({ show: show })
+      const made = await dsx.module.data.favorite.create({ show: show })
+      if (!made.ok) { return { favorite: true, already: true } }
       return { favorite: true }
     </action>
 
@@ -80,8 +102,18 @@
     </action>
   </head>
 
-  <route method="POST" path="/viewer/progress"  action="saveProgress"     auth="required"/>
-  <route method="GET"  path="/viewer/continue"  action="continueWatching" auth="required"/>
-  <route method="POST" path="/viewer/favorite"  action="toggleFavorite"   auth="required"/>
-  <route method="GET"  path="/viewer/list"      action="myList"           auth="required"/>
+  <!-- RATE CEILINGS.
+         · progress 240/m — the player is meant to gain a periodic save (the audit's S6, ~1
+           per 15s of playback) on top of the save-on-episode-change it has today. 4/s leaves
+           room for that and for a swipe binge, and still bounds a runaway <watch> loop —
+           which is the realistic failure here, not an attacker.
+         · continue  60/m — up to 1 + 3N reads per call (a show get, an episode get and an
+           episode list per progress row): the single most read-amplifying route in the app
+           at ~37 reads a call, against a 2.5M/day read ceiling. 60/m is ~2,200 reads/min from
+           one caller; more than that is a loop, not a viewer.
+         · favorite  60/m · list 60/m — cheap owner reads/writes behind a tap. -->
+  <route method="POST" path="/viewer/progress"  action="saveProgress"     auth="required" rate="240/m"/>
+  <route method="GET"  path="/viewer/continue"  action="continueWatching" auth="required" rate="60/m"/>
+  <route method="POST" path="/viewer/favorite"  action="toggleFavorite"   auth="required" rate="60/m"/>
+  <route method="GET"  path="/viewer/list"      action="myList"           auth="required" rate="60/m"/>
 </server>

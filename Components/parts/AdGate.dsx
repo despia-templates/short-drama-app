@@ -159,8 +159,8 @@
       return v === true || v === 'true'
     </variable>
     <!-- the viewer used the 2.5.18 report control. App-wide rather than per-mount so it
-         survives leaving and re-entering the Rewards tab: `<api cache>` and `<variable>`
-         both die with the mount (PLAN.md §6.30), and an opt-out that forgets itself the
+         survives leaving and re-entering the Rewards tab: an api cache and a per-mount
+         variable both die with the mount (PLAN.md §6.30), and an opt-out that forgets the
          moment you navigate away is not an opt-out. It is a SESSION fact, not a stored
          preference — §6.33 (no cross-platform KV) means there is nowhere durable to put it —
          and the card says "this session" rather than implying it is remembered. -->
@@ -327,9 +327,18 @@
     <style as="cta" radius="24" paddingV="14" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
     <style as="note" fontSize="12" color="rgba(255,255,255,0.45)" lineSpacing="3"/>
 
+    <style as="vipPill" background="rgba(246,182,61,0.16)" radius="10" paddingH="9" paddingV="4" spacing="5" alignItems="center"/>
+    <style as="vipPillTxt" fontSize="11" fontWeight="bold" color="#F6B63D"/>
+
     <style as="adTag" background="rgba(0,0,0,0.6)" radius="4" paddingH="7" paddingV="2" fontSize="11" fontWeight="bold" color="rgba(255,255,255,0.85)" tracking="1"/>
     <style as="countPill" background="rgba(0,0,0,0.6)" radius="12" paddingH="10" paddingV="5" fontSize="12" fontWeight="semibold" color="rgba(255,255,255,0.9)"/>
-    <style as="closeBtn" width="32" height="32" radius="16" background="rgba(0,0,0,0.6)" alignItems="center"/>
+    <!-- 44pt, both of them. 2.5.18 asks for a close control "large enough for people to
+         easily dismiss the ad" and the house design bar puts the floor at 44 — the close
+         button shipped at 32×32, which is the size the rule is written about. The report
+         control is sized to the same floor rather than to its text. -->
+    <style as="closeBtn" width="44" height="44" radius="22" background="rgba(0,0,0,0.6)" alignItems="center"/>
+    <style as="reportBtn" height="44" radius="22" paddingH="14" spacing="6" background="rgba(0,0,0,0.6)" alignItems="center"/>
+    <style as="reportTxt" fontSize="12" fontWeight="semibold" color="rgba(255,255,255,0.85)"/>
     <style as="pitch" spacing="10" alignItems="center" paddingH="26" paddingBottom="22"/>
     <style as="kicker" fontSize="11" fontWeight="bold" color="#FFE9A8" tracking="3"/>
     <style as="pitchTitle" fontSize="24" fontWeight="bold" color="#FFFFFF" textAlign="center"/>
@@ -340,21 +349,40 @@
 
   <vstack class="card">
     <hstack class="cardHead">
-      <text value="Watch ads, earn coins" class="h2"/>
+      <text value="{{ dsx.variable.cardTitle }}" class="h2"/>
       <spacer/>
-      <text value="{{ dsx.attribute.today }}/{{ dsx.attribute.cap }} today" class="meta"/>
+      <!-- the daily counter is a fact about an ad lane the member does not have; showing
+           "0/10 today" to a VIP would re-introduce the thing the pass removed -->
+      <text value="{{ dsx.attribute.today }}/{{ dsx.attribute.cap }} today" class="meta"
+            visible-if="dsx.variable.isVip == false"/>
+      <hstack class="vipPill" visible-if="dsx.variable.isVip" a11yGroup="true" a11yLabel="Included with VIP">
+        <image icon="crown.fill" iconSize="11" color="#F6B63D" a11yHidden="true"/>
+        <text value="VIP" class="vipPillTxt"/>
+      </hstack>
     </hstack>
 
-    <hstack spacing="8" alignItems="center">
+    <!-- ── THE MEMBER FACE. Not blank: a benefit someone paid for should be visible at the
+             place it takes effect, and this is that place. ───────────────────────────── -->
+    <text value="{{ dsx.variable.memberNote }}" class="note" visible-if="dsx.variable.isVip"/>
+
+    <!-- ── THE AD FACE ─────────────────────────────────────────────────────────────── -->
+    <!-- the lane pill describes the creative that is about to play, so it goes with it: a
+         viewer who has switched the placement off has no lane to be told about -->
+    <hstack spacing="8" alignItems="center"
+            visible-if="dsx.variable.isVip == false && dsx.variable.optedOut == false">
       <text value="{{ dsx.variable.laneLabel }}" class="lanePill"/>
       <spacer/>
     </hstack>
 
     <button label="{{ dsx.variable.btnLabel }}" class="cta"
             background="{{ dsx.variable.canPlay ? '#FF2C55' : '#26262C' }}"
-            on:tap="dsx.action.play()"/>
+            on:tap="dsx.action.play()"
+            visible-if="dsx.variable.isVip == false"/>
 
-    <text value="{{ dsx.variable.laneNote }}" class="note"/>
+    <text value="{{ dsx.variable.laneNote }}" class="note"
+          visible-if="dsx.variable.isVip == false && dsx.variable.optedOut == false"/>
+    <text value="{{ dsx.variable.optedOutNote }}" class="note"
+          visible-if="dsx.variable.isVip == false && dsx.variable.optedOut"/>
   </vstack>
 
   <!-- the creative. `mode="cover"` is a full-screen modal on every renderer, which is what a
@@ -381,21 +409,38 @@
            sibling does NOT reliably paint over it (the same law as a transformed sibling —
            AGENTS.md). Without this the clip covered the pitch copy. -->
       <vstack style="z-index: 2; width: 100%; height: {{ dsx.screen.height }}px; justify-content: space-between; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0.35) 58%, rgba(0,0,0,0.92) 100%)">
-        <hstack style="padding: 16px; align-items: center; pointer-events: auto">
+        <!-- THE AD CHROME, built to 2.5.18: the label, the report control, the counter and a
+             close target that is present from the first frame. It used to appear only once
+             `complete` was true, which made the countdown inescapable and left the
+             early-close branch in `close` permanently unreachable. -->
+        <hstack spacing="8" style="padding: 16px; align-items: center; pointer-events: auto">
           <text value="AD" class="adTag"/>
+          <hstack class="reportBtn" on:tap="dsx.action.report()"
+                  a11yGroup="true" a11yTrait="button"
+                  a11yLabel="Report this ad as inappropriate. It closes with no reward.">
+            <image icon="exclamationmark.triangle.fill" iconSize="12" color="rgba(255,255,255,0.85)" a11yHidden="true"/>
+            <text value="Report" class="reportTxt"/>
+          </hstack>
           <spacer/>
           <text value="{{ dsx.variable.secsLeft }}s" class="countPill" visible-if="dsx.variable.complete == false"
                 a11yLabel="{{ dsx.variable.secsLeft }} seconds before the reward"/>
-          <vstack class="closeBtn" style="justify-content: center" visible-if="dsx.variable.complete"
-                  on:tap="dsx.action.close()" a11yTrait="button" a11yLabel="Close ad">
-            <image icon="xmark" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
+          <vstack class="closeBtn" style="justify-content: center"
+                  on:tap="dsx.action.close()" a11yTrait="button" a11yLabel="{{ dsx.variable.closeLabel }}">
+            <image icon="xmark" iconSize="16" color="#FFFFFF" a11yHidden="true"/>
           </vstack>
         </hstack>
 
         <vstack class="pitch" style="pointer-events: auto">
           <text value="SHORTDRAMA VIP" class="kicker"/>
           <text value="Every episode. No coins." class="pitchTitle"/>
-          <text value="VIP unlocks the whole catalogue, skips these ads, and drops bonus coins into your wallet every week." class="pitchBody" style="max-width: 330px"/>
+          <!-- THE HOUSE AD IS STILL AN AD, AND IT IS STILL THIS APP'S WORD. It used to close
+               with "…and drops bonus coins into your wallet every week", which no action in
+               `server/*.dsx` does — VIP writes `vip_until` and nothing else (server/store.dsx
+               :150-153). A false claim is not more forgivable for being inside a creative;
+               it is less, because a viewer buys against it. Both clauses below are checkable:
+               `unlockEpisode` prices at 0 for a VIP (server/wallet.dsx:190-192), and this
+               component switches itself off above. -->
+          <text value="VIP unlocks every episode at zero coins and switches this ad off. The coins you already have stay in your wallet." class="pitchBody" style="max-width: 330px"/>
           <text value="{{ dsx.variable.ctaLabel }}" class="claimBtn" visible-if="dsx.variable.complete"
                 a11yTrait="button" on:tap="dsx.action.close()"/>
           <text value="{{ dsx.variable.ctaLabel }}" class="waitBtn"

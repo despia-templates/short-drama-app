@@ -157,14 +157,25 @@
           if (cur == null || e.idx < cur.idx) { byShow[e.show] = e }
         }
       }
+      // The discover reel autoplays each show's FIRST episode, which is free by construction
+      // (idx 1 is inside any free_until >= 1). It is checked rather than assumed: an operator
+      // can set free_until to 0, and this route is auth="none" — an unchecked `video_url`
+      // here would be the same leak showDetail just closed, wearing a different name. A card
+      // whose first episode is not free carries no source and the reel shows its poster.
       const cards = shows.data
         .map(s => ({ show: s, first: byShow[s.id] == null ? null : byShow[s.id] }))
         .filter(c => c.first !== null)
-        .map(c => ({
-          show: c.show.id, title: c.show.title, synopsis: c.show.synopsis,
-          genre: c.show.genre, poster: c.show.poster, hero: c.show.hero, hero_tall: c.show.hero_tall,
-          video: c.first.video_url, featured: c.show.featured === true
-        }))
+        .map(c => {
+          const isFree = c.first.price === 0 || c.first.idx <= c.show.free_until
+          const sep = c.first.video_url != null && c.first.video_url.includes('?') ? '&' : '?'
+          return {
+            show: c.show.id, title: c.show.title, synopsis: c.show.synopsis,
+            genre: c.show.genre, poster: c.show.poster, hero: c.show.hero, hero_tall: c.show.hero_tall,
+            video: isFree && c.first.video_url != null && c.first.video_url !== ''
+              ? c.first.video_url + sep + 'ep=' + c.first.id : null,
+            featured: c.show.featured === true
+          }
+        })
       const front = cards.filter(c => c.featured)
       const rest = cards.filter(c => c.featured !== true)
       return { cards: front.concat(rest) }
@@ -178,12 +189,32 @@
       // clamped, so the number written here is the real one
       const eps = await dsx.module.data.episode.list({ filters: { show: id, state: 'live' }, limit: 100 })
       const list = (eps.ok ? eps.data : []).sort((a, b) => a.idx - b.idx)
-      const episodes = list.map(e => ({
-        id: e.id, idx: e.idx, title: e.title, poster: e.poster, duration: e.duration,
-        video: e.video_url,
-        free: e.price === 0 || e.idx <= s.data.free_until,
-        price: e.price
-      }))
+      // THE PAYWALL PROTECTS THE MEDIA, NOT THE PLAYER. This action is auth="none" — the
+      // storefront is public and server-rendered — and it used to return `video_url` for
+      // EVERY episode, free and paid alike. The client hid the locked ones; the URLs were in
+      // the JSON and in the SSR html, so `curl /catalog/show/:id | jq '.episodes[].video'`
+      // handed a stranger all 24 paid episodes and `GET /media/bride.mp4` answered 200 with
+      // no token. Entitlement was enforced in MARKUP, which is not enforcement.
+      // The grid still needs every episode's METADATA (title, index, duration, price, lock
+      // state) — that is what a locked cell renders — so the shape here is: metadata always,
+      // SOURCE only for an episode that is free to everyone. A paid episode's source comes
+      // from GET /wallet/play/:episode (auth="required"), which re-runs the free/VIP/unlock
+      // check server-side and answers with a short-lived, ticketed URL.
+      // The `?ep=` on a free source is not decoration: the origin (and, in a real
+      // deployment, the CDN rule that replaces it) needs to know WHICH episode a media
+      // request is claiming, because one file can back many episodes — in this demo three
+      // MP4s stand in for 352. Without it a free episode's id would open every file.
+      const episodes = list.map(e => {
+        const isFree = e.price === 0 || e.idx <= s.data.free_until
+        const sep = e.video_url != null && e.video_url.includes('?') ? '&' : '?'
+        return {
+          id: e.id, idx: e.idx, title: e.title, poster: e.poster, duration: e.duration,
+          video: isFree && e.video_url != null && e.video_url !== '' ? e.video_url + sep + 'ep=' + e.id : null,
+          locked: isFree === false,
+          free: isFree,
+          price: e.price
+        }
+      })
       // "More like this" — the same-genre neighbours, minus this show. Both category
       // leaders put a related rail under the episode grid; it is what turns one finished
       // series into the next one. Bounded like every other read here (LIST_LIMIT is 100
@@ -243,9 +274,26 @@
     </action>
   </head>
 
-  <route method="GET" path="/catalog/home"     action="homeShelves"  auth="none"/>
-  <route method="GET" path="/catalog/discover" action="discoverFeed" auth="none"/>
-  <route method="GET" path="/catalog/show/:id" action="showDetail"   auth="none"/>
-  <route method="GET" path="/catalog/browse/:genre" action="browseCatalog" auth="none"/>
-  <route method="POST" path="/catalog/search"   action="searchShows"  auth="none"/>
+  <!-- RATE CEILINGS ON A PUBLIC SURFACE, and the one thing that had to be true first.
+       An anonymous caller is bucketed by whatever `clientAddress` reports, and when that is
+       null EVERY anonymous caller shares ONE bucket per route (host.ts) — so a limit
+       declared before the origin supplied an address would have been a GLOBAL limit on the
+       storefront, i.e. a self-inflicted outage rather than a defence. scripts/serve.mjs now
+       supplies it (x-forwarded-for, then the socket), which is the precondition for these
+       numbers meaning anything.
+       They are deliberately generous, because these four are the SSR path as well as the
+       API path and a household behind one NAT is one address:
+         · home / browse / show  240/m — a cold load is 3 requests plus a re-fetch on every
+           tab revisit (§6.30: <api cache> dies with the mount). 4/s per address.
+         · discover 120/m — 1 + N reads over 50 shows, the second-heaviest public read.
+         · search    60/m — the cheapest way to burn the `data:reads` ceiling: `auth="none"`
+           and 1 + N bounded reads for up to 24 matches, so ~25 reads per call. 60/m caps one
+           address at ~1,500 reads/min against 2.5M/day. This is the route the audit named
+           first and the only public one where the limit is a real defence rather than a
+           courtesy. -->
+  <route method="GET" path="/catalog/home"     action="homeShelves"  auth="none" rate="240/m"/>
+  <route method="GET" path="/catalog/discover" action="discoverFeed" auth="none" rate="120/m"/>
+  <route method="GET" path="/catalog/show/:id" action="showDetail"   auth="none" rate="240/m"/>
+  <route method="GET" path="/catalog/browse/:genre" action="browseCatalog" auth="none" rate="240/m"/>
+  <route method="POST" path="/catalog/search"   action="searchShows"  auth="none" rate="60/m"/>
 </server>

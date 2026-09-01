@@ -760,20 +760,16 @@
                 <image icon="square.and.arrow.up" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
                 <text value="Share" class="railCap"/>
               </vstack>
-              <vstack class="railItem" on:tap="dsx.module.route.push({ path: '/vip' })" a11yGroup="true" a11yTrait="button" a11yLabel="Download — VIP">
-                <!-- `align-self: center` is load-bearing: a column stack nested in a column
-                     stack is handed `align-self: stretch` by the web sheet, and a stretch
-                     with a definite cross size behaves as flex-start — so this anchor grew
-                     to the rail's full 51px and the icon inside it sat at the LEFT edge
-                     while "Download" under it stayed centred (measured, PLAN.md §6.21).
-                     The badge is sized and offset to stay inside the rail: at `right: -14`
-                     off a stretched anchor it ran to x=377 on a 375pt screen and clipped. -->
-                <stack style="align-self: center; position: relative">
-                  <image icon="square.and.arrow.down" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
-                  <text value="VIP" class="vipCorner" style="position: absolute; top: -6px; right: -11px"/>
-                </stack>
-                <text value="Download" class="railCap"/>
-              </vstack>
+              <!-- THE DOWNLOAD CONTROL IS GONE. There is no download plane in this build —
+                   no file store, no queue, no setting — and the control's entire behaviour
+                   was to route to the screen selling it. That is a purchase inducement for a
+                   feature that does not exist, in the most-used surface in the app.
+                   It is NOT the same call as the Quality row in the ⋯ menu, which stays: a
+                   rendition is a real property of the thing playing, so that row degrades
+                   into a true readout (Article 7). A download control has no underlying fact
+                   to report, so there is nothing to degrade INTO — the honest form is its
+                   absence. Same split Phase 1 made when it deleted the quality ladder and
+                   kept the note. The gap belongs in PLAN.md §6, not in a dead button. -->
             </vstack>
           </hstack>
 
@@ -1126,11 +1122,6 @@ Please unlock to watch." class="lockHead"/>
                         on:tap="dsx.variable.range = (item.from - 1) / 30" a11yTrait="button"/>
                 </list>
                 <spacer/>
-                <hstack spacing="6" alignItems="center" on:tap="dsx.module.route.push({ path: '/vip' })"
-                        a11yGroup="true" a11yTrait="button" a11yLabel="Download episodes — VIP">
-                  <image icon="square.and.arrow.down" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
-                  <text value="VIP" class="vipTag"/>
-                </hstack>
               </hstack>
               <vstack class="epGridWrap">
                 <!-- the cell is the DIRECT grid child: a wrapper here loses the column width

@@ -1,11 +1,38 @@
 <!-- wallet.dsx — the money trust-chain, server-side only. The client renders balances;
-     it NEVER computes them. Two currencies per the product spec: coins (purchased,
-     durable) and bonus (earned, spend-first, 7-day expiry). Every movement is a ledger
-     row; the wallet row is a cached fold the actions keep true.
+     it NEVER computes them. Two balances per the product spec: coins (PURCHASED, durable)
+     and bonus (GRANTED by the rewards loop, spent first). Every movement is a ledger row;
+     the wallet row is a cached fold the actions keep true.
      NOTE (upstream ledger): the standalone server compiler has no <webhook> tag yet, so
      the RevenueCat receiver is a hosted-lane integration for now; local coin packs are
      credited through the operator-gated admin grant. Sibling actions return void by
-     design, so the ensure-wallet fold is inlined per action. -->
+     design, so the ensure-wallet fold is inlined per action.
+
+     ── NEITHER BALANCE EXPIRES, AND THAT IS A COMPLIANCE RULE, NOT A PREFERENCE ──────────
+     App Store Review Guideline 3.1.1: "Any credits or in-game currencies purchased via
+     in-app purchase may not expire." 3.2.1(iii) permits an expiry window only for the
+     RENTAL of specific approved content — a coin balance is not that. This document used
+     to write a 7-day `expires` onto every granted-bonus ledger row (nothing ever read it,
+     so nothing expired — but the column made the promise real enough to ship). The column
+     and every write of it are GONE rather than left unimplemented: a capability that can
+     expire a balance is one refactor away from expiring a purchased one, and the coin
+     packs credit part of their value into `bonus` (`settleOrder` writes `o.bonus`, the
+     "+5% free" of a paid pack), so `bonus` is NOT a purely-granted bucket and an expiry on
+     it would expire purchased value directly.
+     The two balances stay separate because spend ORDER is a real product rule (granted
+     first, so a viewer's purchased coins outlive their free ones) and because keeping the
+     purchased balance nameable is what makes 3.1.1 provable. Neither expires.
+     THE COPY STILL PROMISES EXPIRY on three lines this document does not own —
+     Components/Profile.dsx:255, :281, :303 — and they must be changed with this. See the
+     handover note in PLAN.md §6.85.
+
+     ── RESTORE IS PART OF THE SAME GUIDELINE ────────────────────────────────────────────
+     3.1.1 also requires a restore mechanism for restorable purchases. Entitlement here is
+     SERVER-SIDE and account-scoped (wallet.vip_until, unlock rows), so a reinstall that
+     signs back in already has everything — the real gap is an order that was PAID at the
+     provider and never granted here (the app closed between confirm and settle). That is
+     `restoreOrders` in store.dsx. The NATIVE store lanes (StoreKit / Play Billing /
+     RevenueCat) have no receiver in this template at all — named in store.dsx and in
+     PLAN.md §6.86, not silently missing. -->
 <server>
   <head>
     <entity as="wallet" ownership="owner">
@@ -17,9 +44,13 @@
     <entity as="ledger" ownership="owner">
       <field as="kind" type="text"/>       <!-- coin | bonus -->
       <field as="amount" type="integer"/>  <!-- signed -->
-      <field as="source" type="text"/>     <!-- checkin | task | spin | ad | pack | unlock -->
+      <field as="source" type="text"/>     <!-- checkin | task | spin | ad | pack | vip | unlock -->
+      <!-- `ref` is the thing the movement is ABOUT: an episode id for an unlock, a day for a
+           check-in, and — since the settle rewrite — the ORDER ID for a pack/vip grant. That
+           last one is load-bearing: policies.local.sql puts a partial unique index on
+           (owner_id, kind, source, ref) for source in ('pack','vip'), which makes the ledger
+           row itself the exactly-once lock on a payment grant (see store.dsx settleOrder). -->
       <field as="ref" type="text"/>
-      <field as="expires" type="timestamptz"/>
     </entity>
 
     <entity as="unlock" ownership="owner">
@@ -27,15 +58,49 @@
       <field as="show" type="uuid"/>
       <field as="price" type="integer"/>
       <index on="show"/>
+      <index on="episode"/>
+    </entity>
+
+    <!-- THE PLAYBACK TICKET — a short-lived, per-viewer, per-episode grant that the media
+         plane can check without re-deriving entitlement on every byte range.
+         WHY A ROW AND NOT A SIGNATURE. A production deployment signs the URL: CloudFront
+         `Expires`+`Signature`, a Cloudflare signed-URL token, or a Mux signed playback JWT —
+         the edge verifies an HMAC and never talks to the database. A declared action cannot
+         do that today: the JSE seam a `<server>` body may call is `data` · `queue` · `secret`
+         · declared packages (actions.ts moduleTable) and there is NO crypto/HMAC among them,
+         so there is no way to compute a signature in the declared lane. Filed as PLAN.md
+         §6.82 (`dsx.module.crypto.hmac` on the server seam). Until it lands, the capability
+         is a row id: `gen_random_uuid()` is 122 bits the caller cannot guess, the row carries
+         its own expiry, and scripts/serve.mjs checks both. Same security property, one round
+         trip more.
+         BOUNDED BY CONSTRUCTION: policies.local.sql puts `unique (owner_id, episode)` on it,
+         and the action REFRESHES the existing row rather than inserting a second — so the
+         table is at most one row per episode a viewer has actually played, the same order as
+         `unlock`, and it never grows per play. -->
+    <entity as="playticket" ownership="owner">
+      <field as="episode" type="uuid"/>
+      <field as="expires" type="timestamptz"/>
+      <index on="episode"/>
     </entity>
 
     <action as="walletState">
       const mine = await dsx.module.data.wallet.list({ limit: 1 })
       let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
       if (w == null) {
+        // TWO CONCURRENT FIRST CALLS USED TO CREATE TWO WALLETS and the balance split
+        // between them (`list({limit:1})` then returns whichever row Postgres feels like).
+        // `unique (owner_id)` in policies.local.sql makes the second insert fail; the loser
+        // re-reads the winner's row instead of throwing. There is no transaction seam in a
+        // declared action (PLAN.md §6.38), so the constraint IS the lock — every
+        // read-then-write guard in this document is written this way.
         const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
-        if (!made.ok) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
-        w = made.data
+        if (made.ok) {
+          w = made.data
+        } else {
+          const again = await dsx.module.data.wallet.list({ limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+        if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
       }
       // 100 is the ceiling `list` actually honours; a viewer past it would see the oldest
       // unlocks fall out of this set, so the flag travels with it and the UI says so rather
@@ -46,6 +111,82 @@
         coins: w.coins, bonus: w.bonus, vip: vip, vipUntil: w.vip_until,
         unlocked: (unlocks.ok ? unlocks.data : []).map(u => u.episode),
         unlockedCapped: unlocks.ok && unlocks.data.length >= 100
+      }
+    </action>
+
+    <!-- THE ENTITLED SOURCE. `/catalog/show/:id` is public and now returns a playable URL
+         only for episodes that are free to everyone; everything else asks HERE, with a
+         token, and the answer is a URL that stops working in five minutes.
+
+         The check is the SAME THREE FACTS unlockEpisode charges on — free window, VIP,
+         an unlock row — deliberately spelled the same way, because two entitlement rules
+         that must agree and are written differently is how a paying VIP ends up staring at
+         a padlock (the audit's G8, one layer up in the client). If one of them changes,
+         both sites change together or the gate is wrong in one direction or the other.
+
+         WHAT A PRODUCTION CDN DOES INSTEAD. It signs. This action would return
+         `https://cdn.example.com/ep/<id>/master.m3u8?Expires=…&Signature=…` (CloudFront),
+         or a Mux/Cloudflare Stream signed playback token, and the EDGE would verify it —
+         no origin round trip, no database, and the media never leaves the CDN's control.
+         The ticket row below is the honest stand-in for that while the declared lane has no
+         HMAC seam (PLAN.md §6.82); scripts/serve.mjs's /media gate is the honest stand-in
+         for the edge check, and says so in place. -->
+    <action as="playSource" inputs="episode">
+      if (episode == null || episode === '') { throw { reason: 'invalid', message: 'episode is required' } }
+      const e = await dsx.module.data.episode.get({ id: episode })
+      if (!e.ok || e.data == null) { throw { reason: 'not_found', message: 'no such episode' } }
+      if (e.data.state !== 'live') { throw { reason: 'not_found', message: 'no such episode' } }
+      const s = await dsx.module.data.show.get({ id: e.data.show })
+      if (!s.ok || s.data == null) { throw { reason: 'not_found', message: 'no such show' } }
+
+      const free = e.data.price === 0 || e.data.idx <= s.data.free_until
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      const w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      const vip = w != null && w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
+      let owned = false
+      if (free === false && vip === false) {
+        const u = await dsx.module.data.unlock.list({ filters: { episode: episode }, limit: 1 })
+        owned = u.ok && u.data.length > 0
+      }
+      // FAIL CLOSED. The refusal is a declared rejection, so the client reads
+      // `r.data.message` and can offer the unlock — it is not a 404 pretending the episode
+      // does not exist, because the episode DOES exist and the grid already showed it.
+      if (free === false && vip === false && owned === false) {
+        throw { reason: 'forbidden', message: 'unlock this episode to watch it' }
+      }
+      if (e.data.video_url == null || e.data.video_url === '') {
+        throw { reason: 'unavailable', message: 'this episode has no video yet' }
+      }
+
+      // FIVE MINUTES. Long enough that a viewer who pauses mid-episode and comes back does
+      // not get a dead <video>, short enough that a leaked URL is worthless by the time it
+      // is pasted anywhere. A real signed URL uses the same order of magnitude for the same
+      // reason; the player re-asks on the next episode either way.
+      const TTL_S = 300
+      const until = new Date(Date.now() + TTL_S * 1000).toISOString()
+      const have = await dsx.module.data.playticket.list({ filters: { episode: episode }, limit: 1 })
+      let t = have.ok && have.data.length > 0 ? have.data[0] : null
+      if (t == null) {
+        const made = await dsx.module.data.playticket.create({ episode: episode, expires: until })
+        if (made.ok) {
+          t = made.data
+        } else {
+          // lost the `unique (owner_id, episode)` race with the viewer's other tab — the
+          // winner's row is as good as ours, so read it rather than failing the playback
+          const again = await dsx.module.data.playticket.list({ filters: { episode: episode }, limit: 1 })
+          t = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+      } else {
+        const rolled = await dsx.module.data.playticket.update({ id: t.id, values: { expires: until } })
+        if (!rolled.ok) { throw { reason: 'unavailable', message: 'could not start playback' } }
+      }
+      if (t == null) { throw { reason: 'unavailable', message: 'could not start playback' } }
+
+      const sep = e.data.video_url.includes('?') ? '&' : '?'
+      return {
+        episode: episode, idx: e.data.idx, title: e.data.title,
+        source: e.data.video_url + sep + 'ep=' + episode + '&ticket=' + t.id,
+        free: free, vip: vip, owned: owned, expires: until, ttl: TTL_S
       }
     </action>
 
@@ -117,9 +258,16 @@
       const mine = await dsx.module.data.wallet.list({ limit: 1 })
       let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
       if (w == null) {
+        // same `unique (owner_id)` re-read as walletState — two first-time calls must not
+        // end up with two wallets and a split balance
         const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
-        if (!made.ok) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
-        w = made.data
+        if (made.ok) {
+          w = made.data
+        } else {
+          const again = await dsx.module.data.wallet.list({ limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+        if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
       }
       const vip = w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
 
@@ -145,6 +293,13 @@
       let spent = 0
       for (const row of chargeable) {
         const price = unit(row)
+        // SAME LOCK, SAME ORDER as unlockEpisode: the unlock row goes in FIRST, and a
+        // duplicate (this viewer's other tab running the same basket) loses the
+        // `unique (owner_id, episode)` race and is SKIPPED rather than charged. This is what
+        // makes "re-running charges only the remainder and never twice" true under
+        // concurrency and not just under sequential retry.
+        const got = await dsx.module.data.unlock.create({ episode: row.id, show: show, price: price })
+        if (!got.ok) { continue }
         const fromBonus = Math.min(bonusLeft, price)
         const fromCoins = price - fromBonus
         if (fromBonus > 0) {
@@ -161,40 +316,65 @@
         // failed grant is the shape that charges twice on the retry
         const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: bonusLeft, coins: coinsLeft } })
         if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
-        const got = await dsx.module.data.unlock.create({ episode: row.id, show: show, price: price })
-        if (!got.ok) { throw { reason: 'unavailable', message: 'unlock could not be recorded' } }
         done = done + 1
         spent = spent + price
       }
       return { unlocked: done, spent: spent, listPrice: listTotal, saved: listTotal - spent, remaining: 0 }
     </action>
 
+    <!-- THE UNLOCK, AND WHY THE GRANT COMES BEFORE THE CHARGE.
+         This used to read "do I already own it?", then debit, then insert the unlock row.
+         Every step is its own transaction (postgres.ts sets the caller identity per
+         statement; a declared action cannot wrap several — PLAN.md §6.38), so two taps that
+         arrive together BOTH passed the ownership check, BOTH debited, and the viewer paid
+         twice for one episode. A plain index does not stop that; only a unique constraint
+         does, and the emitter has no `unique` word (PLAN.md §6.83) — so the constraint lives
+         in policies.local.sql as `unique (owner_id, episode)` on dsx_unlock.
+         Given the constraint, the ORDER decides which way the race fails:
+           · debit → grant  ⇒ the loser is charged and gets nothing. Two charges, one episode.
+           · grant → debit  ⇒ the loser is refused by the constraint and charges NOTHING.
+         So the insert is moved in front of the money and IS the lock. The residual, named
+         rather than hidden: if the debit fails after a successful grant, the viewer owns an
+         episode they did not pay for. That is the same trade unlockSeries already documents
+         and takes deliberately — losing a sale beats double-charging a customer, and it is
+         the only one of the two a support ticket cannot fix. The affordability check still
+         runs BEFORE the insert, so a broke viewer never gets a free grant. -->
     <action as="unlockEpisode" inputs="episode">
       if (episode == null || episode === '') { throw { reason: 'invalid', message: 'episode is required' } }
       const already = await dsx.module.data.unlock.list({ filters: { episode: episode }, limit: 1 })
       if (already.ok && already.data.length > 0) { return { unlocked: true, alreadyOwned: true } }
 
       const e = await dsx.module.data.episode.get({ id: episode })
-      if (!e.ok) { throw { reason: 'not_found', message: 'no such episode' } }
+      if (!e.ok || e.data == null) { throw { reason: 'not_found', message: 'no such episode' } }
       const s = await dsx.module.data.show.get({ id: e.data.show })
-      if (!s.ok) { throw { reason: 'not_found', message: 'no such show' } }
+      if (!s.ok || s.data == null) { throw { reason: 'not_found', message: 'no such show' } }
 
       const mine = await dsx.module.data.wallet.list({ limit: 1 })
       let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
       if (w == null) {
         const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
-        if (!made.ok) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
-        w = made.data
+        if (made.ok) {
+          w = made.data
+        } else {
+          const again = await dsx.module.data.wallet.list({ limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+        if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
       }
 
       const vip = w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
       const free = e.data.price === 0 || e.data.idx <= s.data.free_until
       const price = (free || vip) ? 0 : e.data.price
 
+      // affordability BEFORE the grant, so the lock never hands out something unpaid for
+      if (price > 0 && w.bonus + w.coins < price) {
+        throw { reason: 'conflict', message: 'not enough coins' }
+      }
+      // THE LOCK. A duplicate loses here and returns without charging.
+      const got = await dsx.module.data.unlock.create({ episode: episode, show: e.data.show, price: price })
+      if (!got.ok) { return { unlocked: true, alreadyOwned: true, spent: 0 } }
+
       if (price > 0) {
-        if (w.bonus + w.coins < price) {
-          throw { reason: 'conflict', message: 'not enough coins' }
-        }
         const fromBonus = Math.min(w.bonus, price)
         const fromCoins = price - fromBonus
         // ledger first, checked — the fold never moves without its rows
@@ -206,9 +386,9 @@
           const lc = await dsx.module.data.ledger.create({ kind: 'coin', amount: -fromCoins, source: 'unlock', ref: episode })
           if (!lc.ok) { throw { reason: 'unavailable', message: 'spend could not be recorded' } }
         }
-        await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus - fromBonus, coins: w.coins - fromCoins } })
+        const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus - fromBonus, coins: w.coins - fromCoins } })
+        if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
       }
-      await dsx.module.data.unlock.create({ episode: episode, show: e.data.show, price: price })
       return { unlocked: true, spent: price }
     </action>
 
@@ -219,9 +399,29 @@
     </action>
   </head>
 
-  <route method="GET"  path="/wallet/state"   action="walletState"   auth="required"/>
-  <route method="POST" path="/wallet/unlock"  action="unlockEpisode" auth="required"/>
-  <route method="POST" path="/wallet/unlockseries" action="unlockSeries" auth="required"/>
-  <route method="GET"  path="/wallet/series/:show"  action="seriesOffer"  auth="required"/>
-  <route method="GET"  path="/wallet/ledger"  action="ledgerRows"    auth="required"/>
+  <!-- RATE CEILINGS. `rate` is parsed once per row at host construction and counted in
+       `dsx_rate_counter` through the Postgres store (installPostgresPool fills
+       RateLimitSeam.store, so the ceiling is durable rather than per-isolate — the thing
+       ratelimit.ts calls "a FALSE STATEMENT in the security posture" if it is not).
+       An identified caller is bucketed by `sub`, which they cannot forge; anonymous callers
+       are bucketed by the address scripts/serve.mjs now supplies via `clientAddress`.
+       Every number below is derived from what the SURFACE costs, not from taste:
+         · state   240/m — five screens read the wallet on mount and §6.30 means a tab
+                   revisit refetches; 4/s is far above a human and still caps a poller.
+         · unlock   60/m — the fastest real binge is a tap a second; 60/m is 6× that and
+                   caps a script at ~360 writes/min against the 500k/day write ceiling.
+         · series   10/h — the biggest write in the app: 3 rows per episode, so a
+                   100-episode basket is 300 writes. 10/h bounds one caller at 3,000.
+         · quote    60/m — a read the Show screen re-runs as the wallet changes.
+         · ledger   60/m — a page of 100 owner rows.
+         · play    240/m — asked once per episode; a fast swiper legitimately runs ~60/m,
+                   and the 5-minute ticket means a re-ask is cheap. 4/s bounds a scraper
+                   walking a 100-episode series to ~25s per pass, which the entitlement
+                   check refuses anyway. -->
+  <route method="GET"  path="/wallet/state"   action="walletState"   auth="required" rate="240/m"/>
+  <route method="POST" path="/wallet/unlock"  action="unlockEpisode" auth="required" rate="60/m"/>
+  <route method="POST" path="/wallet/unlockseries" action="unlockSeries" auth="required" rate="10/h"/>
+  <route method="GET"  path="/wallet/series/:show"  action="seriesOffer"  auth="required" rate="60/m"/>
+  <route method="GET"  path="/wallet/ledger"  action="ledgerRows"    auth="required" rate="60/m"/>
+  <route method="GET"  path="/wallet/play/:episode" action="playSource" auth="required" rate="240/m"/>
 </server>
