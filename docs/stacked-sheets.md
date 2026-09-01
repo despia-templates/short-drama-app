@@ -4,6 +4,59 @@ Research + design, written to be implemented without the author. Every claim bel
 cited to a file and line, or explicitly marked as *unmeasured — probe first*. Nothing here was
 eyeballed.
 
+---
+
+> ## ⟡ RE-MEASURED 2026-09-01 on dev@71155a18, and the template SHIPPED two nested drawers
+>
+> This document was written before anything was built on it. It was mostly right and it is
+> still the design record — but four of its claims did not survive a live probe, and its §6
+> recommendation was overtaken by a defect it did not know about. Read this box first.
+>
+> **1. The nested sheet WORKS today, on the plain flat presentation.** A `<sheet>` declared
+> inside a presented `<sheet>`'s slot presents as a real second level with no engine work at
+> all. Probed on a throwaway two-sheet component and then on two shipped surfaces at 375×812:
+> parent level 1 / child level 2, z 10001 / 10002, the parent's portal scope `inert` **and**
+> `aria-hidden`, Escape closing exactly one level, focus restored to the exact control that
+> opened the child, one document scroll lock across both and released on the last close, each
+> level running its own detents, and drag-to-dismiss owning the top card only (a 176px pull on
+> the child's grabber wrote `--dsx-sheet-drag: 88px` mid-gesture and dismissed to the parent).
+> §2.2 predicted the ledger; what it under-sold is that this is **enough to ship on**.
+> `Components/Watch.dsx` and `Components/parts/PlansSheet.dsx` each carry one now.
+>
+> **2. §2.3 S1a is FIXED upstream.** The `@media (min-width: 48rem)` rule no longer overwrites
+> the drag channel — `overlay-controls.ts:1985` now spells
+> `transform: translateX(-50%) translateY(var(--dsx-sheet-drag, 0px))`. The tablet/desktop
+> sheet follows the finger. S1b (`--dsx-scrim-drag` written and read by nothing) is still open.
+>
+> **3. §1.3(c) is confirmed and it is the ONE gap that matters.** Closing a parent leaves the
+> child presented and orphaned at level 1 with its `present` key still true — measured, the
+> store reads `p=0 c=1`. That is the whole state half, and it is cheap: see PLAN.md §6.95.
+> The template bridges it by hand (`closeDrawer`, `closePlans`) and says so at each site.
+>
+> **4. §4.3's note about routing was RIGHT, and it is worse than a note.** Three shipped
+> surfaces in this template pushed a route from inside an open sheet and left the sheet
+> painted over the new screen: the player's drawer, the search overlay and the house ad —
+> the last of which went on playing its video behind the paywall it had just sent you to.
+> All three are fixed by closing the sheet in an action before the push. This deserves to be
+> Stage 1, not Stage 6.
+>
+> **5. §6.1's recommendation is overturned for the genre tag, on evidence it did not have.**
+> Its case was sound — the desktop panel has no sheet, the in-sheet depth stack already ships,
+> a `full` child hides the parent it is stacked on, and a sheet has no URL. But it was arguing
+> against a *route that worked*, and the route did not work: the push left the drawer over
+> /browse. What shipped answers each objection rather than ignoring it. The desktop panel
+> (≥1120) keeps the route, because there is no drawer there to stack on and /browse/:genre is
+> a page with room; the phone and tablet lanes get the level. The child is `detents="content"`,
+> not `full`, so it hugs its result set instead of covering the parent for nothing. And the
+> URL affordance stays reachable from inside the level — a "See all in {genre}" row closes
+> both sheets and pushes. §6.1(5)'s real warning — that Watch is the riskiest screen to debut
+> a second presentation on, because a playing `<video>` once killed presentation there
+> (`Sheet.swift:395–404`) — is unresolved on device and is the one thing left to check.
+>
+> Everything below is unedited.
+
+---
+
 **Sources read (read-only; all were being edited concurrently by other agents):**
 
 | File | What it settles |

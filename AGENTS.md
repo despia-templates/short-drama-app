@@ -164,6 +164,30 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   intent (a `<watch>` on `paused`), bound the retries, and give the viewer a tap target when
   the browser is genuinely refusing autoplay (PLAN.md §6.23). `<sheet inset>` is declared and
   ignored on web, so a full-bleed sheet still needs a named bridge (PLAN.md §6.22).
+- **A NESTED `<sheet>` is declared inside its parent's CHILDREN, and it works — but you own
+  the cascade and the router does not know it exists** (PLAN.md §6.95). Nesting IS the
+  declaration: on iOS the sheet slot is an escaping closure, so the child's anchor only
+  exists while the parent is presented and UIKit stacks the two cards. Two `<sheet>` tags as
+  SIBLINGS are not a stack — a view controller presents one thing at a time, so the second
+  silently does nothing. What the engine already gives you, measured: level ledger (1/2),
+  z 10001/10002, the parent's portal scope `inert` + `aria-hidden`, per-level Escape, focus
+  restored to the control that opened the child, one scroll lock across both, per-level
+  detents, and drag-to-dismiss on the top card only. What it does NOT: (1) **closing a parent
+  leaves the child open**, orphaned at level 1 with its key still true — so a sheet with a
+  child closes through ONE action that clears the child first, and every writer of the
+  parent's key goes through it; (2) **`route.push` from inside any sheet leaves it painted
+  over the new screen** — the router never consults the overlay ledger, so every navigation
+  out of a sheet closes the sheet first, in an action. Three shipped surfaces here had defect
+  (2) before it was measured. Also: a stacked child MUST carry `title=` (it is the panel's
+  accessible name) and a back affordance that says where it goes — the system `close=` control
+  dismisses the top card but cannot name the level below it.
+- **A nested sheet has to BEAT a route push, not just differ from it.** A sheet keeps the
+  viewer in place; a route takes them somewhere. Use the level when there is live state behind
+  it worth preserving — a playing episode, a half-made purchase decision, a drawer's detent
+  and scroll. Use the route when the destination is a real page that should own the frame and
+  wants a URL (a show, a browse result, a benefits page). In this template the player's genre
+  chips and the plans sheet's "what you get" earned levels; the search results, the ad's
+  paywall link and the desktop panel's chips are routes, and each says why in place.
 - **A route param is readable in markup, in a computed and in an action body — NOT in a plain
   `<variable>` initializer.** An initializer runs before the param is in scope and reads empty,
   so `/browse/Revenge` server-rendered "All series" with no error anywhere. Seed from a

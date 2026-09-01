@@ -1866,3 +1866,85 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     boundary, make it an authoring-time error to name a runner callee or assign to `global`
     inside one. `jse-audit` already exists for exactly this class ("unsupported JS is an
     authoring-time error, never a silent null at runtime").
+
+95. **A `<sheet>` nested inside a presented `<sheet>` STACKS correctly today — but nothing
+    closes the child when the parent goes down, and no route change closes either.** Two
+    separate engine gaps, found together while building the template's nested drawers, both
+    measured on a live origin at dev@71155a18 (web lane, 375×812).
+
+    **WHAT ALREADY WORKS, and it is more than `docs/stacked-sheets.md` predicted.** A child
+    `<sheet>` declared inside its parent's slot presents as a real second level with no
+    engine work at all. Probed on a throwaway two-sheet component and then again on the
+    shipped surfaces:
+
+        parent level 1 / child level 2 · z-index 10001 / 10002
+        the parent's `.dsx-overlay-portal-scope` goes inert = true AND aria-hidden = "true"
+        Escape closes exactly one level (first the child, parent stays at its detent)
+        focus restores to the exact control that opened the child
+        `document.documentElement.style.overflow` lock survives both, released on the last
+        drag-to-dismiss owns the TOP card only (a 176px pull on the child's grabber wrote
+          --dsx-sheet-drag: 88px mid-gesture and dismissed to the parent on release)
+        each level runs its own detents (`content` child over a `half,full` parent)
+
+    Two things from the design record are now stale and are corrected in that document:
+    S1a (the ≥48rem rule overwriting the drag transform) is FIXED upstream — the media query
+    at `overlay-controls.ts:1985` now carries `translateY(var(--dsx-sheet-drag, 0px))`. And
+    the visual card-stack (S1/S2) is still absent: no `data-dsx-stacked`, the parent panel's
+    computed `scale` reads `none` with a child up, and the child's scrim still carries
+    `blur(8px) saturate(1.12)` so the app behind is blurred twice.
+
+    **GAP (a) — THE CASCADE. Closing a parent leaves its declared child open, orphaned.**
+    Probed: parent and child both up, close the parent → the child is still presented, now
+    promoted to level 1, with its own `present` key still true. The store reads `p=0 c=1`.
+    On web the child's portal scope is a body-level sibling, not a descendant, so nothing
+    tears it down; `bindPresentation`'s disposer (`overlay-controls.ts:677`) calls
+    `detachDocumentListeners`, `deactivateLayer` and `portal.unmount()` and never writes the
+    key back. On iOS `SheetAnchor.onDisappear` (`Sheet.swift:422`) only NSLogs, so the key
+    survives the teardown and — per `.onAppear { shown = present.wrappedValue }` at 411 —
+    re-presents the child the next time the parent opens.
+
+    **GAP (b) — ROUTING IGNORES THE OVERLAY LEDGER.** `router.ts` contains no reference to
+    `activateLayer`, `deactivateLayer` or `dsx-overlay-layer`, so a `push`/`reset`/`replace`
+    from inside an open sheet mounts the new frame UNDER it. Three shipped instances in this
+    template, all measured and all fixed this pass:
+
+        Watch.dsx    the drawer's genre chip pushed /browse/:genre and the episode drawer
+                     stayed painted over it — frames 2→3, path changed, elementFromPoint at
+                     the screen centre still inside `.dsx-sheet-layer`, scrim and blur intact
+        SearchOverlay.dsx  a result row pushed /show/:id and the cover sheet stayed up
+        AdGate.dsx   "See VIP plans" pushed /vip out of a cover sheet that was PLAYING A
+                     VIDEO — the ad went on playing behind the paywall
+
+    **THE BRIDGE IN THIS TEMPLATE, named rather than silent.** Every sheet whose key can be
+    written by anything other than its own dismissal now closes through ONE action that
+    takes its declared children down first, top-down, the way the engine will:
+    `Watch.dsx closeDrawer` and `PlansSheet.dsx closePlans`. Every navigation out of a sheet
+    goes through an action that closes it first: `goShow`, `seeAllGenre`, `openVipPage`,
+    `openShow`, `seePlans`. Both are duplications of engine responsibility and both should
+    be DELETED the day the engine owns them — the comment at each site says so.
+
+    **THE ASK, in the order it is worth doing.**
+    1. The cascade, on both lanes. Web: `layerPortal` already captures `home` at bind time
+       (`overlay-controls.ts:426`), so the owning layer is `home.closest(".dsx-overlay-layer")`
+       — register the pair and close registered descendants top-down inside `setOpen(false)`
+       before `deactivateLayer`, each firing its own `dismiss` and write-back. iOS: write
+       `present.wrappedValue = false` in `.onDisappear` when `shown` is true, guarded so a
+       normal swipe-dismiss does not double-fire. The semantic is already pinned for the other
+       presentation plane (`Conformance/router/present.json`: "dismissing a CHAIN entry takes
+       its later chain descendants and spares every overlay") — reuse those words, because
+       the two planes must not disagree about what a stack is.
+    2. Routing closes open modal layers. An exported `closeAllLayers()` called from `push`,
+       `reset` and `pop`, firing each `dismiss`. This is the one that no author can be
+       expected to remember, because the failure is invisible from the source.
+    3. Lint: two `<sheet>` elements as SIBLINGS whose `present` keys can both be true is not
+       a stack — on iOS a view controller presents one thing at a time, so the second
+       silently does nothing. Say so at authoring time.
+    4. A stacked child with no `title=` is an unlabelled level-2 dialog. Survivable at level 1,
+       disorienting at level 2. Worth a lint note.
+
+    Everything above `docs/stacked-sheets.md` already specifies in detail — that document is
+    the design record for this item and its §5 staging is still the right order. What this
+    entry adds is the measurement that the STATE half (Stages 1–2, and the routing stage) is
+    what a template actually trips over, while the fidelity half (Stages 3–5, the card-stack
+    look) is a want rather than a blocker: two nested drawers ship in this template today,
+    on the plain flat presentation, and they are good.
