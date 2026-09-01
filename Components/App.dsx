@@ -51,6 +51,16 @@
       return 'phone'
     </variable>
     <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <!-- THE HOVER REVEAL IS A DESKTOP AFFORDANCE, and `wide` is not the right question for
+         it — `wide` includes TABLET, and a tablet is a touch surface that happens to be
+         roomy. The engine already gates `on:hoverStart` on a real pointer, so the card only
+         lights up for someone with a mouse; what it cannot know is that replacing a poster
+         with a wall of synopsis is a POINTER-AND-ROOM pattern, not a pointer pattern. On a
+         tablet — and on a phone browser that reports a hoverable pointer, which several do —
+         the reveal reads as a tap that went wrong, because a touch reader has no way to
+         un-hover it. Both halves must hold: a pointer that hovers, and a viewport with the
+         room to justify the trade. -->
+    <variable as="hoverReveal" computed="true">return dsx.variable.bp == 'desktop'</variable>
     <variable as="gutter" computed="true">
       if (dsx.variable.bp == 'desktop') { return 86 }
       if (dsx.variable.bp == 'tablet') { return 40 }
@@ -166,12 +176,15 @@
 
     <!-- ONE computed list: `style="{{ chunk }}; extras"` discards the chunk (the linter
          now says so out loud — that is how this bug was found after shipping). -->
+    <!-- The lift rides the same gate as the reveal (see `hoverReveal`): a poster that
+         swells under a tablet's finger and never settles is the same wrong affordance in a
+         quieter register. -->
     <formula as="posterHover" id="item.id">
-      const lift = dsx.variable.hovId == id ? 1.04 : 1
+      const lift = (dsx.variable.hoverReveal && dsx.variable.hovId == id) ? 1.04 : 1
       return dsx.variable.posterStyle + '; transition: transform 0.22s ease; transform: scale(' + lift + ')'
     </formula>
     <formula as="shelfHover" id="item.id">
-      const lift = dsx.variable.hovId == ('g-' + id) ? 1.03 : 1
+      const lift = (dsx.variable.hoverReveal && dsx.variable.hovId == ('g-' + id)) ? 1.03 : 1
       return 'width: 100%; aspect-ratio: 3/4; border-radius: 16px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + lift + ')'
     </formula>
     <formula as="metaLine" g="item.genre" n="item.episodes">
@@ -552,7 +565,7 @@
                   <vstack class="badgeWrap" style="width: {{ dsx.variable.posterW }}px; height: {{ dsx.variable.posterH }}px; pointer-events: none">
                     <text value="New" class="badge" visible-if="item.rank <= 2"/>
                   </vstack>
-                  <vstack visible-if="dsx.variable.hovId == item.id"
+                  <vstack visible-if="dsx.variable.hoverReveal &amp;&amp; dsx.variable.hovId == item.id"
                           style="width: {{ dsx.variable.posterW }}px; height: {{ dsx.variable.posterH }}px; justify-content: flex-end; border-radius: 16px; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.88) 100%); transform: scale(1.04); transition: transform 0.22s ease; z-index: 2">
                     <vstack class="hovPanel">
                       <text value="{{ item.synopsis }}" class="hovSyn"/>
@@ -632,7 +645,7 @@
                       a11yGroup="true" a11yLabel="{{ item.title }}">
                 <zstack>
                   <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" style="{{ shelfHover }}"/>
-                  <vstack visible-if="dsx.variable.hovId == 'g-' + item.id"
+                  <vstack visible-if="dsx.variable.hoverReveal &amp;&amp; dsx.variable.hovId == 'g-' + item.id"
                           style="width: 100%; height: 100%; justify-content: flex-end; border-radius: 16px; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.88) 100%); transform: scale(1.03); transition: transform 0.22s ease; z-index: 2">
                     <vstack class="hovPanel">
                       <text value="{{ item.synopsis }}" class="hovSyn"/>
