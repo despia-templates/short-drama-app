@@ -1,0 +1,72 @@
+<!-- ContactRow — published contact information, at the point of need.
+
+     WHY IT IS ITS OWN PART. App Store guideline 1.2 requires an app carrying user-generated
+     content to publish contact information so a reader can reach the developer about what
+     they just saw. `<LegalLinks variant="rows">` already publishes it on the account screen —
+     that is the app-wide answer and it stays — but a reader who has just opened the report
+     panel should not have to go and find the settings page. This is the same fact, said
+     where it is needed, and it reads the SAME config key so the two can never disagree:
+
+       App.json `consts.supportUrl`   (overridable per build in dsx.config.json `consts`)
+
+     Set it and the row is a real link. Leave it unset — this build's default — and the row
+     says exactly what is missing and which key sets it, in LegalLinks own grammar. A
+     placeholder URL would be worse than an absent one: it looks satisfied to an adopter and
+     reads as a broken promise to a reviewer.
+
+     THE SSR CAVEAT, GUARDED, exactly as LegalLinks guards it: the SSR renderer does not seed
+     the `dsx.const.*` plane (only the client bootloader does), so on a server-rendered first
+     paint every key reads null. Unguarded, a deployment that HAS set `supportUrl` would
+     server-render "not set" and then flip — a wrong claim rather than a late one. `constsKnown`
+     tests the whole plane (absent server-side, a dict on the client) and nothing renders until
+     it is answerable. Filed for PLAN.md §6 as the SSR-consts ask.
+
+     LINK MECHANICS: `href` with an absolute URL is a real anchor on web; on native a path the
+     route table does not match falls through to the configured web surface, so one spelling
+     works on every renderer. A `mailto:` in `supportUrl` works the same way. -->
+<vstack spacing="0" alignItems="stretch">
+  <head>
+    <!-- The caller says what the contact is FOR, because the sentence that makes a support
+         link useful is different in a report panel and in a settings list. -->
+    <attribute as="label" default="'Contact us'"/>
+    <attribute as="note" default="'Report something to a person, or ask about a decision.'"/>
+
+    <variable as="support" computed="true">
+      const u = dsx.const.supportUrl
+      return u == null ? '' : u
+    </variable>
+    <variable as="constsKnown" computed="true">return dsx.const != null</variable>
+
+    <style as="row" alignItems="center" paddingV="12" paddingH="14" spacing="12" radius="12"
+           minHeight="44" background="rgba(255,255,255,0.06)"/>
+    <style as="label" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="labelOff" fontSize="14" fontWeight="semibold" color="rgba(255,255,255,0.45)"/>
+    <style as="note" fontSize="12" color="rgba(255,255,255,0.5)" lineSpacing="3"/>
+  </head>
+
+  <vstack spacing="0" alignItems="stretch" visible-if="dsx.variable.constsKnown">
+    <!-- SET — a real link. An icon plus text is an hstack with a11yGroup and one label, never
+         a `button` carrying both (AGENTS.md). -->
+    <hstack class="row" visible-if="dsx.variable.support != ''" href="{{ dsx.variable.support }}"
+            a11yGroup="true" a11yTrait="link"
+            a11yLabel="{{ dsx.attribute.label }} — opens in your browser">
+      <image icon="envelope" iconSize="16" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+      <vstack spacing="3" style="flex: 1; min-width: 0" grow="width" alignItems="stretch">
+        <text value="{{ dsx.attribute.label }}" class="label"/>
+        <text value="{{ dsx.attribute.note }}" class="note"/>
+      </vstack>
+      <image icon="arrow.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+    </hstack>
+
+    <!-- NOT SET — the gap, named in place (Article 7). Not a hidden row and not a dead link. -->
+    <hstack class="row" visible-if="dsx.variable.support == ''" a11yGroup="true"
+            a11yLabel="Contact information is not set in this build. An adopter sets supportUrl in App.json consts. App Store guideline 1.2 requires published contact information for an app carrying user comments.">
+      <image icon="questionmark.circle" iconSize="16" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+      <vstack spacing="3" style="flex: 1; min-width: 0" grow="width" alignItems="stretch">
+        <text value="{{ dsx.attribute.label }}" class="labelOff"/>
+        <text class="note"
+              value="No contact address is set in this build — App.json `consts.supportUrl`. Guideline 1.2 requires one wherever an app carries user comments."/>
+      </vstack>
+    </hstack>
+  </vstack>
+</vstack>

@@ -24,12 +24,20 @@
     <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
     <api as="checkoutCall" url="/store/checkout" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="settleCall" url="/store/settle" method="POST" auto="false" headers="global.auth.headers"/>
+    <!-- the NATIVE lane's settle. Same trust shape as the web one: the client says WHICH
+         purchase to check, the server asks RevenueCat and grants (server/store.dsx). -->
+    <api as="nativeCall" url="/store/native" method="POST" auto="false" headers="global.auth.headers"/>
 
     <variable as="toast">return ''</variable>
     <variable as="buying">return ''</variable>       <!-- the sku currently in checkout -->
     <variable as="paying">return false</variable>    <!-- the Stripe sheet is open -->
     <variable as="order">return ''</variable>
+    <!-- the native lane's equivalent of `order` — what a lost settle is retried with -->
+    <variable as="nativeTxn">return ''</variable>
+    <variable as="nativeSku">return ''</variable>
+    <variable as="nativeProvider">return ''</variable>
     <variable as="settleFailed">return false</variable>
+    <variable as="settleMsg">return ''</variable>
     <variable as="hovId">return ''</variable>
 
     <!-- signed in is the seam, not the presence of a fetched JSON file (docs/auth.md) -->
@@ -91,17 +99,55 @@
       if (dsx.variable.catalogView == null) { return 'loading' }
       return 'content'
     </variable>
+    <!-- ══ THE PURCHASE LANE — the same rule as <PlansSheet>, which carries the long form ══
+         App Store 3.1.1 names "in-game currencies" and "access to premium content" as
+         in-app-purchase products, so COIN PACKS are the clearest case of it in this app:
+         selling them through Stripe inside an iOS build is a rejection, and neither the
+         reader-app rule nor the US anti-steering carve-out rescues it (the first forbids a
+         storefront entirely, the second permits a LINK OUT, never a card sheet in the app).
+         Capability first, platform second — `has('store')` answers "can I", `os` answers
+         "which words" (AGENTS.md, the <AdGate> precedent). The second half of the gate is a
+         SERVER fact: a purchase the backend cannot verify must never be opened, because
+         money taken at Apple that this app cannot grant is the worst outcome on this screen.
+         Both computeds are twins of the ones in Components/parts/PlansSheet.dsx and must
+         stay so — the VIP tiers and the coin packs are one storefront wearing two grids. -->
+    <variable as="payLane" computed="true">
+      const cat = dsx.variable.catalogView
+      const ready = cat != null &amp;&amp; cat.native != null &amp;&amp; cat.native.ready == true
+      if (has('store')) { return ready ? 'iap' : 'blocked' }
+      if (os == 'web') { return 'stripe' }
+      return 'blocked'
+    </variable>
+    <variable as="payNote" computed="true">
+      if (dsx.variable.payLane != 'blocked') { return '' }
+      const cat = dsx.variable.catalogView
+      if (has('store')) {
+        if (cat != null &amp;&amp; cat.native != null &amp;&amp; cat.native.reason != '') { return cat.native.reason }
+        return 'This build cannot complete a store purchase yet.'
+      }
+      return 'Purchases are not available in this build. App Store rule 3.1.1 requires coins and passes to be sold through in-app purchase, and this build ships no in-app-purchase module — so it refuses rather than charging a card inside the app. Add Core/Store to dsx.config.json (packages + modules) and set REVENUECAT_KEY on the backend.'
+    </variable>
+    <variable as="recoverLine" computed="true">
+      const why = dsx.variable.settleMsg == '' ? '' : ' The server said: ' + dsx.variable.settleMsg
+      if (dsx.variable.nativeTxn != '') {
+        return 'The store completed your purchase, but applying it to your wallet did not go through. Nothing is lost: confirm below and it lands. Transaction ' + dsx.variable.nativeTxn + '.' + why
+      }
+      return 'Stripe confirmed your payment, but applying it to your wallet did not go through. Nothing is lost: confirm below and it lands. Order ' + dsx.variable.order + '.' + why
+    </variable>
 
     <!-- the card's whole look is ONE computed string (a bare {{ }} fragment beside other
          declarations is discarded — AGENTS.md); hover lift and in-flight dim live here so
          a tapped card responds on the SAME FRAME as the tap -->
     <formula as="packCardFx" id="item.id">
       const lift = dsx.variable.hovId == ('p-' + id) ? 'translateY(-2px)' : 'none'
-      const dim = dsx.variable.buying == id ? 0.55 : 1
+      // a card that cannot be bought must not look buyable — the notice above the grid
+      // says why (payNote)
+      const dim = dsx.variable.payLane == 'blocked' ? 0.45 : (dsx.variable.buying == id ? 0.55 : 1)
       return 'opacity: ' + dim + '; transform: ' + lift + '; transition: transform 0.18s ease, opacity 0.18s ease'
     </formula>
     <formula as="cardBusyLabel" id="item.id">
       if (dsx.variable.buying != id) { return '' }
+      if (dsx.variable.payLane == 'iap') { return dsx.variable.paying ? 'Complete the purchase…' : 'Opening the App Store…' }
       return dsx.variable.paying ? 'Complete the payment…' : 'Contacting Stripe…'
     </formula>
 
@@ -110,14 +156,24 @@
       else { dsx.module.route.replace({ path: '/' }) }
     </action>
 
-    <!-- ONE checkout path for every sku and every platform. -->
+    <!-- ONE BUY, TWO LANES. Which one is decided by `payLane`, never by this action. -->
     <action as="buy" sku="item.id" label="item.label">
       if (dsx.variable.buying != '') { return }
-      if (dsx.variable.signedIn == false) {
-        // A PURCHASE NEEDS AN ACCOUNT TO LAND ON, so the tap raises the sign-in sheet
-        // rather than farming a refusal toast. This used to be a toast that told the
-        // viewer to sign in on a build where nothing could.
-        dsx.module.route.push({ path: '/auth/signin' })
+      // NO SIGN-IN WALL IN FRONT OF THE MONEY. This used to push /auth/signin before a guest
+      // could buy a coin pack. Most viewers who pay in this category have never made an
+      // account, and a login screen between a decided buyer and a payment sheet is the most
+      // expensive interruption a storefront has. A purchase needs a SUBJECT, not a signed-in
+      // human, and an anonymous session is a subject — so the tap goes to the payment lane
+      // and a backend that has nothing to attach the purchase to says so in its own words.
+      // The <SignInCard> at the top of this screen is then an offer, not a gate.
+      if (dsx.variable.payLane == 'blocked') {
+        dsx.variable.toast = dsx.variable.payNote
+        return
+      }
+      // a NAMED dict, never positional — a positional call resolves the input to null,
+      // silently (AuthSeam.dsx:186 measured what that costs)
+      if (dsx.variable.payLane == 'iap') {
+        await dsx.action.buyNative({ sku: sku })
         return
       }
       dsx.variable.buying = sku
@@ -155,18 +211,63 @@
          safe to call any number of times — which is exactly why the retry card below can
          exist. Money confirmed by Stripe but not yet granted is never a dead end. -->
     <action as="settle">
-      const s = await settleCall.send({ order: dsx.variable.order })
+      const native = dsx.variable.nativeTxn != ''
+      let s = null
+      // an `await` in a ternary branch returns something whose `.ok` is falsy, silently
+      // (PLAN.md §6.31) — so this is an if/else and always will be
+      if (native) {
+        s = await nativeCall.send({ sku: dsx.variable.nativeSku, transaction: dsx.variable.nativeTxn, provider: dsx.variable.nativeProvider })
+      } else {
+        s = await settleCall.send({ order: dsx.variable.order })
+      }
       if (s.ok) {
         dsx.variable.settleFailed = false
         dsx.variable.order = ''
+        dsx.variable.nativeTxn = ''
+        dsx.variable.nativeSku = ''
+        dsx.variable.nativeProvider = ''
         wallet.refresh()
         dsx.variable.toast = s.data.granted
           ? (s.data.coins != null ? 'Added ' + s.data.coins + ' coins' : 'VIP is active for ' + s.data.days + ' days')
-          : 'This order was already applied.'
+          : 'This purchase was already applied.'
       } else {
+        // the card, not a toast — money is never a message that scrolls away. The server
+        // reason rides inside it (recoverLine) so a refusal retrying cannot fix is legible.
         dsx.variable.settleFailed = true
+        dsx.variable.settleMsg = s.data != null &amp;&amp; s.data.message != null ? s.data.message : ''
         dsx.variable.toast = ''
       }
+    </action>
+
+    <!-- THE NATIVE LANE. `store.checkout` opens StoreKit 2 or Play Billing and resolves the
+         module unified envelope — `{ outcome, provider, platform, product, transaction }` —
+         the same shape on every provider. `externalId`/`appAccountToken` carry the viewer
+         subject so the backend can look the purchase up against THIS account instead of
+         taking the client word for whose it is; with no subject yet they are empty, the
+         lookup finds nothing and the grant is REFUSED, which is the safe direction. -->
+    <action as="buyNative" inputs="sku">
+      dsx.variable.buying = sku
+      dsx.variable.toast = ''
+      dsx.variable.settleFailed = false
+      dsx.variable.order = ''
+      dsx.variable.paying = true
+      const got = await dsx.module.store.checkout({
+        product: sku, kind: 'coins', coins: true,
+        externalId: global.auth.sub, appAccountToken: global.auth.sub
+      })
+      dsx.variable.paying = false
+      if (got == null || got.outcome != 'purchased' || got.transaction == null) {
+        dsx.variable.buying = ''
+        // `cancelled` rides the failure channel on this module, so a dismissal and a decline
+        // arrive the same way — both are honestly "nothing was charged"
+        dsx.variable.toast = 'The purchase was not completed. Nothing was charged.'
+        return
+      }
+      dsx.variable.nativeSku = sku
+      dsx.variable.nativeTxn = got.transaction.id
+      dsx.variable.nativeProvider = got.provider == null ? '' : got.provider
+      await dsx.action.settle()
+      dsx.variable.buying = ''
     </action>
 
     <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
@@ -206,6 +307,9 @@
     <style as="errCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="20" alignItems="center"/>
 
     <style as="earnCard" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="12" alignItems="stretch"/>
+    <!-- the lane notice: the earn card's shape, tighter, and left-aligned because it is a
+         paragraph rather than a call to action -->
+    <style as="laneCard" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="8" alignItems="flex-start"/>
     <style as="earnTitle" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
     <style as="earnNote" fontSize="13" color="rgba(255,255,255,0.5)" lineSpacing="3"/>
     <style as="earnCta" background="rgba(255,255,255,0.1)" radius="24" paddingV="14" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
@@ -247,7 +351,7 @@
              a toast that scrolls away. -->
         <vstack class="retryCard" visible-if="dsx.variable.settleFailed" style="margin-top: 12px; border: 1px solid rgba(199,155,255,0.35)">
           <text value="Payment received — one step left" class="retryTitle"/>
-          <text value="Stripe confirmed your payment, but applying it to your wallet did not go through. Nothing is lost: confirm below and it lands. Order {{ dsx.variable.order }}." class="retryBody"/>
+          <text value="{{ dsx.variable.recoverLine }}" class="retryBody"/>
           <button label="Confirm payment" class="retryBtn" on:tap="dsx.action.settle()"/>
         
 </vstack>
@@ -272,12 +376,30 @@
         </vstack>
       </vstack>
 
+      <!-- THE REFUSAL, WHERE THE PRICES ARE. A native build with no in-app-purchase module
+           may not sell coins or passes at all (App Store 3.1.1), so this screen says so and
+           dims the grids rather than quietly opening a card sheet. The seam an adopter fills
+           is named in the note itself — Article 7: the degradation is named where the reader
+           is. On the web lane this never renders. -->
+      <vstack class="section" visible-if="dsx.variable.payLane == 'blocked' &amp;&amp; dsx.variable.phase == 'content'">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <vstack class="laneCard">
+            <text value="Purchasing is off in this build" class="earnTitle"/>
+            <text value="{{ dsx.variable.payNote }}" class="earnNote"/>
+          </vstack>
+        </vstack>
+      </vstack>
+
       <!-- VIP — the ONE plan list in the app: <PlansSheet> owns the tiers, the checkout
            and the settle-recovery, mounted inline here and as a sheet from Profile/VIP -->
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
           <text value="VIP — unlock every series" class="sectionTitle"/>
-          <text value="Unlimited viewing while your plan is active. Cancel anytime." class="sectionNote"/>
+          <!-- "Cancel anytime" described a subscription this backend has never had. Every
+               tier is a one-off charge for a dated pass (server/store.dsx storeCatalog), so
+               there is nothing to cancel — and the tier cards say the same thing in their
+               own notes, which is what a screen and its server agreeing looks like. -->
+          <text value="Unlimited viewing for the length of the pass. One charge, no auto-renewal." class="sectionNote"/>
         </vstack>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <PlansSheet mode="inline"

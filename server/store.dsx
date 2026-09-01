@@ -4,15 +4,35 @@
      confirmed with Stripe — never on the client's say-so, which is the same trust shape as
      episode unlocking.
 
-     Cross-platform by construction: this backend serves the SAME order to
-     `dsx.module.stripe` on web, iOS and Android. The native lanes may also settle through
-     the store modules (RevenueCat / StoreKit / Play Billing); either way the grant runs
-     through `grantOrder`, so entitlement has exactly one writer. -->
+     TWO LANES, PICKED BY CAPABILITY, ONE GRANT. The header used to say this backend served
+     the same Stripe order to web, iOS and Android — which was true, and was an App Store
+     3.1.1 violation in the iOS build (see `settleNative` for the guideline, verbatim, and
+     for why the carve-outs do not rescue it). Stripe is now the WEB lane; a native build
+     buys through the platform store and settles at `settleNative`. Both lanes end in the
+     same three writes — order row, ledger row, wallet fold — keyed on the same exactly-once
+     ledger lock, so entitlement still has exactly one writer and a replay on either lane
+     grants nothing twice. -->
+
 <server>
   <head>
     <secret as="STRIPE_KEY" env="STRIPE_KEY"/>
     <secret as="STRIPE_PUBLISHABLE" env="STRIPE_PUBLISHABLE"/>
+    <!-- THE NATIVE LANE. Stripe is the WEB lane only: App Store 3.1.1 names in-game
+         currencies and premium-content unlocks as in-app-purchase products, so coins and
+         the VIP pass must go through the platform store inside a native build. This key is
+         what lets the backend VERIFY such a purchase (see `settleNative` for why RevenueCat
+         is the only provider a declared action can reach), and its absence is what makes
+         `storeCatalog.native.ready` false so the app refuses to open a purchase it could
+         not honour. Unset in this template on purpose — a placeholder here would read as a
+         wired integration. -->
+    <secret as="REVENUECAT_KEY" env="REVENUECAT_KEY"/>
+    <!-- The INBOUND half. RevenueCat authenticates its webhook by echoing a shared value in
+         `Authorization` — no signature over the body — which is why `verify="bearer"` exists
+         in the scheme table at all, and why the framework names it for what it is. Rotate by
+         listing a second env name on the <webhook> row. -->
+    <secret as="REVENUECAT_WEBHOOK_SECRET" env="REVENUECAT_WEBHOOK_SECRET"/>
     <egress host="api.stripe.com"/>
+    <egress host="api.revenuecat.com"/>
 
     <entity as="order" ownership="owner">
       <field as="sku" type="text"/>
@@ -26,14 +46,67 @@
       <index on="intent"/>
     </entity>
 
-    <!-- ONE price table, server-side. An operator changes price without a build, and the
-         client can never invent one: checkout is looked up by sku, never by posted amount. -->
+    <!-- ══ THE PRICE TABLE. ONE COPY. THIS ONE. ═══════════════════════════════════════════
+         There were three, and they had already drifted: `storeCatalog` served
+         `vip_weekly`/`coins_500`, `createCheckout` re-typed the same rows to price the
+         charge, and `rewardsState` in server/engage.dsx served a THIRD copy with ids
+         (`weekly`/`p500`) that no checkout sku matched and a `best` flag that contradicted
+         this one. The production audit filed it as a blocker (H2) for the obvious reason:
+         the price a screen DISPLAYS and the price a card is CHARGED were two literals with
+         nothing holding them together. The engage.dsx copy is deleted (nothing read it);
+         `createCheckout` and `settleNative` now read THIS action through a sibling call.
+         An operator still changes price without a build, and the client still cannot invent
+         one: every purchase is looked up by sku, never by posted amount.
+
+         ── WHAT A VIP PLAN ACTUALLY IS HERE, NOW SAID IN THE DATA ────────────────────────
+         These three rows used to read `note: 'Auto-renew. Cancel anytime.'` on two tiers and
+         'then $14.99/week' on the third. All three strings were false, and false in the one
+         way a store listing must never be: `createCheckout` opens a ONE-OFF PaymentIntent
+         and `settleOrder` stamps `vip_until = (current expiry or now) + days`. There is no
+         Stripe Subscription object anywhere in this backend, no renewal job, no cancel path
+         — nothing here can charge a second time, so nothing here may promise to. A viewer
+         reading "cancel anytime" would go looking for a cancel control that cannot exist,
+         and a reviewer reading it would look for the subscription disclosures Apple requires
+         beside an auto-renewing price and find a product that does not renew.
+         Components/Vip.dsx had already stopped repeating the claim and said so in its own
+         copy (a deliberate loud bridge, Article 7) — a screen arguing with its own server is
+         not shippable, so the server tells the truth and the bridge comes down.
+
+         The product IS a dated pass, so the LABEL is the product: "7-day pass", not "Weekly
+         VIP". The ids moved with it (`vip_pass_7`, not `vip_weekly`) because the sku is also
+         the product id an adopter creates in App Store Connect and Play Console for the
+         native lane below, and "weekly" on a non-renewing product is a mislabel there too.
+         Old `vip_weekly` order rows still settle correctly: `settleOrder` grants from the
+         days recorded ON THE ROW, never from the sku.
+
+         AND THE PASS SEMANTICS ARE WHAT KEEP THE NATIVE LANE HONEST. A dated pass is a
+         CONSUMABLE, so it has no renewal, no grace period, no billing retry and no
+         refund-driven revocation to stay in step with — one purchase, one grant, done. That
+         matters because the inbound edge this app declares is a `verify="bearer"` RevenueCat
+         receiver: enough to be told a purchase happened, and nothing like enough to run an
+         auto-renewing subscription, whose whole lifecycle arrives as App Store Server
+         Notifications (`verify="apple"`) and Play RTDN (`verify="play"`) — both refused BY
+         NAME by the build today, with the missing work named. Selling a subscription here
+         would mean learning about renewals, cancellations and refunds only when the customer
+         complains. A pass has no such events to miss.
+
+         BADGES ARE ARITHMETIC OR THEY ARE GONE. "21% OFF" priced $11.99 against the
+         "$14.99/week" that never existed, and "POPULAR" measured nothing this app counts.
+         "BEST VALUE" survives because it is checkable from the row it sits on: 19999/365 is
+         55c a day against 1199/7 = 171c and 4999/30 = 167c. -->
     <action as="storeCatalog">
+      // `native.ready` is the one fact that decides whether the app may open a NATIVE store
+      // purchase, and it is a SERVER fact on purpose: the client can see whether the IAP
+      // module is in its build, but only the backend knows whether a receipt from it can be
+      // verified and granted. False here means the purchase surface refuses BEFORE Apple or
+      // Google takes money this deployment could not honour. See `settleNative`.
+      const rc = await dsx.module.secret.read({ name: 'REVENUECAT_KEY' })
+      const verifier = rc.ok && rc.data != null && rc.data !== ''
       return {
         vip: [
-          { id: 'vip_weekly',  label: 'Weekly VIP',  price: '$11.99',  cents: 1199,  days: 7,   note: 'then $14.99/week',           badge: '21% OFF', best: false },
-          { id: 'vip_monthly', label: 'Monthly VIP', price: '$49.99',  cents: 4999,  days: 30,  note: 'Auto-renew. Cancel anytime.', badge: 'POPULAR', best: false },
-          { id: 'vip_yearly',  label: 'Yearly VIP',  price: '$199.99', cents: 19999, days: 365, note: 'Auto-renew. Cancel anytime.', badge: 'BEST VALUE', best: true  }
+          { id: 'vip_pass_7',   label: '7-day pass',   price: '$11.99',  cents: 1199,  days: 7,   note: 'One charge for 7 days. No auto-renewal.',   badge: '',           best: false },
+          { id: 'vip_pass_30',  label: '30-day pass',  price: '$49.99',  cents: 4999,  days: 30,  note: 'One charge for 30 days. No auto-renewal.',  badge: '',           best: false },
+          { id: 'vip_pass_365', label: '365-day pass', price: '$199.99', cents: 19999, days: 365, note: 'One charge for 365 days. No auto-renewal.', badge: 'BEST VALUE', best: true  }
         ],
         packs: [
           { id: 'coins_500',   coins: 500,   free: 25,    cents: 499,  price: '$4.99',  bonus: '+5%' },
@@ -42,7 +115,13 @@
           { id: 'coins_3000',  coins: 3000,  free: 900,   cents: 2999, price: '$29.99', bonus: '+30%' },
           { id: 'coins_5000',  coins: 5000,  free: 2500,  cents: 4999, price: '$49.99', bonus: '+50%' },
           { id: 'coins_10000', coins: 10000, free: 10000, cents: 9999, price: '$99.99', bonus: '+100%' }
-        ]
+        ],
+        native: {
+          ready: verifier,
+          reason: verifier
+            ? ''
+            : 'This build cannot verify a native store receipt yet, so it will not open a purchase it could not honour. Set REVENUECAT_KEY on the deployment (server/store.dsx settleNative names what it does with it).'
+        }
       }
     </action>
 
@@ -70,30 +149,24 @@
          the partial unique index in policies.local.sql is written `where intent <> ''`
          precisely so those pre-intent rows do not all collide with each other. -->
     <action as="createCheckout" inputs="sku">
-      // The price table is inlined here on purpose: this lookup decides what the customer
-      // is charged, and it must not depend on a cross-action hop.
+      // THE TABLE IS READ, NOT RE-TYPED. This lookup decides what the customer is charged,
+      // and the old comment here argued that made it too important to depend on a
+      // cross-action hop — which had it exactly backwards: a second literal copy of the
+      // prices is not safety, it is the drift the audit found (H2). A sibling action
+      // resolves the MODULE ENVELOPE, so this reads `.data` like any other module call
+      // (AGENTS.md; an older note claiming siblings return void is false). It costs ONE of
+      // the 64 calls a request gets, in an action that already spends about six.
       // NOTE the local is `picked`, never `item`: `item` is the reserved ROW-SCOPE name,
       // and a local `let item` in an action is silently shadowed — reads return the whole
       // scope object, so `item == null` is false for a null (upstream #242).
-      const VIP = [
-        { id: 'vip_weekly',  cents: 1199,  days: 7,   label: 'Weekly VIP' },
-        { id: 'vip_monthly', cents: 4999,  days: 30,  label: 'Monthly VIP' },
-        { id: 'vip_yearly',  cents: 19999, days: 365, label: 'Yearly VIP' }
-      ]
-      const PACKS = [
-        { id: 'coins_500',   coins: 500,   free: 25,    cents: 499,  label: '500 coins' },
-        { id: 'coins_1000',  coins: 1000,  free: 100,   cents: 999,  label: '1000 coins' },
-        { id: 'coins_2000',  coins: 2000,  free: 400,   cents: 1999, label: '2000 coins' },
-        { id: 'coins_3000',  coins: 3000,  free: 900,   cents: 2999, label: '3000 coins' },
-        { id: 'coins_5000',  coins: 5000,  free: 2500,  cents: 4999, label: '5000 coins' },
-        { id: 'coins_10000', coins: 10000, free: 10000, cents: 9999, label: '10000 coins' }
-      ]
+      const cat = await dsx.action.storeCatalog()
+      if (!cat.ok || cat.data == null) { throw { reason: 'unavailable', message: 'the price list is unavailable' } }
       let picked = null
-      for (const v of VIP) {
+      for (const v of cat.data.vip) {
         if (v.id === sku) { picked = { kind: 'vip', cents: v.cents, coins: 0, bonus: 0, days: v.days, label: v.label } }
       }
-      for (const p of PACKS) {
-        if (p.id === sku) { picked = { kind: 'coins', cents: p.cents, coins: p.coins, bonus: p.free, days: 0, label: p.label } }
+      for (const p of cat.data.packs) {
+        if (p.id === sku) { picked = { kind: 'coins', cents: p.cents, coins: p.coins, bonus: p.free, days: 0, label: p.coins + ' coins' } }
       }
       if (picked == null) { throw { reason: 'invalid', message: 'unknown item' } }
 
@@ -114,6 +187,11 @@
       let reuse = null
       for (const row of (mineOpen.ok ? mineOpen.data : [])) {
         if (row.intent == null || row.intent === '') { continue }
+        // STRIPE ROWS ONLY. `intent` is a provider-qualified id now that a native store
+        // purchase also lands in this table (settleNative writes `revenuecat:<txn>`), and
+        // handing one of those to api.stripe.com would be a guaranteed 404 on the money
+        // path. Stripe PaymentIntent ids are `pi_` by construction.
+        if (!row.intent.startsWith('pi_')) { continue }
         if (row.amount_cents !== picked.cents) { continue }   // the price changed under them — open a fresh one
         if (Date.now() - new Date(row.created_at).getTime() > OPEN_MS) { continue }
         if (reuse == null || row.created_at > reuse.created_at) { reuse = row }
@@ -275,6 +353,292 @@
       return { granted: true, vipUntil: until, days: o.days }
     </action>
 
+    <!-- ══ SETTLE A NATIVE STORE PURCHASE ══════════════════════════════════════════════════
+         App Store Review 3.1.1, verbatim: "If you want to unlock features or functionality
+         within your app, (by way of example: subscriptions, in-game currencies, game levels,
+         access to premium content, or unlocking a full version), you must use in-app
+         purchase." Coins and the VIP pass are BOTH named by that parenthetical. Selling them
+         through Stripe inside an iOS build is a rejection, and reader-app status does not
+         rescue it: a reader app may not offer IAP at all and may only give access to content
+         bought elsewhere — it may not run a storefront. The US anti-steering carve-out is
+         real and does not rescue it either: it permits a LINK OUT to your own website; it
+         does not permit a non-Apple payment sheet inside the app. Google Play Payments says
+         the same thing for the same products.
+
+         So the purchase LANE is picked by capability (Components/Store.dsx and
+         Components/parts/PlansSheet.dsx, the AdGate pattern): `has(store)` on a native build
+         takes the store module, the web takes Stripe. This action is the SERVER half of that
+         lane, and it exists because the client half must never be the authority — the same
+         law the Stripe lane obeys three actions up. A grant here is sized from the price
+         table, keyed on the provider transaction, and locked by the same ledger row.
+
+         ── WHAT CAN AND CANNOT BE VERIFIED FROM A DECLARED ACTION, MEASURED ────────────────
+         A declared action has `fetch`, `<secret>` and a declared `<egress>` host list. That
+         is enough for a bearer-token REST call and nothing else, which decides the provider:
+
+           Apple App Store Server API — NOT REACHABLE. Auth is an ES256-signed JWT built from
+             a .p8 private key, and verifying a StoreKit JWS transaction directly means
+             checking an x5c chain against Apple root CAs. There is no signing primitive in
+             the server action plane.
+           Google Play Developer API — NOT REACHABLE, same reason: an OAuth2 access token
+             minted from an RS256 service-account assertion.
+           RevenueCat REST v1 — REACHABLE. `Authorization: Bearer <secret key>`, one GET.
+             RevenueCat has already validated the receipt with Apple or Google before it
+             answers, which is exactly why the store module reports `receipt: null` on the
+             revenuecat provider, and why `store.checkout` defaults to it.
+
+         Hence REVENUECAT_KEY, and hence `storeCatalog.native.ready`: with no key this
+         deployment REFUSES TO OPEN a native purchase at all rather than taking money at
+         Apple that it could not then grant. That refusal is the honest failure; granting on
+         the client word is not, and neither is a lane that silently keeps selling through
+         Stripe on a phone.
+
+         ── THIS CODE FAILS CLOSED, AND HAS NOT BEEN RUN AGAINST A LIVE ACCOUNT ─────────────
+         Named rather than implied (Article 7): the RevenueCat read below was written from
+         the documented v1 subscriber shape and has not been exercised against a real
+         sandbox purchase in this template, because there is no RevenueCat project behind it.
+         Every branch refuses on anything it does not positively recognise, so a wrong field
+         guess REFUSES A LEGITIMATE PURCHASE — recoverable, and visible immediately — rather
+         than granting an illegitimate one. An adopter must put one sandbox purchase through
+         this action before shipping, and PLAN.md 6.87 records the ask.
+
+         ── THE PRICE ON A NATIVE LANE IS THE STORE PRICE ───────────────────────────────────
+         `amount_cents` on the row is the table price, and it is the ENTITLEMENT record, not
+         the receipt: on this lane Apple and Google charge their own localized tier and the
+         money lives in their console. The grant is sized from `coins`/`days` for exactly the
+         reason the Stripe lane is — the client never sends an amount. -->
+    <action as="settleNative" inputs="sku, transaction, provider">
+      if (sku == null || sku === '') { throw { reason: 'invalid', message: 'sku is required' } }
+      if (transaction == null || transaction === '') { throw { reason: 'invalid', message: 'a store transaction id is required' } }
+
+      const rc = await dsx.module.secret.read({ name: 'REVENUECAT_KEY' })
+      if (!rc.ok || rc.data == null || rc.data === '') {
+        throw { reason: 'unavailable', message: 'This deployment cannot verify a store receipt, so it will not grant one. Set REVENUECAT_KEY (see server/store.dsx settleNative).' }
+      }
+
+      // THE CALLER, TAKEN FROM A ROW RATHER THAN FROM THE REQUEST. There is no "who am I"
+      // call in the server action plane — identity is implicit, applied by RLS when a query
+      // runs — so the caller id is read off a row the caller owns: `owner_id` on their own
+      // wallet, stamped by the database from the verified subject and unreachable from the
+      // wire. It matters more here than anywhere else in this file, because it is also the
+      // RevenueCat app_user_id: it is the thing that stops viewer A redeeming a transaction
+      // belonging to viewer B. Taking it from the request body would make every other
+      // account a redeemable receipt.
+      // NOTE what this does NOT require: a signed-in human. It requires a SUBJECT. An
+      // anonymous session satisfies it exactly as a signed-in one does, which is the whole
+      // point of buying without a login.
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) {
+        const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (made.ok) { w = made.data } else {
+          const again = await dsx.module.data.wallet.list({ limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+      }
+      if (w == null) { throw { reason: 'conflict', message: 'no wallet' } }
+      const uid = w.owner_id
+      if (uid == null || uid === '') {
+        throw { reason: 'unavailable', message: 'this purchase cannot be attributed to an account, so it will not be granted' }
+      }
+
+      const seen = await fetch('https://api.revenuecat.com/v1/subscribers/' + encodeURIComponent(uid), {
+        method: 'GET',
+        headers: { authorization: 'Bearer ' + rc.data, accept: 'application/json' }
+      })
+      if (!seen.ok || seen.data == null || seen.data.subscriber == null) {
+        throw { reason: 'upstream', message: 'could not verify the purchase with the store' }
+      }
+      // A dated pass and a coin pack are both CONSUMABLES (see the price table header), so
+      // both land in `non_subscriptions`, keyed by product id — an array of every purchase of
+      // that product on this account. The reported transaction must be one of them. Both id
+      // spellings are read: RevenueCat carries its OWN id as `id` and the store transaction
+      // as `store_transaction_id`, and which of the two the module reported depends on
+      // whether it was talking to RevenueCat or to StoreKit directly.
+      const bought = seen.data.subscriber.non_subscriptions
+      const runs = bought == null || bought[sku] == null ? [] : bought[sku]
+      let store_txn = ''
+      for (const one of runs) {
+        if (one.id === transaction || one.store_transaction_id === transaction) {
+          // THE KEY IS THE STORE TRANSACTION, on both paths. The webhook reports
+          // `event.transaction_id` and this REST document reports `store_transaction_id`,
+          // and they are the same identifier — which is what makes the two grant paths
+          // collapse onto ONE ledger row instead of crediting twice. Preferring it here,
+          // rather than the id the client happened to report, is what keeps that true.
+          store_txn = one.store_transaction_id == null || one.store_transaction_id === ''
+            ? transaction
+            : one.store_transaction_id
+        }
+      }
+      if (store_txn === '') {
+        throw { reason: 'conflict', message: 'the store has no record of this purchase on your account' }
+      }
+
+      const done = await dsx.action.grantStore({
+        owner: uid, sku: sku, transaction: store_txn,
+        provider: provider == null || provider === '' ? 'revenuecat' : provider
+      })
+      if (!done.ok || done.data == null) { throw { reason: 'unavailable', message: 'the purchase could not be applied — it will land when the store callback arrives' } }
+      return done.data
+    </action>
+
+    <!-- ══ THE INBOUND EDGE: RevenueCat tells us, we do not ask ═══════════════════════════
+         The house rule for money, and it is not negotiable: no coin grant originates from a
+         client. Every credit comes from a server-to-server exchange this backend verified.
+         There are exactly two of those on this lane and they are BOTH server-to-server —
+         the callback below (RevenueCat pushes), and `settleNative` above (we pull the same
+         fact from RevenueCat over the same trust boundary, so the customer is not left
+         staring at a spinner while a webhook queues). Neither one takes the client word for
+         anything except WHICH purchase to go and check.
+
+         `<webhook>` is a generated receiver, not a route an author writes: the row fixes
+         POST, the raw body, no `auth` (a sender holds no account, so the credential IS the
+         header — `auth="required"` would 401 every delivery while the endpoint looked
+         healthy) and a rate ceiling, because every hand-written version of those gets one of
+         them wrong silently. It enqueues; the worker drains; the drain is where the work is,
+         so a sender timeout can never decide whether the grant was written.
+
+         `verify="bearer"` is named for what it is: RevenueCat echoes a shared secret in
+         `Authorization` and nothing binds it to the body, so the body rests on TLS alone.
+         It is in the scheme table precisely because some senders offer nothing better and an
+         author who cannot declare it hand-rolls a public POST that is worse. `apple` and
+         `play` are refused BY NAME by the build (an x5c chain to Apple root CA; an OIDC
+         bearer against Google rotating JWKS) — which is the second reason RevenueCat is the
+         bridge rather than a convenience: it is the only one of the three whose callback
+         this backend can actually authenticate today.
+
+         `idField="event.id"` is required by the build for a scheme with no signed uniqueness:
+         without the sender own event id, two distinct events with identical bytes would
+         collapse into one queue row. -->
+    <action as="storeEvent" inputs="body">
+      // ONE MESSAGE, ONE EVENT. The envelope the receiver enqueues is
+      // { received_at, signed_at?, source, scheme, body } and `body` is RevenueCat payload:
+      // { api_version, event: { id, type, app_user_id, product_id, transaction_id, store,
+      //   environment, ... } }.
+      if (body == null || body.event == null) { return { skipped: 'no event' } }
+      const ev = body.event
+      const kind = ev.type == null ? '' : ev.type
+
+      // ONLY the event that means "a one-off product was bought". Everything this app sells
+      // is a consumable — a coin pack, or a dated pass (see the price table header) — so
+      // NON_RENEWING_PURCHASE is the whole vocabulary. TEST, TRANSFER, CANCELLATION,
+      // BILLING_ISSUE and the subscription family are ACKED and skipped rather than guessed
+      // at: a grant path that accepts an event type it does not sell is a grant path nobody
+      // can reason about. Returning acks the message; throwing would retry it forever.
+      if (kind !== 'NON_RENEWING_PURCHASE') { return { skipped: kind } }
+
+      // SANDBOX DOES NOT PAY. A sandbox purchase is free and infinitely repeatable, so
+      // granting on one is a hole with a queue in front of it. It is skipped rather than
+      // failed, so an adopter testing in sandbox sees `skipped: sandbox` in the drain and
+      // knows exactly which line to relax while they test:  this one.
+      if (ev.environment != null && ev.environment !== 'PRODUCTION') { return { skipped: 'sandbox' } }
+
+      const owner = ev.app_user_id
+      const sku = ev.product_id
+      const txn = ev.transaction_id
+      if (owner == null || owner === '' || sku == null || sku === '' || txn == null || txn === '') {
+        // A malformed delivery is not retryable — the same bytes will arrive the same way —
+        // so it is acked with a reason rather than dead-lettered after N attempts.
+        return { skipped: 'incomplete' }
+      }
+      const done = await dsx.action.grantStore({ owner: owner, sku: sku, transaction: txn, provider: 'revenuecat' })
+      if (!done.ok) {
+        // THROW = RETRY. This is the one branch that must not swallow: a wallet write that
+        // failed on a database blip is money the customer paid for, and the queue is the
+        // thing that will bring it back.
+        throw { reason: 'unavailable', message: 'the grant did not land' }
+      }
+      return done.data
+    </action>
+
+    <!-- ══ THE ONLY GRANTER ON THE NATIVE LANE ════════════════════════════════════════════
+         Both server-to-server paths above end here, and that is the point: one derivation of
+         the price, one derivation of the idempotency key, one order row, one ledger lock, one
+         wallet fold. Two granters with two copies of this logic is how a webhook and a pull
+         end up crediting the same purchase twice.
+
+         `owner` IS A TRUSTED ARGUMENT and only these two callers may supply it: `settleNative`
+         reads it off the caller own wallet row (RLS-stamped, unreachable from the wire) and
+         `storeEvent` reads it from a delivery the receiver already authenticated. It is NEVER
+         a route input — there is deliberately no `<route>` pointing at this action.
+
+         WHY IT RUNS UNDER TWO DIFFERENT SCOPES AND WRITES `owner_id` EXPLICITLY. A queue drain
+         dispatches internally, with the connection role untouched and no `auth.uid()` to
+         default from, so a row created without an owner would belong to nobody. Naming it is
+         also correct on the viewer path, where it equals the verified subject and satisfies
+         the RLS check rather than bypassing it. -->
+    <action as="grantStore" inputs="owner, sku, transaction, provider">
+      if (owner == null || owner === '') { throw { reason: 'invalid', message: 'owner is required' } }
+      if (transaction == null || transaction === '') { throw { reason: 'invalid', message: 'transaction is required' } }
+
+      // the SAME table the storefront displays and the Stripe lane charges (H2)
+      const cat = await dsx.action.storeCatalog()
+      if (!cat.ok || cat.data == null) { throw { reason: 'unavailable', message: 'the price list is unavailable' } }
+      let picked = null
+      for (const v of cat.data.vip) {
+        if (v.id === sku) { picked = { kind: 'vip', cents: v.cents, coins: 0, bonus: 0, days: v.days } }
+      }
+      for (const p of cat.data.packs) {
+        if (p.id === sku) { picked = { kind: 'coins', cents: p.cents, coins: p.coins, bonus: p.free, days: 0 } }
+      }
+      // A product the price table does not sell is not granted. On the webhook path this is
+      // also the guard against a product id created in App Store Connect that nobody added
+      // here — it fails loudly in the drain rather than crediting a guess.
+      if (picked == null) { throw { reason: 'invalid', message: 'unknown item' } }
+
+      const tag = (provider == null || provider === '' ? 'store' : provider) + ':' + transaction
+      const mine = await dsx.module.data.wallet.list({ filters: { owner_id: owner }, limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) {
+        const made = await dsx.module.data.wallet.create({ owner_id: owner, coins: 0, bonus: 0 })
+        if (made.ok) { w = made.data } else {
+          const again = await dsx.module.data.wallet.list({ filters: { owner_id: owner }, limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+      }
+      if (w == null) { throw { reason: 'unavailable', message: 'no wallet for this purchase' } }
+
+      // THE ORDER ROW IS THE ENTITLEMENT RECORD, NOT THE RECEIPT. On this lane Apple or
+      // Google charged their own localized tier and the money lives in their console;
+      // `amount_cents` is the list price from our table so support can read what was sold.
+      // `intent` carries the provider-qualified transaction, which is also the FIRST of the
+      // two locks: `unique (intent) where intent <> ''` in policies.local.sql.
+      const row = await dsx.module.data.order.create({
+        owner_id: owner, sku: sku, kind: picked.kind, amount_cents: picked.cents,
+        coins: picked.coins, bonus: picked.bonus, days: picked.days,
+        status: 'created', intent: tag
+      })
+      if (!row.ok) { return { granted: false, already: true } }
+
+      if (picked.kind === 'coins') {
+        // THE SECOND LOCK, and the authoritative one: the ledger row keyed
+        // (owner_id, kind, source, ref) with ref = the store transaction. Written BEFORE the
+        // wallet, refused by the database on a replay — the same idiom the Stripe lane uses,
+        // because a declared action has no transaction seam and no compare-and-swap.
+        const lc = await dsx.module.data.ledger.create({ owner_id: owner, kind: 'coin', amount: picked.coins, source: 'pack', ref: tag })
+        if (!lc.ok) { return { granted: false, already: true } }
+        await dsx.module.data.order.update({ id: row.data.id, values: { status: 'paid' } })
+        if (picked.bonus > 0) {
+          await dsx.module.data.ledger.create({ owner_id: owner, kind: 'bonus', amount: picked.bonus, source: 'pack', ref: tag })
+        }
+        const paid = await dsx.module.data.wallet.update({ id: w.id, values: { coins: w.coins + picked.coins, bonus: w.bonus + picked.bonus } })
+        if (!paid.ok) { throw { reason: 'unavailable', message: 'the balance could not be updated — contact support with this order id' } }
+        return { granted: true, coins: picked.coins, bonus: picked.bonus, order: row.data.id }
+      }
+
+      const lv = await dsx.module.data.ledger.create({ owner_id: owner, kind: 'coin', amount: 0, source: 'vip', ref: tag })
+      if (!lv.ok) { return { granted: false, already: true } }
+      await dsx.module.data.order.update({ id: row.data.id, values: { status: 'paid' } })
+      // EXTENDS, never truncates — the same rule as settleOrder
+      const from = w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
+        ? new Date(w.vip_until).getTime()
+        : Date.now()
+      const until = new Date(from + picked.days * 86400000).toISOString()
+      const paid = await dsx.module.data.wallet.update({ id: w.id, values: { vip_until: until } })
+      if (!paid.ok) { throw { reason: 'unavailable', message: 'the membership could not be updated — contact support with this order id' } }
+      return { granted: true, vipUntil: until, days: picked.days, order: row.data.id }
+    </action>
+
     <!-- RESTORE. App Store 3.1.1: "you should make sure you have a restore mechanism for any
          restorable in-app purchases." Most of it is already true by construction — VIP and
          every unlock are SERVER-side, account-scoped rows, so a reinstall that signs back in
@@ -285,11 +649,13 @@
          This walks the caller's own unsettled orders, asks Stripe about each, and settles the
          ones that succeeded. It is exactly-once for the same reason settleOrder is: the same
          ledger unique index refuses a second grant.
-         NOT COVERED, and named rather than implied: the NATIVE store lanes. A purchase made
-         through StoreKit or Play Billing never creates one of these rows, so there is nothing
-         here to restore — that receiver is a hosted-lane integration this template does not
-         have (no <webhook> tag in the standalone compiler; see the wallet.dsx header and
-         PLAN.md §6.86). An adopter shipping to the App Store must wire it before submitting. -->
+         NOT THIS LANE, and named rather than implied: a NATIVE store purchase never creates
+         one of these rows, so there is nothing here to sweep for it. Its restore is the
+         store module own `store.restore` on the client (it re-reads what the platform says
+         this device owns) plus `settleNative`, which re-verifies against RevenueCat and is
+         idempotent by the same ledger lock — so a viewer can run it as often as they like.
+         Wiring that pair into <RestoreRow> is the handoff this pass leaves behind; that file
+         is not ours to edit. -->
     <action as="restoreOrders">
       const open = await dsx.module.data.order.list({ filters: { status: 'created' }, limit: 100 })
       const rows = open.ok ? open.data : []
@@ -319,6 +685,10 @@
       // call rather than a deadline error on this one.
       for (const o of rows.slice(0, 20)) {
         if (o.intent == null || o.intent === '') { continue }
+        // Stripe rows only — the same guard as the reuse loop in createCheckout. A native
+        // store order carries `revenuecat:<txn>` here, and its restore lane is the store
+        // module (see settleNative), not a PaymentIntent read.
+        if (!o.intent.startsWith('pi_')) { continue }
         checked = checked + 1
         const res = await fetch('https://api.stripe.com/v1/payment_intents/' + o.intent, {
           method: 'GET', headers: { authorization: 'Bearer ' + key.data }
@@ -375,10 +745,26 @@
          · settle     20/h — a read-back plus a grant. The Store's recovery card retries on
                      purpose, and a viewer may settle several orders in a session; twenty
                      covers every legitimate case and bounds a replay loop.
+         · native     20/h — the same shape as settle, one lane over: one RevenueCat read
+                     plus the same grant. Sized to the RETRY, not to the intent — a native
+                     purchase whose settle is lost is money already taken at Apple, so the
+                     app must be able to keep asking (AGENTS.md: size the rate to the sweep).
          · restore     6/h — up to twenty Stripe reads per call. It is a deliberate,
                      user-initiated action, not something a screen polls. -->
   <route method="GET"  path="/store/catalog"  action="storeCatalog"   auth="none"     rate="120/m"/>
   <route method="POST" path="/store/checkout" action="createCheckout" auth="required" rate="6/h"/>
   <route method="POST" path="/store/settle"   action="settleOrder"    auth="required" rate="20/h"/>
+  <route method="POST" path="/store/native"   action="settleNative"   auth="required" rate="20/h"/>
+  <!-- THE RECEIVER AND ITS DRAIN. No `<route>` names `grantStore` or `storeEvent`, and that
+       is the design: the only ways into the granter are a caller re-verifying their own
+       purchase (settleNative) and a delivery this backend authenticated. `queue=` is drained
+       by the worker below — a webhook whose queue nobody drains verifies, enqueues, answers
+       200, and sits there forever while the sender dashboard shows every delivery green, so
+       the build refuses that pairing outright. `rate` is the only ceiling on an endpoint a
+       stranger may call at will. -->
+  <webhook as="revenuecat" queue="store_events" verify="bearer"
+           secret="REVENUECAT_WEBHOOK_SECRET" idField="event.id" rate="600/m"/>
+  <worker as="drain-store-events" queue="store_events" action="storeEvent"
+          schedule="* * * * *" idempotencyKey="event"/>
   <route method="POST" path="/store/restore"  action="restoreOrders"  auth="required" rate="6/h"/>
 </server>

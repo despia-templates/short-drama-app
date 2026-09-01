@@ -41,11 +41,25 @@
          public source, which is the funnel's hook and is public by design. -->
     <api as="play" url="/wallet/play/{{ dsx.variable.needsTicket }}" ssr="false"
          auto="global.auth.ok == true &amp;&amp; dsx.variable.needsTicket != ''" headers="global.auth.headers"/>
-    <api as="thread" url="/social/comments/{{ dsx.variable.epId }}" ssr="false" auto="false"/>
+    <!-- THE THREAD READ NOW CARRIES THE TOKEN, on a route that does not require one. That is
+         not a contradiction: reading a thread stays open to a guest (auth="none"), but BLOCK
+         is enforced inside the read, and the server can only scope a block list to a caller it
+         can identify. A guest sends `{}`, resolves to the anon role, and an owner-policy table
+         yields nothing — so the same action serves both without a branch. The whole URL is one
+         computed value because the filter level rides it as a query parameter. -->
+    <api as="thread" url="{{ dsx.variable.threadUrl }}" ssr="false" auto="false" headers="global.auth.headers"/>
+    <api as="blocks" url="/social/blocks" ssr="false" auto="false" headers="global.auth.headers"/>
     <api as="unlockCall" url="/wallet/unlock" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="progressCall" url="/viewer/progress" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="favCall" url="/viewer/favorite" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="commentCall" url="/social/comment" method="POST" auto="false" headers="global.auth.headers"/>
+    <!-- THE SAFETY SET (App Store 1.2). Four writes, all imperative, all carrying the seam
+         token — reporting, blocking and deleting your own comment are identity acts and the
+         routes refuse an anonymous caller outright. -->
+    <api as="reportCall" url="/social/report" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="blockCall" url="/social/block" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="unblockCall" url="/social/unblock" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="commentDeleteCall" url="/social/comment/delete" method="POST" auto="false" headers="global.auth.headers"/>
 
     <variable as="page">return 0</variable>   <!-- 0-based; the vertical pager owns it -->
     <variable as="showId">return ''</variable>
@@ -89,6 +103,25 @@
     <variable as="toast">return ''</variable>
     <variable as="favTouched">return ''</variable>
     <variable as="plotOpen">return false</variable>
+
+    <!-- ── the comment sheet, which is THREE PANES IN ONE SHEET ─────────────────────────
+         NOT a second <sheet> over the first. docs/stacked-sheets.md measured what nesting
+         does today: the child present key is never written false when the parent tears the
+         chain down, so the child auto-presents the next time the parent opens (iOS), and on
+         web closing the parent does not close the child at all. A depth stack inside the one
+         sheet — the same shape the episode drawer already uses for its two tabs — has none of
+         that and works identically on every renderer. -->
+    <variable as="cPane">return 'thread'</variable>      <!-- thread | options | safety -->
+    <variable as="filterLevel">return 'standard'</variable>   <!-- standard | strict -->
+    <!-- the comment the options pane is about: { id, owner, author, body } -->
+    <variable as="pick">return null</variable>
+    <!-- THE OPTIMISTIC HIDE. A report has to feel done before the round trip finishes, and a
+         viewer who blocks someone must not watch that person sit on screen until a refetch
+         lands. These ids are dropped from the rendered thread immediately and put BACK if the
+         write fails — an acknowledgement that outlives a failed request is a lie. -->
+    <variable as="hiddenIds">return []</variable>
+    <variable as="modNote">return ''</variable>          <!-- the panel acknowledgement line -->
+    <variable as="modBusy">return false</variable>
 
     <!-- FOUR RUNGS, and the same four on every surface that offers speed.
          The ladder used to carry seven (0.5 … 3.0), which cannot fit a phone sheet, so
@@ -279,9 +312,80 @@
       if (favs.data == null) { return false }
       return favs.data.items.filter(x => x.show == dsx.variable.showId).length > 0
     </variable>
+    <!-- THE THREAD URL IS ONE COMPUTED VALUE, so the filter level travels to the server as a
+         query parameter rather than being applied here. See `threadRows` for why. -->
+    <variable as="threadUrl" computed="true">
+      const ep = dsx.variable.epId
+      if (ep == null || ep === '') { return '' }
+      if (dsx.variable.filterLevel == 'strict') { return '/social/comments/' + ep + '?level=strict' }
+      return '/social/comments/' + ep
+    </variable>
+    <!-- WHAT THIS FILTER IS AND IS NOT. The SAFETY filters — a blocked author, and a comment
+         the community has flagged past the threshold — are applied on the SERVER and those
+         rows never reach this device (server/social.dsx says why: a row filtered in markup is
+         still in the payload, in the SSR html and in curl). What happens HERE is only the
+         optimistic hide: the rows this session has just reported or just blocked, dropped
+         before the refetch lands so the tap feels answered. -->
+    <variable as="threadRows" computed="true">
+      if (thread.data == null) { return [] }
+      return thread.data.rows.filter(r => dsx.variable.hiddenIds.includes(r.id) == false)
+    </variable>
+    <!-- the rail badge counts what a reader can actually see, not what the table holds -->
     <variable as="commentCount" computed="true">
-      if (thread.data == null) { return 0 }
-      return thread.data.count
+      return dsx.variable.threadRows.length
+    </variable>
+    <variable as="emptyThread" computed="true">
+      return thread.data != null && dsx.variable.threadRows.length == 0
+    </variable>
+    <!-- THE RECEIPT. A filter that silently removes rows is indistinguishable from an empty
+         thread, and a reader deserves to know the difference. This is the sentence that says
+         it, and it is only ever rendered when something really was withheld. -->
+    <variable as="filterNote" computed="true">
+      if (thread.data == null) { return '' }
+      const b = Number(thread.data.blocked)
+      const h = Number(thread.data.hidden)
+      if (b == 0 && h == 0) { return '' }
+      let out = 'Hidden for you: '
+      if (b > 0) { out = out + b + (b == 1 ? ' comment from someone you blocked' : ' comments from people you blocked') }
+      if (b > 0 && h > 0) { out = out + ', ' }
+      if (h > 0) { out = out + h + (h == 1 ? ' flagged comment' : ' flagged comments') }
+      return out + '.'
+    </variable>
+    <variable as="filterLabel" computed="true">
+      return dsx.variable.filterLevel == 'strict' ? 'Strict' : 'Standard'
+    </variable>
+    <variable as="pickIsMine" computed="true">
+      const p = dsx.variable.pick
+      if (p == null) { return false }
+      return global.auth.sub != '' && p.owner == global.auth.sub
+    </variable>
+    <!-- The options pane reads these rather than `pick.author` directly: an interpolation is
+         evaluated whether or not its subtree is visible, so a null pick would be a read
+         through nothing. -->
+    <variable as="pickAuthor" computed="true">
+      const p = dsx.variable.pick
+      return p == null ? '' : p.author
+    </variable>
+    <variable as="pickBody" computed="true">
+      const p = dsx.variable.pick
+      return p == null ? '' : p.body
+    </variable>
+    <variable as="blockedRows" computed="true">
+      if (blocks.data == null) { return [] }
+      return blocks.data.rows
+    </variable>
+    <variable as="blockedLabel" computed="true">
+      if (dsx.variable.signedIn == false) { return 'Sign in to block someone' }
+      if (blocks.data == null) { return 'Nobody blocked yet' }
+      const n = Number(blocks.data.count)
+      if (n == 0) { return 'Nobody blocked yet' }
+      return n == 1 ? '1 person blocked' : n + ' people blocked'
+    </variable>
+    <!-- G16: the composer had no cap and no counter, so 800 characters became a server
+         rejection after the fact. The server still owns the rule; this is the same number,
+         shown before the tap. -->
+    <variable as="draftLeft" computed="true">
+      return 500 - String(dsx.variable.draft).length
     </variable>
     <!-- '' when the active episode carries its own public source (free) or when there is no
          episode yet — the api block is skipped on that value, so a free binge never asks the
@@ -512,7 +616,15 @@
     <action as="seek">dsx.variable.pos = dsx.this.fraction</action>
     <action as="openComments">
       dsx.variable.comments = true
+      dsx.variable.cPane = 'thread'
+      dsx.variable.modNote = ''
       thread.refresh()
+    </action>
+    <action as="closeComments">
+      dsx.variable.comments = false
+      dsx.variable.cPane = 'thread'
+      dsx.variable.pick = null
+      dsx.variable.modNote = ''
     </action>
     <action as="postComment">
       const text = dsx.variable.draft
@@ -525,7 +637,122 @@
       }
       const r = await commentCall.send({ show: dsx.variable.showId, episode: dsx.variable.epId, body: text })
       if (r.ok) { dsx.variable.draft = ''; thread.refresh() }
+      // A DECLARED REJECTION IS THE FILTER TALKING, and its words are the useful ones: the
+      // server says which shape it refused (a link, a phone number, all capitals), so a
+      // viewer can fix the comment instead of guessing. `r.error` is transport only.
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Could not post' }
+    </action>
+
+    <!-- ══ THE SAFETY SET (App Store 1.2) ═══════════════════════════════════════════════
+         Four viewer verbs — report, block, unblock, delete-own — plus the two pane moves.
+         Every one of them requires an identity and says so by PUSHING the sign-in route
+         rather than by refusing: the routes behind them are auth="required", so a control
+         that pretended to work for a guest would be a control that 401s. -->
+    <action as="setPane" inputs="next">
+      dsx.variable.cPane = next
+      dsx.variable.modNote = ''
+    </action>
+    <action as="openSafety">
+      dsx.variable.cPane = 'safety'
+      dsx.variable.modNote = ''
+      if (dsx.variable.signedIn) { blocks.refresh() }
+    </action>
+    <action as="setFilter" inputs="level">
+      dsx.variable.filterLevel = level
+      // the level rides the URL and the block never fires on its own, so the refetch is explicit
+      thread.refresh()
+    </action>
+    <action as="pickComment" inputs="id, owner, author, body">
+      dsx.variable.pick = { id: id, owner: owner, author: author, body: body }
+      dsx.variable.modNote = ''
+      dsx.variable.cPane = 'options'
+    </action>
+
+    <action as="reportPick" inputs="reason">
+      const p = dsx.variable.pick
+      if (p == null || dsx.variable.modBusy) { return }
+      if (dsx.variable.signedIn == false) {
+        dsx.module.route.push({ path: '/auth/signin' })
+        return
+      }
+      dsx.variable.modBusy = true
+      // ACKNOWLEDGE FIRST. The row leaves this thread now, not when the round trip lands.
+      dsx.variable.hiddenIds = dsx.variable.hiddenIds.concat([p.id])
+      dsx.variable.modNote = 'Sending your report…'
+      const r = await reportCall.send({ target: p.id, reason: reason })
+      dsx.variable.modBusy = false
+      if (r.ok) {
+        dsx.variable.modNote = r.data != null && r.data.duplicate == true
+          ? 'You had already reported this comment. It stays hidden for you.'
+          : 'Reported. It is hidden for you, and it is in the moderation queue now.'
+        thread.refresh()
+        return
+      }
+      // THE ACKNOWLEDGEMENT MUST NOT OUTLIVE THE REQUEST. Put the row back and say what
+      // happened, because a comment that vanished while nothing was filed is the worst of
+      // both outcomes: the reader believes it is handled and it is not.
+      dsx.variable.hiddenIds = dsx.variable.hiddenIds.filter(x => x != p.id)
+      dsx.variable.modNote = r.data != null && r.data.message != null
+        ? r.data.message
+        : 'The report could not be sent. Nothing was filed — try again.'
+    </action>
+
+    <action as="blockPick">
+      const p = dsx.variable.pick
+      if (p == null || dsx.variable.modBusy) { return }
+      if (dsx.variable.signedIn == false) {
+        dsx.module.route.push({ path: '/auth/signin' })
+        return
+      }
+      dsx.variable.modBusy = true
+      // every row by this author leaves the thread at once, not just the one that was tapped
+      const theirs = dsx.variable.threadRows.filter(x => x.owner == p.owner).map(x => x.id)
+      dsx.variable.hiddenIds = dsx.variable.hiddenIds.concat(theirs)
+      dsx.variable.modNote = 'Blocking…'
+      const r = await blockCall.send({ comment: p.id })
+      dsx.variable.modBusy = false
+      if (r.ok) {
+        dsx.variable.modNote = p.author + ' is blocked. You will not see their comments anywhere in the app. Undo it under Safety and filters.'
+        thread.refresh()
+        blocks.refresh()
+        return
+      }
+      dsx.variable.hiddenIds = dsx.variable.hiddenIds.filter(x => theirs.includes(x) == false)
+      dsx.variable.modNote = r.data != null && r.data.message != null
+        ? r.data.message
+        : 'The block could not be saved. Nothing changed — try again.'
+    </action>
+
+    <action as="unblockOne" inputs="subject, handle">
+      if (dsx.variable.modBusy) { return }
+      dsx.variable.modBusy = true
+      const r = await unblockCall.send({ subject: subject })
+      dsx.variable.modBusy = false
+      if (r.ok) {
+        dsx.variable.modNote = handle + ' is unblocked. Their comments are back in every thread.'
+        blocks.refresh()
+        thread.refresh()
+        return
+      }
+      dsx.variable.modNote = r.data != null && r.data.message != null ? r.data.message : 'That block could not be removed.'
+    </action>
+
+    <!-- DELETE YOUR OWN. The row is offered only when the comment subject matches the seam
+         published subject, and the SERVER never takes that word for it: RLS is what refuses a
+         delete of somebody else row, so the worst a tampered client achieves is a 403. -->
+    <action as="deletePick">
+      const p = dsx.variable.pick
+      if (p == null || dsx.variable.modBusy) { return }
+      dsx.variable.modBusy = true
+      const r = await commentDeleteCall.send({ comment: p.id })
+      dsx.variable.modBusy = false
+      if (r.ok) {
+        dsx.variable.hiddenIds = dsx.variable.hiddenIds.concat([p.id])
+        dsx.variable.modNote = 'Your comment is deleted.'
+        thread.refresh()
+        return
+      }
+      dsx.variable.modNote = r.data != null && r.data.message != null ? r.data.message : 'That comment could not be deleted.'
     </action>
 
     <!-- ── stage chrome ── -->
@@ -677,6 +904,32 @@
     <style as="cEmpty" fontSize="14" color="rgba(255,255,255,0.45)" textAlign="center" paddingV="30"/>
     <style as="cField" background="#1C1C1E" radius="22" paddingLeading="16" paddingTrailing="6" paddingV="6" spacing="8" alignItems="center"/>
     <style as="cSend" background="#FF2C55" radius="18" paddingH="16" paddingV="9" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+
+    <!-- ── the safety set: the filter chip, the per-comment options pane, the safety pane ── -->
+    <style as="cChip" background="rgba(255,255,255,0.1)" radius="16" paddingH="12" paddingV="8" spacing="6" alignItems="center" minHeight="44"/>
+    <style as="cChipTxt" fontSize="13" fontWeight="semibold" color="rgba(255,255,255,0.8)"/>
+    <style as="cBack" width="44" height="44" radius="22" alignItems="center"/>
+    <style as="cReceipt" background="rgba(255,255,255,0.04)" paddingH="16" paddingV="10" spacing="8" alignItems="center"/>
+    <style as="cReceiptTxt" fontSize="12" color="rgba(255,255,255,0.62)" lineSpacing="3"/>
+    <style as="cFlagBtn" width="44" height="44" radius="22" alignItems="center"/>
+    <style as="cFlagged" fontSize="12" color="#F6B63D"/>
+    <style as="cPaneBody" spacing="14" paddingH="16" paddingTop="4" paddingBottom="24" alignItems="stretch"/>
+    <style as="cQuote" background="rgba(255,255,255,0.05)" radius="12" paddingH="14" paddingV="12" spacing="5" alignItems="stretch"/>
+    <style as="cQuoteWho" fontSize="12" fontWeight="semibold" color="rgba(255,255,255,0.55)"/>
+    <style as="cQuoteTxt" fontSize="14" color="rgba(255,255,255,0.85)" lineSpacing="4"/>
+    <style as="cGroupCap" fontSize="12" fontWeight="semibold" color="rgba(255,255,255,0.45)" tracking="0.4"/>
+    <style as="cOptRow" background="rgba(255,255,255,0.06)" radius="12" paddingH="14" paddingV="13" spacing="12" alignItems="center" minHeight="44"/>
+    <style as="cOptTxt" fontSize="15" color="#FFFFFF"/>
+    <style as="cOptTxtBad" fontSize="15" color="#FF6B8A"/>
+    <style as="cOptNote" fontSize="12" color="rgba(255,255,255,0.5)" lineSpacing="3"/>
+    <style as="cNote" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="flex-start"/>
+    <style as="cNoteTxt" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
+    <style as="cSmall" fontSize="12" color="rgba(255,255,255,0.5)" lineSpacing="4"/>
+    <style as="cCounter" fontSize="12" color="rgba(255,255,255,0.45)" paddingTrailing="8"/>
+    <style as="cCounterHot" fontSize="12" fontWeight="semibold" color="#FF6B8A" paddingTrailing="8"/>
+    <style as="cRule" fontSize="12" color="rgba(255,255,255,0.42)" lineSpacing="4" paddingH="16" paddingBottom="6"/>
+    <style as="cBlockRow" background="rgba(255,255,255,0.06)" radius="12" paddingH="14" paddingV="11" spacing="12" alignItems="center" minHeight="44"/>
+    <style as="cUndo" background="rgba(255,255,255,0.12)" radius="16" paddingH="14" paddingV="9" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
   <TopNav active="" visible-if="dsx.variable.wide"/>
@@ -1305,44 +1558,254 @@ Please unlock to watch." class="lockHead"/>
     </vstack>
   </sheet>
 
-  <!-- ══════ comments ══════ -->
+  <!-- ══════ comments — THREE PANES IN ONE SHEET ══════════════════════════════════════════
+       App Store guideline 1.2 requires four things of an app carrying user-generated content:
+       a way to FILTER objectionable material, a way to REPORT it, a way to BLOCK a person,
+       and PUBLISHED CONTACT INFORMATION. All four are reachable from this sheet, and the two
+       that are safety boundaries — block, and the community flag threshold — are enforced in
+       `server/social.dsx` rather than here, so a filtered row is not in the payload at all.
+
+       WHY ONE SHEET AND NOT THREE. A `<sheet>` presented over a presented `<sheet>` has two
+       measured defects today (docs/stacked-sheets.md): the child `present` key is never
+       written false when the parent tears the chain down, so it auto-presents next time on
+       iOS, and on web closing the parent does not close the child at all. A depth stack
+       inside the one sheet is the same shape the episode drawer already uses, and it behaves
+       identically on every renderer. -->
   <sheet present="dsx.variable.comments" detents="half,full" background="#141414"
-         on:dismiss="dsx.variable.comments = false">
-    <vstack alignItems="stretch" style="flex: 1; min-height: 0">
-      <hstack class="cHead">
-        <text value="{{ dsx.variable.commentLabel }}" class="cTitle" style="flex: 1"/>
-      </hstack>
-      <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
-      <scroll style="flex: 1; min-height: 0">
-        <vstack alignItems="stretch">
-          <text class="cEmpty" visible-if="thread.data != null && thread.data.count == 0"
-                value="No comments yet — be the first."/>
-          <list bind="thread.data.rows" key="id" scroll="false" spacing="0">
-            <hstack class="cRow">
-              <vstack class="cAvatar" style="justify-content: center">
-                <image icon="person.fill" iconSize="16" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
-              </vstack>
-              <vstack spacing="5" style="flex: 1; min-width: 0">
-                <text value="{{ item.author }}" class="cAuthor"/>
-                <text value="{{ item.body }}" class="cBody"/>
-                <text value="{{ item.likes }} likes" class="cMeta"/>
+         on:dismiss="dsx.action.closeComments()">
+    <vstack alignItems="stretch" grow="true" style="flex: 1; min-height: 0">
+
+      <!-- ══ PANE 1 — THE THREAD ═══════════════════════════════════════════════════════ -->
+      <vstack alignItems="stretch" grow="true" style="flex: 1; min-height: 0"
+              visible-if="dsx.variable.cPane == 'thread'">
+        <hstack class="cHead">
+          <text value="{{ dsx.variable.commentLabel }}" class="cTitle" grow="width" style="flex: 1"/>
+          <!-- 1.2(a) as a control the viewer can actually see and change. An icon beside text
+               is an hstack with one a11y label, never a `button` carrying both. -->
+          <hstack class="cChip" on:tap="dsx.action.openSafety()" a11yGroup="true" a11yTrait="button"
+                  a11yLabel="Safety and filters. Filtering is {{ dsx.variable.filterLabel }}. Opens blocked people, the filter level and how to contact us.">
+            <image icon="line.3.horizontal.decrease" iconSize="14" color="rgba(255,255,255,0.8)" a11yHidden="true"/>
+            <text value="{{ dsx.variable.filterLabel }}" class="cChipTxt"/>
+          </hstack>
+        </hstack>
+        <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
+
+        <!-- THE RECEIPT. A filter that removes rows silently is indistinguishable from a quiet
+             thread. This says what was withheld and why, and renders only when something was. -->
+        <hstack class="cReceipt" visible-if="dsx.variable.filterNote != ''" a11yGroup="true">
+          <image icon="line.3.horizontal.decrease" iconSize="12" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
+          <text value="{{ dsx.variable.filterNote }}" class="cReceiptTxt" grow="width" style="flex: 1"/>
+        </hstack>
+
+        <scroll grow="true" style="flex: 1; min-height: 0">
+          <vstack alignItems="stretch">
+            <text class="cEmpty" visible-if="dsx.variable.emptyThread"
+                  value="No comments yet — be the first."/>
+            <list bind="dsx.variable.threadRows" key="id" scroll="false" spacing="0">
+              <hstack class="cRow">
+                <vstack class="cAvatar" style="justify-content: center">
+                  <image icon="person.fill" iconSize="16" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
+                </vstack>
+                <vstack spacing="5" grow="width" style="flex: 1; min-width: 0">
+                  <!-- THE AUTHOR IS REAL NOW. `author` is derived server-side from the row
+                       owner_id — the verified subject Postgres assigned, which no client can
+                       forge — and the seam publishes this viewer own subject, so their rows
+                       read "You" without the server ever being asked who is looking. -->
+                  <text class="cAuthor"
+                        value="{{ item.owner == global.auth.sub &amp;&amp; global.auth.sub != '' ? 'You' : item.author }}"/>
+                  <text value="{{ item.body }}" class="cBody"/>
+                  <text class="cFlagged" visible-if="item.flags &gt; 0"
+                        value="{{ item.flags == 1 ? 'Flagged by 1 reader' : 'Flagged by ' + item.flags + ' readers' }}"/>
+                </vstack>
+                <!-- 1.2(b) and 1.2(c), one tap from every comment. 44pt, per the tap-target
+                     floor, because this is a hand-rolled hit area with no system hit-slop. -->
+                <vstack class="cFlagBtn" style="justify-content: center" a11yGroup="true" a11yTrait="button"
+                        a11yLabel="Report or block the author of this comment"
+                        on:tap="dsx.action.pickComment({ id: item.id, owner: item.owner, author: item.author, body: item.body })">
+                  <image icon="flag" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
+                </vstack>
+              </hstack>
+            </list>
+          </vstack>
+        </scroll>
+
+        <text class="cRule"
+              value="Comments are public. Anything reported is hidden from you at once and reviewed; three readers flagging the same comment hides it for everyone."/>
+        <vstack spacing="6" alignItems="stretch" style="padding: 0 16px 20px 16px">
+          <hstack alignItems="center">
+            <hstack class="cField" grow="width" style="flex: 1">
+              <!-- READING IS OPEN, POSTING NEEDS AN IDENTITY (/social/comments is auth="none";
+                   /social/comment is not). The composer stays for a guest — a disabled field
+                   beside a thread is a dead end — and the placeholder says which tap will ask,
+                   so the sign-in sheet is expected rather than a surprise. -->
+              <textfield bind="dsx.variable.draft" color="#FFFFFF"
+                         placeholder="{{ dsx.variable.signedIn ? 'Enter your comment here...' : 'Sign in to join the conversation' }}"
+                         grow="width" style="flex: 1" on:submit="dsx.action.postComment()"/>
+              <button label="Submit" class="cSend" on:tap="dsx.action.postComment()"/>
+            </hstack>
+          </hstack>
+          <!-- the 500-character rule, shown BEFORE the tap rather than as a server rejection
+               after it (audit G16). It appears only once it is about to matter. -->
+          <text class="cCounter" textAlign="right" visible-if="dsx.variable.draftLeft &lt; 80 &amp;&amp; dsx.variable.draftLeft &gt;= 0"
+                value="{{ dsx.variable.draftLeft }} characters left"/>
+          <text class="cCounterHot" textAlign="right" visible-if="dsx.variable.draftLeft &lt; 0"
+                value="{{ 0 - dsx.variable.draftLeft }} characters over the 500 limit"/>
+          <!-- The EULA acknowledgement Apple wants beside a UGC composer, from the same
+               config plane the account screen reads. It names its own gap when unset. -->
+          <LegalLinks variant="line"/>
+        </vstack>
+      </vstack>
+
+      <!-- ══ PANE 2 — ONE COMMENT: REPORT · BLOCK · DELETE ═════════════════════════════ -->
+      <vstack alignItems="stretch" grow="true" style="flex: 1; min-height: 0"
+              visible-if="dsx.variable.cPane == 'options'">
+        <hstack class="cHead">
+          <vstack class="cBack" style="justify-content: center" on:tap="dsx.action.setPane({ next: 'thread' })"
+                  a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
+            <image icon="arrow.left" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
+          </vstack>
+          <text value="Report or block" class="cTitle" grow="width" style="flex: 1"/>
+        </hstack>
+        <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
+        <scroll grow="true" style="flex: 1; min-height: 0">
+          <vstack class="cPaneBody">
+            <vstack class="cQuote">
+              <text value="{{ dsx.variable.pickAuthor }}" class="cQuoteWho"/>
+              <text value="{{ dsx.variable.pickBody }}" class="cQuoteTxt" lineLimit="4"
+                    style="display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden"/>
+            </vstack>
+
+            <hstack class="cNote" visible-if="dsx.variable.modNote != ''">
+              <image icon="exclamationmark.triangle" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+              <text value="{{ dsx.variable.modNote }}" class="cNoteTxt" grow="width" style="flex: 1"/>
+            </hstack>
+
+            <vstack spacing="8" alignItems="stretch" visible-if="dsx.variable.pickIsMine == false">
+              <text value="WHY ARE YOU REPORTING THIS?" class="cGroupCap"/>
+              <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'spam' })"
+                      a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment as spam or a scam">
+                <image icon="flag" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+                <text value="Spam or a scam" class="cOptTxt" grow="width" style="flex: 1"/>
+              </hstack>
+              <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'harassment' })"
+                      a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment as harassment or hate">
+                <image icon="flag" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+                <text value="Harassment or hate" class="cOptTxt" grow="width" style="flex: 1"/>
+              </hstack>
+              <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'sexual' })"
+                      a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment as sexual content">
+                <image icon="flag" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+                <text value="Sexual content" class="cOptTxt" grow="width" style="flex: 1"/>
+              </hstack>
+              <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'violence' })"
+                      a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment as violence or a threat">
+                <image icon="flag" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+                <text value="Violence or a threat" class="cOptTxt" grow="width" style="flex: 1"/>
+              </hstack>
+              <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'other' })"
+                      a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment for another reason">
+                <image icon="flag" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+                <text value="Something else" class="cOptTxt" grow="width" style="flex: 1"/>
+              </hstack>
+
+              <text value="BLOCK" class="cGroupCap" paddingTop="6"/>
+              <hstack class="cOptRow" on:tap="dsx.action.blockPick()"
+                      a11yGroup="true" a11yTrait="button"
+                      a11yLabel="Block {{ dsx.variable.pickAuthor }}. Their comments disappear for you everywhere in the app.">
+                <image icon="person.slash" iconSize="16" color="#FF6B8A" a11yHidden="true"/>
+                <vstack spacing="3" grow="width" style="flex: 1; min-width: 0">
+                  <text value="Block {{ dsx.variable.pickAuthor }}" class="cOptTxtBad"/>
+                  <text class="cOptNote"
+                        value="Their comments disappear for you everywhere in the app. They are not told, and you can undo it under Safety and filters."/>
+                </vstack>
+              </hstack>
+            </vstack>
+
+            <!-- YOUR OWN COMMENT. The row is offered on a subject match; the SERVER still
+                 decides, because RLS is what refuses a delete of anyone else row. -->
+            <vstack spacing="8" alignItems="stretch" visible-if="dsx.variable.pickIsMine">
+              <text value="YOUR COMMENT" class="cGroupCap"/>
+              <hstack class="cOptRow" on:tap="dsx.action.deletePick()"
+                      a11yGroup="true" a11yTrait="button" a11yLabel="Delete your comment permanently">
+                <image icon="trash" iconSize="16" color="#FF6B8A" a11yHidden="true"/>
+                <text value="{{ dsx.variable.modBusy ? 'Deleting…' : 'Delete my comment' }}" class="cOptTxtBad" grow="width" style="flex: 1"/>
+              </hstack>
+              <text class="cSmall" value="This removes it for everyone, and it cannot be undone."/>
+            </vstack>
+
+            <!-- 1.2(d), at the point of need: if this needs a person, here is the person. -->
+            <ContactRow label="Contact us about this comment"
+                        note="If it needs a human decision, or you disagree with one, write to us."/>
+          </vstack>
+        </scroll>
+      </vstack>
+
+      <!-- ══ PANE 3 — SAFETY AND FILTERS ═══════════════════════════════════════════════ -->
+      <vstack alignItems="stretch" grow="true" style="flex: 1; min-height: 0"
+              visible-if="dsx.variable.cPane == 'safety'">
+        <hstack class="cHead">
+          <vstack class="cBack" style="justify-content: center" on:tap="dsx.action.setPane({ next: 'thread' })"
+                  a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
+            <image icon="arrow.left" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
+          </vstack>
+          <text value="Safety &amp; filters" class="cTitle" grow="width" style="flex: 1"/>
+        </hstack>
+        <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
+        <scroll grow="true" style="flex: 1; min-height: 0">
+          <vstack class="cPaneBody">
+            <hstack class="cNote" visible-if="dsx.variable.modNote != ''">
+              <image icon="exclamationmark.triangle" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+              <text value="{{ dsx.variable.modNote }}" class="cNoteTxt" grow="width" style="flex: 1"/>
+            </hstack>
+
+            <text value="WHAT YOU SEE" class="cGroupCap"/>
+            <hstack class="cOptRow" on:tap="dsx.action.setFilter({ level: 'standard' })"
+                    a11yGroup="true" a11yTrait="button"
+                    a11yLabel="Standard filtering. Hides people you blocked and comments three or more readers have flagged.">
+              <image icon="checkmark" iconSize="16" color="#FF2C55" visible-if="dsx.variable.filterLevel == 'standard'" a11yHidden="true"/>
+              <image icon="circle" iconSize="16" color="rgba(255,255,255,0.25)" visible-if="dsx.variable.filterLevel != 'standard'" a11yHidden="true"/>
+              <vstack spacing="3" grow="width" style="flex: 1; min-width: 0">
+                <text value="Standard" class="cOptTxt"/>
+                <text class="cOptNote" value="Hides anyone you blocked, and any comment three or more readers have flagged."/>
               </vstack>
             </hstack>
-          </list>
-        </vstack>
-      </scroll>
-      <hstack style="padding: 12px 16px 20px 16px">
-        <hstack class="cField" style="flex: 1">
-          <!-- READING IS OPEN, POSTING NEEDS AN IDENTITY (/social/comments is auth="none";
-               /social/comment is not). The composer stays for a guest — a disabled field
-               beside a thread is a dead end — and the placeholder says which tap will ask,
-               so the sign-in sheet is expected rather than a surprise. -->
-          <textfield bind="dsx.variable.draft" color="#FFFFFF"
-                     placeholder="{{ dsx.variable.signedIn ? 'Enter your comment here...' : 'Sign in to join the conversation' }}"
-                     style="flex: 1" on:submit="dsx.action.postComment()"/>
-          <button label="Submit" class="cSend" on:tap="dsx.action.postComment()"/>
-        </hstack>
-      </hstack>
+            <hstack class="cOptRow" on:tap="dsx.action.setFilter({ level: 'strict' })"
+                    a11yGroup="true" a11yTrait="button"
+                    a11yLabel="Strict filtering. Also hides every comment carrying any flag at all.">
+              <image icon="checkmark" iconSize="16" color="#FF2C55" visible-if="dsx.variable.filterLevel == 'strict'" a11yHidden="true"/>
+              <image icon="circle" iconSize="16" color="rgba(255,255,255,0.25)" visible-if="dsx.variable.filterLevel != 'strict'" a11yHidden="true"/>
+              <vstack spacing="3" grow="width" style="flex: 1; min-width: 0">
+                <text value="Strict" class="cOptTxt"/>
+                <text class="cOptNote" value="Everything Standard hides, plus every comment carrying a single flag."/>
+              </vstack>
+            </hstack>
+
+            <text value="{{ dsx.variable.blockedLabel }}" class="cGroupCap" paddingTop="6"/>
+            <text class="cSmall" visible-if="dsx.variable.blockedRows.length == 0"
+                  value="When you block someone their comments disappear for you everywhere in the app, and they are never told. Nothing you post changes."/>
+            <list bind="dsx.variable.blockedRows" key="id" scroll="false" spacing="8">
+              <hstack class="cBlockRow">
+                <image icon="person.slash" iconSize="16" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+                <text value="{{ item.handle }}" class="cOptTxt" grow="width" style="flex: 1; min-width: 0"/>
+                <text value="Unblock" class="cUndo" a11yTrait="button"
+                      a11yLabel="Unblock {{ item.handle }}"
+                      on:tap="dsx.action.unblockOne({ subject: item.subject, handle: item.handle })"/>
+              </hstack>
+            </list>
+
+            <!-- ARTICLE 7, IN THE PRODUCT AND NOT ONLY IN AN AUDIT. What the filter really
+                 does and really does not, said to the person relying on it. -->
+            <text value="WHAT THE FILTER CHECKS" class="cGroupCap" paddingTop="6"/>
+            <text class="cSmall"
+                  value="Before a comment is posted the server refuses links, phone numbers, all-capitals and repeated-character mashing. It does NOT read meaning: it cannot recognise hate speech, harassment or a threat, and no word list can — which is why this app ships none, and why reporting and blocking exist. A production deployment adds a moderation service in front of the same check; server/social.dsx names the exact seam."/>
+
+            <!-- 1.2(d): published contact information, from App.json `consts.supportUrl`. -->
+            <ContactRow label="Contact us"
+                        note="Report something to a person, ask about a decision, or tell us this filter got it wrong."/>
+            <LegalLinks variant="line"/>
+          </vstack>
+        </scroll>
+      </vstack>
     </vstack>
   </sheet>
   <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of

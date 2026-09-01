@@ -54,7 +54,14 @@
          inherited the stage's grid column, and while `dsx.screen.*` settles after a tab
          switch that column computed 362, so the bar shrank 375 → 362 → 375 in ~60ms.
          Chrome is a sibling of the stage now, exactly as on every other screen. -->
-    <variable as="chromeH" computed="true">return dsx.variable.wide ? 64 : 70</variable>
+    <!-- The bar's own height PLUS the home indicator underneath it. This screen is
+         full-bleed (its pager ignores the safe area), so the frame proposes the whole
+         window and nothing else reserves that strip — leaving it out is what pushed the
+         tab bar into the indicator and clipped its captions. -->
+    <variable as="chromeH" computed="true">
+      const bar = dsx.variable.wide ? 64 : 70
+      return bar + (dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0))
+    </variable>
     <variable as="stageH" computed="true">
       return dsx.screen.height - dsx.variable.chromeH
     </variable>
@@ -181,5 +188,5 @@
 
   </zstack>
 
-  <TabBar active="foryou" visible-if="dsx.variable.wide == false"/>
+  <TabBar active="foryou" inset="{{ dsx.screen.safeBottom || 0 }}" visible-if="dsx.variable.wide == false"/>
 </vstack>

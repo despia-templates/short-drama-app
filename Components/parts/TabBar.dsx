@@ -5,9 +5,23 @@
 
      A tap is a RESET to that root, never a push — tabs are lateral moves, so the stack
      never grows and the bar never travels with a transition (writing-an-app.md §5). -->
-<hstack chrome="true" class="bar" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.07); justify-content: space-around">
+<hstack chrome="true" class="bar" paddingBottom="{{ 9 + Number(dsx.attribute.inset) }}"
+        style="width: 100%; border-top: 1px solid rgba(255,255,255,0.07); justify-content: space-around">
   <head>
     <attribute as="active" default="'home'"/>   <!-- home | foryou | vip | list | profile -->
+    <!-- THE HOME-INDICATOR INSET, and why it is an ATTRIBUTE rather than something this bar
+         reads for itself. A route frame proposes the SAFE region, so on an ordinary screen
+         the bar is already clear of the indicator and adding safeBottom here would double
+         it. A FULL-BLEED screen is the exception: it owns the whole window, so the frame
+         proposes nothing and the bar lands in the indicator zone. Measured on an iPhone 17
+         Pro: Discover sized its stage `dsx.screen.height - 70`, the pager carried
+         ignoreSafeArea so the column got all 874pt, stage 804 + bar 70 = 874 exactly, and
+         the bar occupied the last 70pt — which includes the 34pt indicator. The captions
+         clipped ("Profil…") while Home, which does no such arithmetic, was correct.
+         So the screen that owns the window pays the inset back, per the SAFE-AREA LAW in
+         AGENTS.md, and it declares that by passing it. Default 0 keeps every other caller
+         byte-identical. -->
+    <attribute as="inset" default="0"/>
 
     <variable as="on" computed="true">'#FF2C55'</variable>
     <variable as="off" computed="true">'rgba(255,255,255,0.45)'</variable>

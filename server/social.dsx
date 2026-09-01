@@ -1,19 +1,89 @@
-<!-- social.dsx — the comment thread under an episode. The category's player rail is built
-     around it (a count you can see, a sheet you can open, a field you can type in), so it
-     is real here: rows in Postgres, RLS-scoped writes, public reads.
+<!-- social.dsx — the comment thread under an episode, and the SAFETY SET that App Store
+     guideline 1.2 requires of any app carrying user-generated content.
 
-     ownership="public-read" — anyone can read a thread, only the author's own row is
-     writable through the generated CRUD. The listing action shapes the wire payload so a
-     screen never sees a raw row. -->
+     WHY THE SAFETY SET IS NOT OPTIONAL. 1.2 asks for FOUR things, and an app that ships a
+     comment field without them is rejected on that alone:
+       (a) a method for FILTERING objectionable material from being posted,
+       (b) a mechanism to REPORT offensive content, with timely responses,
+       (c) the ability to BLOCK abusive users,
+       (d) PUBLISHED CONTACT INFORMATION so a reader can reach the developer.
+     This document owns (a), (b) and (c). (d) is `supportUrl` in App.json `consts`, rendered
+     by `Components/parts/ContactRow.dsx` and by `<LegalLinks>` on the account screen — one
+     config key, one degradation, no second plane.
+
+     WORTH KNOWING: comments are NOT a category convention. ReelShort, DramaBox and GoodShort
+     have no comment affordance at all (docs/feature-parity.md, correction 5). So this feature
+     puts the template AHEAD of the reference, and the bar it has to clear is Apple's rather
+     than the category's.
+
+     ═══ THE OWNERSHIP DECISIONS, AND WHY THEY ARE NOT THE SAME WORD ═══════════════════════
+
+     `comment`  public-read — anyone reads a thread; only the author writes their own row
+                (the own-write half is server/policies.local.sql, the §6.25 addendum).
+     `block`    OWNER — nobody but you needs to know whom you blocked, and RLS enforces it.
+                The generated owner policies are exactly right; no addendum.
+     `report`   public-read — and this one is a TRADE, made deliberately and named here.
+
+     A report has two readers: the operator (the moderation queue) and the thread read (which
+     counts flags to auto-hide a comment the community has flagged). A declared action NEVER
+     runs as service_role — `runAs` sets `set local role authenticated` for every user-scope
+     query regardless of the token role claim (PLAN.md §6.7) — so an OWNER-scoped report table
+     is readable by its reporter and by nobody else, ever, through the declared plane. The
+     operator queue would be unreachable and the flag tally would always read 1.
+     So `report` is all-read, and what keeps a viewer out of the queue is the ROUTE GATEWAY:
+     `/social/reports` carries `reach=""`, which host.ts admits only for a service-role
+     identity or DSX_INTERNAL_KEY and answers 404 to everyone else. Said plainly: RLS does not
+     protect report rows here, the gateway does. The rows hold a comment id, a reason code, a
+     snapshot of already-public text and the reporter subject (a random UUID, not a
+     credential). The day `auth="role:operator"` (§6.2) and a service-scoped declared read
+     exist, this becomes owner-read plus one operator read and the trade disappears.
+
+     WHAT THIS DOCUMENT DELIBERATELY DOES NOT SHIP:
+       · a `hidden` boolean on `comment` set by an operator. Writes to a public-read table are
+         service-only, and §6.7 means no declared action can perform one — so the column would
+         be decoration nobody can move. The community threshold below does the same job with a
+         mechanism that actually runs.
+       · a `state` (open/actioned) column on `report`, for the same reason: the operator cannot
+         write it. Resolution belongs to whatever moderation tool an adopter wires the queue to.
+       · a word list pretending to be moderation. See `postComment`. -->
 <server>
   <head>
     <entity as="comment" ownership="public-read">
       <field as="show" type="uuid"/>
       <field as="episode" type="uuid"/>
-      <field as="author" type="text"/>
       <field as="body" type="text"/>
-      <field as="likes" type="integer"/>
       <index on="episode"/>
+    </entity>
+
+    <!-- THE REPORT. One row per (reporter, target), enforced by a unique index in
+         server/policies.local.sql — the same lock every other once-only guard in this backend
+         uses, because a declared action has no transaction seam (§6.38) and a read-then-write
+         guard races.
+         `kind` exists so this is ONE report seam for the whole app rather than two: a comment
+         report carries `target` (the comment row) and an AD report carries `subject` (the
+         creative path), which is the seam `Components/parts/AdGate.dsx` emits its `reported`
+         event for under guideline 2.5.18. -->
+    <entity as="report" ownership="public-read">
+      <field as="kind" type="text"/>        <!-- comment | ad -->
+      <field as="target" type="uuid"/>      <!-- the reported comment row, when kind is comment -->
+      <field as="subject" type="text"/>     <!-- a target with no row of its own: an ad creative -->
+      <field as="episode" type="uuid"/>
+      <field as="show" type="uuid"/>
+      <field as="reason" type="text"/>      <!-- spam | harassment | sexual | violence | other -->
+      <field as="note" type="text"/>
+      <field as="snapshot" type="text"/>    <!-- the reported text, so the queue survives a delete -->
+      <index on="target"/>
+      <index on="episode"/>
+    </entity>
+
+    <!-- THE BLOCK. `subject` is the blocked author owner_id — the RLS subject, which is what
+         a comment row carries and therefore the only stable handle a blocker can name.
+         `handle` is the derived display name, stored so the unblock list can say who without
+         a second read. Owner-scoped: your block list is yours. -->
+    <entity as="block" ownership="owner">
+      <field as="subject" type="uuid"/>
+      <field as="handle" type="text"/>
+      <index on="subject"/>
     </entity>
 
     <!-- The viewer's inbox. Notices are broadcast rows (ownership=public-read, declared in
@@ -31,46 +101,302 @@
       return { rows: shaped }
     </action>
 
-    <action as="listComments" inputs="episode">
+    <!-- ══ THE THREAD READ — where FILTER and BLOCK are actually enforced ══════════════════
+         Three module calls, all bounded: the comments, the caller BLOCK list, the episode
+         REPORT tally. The route is auth="none" so a guest still sees the conversation; a
+         guest simply has no blocks (an owner-policy table yields nothing to the anon role,
+         which is a fact of the RLS and not a branch here).
+
+         WHY THIS IS SERVER-SIDE AND NOT CLIENT-SIDE. A blocked author filtered in markup is
+         still in the payload, in the SSR html and in `curl` — the same defect the paywall had
+         (audit G1: the client hid the locked episodes and the API handed out every URL). A
+         viewer who blocks someone is telling the app "do not show me this person", and the
+         only implementation of that promise which cannot leak is one where the bytes never
+         leave the origin. It costs one extra bounded read.
+
+         THE AUTHOR NAME IS DERIVED, NEVER STORED FROM THE CLIENT. The row used to be written
+         with `author: 'You'`, so every thread rendered as one person talking to themselves
+         (audit M1). The token contract carries only `sub` (docs/auth.md), and a server action
+         has no identity plane — but every row it reads carries `owner_id`, which Postgres
+         assigned from the verified subject and no client can forge. So the display name is
+         computed from it here, at read time, for everyone consistently. It is not a real
+         profile name; the upgrade is a `name` claim on the token or a `profile` entity that
+         this read joins, and both change this one expression. -->
+    <action as="listComments" inputs="episode, level">
       if (episode == null || episode === '') { throw { reason: 'invalid', message: 'episode is required' } }
+      // HIDE_AT is the community threshold. One report must NOT hide a comment for everyone —
+      // that hands any single account a censor button — so the hide is two-stage: it is
+      // immediate and personal for the reporter (the client drops the row the moment the
+      // report is filed) and collective only at HIDE_AT distinct reporters, which the unique
+      // index on (owner_id, target) is what makes "distinct" true.
+      const HIDE_AT = 3
+      const strict = level === 'strict'
       const rows = await dsx.module.data.comment.list({ filters: { episode: episode }, limit: 100 })
-      if (!rows.ok) { return { count: 0, rows: [] } }
-      const out = []
-      for (const c of rows.data) {
-        out.push({ id: c.id, author: c.author, body: c.body, likes: c.likes == null ? 0 : c.likes, at: c.created_at })
+      if (!rows.ok) { return { count: 0, rows: [], blocked: 0, hidden: 0, threshold: HIDE_AT, strict: strict } }
+
+      // the caller own block list. Empty for a guest, by RLS rather than by an if.
+      const mine = await dsx.module.data.block.list({ limit: 100 })
+      let blockedSubs = []
+      if (mine.ok) {
+        for (const b of mine.data) { blockedSubs = blockedSubs.concat([b.subject == null ? '' : String(b.subject)]) }
       }
+
+      // the episode flag tally. A bracket WRITE-BACK on a variable key is the supported
+      // spelling; a bracket-read mutation would be a silent no-op (AGENTS.md).
+      const flagged = await dsx.module.data.report.list({ filters: { episode: episode }, limit: 100 })
+      const tally = {}
+      if (flagged.ok) {
+        for (const f of flagged.data) {
+          const k = f.target == null ? '' : String(f.target)
+          if (k !== '') { tally[k] = (tally[k] == null ? 0 : tally[k]) + 1 }
+        }
+      }
+
+      const out = []
+      let blockedOut = 0
+      let hiddenOut = 0
+      for (const c of rows.data) {
+        const oid = c.owner_id == null ? '' : String(c.owner_id)
+        const n = tally[c.id] == null ? 0 : tally[c.id]
+        if (blockedSubs.includes(oid) && oid !== '') { blockedOut = blockedOut + 1 }
+        else if (n >= HIDE_AT) { hiddenOut = hiddenOut + 1 }
+        else if (strict && n > 0) { hiddenOut = hiddenOut + 1 }
+        else {
+          // Grow the handle from a non-numeric anchor: JSE `+` is total arithmetic, so a
+          // string built the other way round becomes a number (AGENTS.md, PLAN.md).
+          const tail = oid === '' ? '' : oid.slice(0, 6).toUpperCase()
+          const who = tail === '' ? 'Viewer' : 'Viewer ' + tail
+          out.push({ id: c.id, owner: oid, author: who, body: c.body, flags: n, at: c.created_at })
+        }
+      }
+      return { count: out.length, rows: out, blocked: blockedOut, hidden: hiddenOut, threshold: HIDE_AT, strict: strict }
+    </action>
+
+    <!-- ══ THE POST-TIME FILTER — 1.2(a), and exactly what it is ═══════════════════════════
+         WHAT IT DOES. It refuses the shapes that are objectively unwanted under a drama
+         episode and can be recognised WITHOUT reading meaning: links, phone-length digit runs,
+         shouting, and keyboard mashing. Each refusal names itself, so the viewer can fix the
+         comment instead of guessing.
+
+         WHAT IT DOES NOT DO, said plainly because a template that implied otherwise would be
+         teaching a lie to everyone who forks it: it does not detect hate speech, harassment,
+         threats, sexual content or slurs. A word list cannot — one accent character walks
+         through it and the same list fires on the innocent use of the same string — so this
+         file ships none. The semantic half of moderation is carried by the two mechanisms
+         that do not need to read meaning: the per-viewer BLOCK and the community FLAG
+         threshold in `listComments`, plus the operator queue.
+
+         WHAT A PRODUCTION DEPLOYMENT ADDS, precisely: one classifier call between the checks
+         below and the create. Declare the host on the action (`egress="api.example-moderation.com"`)
+         and its key as a secret (`<secret as="moderationKey"/>` in this head), POST the text,
+         and throw `{ reason: 'invalid', message: … }` on a positive. That is the whole change;
+         nothing else in this document or in the player moves. -->
+    <action as="postComment" inputs="show, episode, body">
+      const text = body == null ? '' : String(body).trim()
+      if (text === '') { throw { reason: 'invalid', message: 'Say something first.' } }
+      if (text.length > 500) { throw { reason: 'invalid', message: 'Comments are capped at 500 characters.' } }
+      const low = text.toLowerCase()
+      const linkish = ['http://', 'https://', 'www.', '.com', '.net', '.org', '.ru/', 't.me/', 'wa.me/', 'bit.ly']
+      for (const probe of linkish) {
+        if (low.includes(probe)) { throw { reason: 'invalid', message: 'Links are not allowed in comments.' } }
+      }
+      // ONE bounded pass over at most 500 characters, reading two structural signals: the
+      // longest run of one repeated character, and the longest run of digits with the
+      // separators a phone number is written with. The loop ceiling is 50000 (ACTION_LOOP_CAP).
+      let prev = ''
+      let run = 0
+      let maxRun = 0
+      let digits = 0
+      let maxDigits = 0
+      for (const ch of text.split('')) {
+        if (ch === prev) { run = run + 1 } else { prev = ch; run = 1 }
+        if (run > maxRun) { maxRun = run }
+        const code = ch.charCodeAt(0)
+        if (code >= 48 && code <= 57) { digits = digits + 1 }
+        else if (ch === ' ' || ch === '-' || ch === '.' || ch === '(' || ch === ')' || ch === '+') { digits = digits }
+        else { digits = 0 }
+        if (digits > maxDigits) { maxDigits = digits }
+      }
+      if (maxDigits >= 7) { throw { reason: 'invalid', message: 'Phone numbers and contact details are not allowed in comments.' } }
+      if (maxRun >= 8) { throw { reason: 'invalid', message: 'That reads as repeated characters rather than a comment.' } }
+      if (text.length >= 24 && text === text.toUpperCase() && low !== text) {
+        throw { reason: 'invalid', message: 'Please do not post in all capitals.' }
+      }
+      const made = await dsx.module.data.comment.create({ show: show, episode: episode, body: text })
+      if (!made.ok) { throw { reason: 'conflict', message: 'Could not post that.' } }
+      // The create returns the row Postgres wrote, so the caller subject is knowable HERE and
+      // nowhere else in a server action — the same derivation `listComments` performs, so an
+      // optimistic row and a refetched one carry the same name.
+      const oid = made.data.owner_id == null ? '' : String(made.data.owner_id)
+      const tail = oid === '' ? '' : oid.slice(0, 6).toUpperCase()
+      return { id: made.data.id, body: text, owner: oid, author: tail === '' ? 'Viewer' : 'Viewer ' + tail, at: made.data.created_at }
+    </action>
+
+    <!-- ══ REPORT — 1.2(b) ════════════════════════════════════════════════════════════════
+         IDEMPOTENT PER (reporter, target), and the lock is the unique index rather than a
+         read: a report table is all-read, so a scoped "have I already reported this?" query
+         is not expressible — `filters` accepts declared fields only and `owner_id` is not one
+         (repo.ts drops an undeclared filter silently).
+         So the create goes FIRST, exactly as every other guard in this backend now does. When
+         it is refused, one bounded read decides which refusal it was: rows already exist on
+         this target, so a duplicate is the explanation and the viewer is told the honest
+         thing (it is already reported); NO rows exist, so a unique violation is impossible and
+         the write was refused by POLICY — which is an adopter who has not applied
+         server/policies.local.sql, and it must be said out loud rather than swallowed as
+         success. The one case this cannot separate — someone else reported it AND my insert
+         was policy-refused — reports as a duplicate; it is unreachable in a deployment where
+         the addendum is applied, which the first report on any comment proves. -->
+    <action as="reportComment" inputs="target, reason, note">
+      if (target == null || target === '') { throw { reason: 'invalid', message: 'a comment is required' } }
+      const reasons = ['spam', 'harassment', 'sexual', 'violence', 'other']
+      const why = reason == null || reason === '' ? 'other' : String(reason)
+      if (!reasons.includes(why)) { throw { reason: 'invalid', message: 'unknown report reason' } }
+      const row = await dsx.module.data.comment.get({ id: target })
+      if (!row.ok || row.data == null) { throw { reason: 'invalid', message: 'that comment no longer exists' } }
+      // The snapshot, the episode and the show come from the ROW, never from the caller: a
+      // queue that trusted the reporter for the text it shows an operator could be used to
+      // put words in someone else mouth.
+      const said = row.data.body == null ? '' : String(row.data.body).slice(0, 300)
+      const values = {
+        kind: 'comment', target: target, reason: why, snapshot: said,
+        note: note == null ? '' : String(note).trim().slice(0, 300)
+      }
+      // NEVER a `field: null` in create values (AGENTS.md) — omit the key instead. A literal
+      // path assignment on a local dict is the supported spelling.
+      if (row.data.episode != null) { values.episode = row.data.episode }
+      if (row.data.show != null) { values.show = row.data.show }
+      const made = await dsx.module.data.report.create(values)
+      if (made.ok) { return { filed: true, duplicate: false } }
+      const already = await dsx.module.data.report.list({ filters: { target: target }, limit: 100 })
+      if (already.ok && already.data.length > 0) { return { filed: true, duplicate: true } }
+      throw { reason: 'unavailable', message: 'The report could not be filed. If this is a fresh deployment, apply server/policies.local.sql — dsx_report needs its owner-insert policy.' }
+    </action>
+
+    <!-- THE AD REPORT, same seam. `Components/parts/AdGate.dsx` raises `reported` with the
+         lane and the creative for guideline 2.5.18; `Components/Rewards.dsx` catches it and
+         today only acknowledges the viewer, because no route existed. This is that route.
+         HAND-OFF, one line, in a file this document does not own: `adReported` in
+         Rewards.dsx should POST { lane, creative } here and report what the server said. -->
+    <action as="reportAd" inputs="lane, creative, note">
+      const what = creative == null || creative === '' ? String(lane == null ? '' : lane) : String(creative)
+      if (what === '') { throw { reason: 'invalid', message: 'a creative is required' } }
+      const named = what.slice(0, 300)
+      const values = {
+        kind: 'ad', subject: named, reason: 'other',
+        snapshot: 'lane: ' + String(lane == null ? 'house' : lane),
+        note: note == null ? '' : String(note).trim().slice(0, 300)
+      }
+      const made = await dsx.module.data.report.create(values)
+      if (made.ok) { return { filed: true, duplicate: false } }
+      const already = await dsx.module.data.report.list({ filters: { subject: named }, limit: 1 })
+      if (already.ok && already.data.length > 0) { return { filed: true, duplicate: true } }
+      throw { reason: 'unavailable', message: 'The report could not be filed. If this is a fresh deployment, apply server/policies.local.sql — dsx_report needs its owner-insert policy.' }
+    </action>
+
+    <!-- ══ BLOCK — 1.2(c) ═════════════════════════════════════════════════════════════════
+         KEYED ON THE COMMENT, resolved to the author here. The client holds the author
+         subject already (it needs it to render "You" on its own rows), but taking the comment
+         id means the server decides who the author is, which is the same rule the snapshot
+         above follows. Idempotent through unique (owner_id, subject). -->
+    <action as="blockAuthor" inputs="comment">
+      if (comment == null || comment === '') { throw { reason: 'invalid', message: 'a comment is required' } }
+      const row = await dsx.module.data.comment.get({ id: comment })
+      if (!row.ok || row.data == null) { throw { reason: 'invalid', message: 'that comment no longer exists' } }
+      const who = row.data.owner_id == null ? '' : String(row.data.owner_id)
+      if (who === '') { throw { reason: 'invalid', message: 'that comment has no author to block' } }
+      const tail = who.slice(0, 6).toUpperCase()
+      const made = await dsx.module.data.block.create({ subject: who, handle: 'Viewer ' + tail })
+      if (made.ok) { return { blocked: true, subject: who, handle: 'Viewer ' + tail } }
+      // owner-scoped, so this read is the caller own list and the answer is exact
+      const mine = await dsx.module.data.block.list({ filters: { subject: who }, limit: 1 })
+      if (mine.ok && mine.data.length > 0) { return { blocked: true, subject: who, handle: mine.data[0].handle } }
+      throw { reason: 'unavailable', message: 'The block could not be saved.' }
+    </action>
+
+    <action as="unblockAuthor" inputs="subject">
+      if (subject == null || subject === '') { throw { reason: 'invalid', message: 'a subject is required' } }
+      const mine = await dsx.module.data.block.list({ filters: { subject: subject }, limit: 1 })
+      if (!mine.ok || mine.data.length === 0) { return { blocked: false } }
+      // same rule as deleteComment: `ok` survives a row RLS filtered away, `data` does not
+      const gone = await dsx.module.data.block.delete({ id: mine.data[0].id })
+      if (!gone.ok || gone.data == null) { throw { reason: 'unavailable', message: 'The block could not be removed.' } }
+      return { blocked: false, subject: subject }
+    </action>
+
+    <action as="listBlocks">
+      const mine = await dsx.module.data.block.list({ limit: 100 })
+      if (!mine.ok) { return { count: 0, rows: [] } }
+      const out = []
+      for (const b of mine.data) { out.push({ id: b.id, subject: b.subject, handle: b.handle, at: b.created_at }) }
       return { count: out.length, rows: out }
     </action>
 
-    <action as="countComments" inputs="episode">
-      if (episode == null || episode === '') { return { count: 0 } }
-      // no count op and a 100-row page ceiling: `capped` is what lets the UI render "99+"
-      const rows = await dsx.module.data.comment.list({ filters: { episode: episode }, limit: 100 })
-      const n = rows.ok ? rows.data.length : 0
-      return { count: n, capped: n >= 100 }
+    <!-- DELETE YOUR OWN COMMENT. The owner-delete policy has existed since the §6.25 addendum
+         landed; nothing exposed it. RLS is the whole guard — this action names no owner and
+         cannot, so a delete of somebody else row is refused by Postgres rather than by an if
+         that could be forgotten. -->
+    <action as="deleteComment" inputs="comment">
+      if (comment == null || comment === '') { throw { reason: 'invalid', message: 'a comment is required' } }
+      const gone = await dsx.module.data.comment.delete({ id: comment })
+      // A DELETE FILTERED AWAY BY RLS IS `ok`, AND THAT IS THE TRAP. The statement is
+      // `delete … where id = $1 returning id`, so a row the policy hides simply matches
+      // nothing: no error, no throw, `ok` true — and the transport answers `null` because it
+      // returns `rows[0] ?? null` for every non-list op. Measured here before this line
+      // existed: viewer A deleted viewer B comment and the API said `{deleted: true}` while the
+      // row was still in the thread. The DATA, not the flag, is what says a row went.
+      if (!gone.ok || gone.data == null) { throw { reason: 'forbidden', message: 'You can only delete your own comment.' } }
+      return { deleted: true, id: comment }
     </action>
 
-    <action as="postComment" inputs="show, episode, body">
-      const text = body == null ? '' : String(body).trim()
-      if (text === '') { throw { reason: 'invalid', message: 'say something first' } }
-      if (text.length > 500) { throw { reason: 'invalid', message: 'comments are capped at 500 characters' } }
-      const made = await dsx.module.data.comment.create({
-        show: show, episode: episode, author: 'You', body: text, likes: 0
-      })
-      if (!made.ok) { throw { reason: 'conflict', message: 'could not post that' } }
-      return { id: made.data.id, body: text }
+    <!-- ══ THE OPERATOR QUEUE ═════════════════════════════════════════════════════════════
+         Behind `reach=""`: service-role identity or DSX_INTERNAL_KEY, 404 for everyone else.
+         Newest first, bounded at 100, with a per-target count so the operator sees which
+         comment several people flagged. There is deliberately no "mark handled" verb — a
+         declared action cannot write a public-read table (§6.7), so a `state` column would be
+         a control nobody can move. Resolution lives in whatever moderation tool the queue is
+         drained into, and `deleteComment` above is the only in-app remedy that actually runs.
+         NO `<tool>` ROW, on purpose: createMcpFace checks `auth === "required"` and a non-null
+         identity and has no notion of `reach` (§6.84), so exposing this queue over /mcp would
+         hand every authenticated caller the thing the gateway just refused them. -->
+    <action as="listReports">
+      const rows = await dsx.module.data.report.list({ limit: 100 })
+      if (!rows.ok) { return { count: 0, rows: [], capped: false } }
+      const tally = {}
+      for (const r of rows.data) {
+        const k = r.target == null ? String(r.subject) : String(r.target)
+        tally[k] = (tally[k] == null ? 0 : tally[k]) + 1
+      }
+      const out = rows.data
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+        .map(r => ({
+          id: r.id, kind: r.kind, target: r.target, subject: r.subject,
+          episode: r.episode, show: r.show, reason: r.reason, note: r.note,
+          snapshot: r.snapshot, reporter: r.owner_id, at: r.created_at,
+          flags: tally[r.target == null ? String(r.subject) : String(r.target)]
+        }))
+      return { count: out.length, rows: out, capped: rows.data.length >= 100 }
     </action>
   </head>
 
   <!-- RATE CEILINGS.
-         · comments 120/m — a public read the player opens per episode; anonymous callers
-           share a bucket per address (scripts/serve.mjs supplies clientAddress).
+         · comments 120/m — a public read the player opens per episode, and re-opens when the
+           viewer changes the filter level. An authenticated caller is bucketed by `sub`; an
+           anonymous one shares a bucket per address (scripts/serve.mjs supplies clientAddress).
          · notices   60/m — a public read of one small table.
-         · comment   10/m — the write. Nobody types ten distinct comments a minute, and this
-           is the app's only UGC surface, so the ceiling is the first line of spam defence
-           until the moderation set lands (the audit's G15: no filter, no report, no block,
-           no delete-own — all four are App Store 1.2 requirements and none of them exist). -->
+         · comment   10/m — the write. Nobody types ten distinct comments a minute.
+         · report / block  20/m — sized to the SWEEP and not to the intent: a viewer cleaning
+           up one bad thread files several in a row, and a ceiling that locks them out halfway
+           through moderating their own feed is a ceiling that defeats the feature it protects.
+         · blocks    60/m — a read the safety panel refreshes.
+         · reports  600/m — the operator lane, which bulk-drains. -->
   <route method="GET"  path="/social/comments/:episode" action="listComments"  auth="none"     rate="120/m"/>
-  <route method="GET"  path="/social/notices"            action="listNotices"   auth="none"     rate="60/m"/>
+  <route method="GET"  path="/social/notices"           action="listNotices"   auth="none"     rate="60/m"/>
+  <route method="GET"  path="/social/blocks"            action="listBlocks"    auth="required" rate="60/m"/>
   <route method="POST" path="/social/comment"           action="postComment"   auth="required" rate="10/m"/>
+  <route method="POST" path="/social/comment/delete"    action="deleteComment" auth="required" rate="20/m"/>
+  <route method="POST" path="/social/report"            action="reportComment" auth="required" rate="20/m"/>
+  <route method="POST" path="/social/report/ad"         action="reportAd"      auth="required" rate="20/m"/>
+  <route method="POST" path="/social/block"             action="blockAuthor"   auth="required" rate="20/m"/>
+  <route method="POST" path="/social/unblock"           action="unblockAuthor" auth="required" rate="20/m"/>
+  <route method="POST" path="/social/reports"           action="listReports"   auth="required" reach="" rate="600/m"/>
 </server>

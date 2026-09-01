@@ -332,6 +332,15 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   insets; web resolved env(), 0 in a browser tab, real in a standalone PWA). Never a
   device constant, never window-height stages inside the safe region (the EP pill spilled
   off-screen). Overlays and paywalls balance their inner padding the same way.
+  THE TAB-ROOT COROLLARY: a shared bar cannot read the inset for itself, because on an
+  ordinary screen the frame already proposed the safe region and adding it again doubles it.
+  So the FULL-BLEED screen passes it (`<TabBar inset="{{ dsx.screen.safeBottom }}">`) and
+  reserves it in its own stage arithmetic. Measured: Discover sized its stage
+  `dsx.screen.height - 70`, its pager carried `ignoreSafeArea`, so the column got all 874pt,
+  stage 804 + bar 70 filled the window exactly, and the bar sat in the last 70 — which
+  contains the 34pt home indicator. The captions clipped while Home, which does no such
+  arithmetic, was correct. Any screen deriving a height from `dsx.screen.height` while
+  chrome shares its column is making this mistake.
 - **Icons are UNIFIED here** (App.json `icons: "unified"`, dev@37e1c82c): native draws the
   web's own 24×24 Boxicons paths — same geometry, same em-box, so icon spacing is
   pixel-true. `position: absolute` + edge insets and `filter: blur(N)` are bridged now;

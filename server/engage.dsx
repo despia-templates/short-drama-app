@@ -1,8 +1,12 @@
 <!-- engage.dsx — the rewards loop: daily check-in streak, spin the wheel, daily tasks.
      Numbers follow docs/product/spec.md and are deliberately visible here: the curve,
      the prize table and the caps are server facts an admin surface can render, never
-     client constants. Grants write the ledger + wallet fold directly (sibling actions
-     return void, so the fold is inlined, same as wallet.dsx).
+     client constants. Grants write the ledger + wallet fold directly: a sibling call would
+     work (it resolves the module envelope `{ ok, data }` — AGENTS.md; the note that used to
+     stand here claiming siblings return VOID is false and is corrected), but the fold is
+     four writes deep in a request with a 64-call budget, and inlining keeps each grant one
+     readable block, same as wallet.dsx. Where a sibling call IS the right answer is a shared
+     TABLE, and server/store.dsx now uses one for exactly that.
 
      ── EVERY ONCE-PER-DAY GUARD IS A UNIQUE CONSTRAINT, NOT AN `if` ─────────────────────
      Each grant below used to read "did I already do this today?" and then write. A
@@ -84,6 +88,12 @@
       const claimed = (claims.ok ? claims.data : []).map(c => c.task)
       const watched = await dsx.module.data.progress.list({ filters: { day: today }, limit: 50 })
       const watchedCount = watched.ok ? watched.data.length : 0
+      // `firstFavorite` reported `progress: 0` to every viewer, including one holding a full
+      // My List — the CLAIM guard read the real table (claimTask below) and the DISPLAY did
+      // not, so the task bar sat at 0/1 under a control that would have paid out. One
+      // bounded read, the same one the guard does; the target is 1, so limit 1 answers it.
+      const favs = await dsx.module.data.favorite.list({ limit: 1 })
+      const favCount = favs.ok ? favs.data.length : 0
 
       const days = []
       for (let i = 0; i < curve.length; i++) {
@@ -94,21 +104,20 @@
       const AD_CAP = 10
       const AD_REWARD = 15
 
-      // The two things a drama app actually sells, as SERVER facts so an operator can
-      // change price without a build: VIP tiers first, then coin packs.
-      const vipTiers = [
-        { id: 'weekly',  label: 'Weekly VIP',  price: '$11.99', note: 'then $14.99/week', badge: '21% OFF', best: false },
-        { id: 'monthly', label: 'Monthly VIP', price: '$49.99', note: 'Auto-renew. Cancel anytime.', badge: '', best: true },
-        { id: 'yearly',  label: 'Yearly VIP',  price: '$199.99', note: 'Auto-renew. Cancel anytime.', badge: 'BEST VALUE', best: false }
-      ]
-      const coinPacks = [
-        { id: 'p500',   coins: 500,   free: 25,    price: '$4.99',  bonus: '+5%' },
-        { id: 'p1000',  coins: 1000,  free: 100,   price: '$9.99',  bonus: '+10%' },
-        { id: 'p2000',  coins: 2000,  free: 400,   price: '$19.99', bonus: '+20%' },
-        { id: 'p3000',  coins: 3000,  free: 900,   price: '$29.99', bonus: '+30%' },
-        { id: 'p5000',  coins: 5000,  free: 2500,  price: '$49.99', bonus: '+50%' },
-        { id: 'p10000', coins: 10000, free: 10000, price: '$99.99', bonus: '+100%' }
-      ]
+      // THE PRICE TABLE THAT USED TO BE HERE IS DELETED, and its absence is the fix. It was
+      // a THIRD copy of the storefront (server/store.dsx storeCatalog is the first,
+      // createCheckout re-typed it as the second) and it had already drifted three ways: its
+      // ids were `weekly`/`p500` where no checkout sku matches, it flagged monthly as `best`
+      // where the store flags yearly, and it repeated the same false auto-renew notes.
+      // Nothing read it — no component binds `vipTiers` or `coinPacks` (grep) — so it was
+      // pure drift surface, which is the audit blocker H2. THE RULE THIS LEAVES BEHIND: a
+      // rewards screen that wants to merchandise VIP reads /store/catalog, the same endpoint
+      // the storefront reads, and the same one createCheckout prices from through a sibling
+      // call. One table, one owner, one place to change a price.
+      // The precedent for the other shape is BULK_OFF in server/wallet.dsx: a SCALAR that
+      // two actions in one document both need, written twice because a server head has no
+      // shared-constant seam, with a comment on each saying so. A nine-row table is not that
+      // — it is a document that belongs to one action.
       // ODDS, PUBLISHED. The wheel picks uniformly from `spinPrizes`, so every prize is
       // 1/N. It is a server fact rather than a client assumption because the client must be
       // able to SHOW it (App Store 3.1.1's loot-box disclosure applies the moment a
@@ -121,10 +130,9 @@
         freeSpinLeft: spinsToday === 0,
         spinPrizes: spinPrizes, spinOdds: spinOdds, spinCost: 0,
         adsToday: adsToday, adCap: AD_CAP, adReward: AD_REWARD, adsLeft: Math.max(0, AD_CAP - adsToday),
-        vipTiers: vipTiers, coinPacks: coinPacks,
         tasks: [
           { id: 'watch3', title: 'Watch 3 episodes today', reward: 15, progress: Math.min(watchedCount, 3), target: 3, claimed: claimed.includes('watch3') },
-          { id: 'firstFavorite', title: 'Add a show to My List', reward: 10, progress: 0, target: 1, claimed: claimed.includes('firstFavorite') }
+          { id: 'firstFavorite', title: 'Add a show to My List', reward: 10, progress: favCount, target: 1, claimed: claimed.includes('firstFavorite') }
         ]
       }
     </action>

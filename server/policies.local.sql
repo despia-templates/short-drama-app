@@ -123,3 +123,43 @@ create unique index if not exists dsx_order_intent_uniq
 -- repeat a ref across kinds) and must not be caught by this.
 create unique index if not exists dsx_ledger_grant_once
   on dsx_ledger (owner_id, kind, source, ref) where source in ('pack', 'vip');
+
+-- one block per viewer per subject. The unblock path reads the row and deletes it, so a
+-- duplicate would make a block un-clearable the same way a duplicate favorite made the heart
+-- un-clearable; and `blockAuthor` relies on the refused insert to answer "already blocked".
+create unique index if not exists dsx_block_owner_subject_uniq on dsx_block (owner_id, subject);
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════════════
+-- THE REPORT TABLE — the same all-read/own-write shape as dsx_comment, for the same missing
+-- upstream word (§6.25), and one index that is doing more work than it looks.
+--
+-- WHY THE TABLE IS ALL-READ AT ALL: a declared action never runs as service_role (§6.7), so
+-- an owner-scoped report table would be invisible to the operator queue AND to the flag
+-- tally the thread read computes. `server/social.dsx` names this trade in full. The gateway
+-- (`reach=""` on /social/reports) is what keeps a viewer out of the queue.
+alter table dsx_report alter column owner_id set default auth.uid();
+
+drop policy if exists dsx_report_owner_write on dsx_report;
+create policy dsx_report_owner_write on dsx_report
+  for insert with check (owner_id = auth.uid());
+
+-- a reporter may withdraw their own report; nobody may edit anyone else
+drop policy if exists dsx_report_owner_update on dsx_report;
+create policy dsx_report_owner_update on dsx_report
+  for update using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+drop policy if exists dsx_report_owner_delete on dsx_report;
+create policy dsx_report_owner_delete on dsx_report
+  for delete using (owner_id = auth.uid());
+
+-- ONE REPORT PER REPORTER PER TARGET, and this index is the ONLY thing that makes the
+-- community flag threshold mean "three distinct people" rather than "three taps". Without
+-- it, one account can hide any comment for everyone by reporting it three times.
+--
+-- The coalesce is because there are two kinds of target and only one of them is a row: a
+-- comment report carries `target` (uuid) and an ad report carries `subject` (text). A plain
+-- `(owner_id, target)` would leave every ad report unconstrained, because Postgres treats
+-- NULLs as distinct and every ad row has target NULL.
+create unique index if not exists dsx_report_owner_target_uniq
+  on dsx_report (owner_id, kind, coalesce(target::text, subject));
