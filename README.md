@@ -32,7 +32,7 @@ lists every one of them, and each is filed in PLAN.md §6.
 | **VIP** `/vip` | Masthead, benefits (every claim true), free-with-VIP rail, plans sheet, an honest restore row |
 | **Rewards** `/rewards` | 7-day check-in curve, the wheel (server-declared prize table), tasks, rewarded ads capped per day and **VIP-gated**, with the App Store 2.5.18 report-this-ad seam |
 | **My List** `/list` | History rail with resume, favourites grid |
-| **Profile** `/profile` | Identity, wallet, transaction ledger, **a working language switcher**, Manage, Account |
+| **Profile** `/profile` | Identity, wallet, transaction ledger, **a real language picker over thirteen shipped locales**, Manage, Account |
 | **Account** `/account`, `/auth/:pane` | Sign in / sign up / sign out, restore purchases, terms, privacy, support, **and account deletion that provably empties the account** |
 | **Notices** `/notices` | Operator broadcast inbox |
 | **Manage** `/admin` | Catalogue table, create show, add episode, notice composer, the MCP tool list, **a moderation queue**, and a funnel readout |
@@ -99,7 +99,7 @@ Two smaller tools, not gates:
 ```sh
 node scripts/theme.mjs                    # the palette: every named tone and where it is painted
 node scripts/strings.mjs                  # locale coverage per language
-node scripts/strings.mjs --write es       # refresh a locale table against the current source
+node scripts/strings.mjs --write pt-br    # refresh a locale table against the current source
 node scripts/strings.mjs --unreachable    # the strings the localisation seam cannot reach
 ```
 
@@ -260,37 +260,126 @@ watch it.
 
 ## Localisation
 
-**This template is written in English and it is fully localisable, because in DSX those are the
-same sentence.** Localisation is gettext-shaped: apps are written in English, the **English
-source string is the key**, and the kernel resolves it at the display points — a text value or
-its inner text, a button label, a field placeholder — live, static markup included. Nothing is
-annotated and nothing is rewritten.
+**This template is written in English and it ships in thirteen languages, because in DSX those
+are the same sentence.** Localisation is gettext-shaped: apps are written in English, the
+**English source string is the key**, and the kernel resolves it at the display points — a text
+value or its inner text, a button label, a field placeholder — live, static markup included.
+Nothing is annotated and nothing is rewritten. Not one literal in `Components/**` was converted
+to ship these tables.
 
 A locale is one file: `Strings.<lowercase-bcp47>.json` at the repo root, flat
 `{ "Sign in": "Iniciar sesión" }`. **File presence is the declaration** — `despia build` folds
 every one it finds into the registry. Switching is one state write, `global.locale`, and the
 Profile screen's Language row does exactly that.
 
-`Strings.es.json` ships, complete. `node scripts/strings.mjs` reports the split:
+### What ships
+
+Twelve tables plus the English source, chosen by this category's revenue rather than by speaker
+count — the markets ReelShort, DramaBox and ShortMax actually operate in:
+
+| tier | locales |
+|---|---|
+| 1 | `es` Español · `pt-br` Português (Brasil) · `ja` 日本語 · `de` Deutsch · `fr` Français |
+| 2 | `ko` 한국어 · `zh-hant` 繁體中文 · `id` Bahasa Indonesia · `th` ไทย · `it` Italiano |
+| 3 | `tr` Türkçe · `vi` Tiếng Việt |
+
+**`zh-Hans` is deliberately absent.** The category does not ship Simplified Chinese as a locale;
+it ships a separate domestic app under a separate licence, which is a different product, not a
+translation.
+
+**`ar` is deliberately absent too, and this one is a gap rather than a decision.** Arabic needs
+the RTL layout plane — mirrored leading/trailing, mirrored chevrons, mirrored progress fills,
+bidi-correct interpolation — and this build has none of it. A locale that renders every string
+correctly inside a layout that runs the wrong way is not a partial translation, it is a broken
+app; the honest move is to ship it the day the layout plane lands, not before.
+
+### These translations have not been reviewed by a native speaker
+
+**They are model-generated.** Say this out loud in your own README if you adopt them, and get
+them reviewed before you take money in a market. They were produced against the category's own
+vocabulary (coins, unlock, episode counters, VIP, top-up — the words ReelShort and DramaBox use
+in each market rather than the words a dictionary offers), they were checked in a browser for
+clipping and wrapping at 390px, and they are good enough to demonstrate the plane and to start
+from. They are not a substitute for a linguist.
+
+Where we are least confident, in order:
+
+1. **`th` Thai** — the most distant from the rest and the hardest to self-check: word breaking
+   is implicit, so caption widths were verified by measurement rather than by reading, and the
+   register (polite-neutral, no ค่ะ/ครับ particles in chrome) is a judgement call.
+2. **`ko` Korean** — particle selection (은/는, 이/가, 을/를) is correct by rule but a native ear
+   catches unnatural sequences a rule does not; the politeness level is consistent, which is the
+   part machine Korean usually fails.
+3. **`vi` Vietnamese and `tr` Turkish** — smaller reference corpus in this category, so the
+   coin/unlock vocabulary (`Xu`, `Jeton`) follows the local app convention rather than a
+   verified in-market string.
+4. **The long legal and deletion paragraphs in every locale** — App Store 5.1.1(v) copy about
+   what a deletion destroys is the copy where a mistranslation is most expensive, and it is the
+   copy furthest from the punchy consumer register the rest of the app is written in.
+
+### The switcher
+
+Profile's Language row is a real `<picker>` — a `<select>` on the web, the system menu on iOS
+and Android — with fourteen rows: **Device language** first, then twelve endonyms and English.
+
+- Every language is named **in itself** (`Deutsch`, `日本語`, `Tiếng Việt`), because a Japanese
+  reader hunting for German is looking for `Deutsch`. The rows are DATA
+  (`Components/parts/Theme.dsx languageRows()`), which is why thirteen endonyms do not enter
+  the string corpus — and also the only thing they could be, since a choice control's option
+  labels never reach the localization seam (PLAN.md §6.98).
+- **The device row is the default and it is real.** The kernel ladder is `global.locale` →
+  device language → `en`, so an app that has never been switched is already following the
+  device. Writing a tag at boot to make the control look decided would delete that step;
+  picking the device row clears the choice and hands the ladder back.
+- **The choice is remembered in the cookie jar** — the only declared cross-platform storage
+  grammar there is, because §6.33 (no key-value plane) is still open. It survives reloads and
+  deep links; it does **not** survive quitting the browser, because the web cookie writer emits
+  no `max-age` and there is no way to ask for one (PLAN.md §6.100). The row says so in the UI.
+- **A device set to `pt-PT` or `zh-TW` will not find these tables on its own.** The kernel tries
+  the full tag and then the bare language and nothing between, so `zh-tw` → `zh` misses a
+  `zh-hant` table (PLAN.md §6.99). Bare-language locales are fine (`de-AT` → `de`). Until that
+  lands, those two are reachable through the picker rather than through the device.
+
+### What a locale is measured against
+
+`node scripts/strings.mjs` classifies the corpus mechanically, so a coverage number means
+something:
 
 | | |
 |---|---|
-| **210 viewer** | product copy — what a locale is measured against, and Spanish is at 100% |
-| **36 operator** | rendered only by the Manage surface: an internal tool, deliberately English |
+| **244 viewer** | product copy — what a locale is measured against, and all twelve are at 100% |
+| **43 operator** | rendered only by the Manage surface: an internal tool, deliberately English |
 | **17 developer** | copy that cites a source path, a config key or a ledger entry. Translating "set `authSignInUrl` in App.json `consts`" makes the instruction *wrong* in the target language |
-| **248 unreachable** | the seam's real boundary, listed by `--unreachable` rather than guessed |
+| **258 unreachable** | the seam's real boundary, listed by `--unreachable` rather than guessed |
 
 That last row is the honest part. Three things the seam does not reach, each needing a
 different answer: **a11y labels** (the kernel localizes display points only, so a screen reader
-hears English on a Spanish device — an upstream ask), **interpolated composites** (`{{ x ? 'a'
-: 'b' }}` resolves before the lookup; the scheduled Translate module owns that tier), and
-**copy the server sends** (prices, rejection messages, notice bodies — they localize
+hears English on a Spanish device — an upstream ask), **interpolated composites** (`EP 1–{{ n }}
+Free` renders `EP 1–5 Free`, which no table can hold; the scheduled Translate module owns that
+tier), and **copy the server sends** (prices, rejection messages, notice bodies — they localize
 server-side).
 
-**A half-locale cannot ship.** `npm run verify` reads the built registry and fails if any
-shipped locale is missing one viewer string, because a language chip that returns a
-half-Spanish app is a control that promises something it does not do. Adding a language is
-adding a file and a chip.
+**A ternary is not a composite, and getting that wrong cost 29 strings.** `bindDisplay`
+localizes the string it *renders*, so `<text value="{{ favOn ? 'Saved' : 'Save' }}">` looks up
+`Saved` or `Save` and hits the table — measured, that control reads `Liste` in German today.
+The extractor used to file every interpolated value as unreachable, so twelve complete locales
+all showed English on `Follow`, `Claim`, `See plans` and `Restore purchases`. It now pulls the
+literal arms of a ternary when the attribute is exactly one hole and each arm is a whole
+literal; a concatenation fragment still is not a rendered form and stays out.
+
+The **known next tier**, named rather than quietly skipped: a display bound to
+`{{ dsx.variable.vipLine }}` renders one of the literal sentences that computed returns, so the
+seam would hit those too — roughly 25 strings, listed by `--unreachable`. Following a computed's
+returns needs a rule that cannot mistake an enum key or a CSS string for copy, and a half-safe
+rule puts junk in twelve tables, so it waits.
+
+**A half-locale cannot ship, and neither can a fake one.** `npm run verify` reads the built
+registry and fails if a shipped locale is missing one viewer string, if the picker offers a
+language whose table nobody wrote (or ships a table nobody can select), if a locale is missing
+from the device-row map, or if more than 30% of a table's values are byte-identical to their
+English key — because completeness is a count, and a count is satisfiable by pasting the key
+into the value 244 times. Adding a language is: write the table, add the row and the tag in
+`Theme.dsx`, add the device-row label, run the gates.
 
 Numbers and dates are locale **formatting**, not translation: `compactCount()` and
 `shortDate()` in `Components/parts/Theme.dsx` run through `Intl` and read the same
@@ -336,6 +425,9 @@ most trying to teach.
 | **Push** | Notices queue and land in the in-app inbox; nothing is delivered to a device | The Manage composer, and Notices |
 | **Moderator remedy** | An operator can read the queue and cannot hide a comment: a declared action carries no service authority (§6.7), so the token is scoped like a viewer's — measured, `POST /social/comment/delete` answers 403 | The moderation queue card |
 | **Content language** | `<video>` can select neither a rendition nor a track (§6.36) | The Language row |
+| **Arabic and every RTL locale** | No RTL layout plane in this build: mirrored leading/trailing, chevrons, progress fills, bidi interpolation | The Localisation section above — the locale is withheld rather than shipped broken |
+| **A remembered language** | No key-value plane (§6.33), and the cookie the choice rides is a SESSION cookie with no way to ask for durability (§6.100) | The Language row says it forgets when you quit |
+| **`pt-PT` and `zh-TW` devices** | The table ladder tries the full tag then the bare language and nothing between, so a script-qualified table is unreachable from the device step (§6.99) | The Localisation section; the picker reaches them explicitly |
 | **Playback quality** | One rendition in this build | The player's options sheet |
 | **Demo media** | CC-licensed sample clips stand in for episodes; the hosted lane swaps `video_url` to a CDN, which is a seed change and not a code change | The Manage screen |
 | **View counts and ratings** | Seeded demo values; nothing increments them | The Manage screen |

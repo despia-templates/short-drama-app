@@ -73,6 +73,24 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   `fetch`. (Probed 2026-08-30; an earlier note here claimed siblings return void, which is
   false and cost a silent auth bug: `null` came back as `{ok:true,data:null}`, so an
   `x == null` guard never fired.)
+- **THE LOCALIZATION SEAM READS WHAT AN INTERPOLATION RENDERS, so a ternary over literals IS
+  translatable.** `bindDisplay` is `localize(interpolate(expr))`, in that order — so
+  `<text value="{{ favOn ? 'Saved' : 'Save' }}">` looks up `Saved` or `Save` and hits the
+  table (measured: it renders `Liste` under `global.locale = 'de'`). What is genuinely out of
+  reach is a CONCATENATION — `EP 1–{{ n }} Free` renders `EP 1–5 Free`, which no table can
+  hold. Treating the two the same left 29 strings untranslated in twelve complete locales,
+  including `Follow`, `Claim` and the VIP card's `See plans`. `scripts/strings.mjs`
+  `ternaryLiterals()` is the rule: one hole, whole attribute, each arm a bare literal.
+- **AN EVENT PAYLOAD ARRIVES FLAT, so a declared action input names the key BARE.**
+  `<action as="failed" message="message">` reads the payload's `message`;
+  `message="event.message"` reads NOTHING — there is no `event` plane, the miss resolves to
+  the NSNull sentinel, and `callAction` stores it (`?? NSNull`) rather than erroring. The
+  cost is invisible: NSNull is truthy, `== null` is false, and it stringifies `<null>`, so
+  the guard passes and the toast says `<null>`. Five sites shipped with the wrong spelling
+  and no gate saw one of them (found 2026-09-01, when a cookie came back
+  `uiLocale=%3Cnull%3E`). The runner spreads the payload into the handler scope and passes
+  that scope as the callee's caller scope, so the bare name is the only spelling that
+  resolves — `dsx.this.message` is the documented alternative inside a handler BODY.
 - **`api.send(payload)`** — the payload is the body; do not wrap in `{ body: … }`.
 - **Never ship an emoji as an icon.** An emoji is a font-dependent glyph with no
   per-platform twin, no tint, and no a11y story; every icon comes from the shared catalog
