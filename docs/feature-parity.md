@@ -217,7 +217,6 @@ seeing: every one was a sell surface that had drifted from what the player actua
 
 | # | Defect | Evidence | Fix |
 |---|---|---|---|
-| D1 | **The expiry claim outlived the expiry.** The server no longer expires anything, and the Profile UI still says it does: `Profile.dsx:255` "Bonus · 7-day", `Profile.dsx:281` "Bonus coins expire 7 days after they land" | Both are unconditional; `Profile.dsx:303` is correctly conditional on `item.expires` and simply falls silent now. Nothing anywhere reads or enforces an expiry | Delete the two claims. This is the last mile of a fix that is otherwise complete |
 | D2 | **Every comment is authored "You".** `server/social.dsx:58` hardcodes `author: 'You'` and `Watch.dsx` renders `item.author` | Two viewers see each other's comments attributed to themselves | Carry a display name from the verified subject once auth exists (§7, T1) |
 | D3 | **Comments show a like count with no way to like.** `server/social.dsx:15` declares `likes`, `:40` returns it, the sheet renders "N likes" — and no action increments it | — | Ship the like, or drop the count |
 | D4 | **Resume position is stored, displayed, and never applied.** `server/viewer.dsx` writes `position`, `continueWatching` returns it, `MyList.dsx:175` draws a resume bar from it, and **`Watch.dsx` never sets `<video start=>`** | `start` is in the element census; grep for `start=` in `Watch.dsx` returns nothing | One attribute (§7, T10) |
@@ -507,8 +506,11 @@ all. `trash` is in the icon catalog.
 `nowPlaying="true" nowTitle="{{ episode.title }}" nowArtist="{{ show.title }}" remoteSkip="true"`,
 plus `on:remoteNext="dsx.action.next()"`. XS.
 
-**D1 · Expiry, last mile.** Delete `Profile.dsx:255` and `Profile.dsx:281`, and drop the
-`expires` field (`server/wallet.dsx:82`) once nothing reads it. XS.
+**D1 · Expiry — CLOSED 2026-09-01.** All three Profile claims are gone. The last one was the
+conditional this table dismissed as harmless (*"simply falls silent now"*), and that reading was
+the mistake: an unreachable promise is one payload change from a live one, so it was deleted
+rather than left. `verify` now asserts the COPY beside the behaviour — no display string may
+claim an expiry unless it negates one — read through the app's own display-point extractor.
 
 **D5 · Auto-unlock.** `Watch.dsx:69` → `return false`; read and write the per-show preference
 through `dsx.module.storage` keyed on the show id; add a "spent on this series" line beside the
@@ -533,7 +535,7 @@ inside the `BuyGate` capability check. S.
 | 5 | **No restore mechanism** (3.1.1), and no sign-in-or-restore on the purchase screen (3.1.2) | Apple | **Partial** (T5, D6): a local-refresh Restore exists on `/vip`; the route it needs is unused and `PlansSheet` has no row |
 | 6 | **Subscription purchase screen** must show name, duration, and the **full renewal price as the most prominent pricing element** — an annual plan leads with the annual charge, not a per-week equivalent | Both | **Partial**: `PlansSheet` shows label, price and note; no duration statement, no legal links, no restore |
 | 7 | **UGC without filter, report, block and published contact**, and without an EULA the user agrees to. Reports must be actioned within 24 hours | Apple 1.2 | **Missing** (T7) — and the template ships comments |
-| 8 | **Purchased currency that expires** (3.1.1) | Apple | **Compliant server-side** — the stamps were removed mid-research. **The UI still claims a 7-day expiry** (D1), which is a reviewer-visible contradiction of your own behaviour |
+| 8 | **Purchased currency that expires** (3.1.1) | Apple | **Compliant, both halves** — the stamps were removed mid-research and the three UI claims followed (D1). Nothing in the schema, the grants, the payload or the copy expires a balance, and `verify` asserts all four |
 | 9 | **Age rating questionnaire unanswered** — the revised system (13+/16+/18+ added, 12+/17+ removed) went live and the response deadline of 31 Jan 2026 has passed; submissions are blocked until it is answered | Apple | Not applicable to source, but must be done at submission |
 | 10 | **No reviewer test account** funded with coins and an active subscription | Both | Not present; a paywalled catalogue bounces without one |
 | 11 | **`targetSdkVersion` < 36 or Play Billing Library < 8** — both deadlines passed 31 Aug 2026, extension window closes 1 Nov 2026 | Google | Build config |

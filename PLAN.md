@@ -1562,8 +1562,8 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     because every tool here is an admin verb; a project with viewer-facing tools would need
     the upstream fix rather than this.
 
-85. HANDOVER 2026-09-01 — **the coin economy must stop promising expiry, and three lines of
-    copy are the remaining half.** App Store Review Guideline 3.1.1, verbatim: *"Any credits
+85. RESOLVED 2026-09-01 — **the coin economy no longer promises expiry, on either side of
+    the wire.** App Store Review Guideline 3.1.1, verbatim: *"Any credits
     or in-game currencies purchased via in-app purchase may not expire."* 3.2.1(iii) permits
     an expiry window only for the rental of specific approved content; a coin balance is not
     that. The backend was writing a 7-day `expires` onto every granted-bonus ledger row and
@@ -1577,11 +1577,33 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     two balances stay separate, because spend order is a real product rule (granted first, so
     purchased coins outlive free ones) and because keeping the purchased balance nameable is
     what makes 3.1.1 provable.
-    STILL TO DO (Components/, not owned by that pass): `Components/Profile.dsx:255`, `:281`
-    and `:303` still tell the customer bonus coins expire in 7 days. Every one of them must
-    drop the expiry clause — "Bonus coins are spent first" is the true and sufficient
-    sentence. Until they change, the app promises something the server no longer does, which
-    is the same defect pointing the other way.
+    DONE (Components/, this pass). Re-measured before touching a string, because the ledger
+    named three line NUMBERS and line numbers rot: two of the three had already been fixed
+    (the balance-strip caption is now `Bonus`, the wide strip now reads "Coins never expire —
+    bought or earned"). The third had NOT, and it was the one worth finding, because it read
+    as dead code:
+
+        {{ item.kind == 'bonus' ? 'Bonus coins' : 'Coins' }}{{ item.expires == null ? '' : ' · expires in 7 days' }}
+
+    A SECOND interpolation appended to the first, on every ledger row. `ledgerRows` had
+    already stopped naming `expires` in its payload, so it could not fire — which is exactly
+    why it survived two passes. An unreachable promise is one payload change from a live one
+    and no gate could see it, so it is deleted rather than left unexercised, on the same
+    reasoning that removed the column instead of leaving it unread.
+    A LOCALISATION MISS CAME OFF WITH IT. Two holes is a CONCATENATION, so neither branch was
+    ever a rendered form the seam could look up — `scripts/strings.mjs ternaryLiterals` names
+    this very line as its worked example. One hole over two bare literals is translatable, so
+    `Coins` and `Bonus coins` now resolve in all thirteen locales (248/248 per table), each
+    translation taken from the noun phrase that locale's own "Bonus coins are spent first"
+    sentence already used.
+    AND THE COPY IS GATED NOW, not just the behaviour. `verify` proved three server-side
+    facts and nothing about what the app TELLS the customer, which is the half a reviewer
+    reads. Two assertions run over the app's own display-point extractor — `keys` for
+    literals and whole-attribute ternary branches, `unreachable` for every interpolated
+    display attribute verbatim, which is precisely where a concatenated fragment hides. A
+    mention of expiry passes only when it NEGATES one. Proven to fail by re-planting the
+    deleted clause (1 promise of 2 mentions; 0 of 1 once restored), and paired with a
+    positive so it cannot pass vacuously on an app that never mentions expiry.
     ALSO CHECKED, and clean: the spin is FREE (one a day, no coin cost anywhere in
     `spinWheel`), so it is not a loot box under 3.1.1 — a randomised reward is only one when
     it can be obtained with PURCHASED currency, and declaring one forces an 18+ rating in
