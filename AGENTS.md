@@ -332,15 +332,24 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   insets; web resolved env(), 0 in a browser tab, real in a standalone PWA). Never a
   device constant, never window-height stages inside the safe region (the EP pill spilled
   off-screen). Overlays and paywalls balance their inner padding the same way.
-  THE TAB-ROOT COROLLARY: a shared bar cannot read the inset for itself, because on an
-  ordinary screen the frame already proposed the safe region and adding it again doubles it.
-  So the FULL-BLEED screen passes it (`<TabBar inset="{{ dsx.screen.safeBottom }}">`) and
-  reserves it in its own stage arithmetic. Measured: Discover sized its stage
-  `dsx.screen.height - 70`, its pager carried `ignoreSafeArea`, so the column got all 874pt,
-  stage 804 + bar 70 filled the window exactly, and the bar sat in the last 70 — which
-  contains the 34pt home indicator. The captions clipped while Home, which does no such
-  arithmetic, was correct. Any screen deriving a height from `dsx.screen.height` while
-  chrome shares its column is making this mistake.
+  THE TAB-ROOT COROLLARY, and it is the opposite of the obvious fix: SHARED CHROME HAS ONE
+  GEOMETRY AND SCREENS CONFORM TO IT. A tab bar must read nothing about the safe area. The
+  frame already proposes the safe region, so the bar is clear of the indicator by
+  construction, and the only way its captions land at two different heights is a screen
+  handing it a different box.
+  Measured, both halves. Discover sized its stage `dsx.screen.height - 70` and its pager
+  carried `ignoreSafeArea`, so the column got all 874pt; stage 804 + bar 70 filled the window
+  exactly, inside a frame offering 781 — the bar sat in the last 70, which contains the 34pt
+  indicator, and the captions clipped. The tempting fix — pass the inset to the bar so it pays
+  it back — WAS TRIED AND IS WRONG: it made the bar 104pt on that screen against 70
+  everywhere else, so the captions stopped clipping and started SHIFTING as you changed tabs.
+  Compensating in the shared component turns a clip into a drift.
+  The fix is that the screen conforms: no `ignoreSafeArea` on a pager whose sibling is chrome,
+  and stage height derived from the SAFE region (`screen.height - safeTop - safeBottom -
+  chromeH`). `ignoreSafeArea` belongs only to a screen that owns the WHOLE window and pays
+  every inset back itself — Watch does exactly that, and mounts no tab bar (§6.29). Any screen
+  deriving a height from `dsx.screen.height` while chrome shares its column is making this
+  mistake.
 - **Icons are UNIFIED here** (App.json `icons: "unified"`, dev@37e1c82c): native draws the
   web's own 24×24 Boxicons paths — same geometry, same em-box, so icon spacing is
   pixel-true. `position: absolute` + edge insets and `filter: blur(N)` are bridged now;

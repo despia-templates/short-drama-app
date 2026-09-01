@@ -54,16 +54,17 @@
          inherited the stage's grid column, and while `dsx.screen.*` settles after a tab
          switch that column computed 362, so the bar shrank 375 → 362 → 375 in ~60ms.
          Chrome is a sibling of the stage now, exactly as on every other screen. -->
-    <!-- The bar's own height PLUS the home indicator underneath it. This screen is
-         full-bleed (its pager ignores the safe area), so the frame proposes the whole
-         window and nothing else reserves that strip — leaving it out is what pushed the
-         tab bar into the indicator and clipped its captions. -->
-    <variable as="chromeH" computed="true">
-      const bar = dsx.variable.wide ? 64 : 70
-      return bar + (dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0))
-    </variable>
+    <variable as="chromeH" computed="true">return dsx.variable.wide ? 64 : 70</variable>
+    <!-- THE SAFE REGION, not the window. `dsx.screen.height` is the whole display; the frame
+         hands this screen height MINUS the insets, so subtracting only the bar overshot by
+         safeTop + safeBottom and the column ran past its box. Measured on an iPhone 17 Pro:
+         874 - 70 = 804 for the stage plus 70 for the bar is exactly 874, the full window,
+         inside a frame offering 781 — so the bar spilled into the 34pt indicator. Any screen
+         deriving a height from dsx.screen.height while chrome shares its column is making
+         this mistake (AGENTS.md, the safe-area law). -->
     <variable as="stageH" computed="true">
-      return dsx.screen.height - dsx.variable.chromeH
+      const inset = (dsx.screen.safeTop || 0) + (dsx.screen.safeBottom || 0)
+      return dsx.screen.height - inset - dsx.variable.chromeH
     </variable>
 
     <variable as="card" computed="true">
@@ -106,7 +107,15 @@
          mount, so sizing a full-bleed layer from it pins the feed to whatever the window
          was then — on a desktop pane the video ran 959px while the pager stayed 697px.
          Widths are percentages; only the page HEIGHT needs a real number. -->
-    <pager axis="vertical" ignoreSafeArea="true" bind="dsx.variable.feedView.cards" key="show"
+    <!-- NO ignoreSafeArea. This pager is not the window owner — the tab bar is its sibling —
+         and claiming the whole window is what made the frame taller than the safe region,
+         pushed the bar into the home indicator, and left the bar sitting at a different
+         height here than on every other tab root. `ignoreSafeArea` belongs to a screen that
+         owns the WHOLE window and pays the insets back itself (Watch does exactly that);
+         a screen sharing its column with chrome must live in the box the frame proposes.
+         Nothing is lost visually: the bar paints opaque black, so there was never anything
+         to see behind it — the file already recorded that when it stopped overlaying. -->
+    <pager axis="vertical" bind="dsx.variable.feedView.cards" key="show"
            value="dsx.variable.page" dots="false" on:change="dsx.action.rest()"
            height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}" style="width: 100%; margin-left: auto; margin-right: auto">
       <zstack>
@@ -188,5 +197,5 @@
 
   </zstack>
 
-  <TabBar active="foryou" inset="{{ dsx.screen.safeBottom || 0 }}" visible-if="dsx.variable.wide == false"/>
+  <TabBar active="foryou" visible-if="dsx.variable.wide == false"/>
 </vstack>
