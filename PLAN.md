@@ -2637,8 +2637,18 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      paths, both bridges with `css-bridge.json` rows, and the web `borderDecls` emitter. (a) LANDED upstream the same night (dev@6c5f185a): Android's fixed frames anchor per axis and
      the three words reach the Compose arrangement — Play pill at 71.0% of screen height vs iOS 73.1%
      (the residual is the two lanes' status/home bars). One iOS follow-up filed with it: a fixed-WIDTH
-     `hstack` under `justify-content: center` still sits leading on iOS. (b) is in flight; the
-     template changes nothing for either — the markup is already the right markup.
+     `hstack` under `justify-content: center` still sits leading on iOS. (b) LANDED upstream the same
+     night (dev@3ecc0b7e): `borderEdges` is the catalogued key (border group, multiEnum, ejects), one
+     decision on three renderers pinned by `Conformance/style-semantics/border-edges.json` (parse ·
+     rects · web; each executor shown red on a mutated corpus first), both native pipelines fill the
+     corpus rects inside the box (SwiftUI Shape overlay, Compose `drawWithContent` on :render and
+     :desktop), and both CSS bridges fold `border-top/right/bottom/left` + `-width/-color/-style` into
+     it (13 whole-map rows in `css-bridge.json`; one stroke per element is the pinned limitation).
+     Measured: iPhone 17 Pro Profile row (600,1618) went (20,20,25) → (32,32,36), the tab bar's top
+     edge (600,2324) went (12,2,4) → (29,20,22) — the declared 0.05 and 0.07 whites exactly; the
+     API 36 tablet paints the same rows (20,20,25) → (32,32,37) and the phone's bar edge reads 18 over
+     black; the `border-top … inert` line went 23 → 0 per iOS launch. The template changes nothing
+     for either — the markup is already the right markup.
 
 119. **ANDROID'S ROUTE CHROME, INBOUND LINKS, BOOT SPLASH AND SYSTEM BARS NOW MATCH iOS** (found
      2026-09-02; fixed upstream dev@bbb14a66 · 10c3b381 · adec03fe). Four findings. (1) `Router.kt
