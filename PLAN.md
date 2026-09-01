@@ -2119,3 +2119,208 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      better, close §6.33 with a real preferences plane and let cookies go back to being
      about credentials. A language choice is not a credential and should not have been
      riding the auth plane's storage in the first place.
+
+101. **THE MESSAGE TEMPLATE TIER IS A CLIENT TIER: the SSR renderer emits the raw ICU
+     group into the delivered HTML** (found 2026-09-01 shipping Arabic; measured on a live
+     origin with `curl`, so it is the artefact and not a timing guess).
+
+     `DSXStrings.localizeTemplate` is called from exactly one place — `dom/src/mount.ts`
+     line 428, inside `bindDisplay`'s effect. `packages/server/src/render.ts` has no
+     reference to `DSXStrings` at all. That is correct and invisible for every string this
+     app shipped before today, because SSR renders the ENGLISH source and hydration swaps
+     in the translation, which is the same story for all 247 keys. It stops being invisible
+     the moment the source string is a MESSAGE rather than a sentence.
+
+     Probed with one caption on `/show`:
+
+         <text value="{dsx.variable.freeCount, plural, one {# free} other {# free}}"/>
+
+     The delivered body carried
+
+         <span class="dsx-text gridAll" …>{dsx.variable.freeCount, plural, one {# free} …
+
+     verbatim — the reader's first paint is ICU markup, replaced only when the bundle
+     hydrates. SSR *does* resolve `{{ … }}` holes (the same page serves `EP 1–5 Free`
+     correctly), so this is specifically the `{expr, kind, …}` group grammar that the
+     server-side path never learned.
+
+     **WHAT IT COSTS RIGHT NOW.** Six counted strings in this template want a plural group
+     and cannot have one, because their display points are server-rendered:
+     `1-{{ n }}` and the free count on `/show`'s grid head, `EP 1 — {{ n }} episodes` and
+     `Unlock all {{ n }} remaining episodes` on the detail panel, `All {{ n }} Episodes` in
+     the player drawer, and `{{ n }} day streak` on Rewards. Every one of them is a place
+     Arabic needs up to six forms and gets a concatenation. The three that DID convert
+     (the composer's two counters and the moderation flag count) are inside sheets that
+     mount on a tap and appear nowhere in an SSR body — `npm run verify` now asserts that
+     confinement over the delivered bytes of seven routes, so the next author who writes a
+     group at a server-rendered point is told rather than discovering it in Arabic.
+
+     **THE ASK.** Run the message tier in `render.ts` at the same display points the client
+     binds, with the request's resolved locale. The fold is already lane-independent by
+     construction (`kernel/message.ts` is pure: no DOM, no store), so this is a call site
+     rather than a port. Until then, `despia lint` could say it: a `{expr, plural, …}` group
+     in a component that any route renders is a defect the author cannot see locally,
+     because on localhost hydration usually beats the eye.
+
+102. **THE RESOLVED LAYOUT DIRECTION IS NOT READABLE FROM DSX — the plane is write-only
+     from the app's side** (found 2026-09-01, same pass; source-read across kernel, dom and
+     store, confirmed by the absence of any `DSXState.set` for it).
+
+     `DSXStrings.direction()` is the whole ladder and it works: an app pin (`global.direction`)
+     over the resolved locale, script subtag over language, applied at each root. Nothing
+     publishes its ANSWER anywhere an expression can read. There is no `dsx.screen.direction`,
+     no `global.screen.direction`, and `global.locale` — the only readable input — is empty
+     EXACTLY in the case that matters most, because an app that has never been switched is
+     following the device and the device language is not exposed to JSE either
+     (`DSXStrings.deviceLang` is kernel-internal).
+
+     **WHY AN APP NEEDS TO ASK.** Three things do not mirror on their own and can only be
+     fixed by the author choosing differently in RTL: a directional ICON name (§6.105), a
+     physical transform (§6.104), and any gesture written against a raw x delta. All three
+     need a boolean, and today the only way to get one is to reimplement the RTL language
+     set in app code over `global.locale` — which this template now does
+     (`Components/parts/Theme.dsx isRtl()`), and which is wrong for a device that never
+     opened the picker. Measured consequence: an Arabic-language iPhone with no in-app
+     choice gets a correctly mirrored layout from the engine and 34 chevrons pointing the
+     wrong way from the app.
+
+     The obvious workaround is worse than the gap. Writing the device tag into
+     `global.locale` at boot would make `isRtl()` complete and would delete the kernel
+     ladder's device step for every locale at once — a `de-AT` device pinned to `de-AT`
+     stops falling back to the `de` table. This template refused it.
+
+     **THE ASK.** Publish the two facts the plane already computes, tracked, on all three
+     lanes: `dsx.screen.direction` (`'ltr' | 'rtl'`) and the resolved locale tag. They cost
+     one `DSXState.set` each in the same sink that writes `dir` on the document element
+     (`dom/src/boot.ts installLocalePlane`), the iOS environment write, and the Compose
+     `LocalLayoutDirection` write. `Conformance/strings/direction.json` already pins every
+     answer; this is publishing it. Secondary: a `mirror="true"` attribute on `<image>` that
+     applies `scaleX(-1)` under RTL would remove the need for the boolean at the single
+     largest call site.
+
+103. **A `<pager>`'s PAGE ORDER DOES NOT MIRROR, and the app-side consequences are not
+     documented anywhere** (measured 2026-09-01 in Arabic on the Home hero).
+
+     `dom/src/mount.ts` sets `viewport.setAttribute("dir", "ltr")` on both the bound and
+     the static pager, with a comment that says why: "One scroll-coordinate model in every
+     engine. Page content is restored to RTL by the weak `:dir(rtl)` rule; keyboard intent
+     mirrors with the outer direction." Measured, all three halves are true —
+     `.dsx-paged-viewport` computes `ltr` while every ancestor computes `rtl`, each
+     `.dsx-paged-page` computes `rtl` again, and the arrow keys swap. **This entry is not
+     asking for that to change.** A stable index-to-offset model is worth more than a
+     mirrored swipe, and the engine's own dots carry `dir="ltr"` too, so the control agrees
+     with itself.
+
+     What is missing is that nobody outside `mount.ts` can know. The consequence for an app
+     is concrete: any affordance the app draws FOR a pager — a custom dot row, a thumbnail
+     strip, a prev/next pair — is an ordinary stack and mirrors, while the thing it drives
+     does not. This template's hero has both. The dash row is fine either way (index order
+     maps monotonically right-to-left in RTL, which is what "slide 1 of 5" should look
+     like), but the prev/next chevrons had to be pinned physical against a codebase rule
+     that every other chevron follows, and there is no way to express "agree with the
+     pager" other than a comment.
+
+     **THE ASK.** Say it in `reference/` where an author reads it, not only in the source:
+     a pager's index axis is physical on every lane, chrome that drives one should not
+     mirror, and `dsx.screen.direction` (§6.102) is not the right input for that decision.
+     If a mirrored page order is ever wanted, it belongs behind an attribute
+     (`pageOrder="logical"`) rather than as a silent change of meaning.
+
+104. **THE TRANSFORM VOCABULARY IS PHYSICAL WHILE THE LAYOUT VOCABULARY IS LOGICAL, and
+     the same word means two different things on one element** (found 2026-09-01; measured
+     on two live controls at 390px in Arabic).
+
+     `compiler/src/cssmap.ts` maps `leading` to the logical `start` everywhere it is a
+     LAYOUT word — `align`, `paddingLeading`, and the rest — which is why the direction
+     plane mirrors this app's stacks for free. Twelve lines further down:
+
+         const TRANSFORM_ORIGINS = { leading: "left center", trailing: "right center", … }
+
+     So `transformOrigin="leading"` is `left` in Arabic. And `offsetX` has no logical twin
+     at all: there is no `offsetLeading`, so a pin computed from a `measure=` box always
+     travels rightward.
+
+     Two measured breakages in this template, both from the reference recipes:
+
+     · **The player's seek bar.** `custom-ux.md`'s PlayerScrubber is a track, a
+       `scaleX` fill with `transformOrigin="leading"`, and a thumb at
+       `offsetX="{{ pos * box.width - 7 }}"`. In Arabic the track measures x 14→376 and
+       computes `direction: rtl` correctly; the fill's `transform-origin` resolves to
+       `0px 2px` so it anchors at the LEFT and grows away from the reader's start edge;
+       and the thumb, whose static position is now the track's right edge, gets
+       `translateX(+109px)` on top of it and lands at **x 471–485 in a 390px viewport** —
+       95px past the end of its own track and entirely off-screen. English at position 0
+       renders the identical markup at x 7–21, centred on the track's left end.
+
+     · **The episode drawer's sliding tab underline.** `align="leading"` on the rail
+       mirrors correctly and puts the rail's start at the right; `offsetX="{{ tabSynBox.width + 28 }}"`
+       then travels the rule rightward off it. Measured: the active tab (الحلقات) at
+       x 239–290, the underline at **x 375–426** — under the OTHER tab and half outside the
+       390px panel. The two attributes on the same element disagree about which way
+       "leading" points.
+
+     **THE ASK.** (a) Resolve `TRANSFORM_ORIGINS.leading`/`trailing` against the active
+     direction on every lane — on web that is a `:dir(rtl)` companion rule or a computed
+     value, since CSS `transform-origin` takes no logical keyword. (b) Add `offsetLeading`
+     / `offsetTrailing` beside `offsetX`/`offsetY`, mapping to a sign-flipped translate
+     under RTL. Both are small, and without them every measured-box affordance in every DSX
+     app is broken in Arabic while passing all four static gates — this one shipped through
+     `lint`, `check:styles`, `review` and `verify` untouched.
+
+105. **THE SHARED ICON CATALOG HAS NO MIRRORING VOCABULARY: 115 names, and every
+     directional one is a compass point** (found 2026-09-01; counted against
+     `Conformance/icons/sf-map.json`).
+
+     The catalog offers `chevron.left`, `chevron.right`, `arrow.right`, `arrow.backward`,
+     `arrow.uturn.backward`, `arrow.uturn.forward`. SF Symbols' own auto-mirroring pair —
+     `chevron.forward` / `chevron.backward`, which UIKit and SwiftUI flip with the layout
+     direction for free — is not mapped, and no renderer mirrors a physical name (correctly:
+     a `chevron.left` that pointed right would be a lie).
+
+     So every DSX app is on its own for the single most common RTL affordance there is.
+     Measured here: 37 directional icon sites, of which 34 were pointing the wrong way in
+     Arabic — every back chevron on every screen, every disclosure chevron on every menu
+     row, and the "opens something" arrow beside every legal link. The template now picks
+     the glyph itself through `chevBack()` / `chevFwd()` / `arrowFwd()`, which works on all
+     three lanes and costs an interpolation at 34 call sites; it also required extending
+     `npm run check:styles`, because an interpolated `icon=` had been silently outside the
+     catalog gate.
+
+     **THE ASK.** Map the logical pair — `chevron.forward` / `chevron.backward`,
+     `arrow.forward` / `arrow.backward` — and have each renderer resolve it against the
+     active layout direction: SF Symbols does it natively, Material has
+     `chevron_right`/`chevron_left` to select between, and the web can pick the path or
+     apply `scaleX(-1)` under `:dir(rtl)` exactly as the framework's own
+     `.dsx-route-back-icon` already does. That last point is the sharp one: the engine
+     ALREADY mirrors the back chevron it draws itself (`route-chrome-style.ts:106`). An app
+     that draws its own gets nothing.
+
+106. **THERE IS NO PER-STRING TEXT DIRECTION, so content in one language inside a UI in
+     another renders with its punctuation on the wrong side** (found 2026-09-01 reading the
+     Arabic build's own demo catalogue).
+
+     Every string a DSX app displays inherits the frame's paragraph direction, which is
+     right for UI copy — that is the whole point of the direction plane — and wrong for
+     CONTENT, whose language the app does not choose. A short-drama storefront is the
+     clearest possible case: the chrome is Arabic and the catalogue is whatever the
+     operator uploaded.
+
+     Measured on `/show` with locale `ar`, English demo data: the synopsis renders its
+     final full stop at the LEFT edge of the last line (`.somebody forgot they were
+     pretending`), and a truncated related-show title clips its START rather than its end
+     (`... Billionaire Twin` for "Swapped With My Billionaire Twin"). Both are exactly what
+     the Unicode bidi algorithm specifies for an LTR run inside an RTL paragraph; neither is
+     what the reader wants.
+
+     The web has an answer (`unicode-bidi: plaintext`, or `dir="auto"`, which resolves each
+     paragraph from its own first strong character) and DSX has no attribute for it, so it
+     would be a web-only enhancement with no native twin — and it is not a free win even
+     there, because with `text-align: start` a mixed-language column would then align some
+     rows left and some right. This template deliberately did NOT half-fix it.
+
+     **THE ASK.** A `textDirection="auto" | "ltr" | "rtl"` attribute on the text family,
+     mapping to `unicode-bidi: plaintext` on web, `.environment(\.layoutDirection)` scoped
+     to the Text on iOS, and `LocalLayoutDirection` / `TextDirection.Content` on Compose —
+     plus a documented note that alignment stays with the UI while ORDERING follows the
+     content, which is the behaviour every mature app converges on. Corpus-pinnable in
+     `Conformance/strings/direction.json` as a per-string case beside the per-app ladder.
