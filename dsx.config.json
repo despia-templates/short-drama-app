@@ -113,12 +113,7 @@
       "component": "shortdrama.Show",
       "meta": {
         "title": "Show — Short Drama"
-      },
-      "motion": {
-        "mobile": "none",
-        "wide": "dsx"
-      },
-      "_PROBE": "temporary — suppression probe, removed after measurement"
+      }
     },
     {
       "path": "/watch/:show/:idx",

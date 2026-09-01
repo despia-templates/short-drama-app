@@ -1655,3 +1655,40 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     Args now merge into the locals seed and shadow the row scope, because an explicit payload
     is more specific than the ambient item.
 
+
+89. **The tab bar shifted between routes, and the shift was the previous fix.** Two rounds on
+    one bug, worth recording as a pair because the first round is the tempting one.
+
+    ROUND ONE (a44005f) — For You clipped its tab-bar captions where Home did not. Cause:
+    Discover sized its pager stage `dsx.screen.height - 70` and carried `ignoreSafeArea` on
+    the pager, so the column took all 874pt of an iPhone 17 Pro window inside a frame offering
+    781; stage 804 + bar 70 filled the window exactly and the bar sat in the last 70, which
+    contains the 34pt home indicator. The fix passed the inset INTO the shared bar
+    (`<TabBar inset="{{ dsx.screen.safeBottom }}">`) so it could pay it back.
+
+    ROUND TWO — that made the bar 104pt on For You against 70 everywhere else. The captions
+    stopped clipping and started MOVING, which is what the founder saw and screenshotted:
+    same bar, two heights, two caption baselines, changing under the tab tap. **Compensating
+    inside shared chrome converts a clip into a drift, and a drift is worse** — a clip is one
+    wrong screen, a drift is the frame of the whole app failing to hold still.
+
+    The law is the inverse of the instinct: SHARED CHROME HAS ONE GEOMETRY AND SCREENS CONFORM
+    TO IT. The bar now reads nothing about the safe area — a route frame already proposes the
+    safe region, so the bar is clear of the indicator by construction, and the only way its
+    captions land at two heights is a screen handing it a different box. That is a bug in that
+    screen. Discover drops `ignoreSafeArea` (it is not the window owner; the tab bar is its
+    sibling) and sizes its stage from the SAFE region:
+    `screen.height - safeTop - safeBottom - chromeH`. `ignoreSafeArea` belongs only to a
+    screen that owns the WHOLE window and pays every inset back itself — Watch does exactly
+    that, and mounts no tab bar (§6.29 / item 56). The `inset` attribute is deleted rather than
+    defaulted to zero: an unused compensation mechanism is the next person's trap.
+
+    THE ENGINE GAP UNDERNEATH (filed, not worked around). `dsx.screen.height` is the WINDOW,
+    and there is no fact for the box a frame actually proposes — so a screen doing pixel
+    arithmetic must reconstruct it as a three-term subtraction, and every renderer's authors
+    will get it wrong in the same direction (too tall, chrome into the indicator). The insets
+    are published; the region they imply is not. `screen.contentHeight`/`contentWidth` is one
+    addition to `DSXScreen.swift` and `boot.ts`'s `safeInsets()` that would make the correct
+    spelling shorter than the wrong one. Until then AGENTS.md's tab-root corollary carries the
+    subtraction, and the web router's chrome-drift reporter (the navigation pass) catches the
+    class at runtime rather than in a screenshot.
