@@ -16,7 +16,7 @@
   <head>
     <!-- the router publishes nav.canPop / nav.depth; back reads it -->
     <expects variable="nav"/>
-    <api as="detail" url="/catalog/show/{{ vars.id }}" on:success="global.cacheShow = detail.data"/>
+    <api as="detail" url="/catalog/show/{{ vars.id }}" on:success="dsx.action.detailLanded()"/>
     <!-- the seam owns the token (<AuthSeam/> at the foot of this file); every authenticated
          read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
     <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
@@ -28,6 +28,7 @@
     <api as="buySeries" url="/wallet/unlockseries" method="POST" auto="false" headers="global.auth.headers"/>
 
     <variable as="favTouched">return ''</variable>
+    <variable as="lastViewed">return ''</variable>   <!-- the show the funnel has reported -->
     <variable as="buyingSeries">return false</variable>
     <variable as="seriesToast">return ''</variable>
 
@@ -154,6 +155,31 @@
     <!-- The canonical back (writing-an-app.md §5): POP when there is history, REPLACE
          when the screen was deep-linked, so a dismiss never teleports home and never
          stacks a second copy of where you came from. Back is never href — href pushes. -->
+    <!-- the stash AND the funnel step, in one place. `on:success` used to hold the stash
+         inline; the detail arriving is also the moment this screen was genuinely VIEWED
+         (a mount alone is not — the router seeds a root frame under a deep link). -->
+    <!-- THE EMIT SHELL (Components/parts/Analytics.dsx). Four lines, and they are copied
+         rather than shared because a `<functions global="true">` body is the EXPRESSION
+         tier: dsx.log, dsx.module.* and a global write are all silent no-ops there, measured
+         (PLAN.md §6.94). The POLICY is not copied — analyticsBlocked and analyticsSink are
+         pure expressions and live in that one file. -->
+    <action as="track" inputs="name, props">
+      if (analyticsBlocked()) { return }
+      if (analyticsSink() != '') { dsx.module.posthog.capture({ event: name, properties: props }) }
+      else { dsx.log('funnel', name, props) }
+    </action>
+
+    <action as="detailLanded">
+      global.cacheShow = detail.data
+      if (detail.data == null) { return }
+      // ONCE PER SHOW. This block refetches (stale-then-fresh, §6.30) and every refetch is an
+      // on:success, so an unguarded emit reports a second view for a screen the viewer never
+      // left. The guard is the SHOW id, not a boolean: a route param change re-uses this
+      // mount, and show B genuinely is a second view.
+      if (dsx.variable.lastViewed == vars.id) { return }
+      dsx.variable.lastViewed = vars.id
+      dsx.action.track({ name: 'show_detail_viewed', props: { show: vars.id, episodes: detail.data.episodes.length, freeUntil: detail.data.show.free_until } })
+    </action>
     <action as="buyWholeSeries">
       if (dsx.variable.buyingSeries) { return }
       // NO SIGN-IN GATE ON MONEY. Most revenue in this category never signs in, so a gate
@@ -163,6 +189,8 @@
       // would. Sign-in is the UPSELL AFTER the purchase ("keep what you bought on another
       // device"), never the toll in front of it.
       dsx.variable.buyingSeries = true
+      const quoted = offer.data == null ? 0 : offer.data.price
+      dsx.action.track({ name: 'unlock_attempted', props: { show: vars.id, price: quoted, kind: 'series' } })
       const r = await buySeries.send({ show: vars.id })
       dsx.variable.buyingSeries = false
       if (r.ok !== true) {
@@ -170,6 +198,7 @@
         dsx.variable.seriesToast = r.data == null ? 'That did not go through.' : r.data.message
         return
       }
+      dsx.action.track({ name: 'unlock_succeeded', props: { show: vars.id, spent: r.data.spent, episodes: r.data.unlocked, kind: 'series' } })
       dsx.variable.seriesToast = 'Unlocked ' + r.data.unlocked + ' episodes — saved ' + r.data.saved + ' coins'
       wallet.refresh()
       offer.refresh()
@@ -251,6 +280,9 @@
        FIRST CHILD, always: the block registers on instantiate, and this screen reads its
        own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
   <Theme/>
+  <!-- the funnel (Components/parts/Analytics.dsx). The mount is what fires app_open,
+       once per session however many screens mount it. -->
+  <Analytics/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
 

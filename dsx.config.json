@@ -141,8 +141,11 @@
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Payments/Stripe",
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/SocialShare"
   ],
+  "_modules_note": "DECLARE-THEN-REACH. `modules` is the LINTER's allowlist of platform module schemes this app reaches and no configured `package` claims — the native side provides them, and every call is guarded by has(). `posthog` and `consent` are here for Components/parts/Analytics.dsx: Core/PostHog is the framework's product-analytics verb and Core/Consent its gate, and BOTH ship a complete web/index.js that no build can load because neither manifest declares a `web.entry` (cli/src/build.ts: `if (pkg.entry === undefined) continue`). So they are NOT in `packages`: adding a package whose manifest has no web entry emits no chunk and changes nothing. has('posthog') is therefore false on every lane today, the funnel keeps a bounded in-memory ring instead, and the Manage screen names the gap. Filed as PLAN.md §6.92 — three lines per manifest, no new code, the implementations are already written.",
   "modules": [
     "stripe",
-    "share"
+    "share",
+    "posthog",
+    "consent"
   ]
 }

@@ -15,6 +15,13 @@
     <api as="publishCall" url="/internal/admin/publish" method="POST" auto="false" headers="global.auth.opHeaders"/>
     <api as="featureCall" url="/internal/admin/feature" method="POST" auto="false" headers="global.auth.opHeaders"/>
     <api as="noticeCall" url="/internal/admin/notice" method="POST" auto="false" headers="global.auth.opHeaders"/>
+    <!-- THE MODERATION QUEUE, and note the URL: this is the DECLARED route (server/social.dsx
+         listReports), not one of the /internal/admin/* twins the rest of this screen uses. It
+         is gated by `reach=""`, which the HOST enforces — a viewer gets the 404 an absent
+         route gets, proven by npm run verify. Two consequences worth knowing: it survives a
+         `despia deploy` where the ops twins do not, and it needs the OPERATOR headers exactly
+         as they do. -->
+    <api as="reports" url="/social/reports" method="POST" body="dsx.variable.empty" ssr="false" auto="global.auth.ok == true" headers="global.auth.opHeaders"/>
 
     <variable as="empty">return {}</variable>
     <variable as="toast">return ''</variable>
@@ -27,6 +34,7 @@
     <variable as="pTitle">return ''</variable>
     <variable as="pMessage">return ''</variable>
     <variable as="pSegment">return 'all'</variable>
+    <variable as="modFilter">return 'all'</variable>   <!-- all | comment | ad -->
 
 
     <!-- The stat cards fell back to an em dash and the table to nothing, for BOTH a pending
@@ -51,6 +59,53 @@
       return dsx.variable.opsFailed == false && (stats.data == null || shows.data == null)
     </variable>
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
+    <!-- THE QUEUE, four states like every other data surface on this screen. `queueFailed`
+         is separate from `opsFailed` on purpose: the queue rides the declared route and the
+         table above rides the internal twins, so one can answer while the other does not —
+         and on a hosted deployment that is the NORMAL case, not an edge one. -->
+    <variable as="queueFailed" computed="true">
+      if (dsx.variable.signedIn == false) { return false }
+      return reports.error != null &amp;&amp; reports.data == null
+    </variable>
+    <variable as="queueLoading" computed="true">
+      if (dsx.variable.signedIn == false) { return false }
+      return dsx.variable.queueFailed == false &amp;&amp; reports.data == null
+    </variable>
+    <!-- the filter is client-side over ONE bounded page (the route reads 100 rows and says
+         so with `capped`); it is a lens on what arrived, never a second query -->
+    <variable as="queueRows" computed="true">
+      if (reports.data == null) { return [] }
+      const f = dsx.variable.modFilter
+      if (f == 'all') { return reports.data.rows.map(r => ({ ...r })) }
+      return reports.data.rows.filter(r => r.kind == f).map(r => ({ ...r }))
+    </variable>
+    <variable as="queueTotal" computed="true">
+      if (reports.data == null) { return '—' }
+      return reports.data.capped ? '100+' : String(reports.data.count)
+    </variable>
+    <!-- HOW MANY ROWS THE COMMUNITY FOLD HAS ALREADY ACTED ON. At `threshold` distinct
+         reporters listComments withholds a comment from every standard reader, which is the
+         only remedy in this app that actually runs — so the operator needs to see it. -->
+    <variable as="queueHidden" computed="true">
+      if (reports.data == null) { return 0 }
+      const t = reports.data.threshold
+      return reports.data.rows.filter(r => r.kind == 'comment' &amp;&amp; r.flags >= t).length
+    </variable>
+    <variable as="queueThreshold" computed="true">
+      if (reports.data == null) { return 3 }
+      return reports.data.threshold
+    </variable>
+
+    <!-- ══ THE ANALYTICS PLANE, REPORTED HONESTLY ═════════════════════════════════════
+         `analyticsSink()` is Components/parts/Analytics.dsx asking has('posthog'). Empty
+         means no sink is reachable in this build (PLAN.md §6.92 — Core/PostHog ships a
+         complete web facet and declares no web.entry, so no chunk is emitted), and every
+         event is draining to `dsx.log` instead — the framework diagnostic spine, which is
+         where an adopter watches the funnel until a key is wired. An operator screen that
+         stayed silent here would be implying a funnel is recorded that is not, which is the
+         one thing this template never does. -->
+    <variable as="sink" computed="true">return analyticsSink()</variable>
+
     <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
     <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
     <variable as="gutter" computed="true">return opsGutterOf(dsx.variable.bp)</variable>
@@ -63,6 +118,34 @@
       if (stats.data == null) { return '—' }
       return stats.data.episodes >= 100 ? '100+' : String(stats.data.episodes)
     </variable>
+
+    <!-- ROW FORMULAS. A formula is read by BARE NAME in an interpolation and binds its
+         declared inputs from the row scope automatically (AGENTS.md) — never the call
+         spelling, which produces nothing and takes the whole attribute with it. -->
+    <formula as="modWhen" at="item.at">
+      if (at == null) { return '' }
+      return String(at).slice(0, 10) + ' ' + String(at).slice(11, 16)
+    </formula>
+    <formula as="modHead" kind="item.kind" reason="item.reason" flags="item.flags">
+      const what = kind == 'ad' ? 'Ad creative' : 'Comment'
+      const n = flags == null ? 1 : flags
+      return what + ' · ' + reason + ' · ' + n + (n == 1 ? ' report' : ' reports')
+    </formula>
+    <!-- WITHHELD means the community fold has already acted: at `threshold` distinct
+         reporters listComments stops returning the row to standard readers. -->
+    <formula as="modState" kind="item.kind" flags="item.flags">
+      if (kind != 'comment') { return '' }
+      const n = flags == null ? 0 : flags
+      return n >= dsx.variable.queueThreshold ? 'WITHHELD' : 'VISIBLE'
+    </formula>
+    <formula as="modStateInk" kind="item.kind" flags="item.flags">
+      const n = flags == null ? 0 : flags
+      return kind == 'comment' &amp;&amp; n >= dsx.variable.queueThreshold ? onGold() : ink()
+    </formula>
+    <formula as="modStateBg" kind="item.kind" flags="item.flags">
+      const n = flags == null ? 0 : flags
+      return kind == 'comment' &amp;&amp; n >= dsx.variable.queueThreshold ? gold() : surfaceChipOn()
+    </formula>
 
     <action as="goBack">
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
@@ -92,6 +175,14 @@
     <action as="pickForEpisode" show="item.id" count="item.episodes">
       dsx.variable.epShow = show;
       dsx.variable.epIdx = '' + (count + 1)
+    </action>
+    <!-- THE ONE NAVIGATION THE QUEUE CAN OFFER. A report carries the show and the episode
+         as ids; the watch route needs an episode INDEX, which the queue does not have, so
+         this lands on the series page — a real destination, reached with a real id, rather
+         than a control that guesses. An ad report has no show at all and does not offer it. -->
+    <action as="openReported" show="item.show">
+      if (show == null || show === '') { return }
+      dsx.module.route.push({ path: '/show/' + show })
     </action>
     <action as="sendNotice">
       if (dsx.variable.pTitle == '') { dsx.variable.toast = 'The notice needs a title'; return }
@@ -131,12 +222,24 @@
     <style as="note" fontSize="11" color="rgba(255,255,255,0.42)" lineSpacing="2"/>
     <style as="toolList" fontSize="12" fontWeight="medium" color="#F7C948" lineSpacing="3"/>
     <style as="empty" fontSize="13" color="rgba(255,255,255,0.45)"/>
+    <style as="modRow" spacing="6" alignItems="stretch" paddingV="11"/>
+    <style as="modHeadRow" spacing="9" alignItems="center"/>
+    <style as="modKind" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="modBadge" fontSize="11" fontWeight="bold" radius="7" paddingH="7" paddingV="3"/>
+    <!-- the reported text is EVIDENCE, so it is quoted rather than styled like the app's own
+         copy: a moderator must never mistake a reported string for the product speaking -->
+    <style as="modQuote" fontSize="13" color="rgba(255,255,255,0.92)" lineSpacing="3"
+           background="#1C1C22" radius="9" paddingH="11" paddingV="9"/>
+    <style as="modNote" fontSize="11" color="rgba(255,255,255,0.5)" lineSpacing="2"/>
   </head>
 
   <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
        FIRST CHILD, always: the block registers on instantiate, and this screen reads its
        own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
   <Theme/>
+  <!-- the funnel (Components/parts/Analytics.dsx). The mount is what fires app_open,
+       once per session however many screens mount it. -->
+  <Analytics/>
   <TopNav active="profile" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page" style="{{ dsx.variable.shell }}">
@@ -196,7 +299,7 @@
 
       <vstack class="card" visible-if="dsx.variable.opsFailed == false && dsx.variable.signedIn">
         <text value="About the numbers on the storefront" class="h2"/>
-        <text class="note" value="Every series carries a view count and a rating, shown in the home hero, on the detail screen and under each browse card. In this template they are DEMO VALUES seeded from scripts/catalogue.mjs — nothing increments them, and no telemetry is collected. A real deployment replaces that table with its own counter; the wire shape (show.views, show.rating) does not change."/>
+        <text class="note" value="Every series carries a view count and a rating, shown in the home hero, on the detail screen and under each browse card. In this template they are DEMO VALUES seeded from scripts/catalogue.mjs and nothing increments them. A real deployment replaces that table with its own counter; the wire shape (show.views, show.rating) does not change. They are unrelated to the Funnel card below — that is the app emitting events about itself, and it says separately whether anything is receiving them."/>
       </vstack>
 
       <!-- shows table -->      <!-- shows table -->
@@ -253,6 +356,86 @@
           <text value="Lapsed" class="chip" background="{{ dsx.variable.pSegment == 'lapsed' ? brand() : '#26262C' }}" on:tap="dsx.variable.pSegment = 'lapsed'" a11yTrait="button"/>
         </hstack>
         <button label="Queue notice" class="cta" background="{{ brand() }}" on:tap="dsx.action.sendNotice()"/>
+      </vstack>
+
+      <!-- ══ MODERATION QUEUE (App Store 1.2) ═══════════════════════════════════════════
+           Guideline 1.2 wants four things from an app carrying user content: a filter, a
+           report mechanism, a block mechanism, and published contact information. The first
+           three ship (server/social.dsx) and the fourth is App.json `consts.supportUrl`.
+           This card is the OPERATOR half — the reports arriving somewhere a human looks. -->
+      <vstack class="card" visible-if="dsx.variable.signedIn">
+        <hstack class="modHeadRow">
+          <text value="Reported content" class="h2" style="flex: 1; min-width: 0"/>
+          <text value="{{ dsx.variable.queueTotal }} open" class="showMeta"/>
+        </hstack>
+
+        <hstack class="chipRow">
+          <text value="All" class="chip" background="{{ dsx.variable.modFilter == 'all' ? brand() : surfaceChipOn() }}" on:tap="dsx.variable.modFilter = 'all'" a11yTrait="button"/>
+          <text value="Comments" class="chip" background="{{ dsx.variable.modFilter == 'comment' ? brand() : surfaceChipOn() }}" on:tap="dsx.variable.modFilter = 'comment'" a11yTrait="button"/>
+          <text value="Ads" class="chip" background="{{ dsx.variable.modFilter == 'ad' ? brand() : surfaceChipOn() }}" on:tap="dsx.variable.modFilter = 'ad'" a11yTrait="button"/>
+          <spacer/>
+          <text value="Refresh" class="miniBtn" on:tap="reports.refresh()" a11yTrait="button"/>
+        </hstack>
+
+        <text class="empty" visible-if="dsx.variable.queueLoading" value="Reading the queue…"/>
+
+        <vstack spacing="8" alignItems="stretch" visible-if="dsx.variable.queueFailed">
+          <text value="The moderation queue is not answering." class="modNote"/>
+          <text class="note" value="This card reads the DECLARED route /social/reports, which is gated by reach=&quot;&quot; — a caller without service-role identity gets the same 404 an absent route gets, so a refusal here means authority, not an outage. It is also the one card on this screen that survives a deploy: the rest talk to the local /internal/admin/* twins."/>
+          <button label="Retry" class="miniBtn" on:tap="reports.refresh()"/>
+        </vstack>
+
+        <text class="empty"
+              visible-if="reports.data != null &amp;&amp; dsx.variable.queueRows.length == 0"
+              value="{{ dsx.variable.modFilter == 'all' ? 'Nothing has been reported.' : 'Nothing of that kind has been reported.' }}"/>
+
+        <list bind="dsx.variable.queueRows" key="id" scroll="false" spacing="0">
+          <vstack class="modRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
+            <hstack class="modHeadRow">
+              <text value="{{ modHead }}" class="modKind" style="flex: 1; min-width: 0"/>
+              <text value="{{ modState }}" class="modBadge" visible-if="item.kind == 'comment'"
+                    color="{{ modStateInk }}" background="{{ modStateBg }}"/>
+              <text value="{{ modWhen }}" class="showMeta"/>
+            </hstack>
+            <text value="{{ item.snapshot }}" class="modQuote" lineLimit="4"
+                  style="display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden"/>
+            <text value="Reporter said: {{ item.note }}" class="modNote" visible-if="item.note != null &amp;&amp; item.note != ''"/>
+            <text value="Creative: {{ item.subject }}" class="modNote" visible-if="item.kind == 'ad'"/>
+            <hstack spacing="9" alignItems="center" visible-if="item.show != null">
+              <text value="Open the series" class="miniBtn" on:tap="dsx.action.openReported()" a11yTrait="button"/>
+            </hstack>
+          </vstack>
+        </list>
+
+        <!-- ARTICLE 7, NAMED IN THE UI. Everything an operator CANNOT do here, and why —
+             measured against this origin rather than assumed. -->
+        <text class="note" paddingTop="6"
+              value="{{ dsx.variable.queueHidden }} of these are already withheld from every standard reader: a comment reaching {{ dsx.variable.queueThreshold }} distinct reporters is folded out of the thread by listComments, and a reporter stops seeing their own report immediately. That community fold is the only remedy in this app that runs."/>
+        <text class="note"
+              value="There is no hide or delete control here, and that is a framework gap rather than an omission. A declared action carries no service authority (PLAN.md §6.7), so the operator token is scoped exactly like a viewer: POST /social/comment/delete with it answers 403 “You can only delete your own comment” — measured. A button would 403 every time it was pressed. Drain this queue into whatever tool actions it, and read server/social.dsx listReports for the shape."/>
+      </vstack>
+
+      <!-- ══ THE FUNNEL ══════════════════════════════════════════════════════════════════
+           Components/parts/Analytics.dsx emits ten events through dsx.module.posthog.capture
+           behind has('posthog'), with Core/Consent as the gate. This card reports whether a
+           sink is reachable, and when one is not it renders the bounded in-memory ring the
+           plane keeps instead — so the funnel is at least legible while the module gap is
+           open (PLAN.md §6.92). -->
+      <vstack class="card">
+        <hstack class="modHeadRow">
+          <text value="Funnel" class="h2" style="flex: 1; min-width: 0"/>
+          <text value="{{ dsx.variable.sink == '' ? 'no sink' : dsx.variable.sink }}" class="modBadge"
+                color="{{ dsx.variable.sink == '' ? ink() : onGold() }}"
+                background="{{ dsx.variable.sink == '' ? surfaceChipOn() : gold() }}"/>
+        </hstack>
+        <text class="note" visible-if="dsx.variable.sink == ''"
+              value="NOTHING IS BEING SENT, AND NOTHING IS BEING RECORDED. Core/PostHog ships a complete web facet and its manifest declares no web.entry, so despia build emits no chunk and has('posthog') is false on every lane — the same defect Core/SocialShare records about itself and has since had fixed (PLAN.md §6.92, three lines upstream). Until it lands, every event drains to dsx.log instead: the framework diagnostic spine, mirrored to devtools on web and to Xcode or logcat on a device, and into the kernel log ring the dev-center console streams. Watch the funnel there while you wire a key — it is a drain, not a transport, and nothing leaves the device."/>
+        <text class="note" visible-if="dsx.variable.sink != ''"
+              value="Events are going to {{ dsx.variable.sink }}, gated on Core/Consent. Ids and numbers only — no subject, no email, no display name, no comment body, no search term. Components/parts/Analytics.dsx names the rule, and identify() is deliberately never called."/>
+        <text class="toolList" paddingTop="4"
+              value="app_open · show_detail_viewed · episode_started · episode_completed · paywall_shown · unlock_attempted · unlock_succeeded · purchase_started · purchase_completed · restore"/>
+        <text class="note"
+              value="Ten events, one per step of the funnel this template is about. paywall_shown and episode_started are the same boundary seen twice — a viewer arriving at an episode either gets the clip or gets the wall — so the ratio between them IS the paywall conversion. purchase_completed fires on the SETTLE, not the tap: a PaymentIntent Stripe confirmed and the server granted, counted once even when the recovery card retries."/>
       </vstack>
 
       <!-- the MCP face -->

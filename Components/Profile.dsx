@@ -182,6 +182,9 @@
        FIRST CHILD, always: the block registers on instantiate, and this screen reads its
        own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
   <Theme/>
+  <!-- the funnel (Components/parts/Analytics.dsx). The mount is what fires app_open,
+       once per session however many screens mount it. -->
+  <Analytics/>
   <TopNav active="profile" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page" style="{{ dsx.variable.shell }}">

@@ -63,6 +63,8 @@
 
     <variable as="page">return 0</variable>   <!-- 0-based; the vertical pager owns it -->
     <variable as="showId">return ''</variable>
+    <!-- the last (episode, locked) pair the funnel reported — see dsx.action.epChanged -->
+    <variable as="lastFunnelKey">return ''</variable>
     <variable as="paused">return false</variable>
     <variable as="buffering">return false</variable>
     <variable as="wMuted">return true</variable>
@@ -496,6 +498,17 @@
     <!-- The app-wide stash §6.30 asks for, with the ID GUARD it warns about: one key per
          ENDPOINT, carrying the id it was fetched for, so the next show cannot read this
          one's payload while its own request is still in the air. -->
+    <!-- THE EMIT SHELL (Components/parts/Analytics.dsx). Four lines, and they are copied
+         rather than shared because a `<functions global="true">` body is the EXPRESSION
+         tier: dsx.log, dsx.module.* and a global write are all silent no-ops there, measured
+         (PLAN.md §6.94). The POLICY is not copied — analyticsBlocked and analyticsSink are
+         pure expressions and live in that one file. -->
+    <action as="track" inputs="name, props">
+      if (analyticsBlocked()) { return }
+      if (analyticsSink() != '') { dsx.module.posthog.capture({ event: name, properties: props }) }
+      else { dsx.log('funnel', name, props) }
+    </action>
+
     <action as="detailLanded">
       global.cacheDetail = { id: vars.show, data: detail.data }
     </action>
@@ -573,6 +586,9 @@
     <action as="onEnded">
       const ep = dsx.variable.episode
       if (dsx.variable.detailView == null || ep == null) { return }
+      // FIRST, before any branch decides what happens next: the episode finished, and that
+      // is true whether the viewer auto-advances, hits the end of the series, or walks away.
+      dsx.action.track({ name: 'episode_completed', props: { show: vars.show, episode: ep.id, idx: Number(dsx.variable.cur) } })
       const n = Number(dsx.variable.cur) + 1
       if (n > dsx.variable.detailView.episodes.length) { dsx.variable.paused = true; return }
       const nxt = dsx.variable.detailView.episodes[n - 1]
@@ -585,6 +601,31 @@
         dsx.action.go({ target: n })
       }
     </action>
+    <!-- THE FUNNEL, AT THE EPISODE BOUNDARY. `epId` changes exactly once per arrival —
+         a tap, a swipe, a deep link, an auto-advance all land here — so this is the one
+         place that sees every episode a viewer reaches, and it sees whether the wall was
+         what they got instead of the clip. No title, no subject: ids and numbers only
+         (Components/parts/Analytics.dsx names the rule). -->
+    <action as="epChanged">
+      const ep = dsx.variable.episode
+      if (ep == null) { return }
+      // ONE EVENT PER (episode, wall) PAIR, and the pair rather than the episode is the key
+      // for a reason. The watch fires twice per boundary — measured, two identical
+      // episode_started lines per swipe, which would have doubled every number in the funnel.
+      // But the SAME episode legitimately reports twice when the wall comes down: a cold load
+      // reads epLocked true until /wallet/state answers, so an episode the viewer already
+      // owns is a paywall_shown followed by a real episode_started. Keying on the episode
+      // alone would swallow that second one and under-count every unlock.
+      const key = ep.id + (dsx.variable.epLocked ? ':wall' : ':clip')
+      if (dsx.variable.lastFunnelKey == key) { return }
+      dsx.variable.lastFunnelKey = key
+      // `vars.show`, NOT dsx.variable.showId: showId is written by dsx.action.boot and the
+      // watch can fire first — measured, the first episode_started of a cold load carried
+      // show:"". A route param is readable in an action body from the first tick (AGENTS.md).
+      const facts = { show: vars.show, episode: ep.id, idx: Number(dsx.variable.cur), price: ep.price }
+      if (dsx.variable.epLocked) { dsx.action.track({ name: 'paywall_shown', props: facts }) }
+      else { dsx.action.track({ name: 'episode_started', props: facts }) }
+    </action>
     <action as="unlockNow">
       const ep = dsx.variable.episode
       if (ep == null || dsx.variable.unlocking) { return }
@@ -595,9 +636,13 @@
       // would. Sign-in is the UPSELL AFTER the purchase ("keep what you bought on another
       // device"), never the toll in front of it.
       dsx.variable.unlocking = true
+      dsx.action.track({ name: 'unlock_attempted', props: { show: vars.show, episode: ep.id, idx: Number(dsx.variable.cur), price: ep.price, kind: 'episode' } })
       const r = await unlockCall.send({ episode: ep.id })
       dsx.variable.unlocking = false
-      if (r.ok) { dsx.variable.toast = 'Unlocked for ' + r.data.spent + ' coins'; dsx.variable.paused = false; wallet.refresh() }
+      if (r.ok) {
+        dsx.action.track({ name: 'unlock_succeeded', props: { show: vars.show, episode: ep.id, idx: Number(dsx.variable.cur), spent: r.data.spent, kind: 'episode' } })
+        dsx.variable.toast = 'Unlocked for ' + r.data.spent + ' coins'; dsx.variable.paused = false; wallet.refresh()
+      }
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Unlock failed' }
     </action>
     <action as="toggleFav">
@@ -759,6 +804,9 @@
     </action>
 
     <!-- ── stage chrome ── -->
+
+    <!-- one observer, the whole funnel at this boundary (see dsx.action.epChanged) -->
+    <watch value="dsx.variable.epId" on:change="dsx.action.epChanged()"/>
     <style as="chromeLayer" zIndex="2"/>
     <!-- The loading/error panel used to be an OPAQUE black stage: it sat at z-index 3 over
          everything, so even once the curtain art was known it could not be seen, and the
@@ -939,6 +987,9 @@
        FIRST CHILD, always: the block registers on instantiate, and this screen reads its
        own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
   <Theme/>
+  <!-- the funnel (Components/parts/Analytics.dsx). The mount is what fires app_open,
+       once per session however many screens mount it. -->
+  <Analytics/>
   <TopNav active="" visible-if="dsx.variable.wide"/>
   <hstack alignItems="stretch" style="flex: 1; min-height: 0; width: 100%">
     <!-- the stage centers its CAPPED pager: web spells it margin:auto on the pager; the

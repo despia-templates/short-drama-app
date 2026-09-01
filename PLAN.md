@@ -1806,3 +1806,63 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     first, platform second. With no sink reachable the plane keeps a bounded in-memory ring
     instead, and the Manage screen SAYS the deployment has no sink rather than implying the
     funnel is being recorded.
+
+93. **A bracket write whose KEY CONTAINS A DOT is stored as a nested path, silently — and it
+    shipped.** `server/social.dsx listReports` tallied reports per target with
+    `tally[k] = (tally[k] == null ? 0 : tally[k]) + 1`, `k` being `target ?? subject`. Comment
+    reports counted correctly; **every ad report came back `flags: null`**. Isolated against a
+    live origin by filing one ad report on a dot-free path:
+
+        key '/promo/nodotcreative'      flags 1
+        key 'a97b4883-…-330e3e104e17'   flags 1     (a UUID — dashes, no dot)
+        key '/promo/house-ad.mp4'       flags null
+
+    Same statement, same loop, same read expression. `tally["/promo/house-ad.mp4"] = 1` writes
+    `tally["/promo/house-ad"]["mp4"]`, and the read finds nothing. It was invisible because
+    100% of ad reports carry a creative path and 100% of creative paths end in `.mp4`, so the
+    column simply looked unpopulated rather than wrong.
+
+    This is a sibling of the bracket-read-mutation law AGENTS.md already carries
+    (`byKey[k].push(v)` writes nothing). That one is about the READ; this one is about the
+    KEY. Together the rule is: **never key a dict on caller data.** Fixed here by counting
+    pairwise over the bounded page (n ≤ 100 by the list clamp, so at most 10k comparisons and
+    no encoding hazard at all), and `npm run verify` now files an ad report with a dotted path
+    on purpose so the assertion cannot pass vacuously.
+
+    THE ASK: either make a bracket write with a computed key a literal key on every renderer,
+    or refuse a dotted key loudly. A silent reinterpretation of a caller's string as a path
+    is the worst of the three options.
+
+94. **A `<functions global="true">` body is the EXPRESSION tier: `dsx.log`, `dsx.module.*`
+    and every `global.*` WRITE are silent no-ops there.** Found while building this
+    template's analytics plane as one shared `track()` function, which emitted nothing at
+    all and reported success. Three statements, probed on a live origin, each run BOTH from
+    inside a functions body and from an `<action>` body three lines away in the same file:
+
+        statement                              in <functions>      in <action>
+        dsx.log('PROBE …')                     no console line     "[dsx.log] app: PROBE …"
+        dsx.module.route.push({path:'/notices'})   no navigation   (route changes)
+        global.sdEvents = next                 reads back NULL     (value lands)
+
+    READS work: `has('posthog')`, `global.consent.granted` and the caller's variables all
+    resolve, exactly as `js-core.md` describes ("free names resolve against the calling
+    surface's live store at call time"). It is the WRITE path and the runner-only callees
+    that are absent — `dsx.log` and `dsx.module.*` are intercepted in `runner.ts`, and a
+    named-function body is not evaluated by that tier.
+
+    WHY IT MATTERS. The global function library is presented as the place shared logic lives
+    ("validation, pricing, formatting … written once and shared by every surface"), so a
+    reader will reach for it exactly when they want one emitter, one logger, one cache
+    writer. Every one of those fails, returns cleanly, and leaves no trace. The lint gate has
+    nothing to say and neither does the runtime.
+
+    THE BRIDGE IN THIS TEMPLATE, named rather than silent: pure POLICY stays in the shared
+    functions (`analyticsBlocked()`, `analyticsSink()` in `Components/parts/Analytics.dsx`)
+    and the four-line SIDE-EFFECT shell is copied into each of the six components that emit,
+    with a comment pointing here. That is a duplication this ledger would normally refuse;
+    it is here because the alternative is a shared function that does nothing.
+
+    THE ASK: run a functions body on the statement tier — or, if that is a deliberate
+    boundary, make it an authoring-time error to name a runner callee or assign to `global`
+    inside one. `jse-audit` already exists for exactly this class ("unsupported JS is an
+    authoring-time error, never a silent null at runtime").

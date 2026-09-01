@@ -737,6 +737,23 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
     asOperator.status === 200 && asOperator.body.rows.some((r) => r.target === theirs.body.id && typeof r.snapshot === "string" && r.snapshot.length > 0),
     `${asOperator.status} ${JSON.stringify(asOperator.body).slice(0, 200)}`);
 
+  // EVERY ROW CARRIES A FLAG COUNT, INCLUDING THE ONES WHOSE KEY HAS A DOT IN IT. This is the
+  // one that shipped broken and no static gate could see: the tally was a dict keyed on
+  // `target ?? subject`, and a bracket write whose key contains a dot is stored as a NESTED
+  // PATH — so a comment (a UUID) counted and every ad report, whose subject is a creative
+  // path ending in .mp4, read back null. Measured on a live origin before the fix: dotted key
+  // null, dot-free key 1, same code (PLAN.md §6.93). An ad row is filed here on purpose so
+  // this assertion cannot pass vacuously on a queue that happens to hold only comments.
+  await POST("/social/report/ad", viewer, { lane: "house", creative: "/promo/house-ad.mp4", note: "" });
+  const withAd = await POST("/social/reports", operator, {}).then(asJson);
+  const adRows = withAd.body?.rows?.filter((r) => r.kind === "ad") ?? [];
+  check("the queue counts an ad report whose creative path contains a dot",
+    adRows.length > 0 && adRows.every((r) => typeof r.flags === "number" && r.flags >= 1),
+    `ad rows: ${JSON.stringify(adRows.map((r) => ({ subject: r.subject, flags: r.flags })))} — a null flag count means the dotted-key tally is back`);
+  check("...and the queue publishes the community-fold threshold",
+    typeof withAd.body?.threshold === "number" && withAd.body.threshold > 1,
+    "listReports must return `threshold` — the Manage screen renders WITHHELD against it, and a hard-coded 3 on the client is the second copy this template exists to avoid");
+
   // 1.2(d) — PUBLISHED CONTACT INFORMATION needs somewhere to be published FROM. The value
   // ships empty on purpose (a placeholder URL reads as a broken promise to a reviewer); the
   // KEY has to exist, or an adopter has nowhere to put it and the UI names a gap forever.

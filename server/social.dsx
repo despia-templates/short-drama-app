@@ -374,24 +374,35 @@
          drained into, and `deleteComment` above is the only in-app remedy that actually runs.
          NO `<tool>` ROW, on purpose: createMcpFace checks `auth === "required"` and a non-null
          identity and has no notion of `reach` (§6.84), so exposing this queue over /mcp would
-         hand every authenticated caller the thing the gateway just refused them. -->
+         hand every authenticated caller the thing the gateway just refused them.
+
+         `threshold` rides the payload so the queue can say which rows the COMMUNITY FOLD has
+         already acted on: at HIDE_AT distinct reporters `listComments` withholds the comment
+         from every standard reader, and that is the only remedy in this app that actually
+         runs. An operator cannot delete a comment they do not own — measured against this
+         origin, `POST /social/comment/delete` with the service-role token answers 403 "You
+         can only delete your own comment", because a declared action carries no service
+         authority (§6.7). The Manage screen says so rather than drawing a button that 403s. -->
     <action as="listReports">
       const rows = await dsx.module.data.report.list({ limit: 100 })
-      if (!rows.ok) { return { count: 0, rows: [], capped: false } }
-      const tally = {}
-      for (const r of rows.data) {
-        const k = r.target == null ? String(r.subject) : String(r.target)
-        tally[k] = (tally[k] == null ? 0 : tally[k]) + 1
-      }
+      if (!rows.ok) { return { count: 0, rows: [], capped: false, threshold: 3 } }
+      // A BRACKET KEY CONTAINING A DOT IS WRITTEN AS A NESTED PATH, silently. This tally was
+      // `tally[k] = …` keyed on `target ?? subject`, and a comment target (a UUID) counted
+      // correctly while EVERY ad report came back `flags: null` — because an ad subject is a
+      // creative path and every creative path ends in `.mp4`, so `tally["/promo/house-ad.mp4"]`
+      // wrote `tally["/promo/house-ad"]["mp4"]` and read back nothing. Measured on a live
+      // origin: dotted key -> null, dot-free key -> 1, same code path (PLAN.md §6.93).
+      // The fix is to stop keying a dict on caller data at all. n is bounded at 100 here, so
+      // the pairwise count is at most 10k comparisons and has no encoding hazard whatever.
       const out = rows.data
         .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
         .map(r => ({
           id: r.id, kind: r.kind, target: r.target, subject: r.subject,
           episode: r.episode, show: r.show, reason: r.reason, note: r.note,
           snapshot: r.snapshot, reporter: r.owner_id, at: r.created_at,
-          flags: tally[r.target == null ? String(r.subject) : String(r.target)]
+          flags: rows.data.filter(o => (o.target == null ? o.subject : o.target) === (r.target == null ? r.subject : r.target)).length
         }))
-      return { count: out.length, rows: out, capped: rows.data.length >= 100 }
+      return { count: out.length, rows: out, capped: rows.data.length >= 100, threshold: 3 }
     </action>
   </head>
 

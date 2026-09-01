@@ -60,6 +60,17 @@
          app makes most of its money from, at the moment they are trying to get back what
          they already paid for. Restore now just restores; the sign-in offer sits beside it as
          the way to carry those purchases to a second device. -->
+    <!-- THE EMIT SHELL (Components/parts/Analytics.dsx). Four lines, and they are copied
+         rather than shared because a `<functions global="true">` body is the EXPRESSION
+         tier: dsx.log, dsx.module.* and a global write are all silent no-ops there, measured
+         (PLAN.md §6.94). The POLICY is not copied — analyticsBlocked and analyticsSink are
+         pure expressions and live in that one file. -->
+    <action as="track" inputs="name, props">
+      if (analyticsBlocked()) { return }
+      if (analyticsSink() != '') { dsx.module.posthog.capture({ event: name, properties: props }) }
+      else { dsx.log('funnel', name, props) }
+    </action>
+
     <action as="tapped">
       dsx.action.restore()
     </action>
@@ -68,6 +79,7 @@
       if (dsx.variable.busy) { return }
       dsx.variable.busy = true
       dsx.variable.result = ''
+      dsx.action.track({ name: 'restore', props: { phase: 'started' } })
       const r = await restoreCall.send({})
       dsx.variable.busy = false
       if (!r.ok) {
@@ -80,6 +92,7 @@
         return
       }
       const d = r.data
+      dsx.action.track({ name: 'restore', props: { phase: 'done', checked: d.checked, restored: d.restored } })
       if (d.restored == 0) {
         dsx.variable.result = d.checked == 0
           ? 'Nothing to restore — every purchase on this account is already applied.'

@@ -1,0 +1,142 @@
+<!-- Analytics — THE funnel: ten events, one policy, emitted through the framework's own
+     plane and through nothing this file invented.
+
+     WHAT THIS ANSWERS. This template's whole thesis is a monetisation funnel — hero →
+     detail → free episodes → paywall → coins or VIP — and until this file the app emitted
+     nothing at all, so not one step of it could be observed. You cannot tune a paywall you
+     cannot measure, and a reference template that ships the paywall without the measurement
+     teaches half a lesson.
+
+     ══ THE TRANSPORT IS `Core/PostHog`, AND NOTHING ELSE IS INVENTED ══════════════════
+     `dsx.module.posthog.capture({ event, properties })` is the framework's product-analytics
+     verb — the one module in the tree with a (name, properties) shape and a real, SDK-free
+     web implementation (its facet POSTs `/i/v0/e/` itself rather than injecting a vendor
+     script). Two neighbours were considered and are NOT this:
+
+       · `Core/Telemetry` is crash and error plumbing. Its `capture` drains the kernel error
+         ledger and has no `event` argument anywhere in it. Wiring a funnel through it would
+         file every purchase as an incident.
+       · `Core/Firebase/Modules/Analytics` has the right verb and NO WEB LANE by design; its
+         own manifest says so and points here: "Product analytics on the web is Core/PostHog."
+
+     ══ CAPABILITY FIRST, PLATFORM SECOND (the AdGate rule) ════════════════════════════
+     `has('posthog')` decides, never `os == 'web'`. With the module present the event is
+     captured; without it the event drains to `dsx.log` — the framework diagnostic spine,
+     console-shaped, credential keys masked, identical on all three renderers and mirrored
+     into the kernel log ring the dev-center console streams. A DRAIN, not a transport:
+     nothing leaves the device, and the Manage screen says exactly that.
+
+     ══ ARTICLE 7, NAMED: NO BUILD CAN REACH THE SINK TODAY ════════════════════════════
+     `Core/PostHog` ships `web/index.js` complete and its manifest declares no `web.entry`,
+     so `cli/src/build.ts` (`if (pkg.entry === undefined) continue`) emits no chunk and
+     `has('posthog')` is false on every web build. Same for `Core/Consent`. Not a new class
+     of defect: `Core/SocialShare/dsx.json` records exactly it about itself — "every web
+     build silently had has('share') === false and no chunk on disk, while the implementation
+     sat there complete. Declaring the entry is the whole fix." SocialShare was fixed; these
+     two were not. Filed as PLAN.md §6.92 — three lines per manifest.
+
+     So `posthog` and `consent` are declared in dsx.config.json `modules`, the DECLARE-THEN-
+     REACH list for platform schemes no configured package claims. That is what admits these
+     calls to the linter while the native side provides the module. The day the entries land,
+     the funnel starts sending and not one line here changes.
+
+     ══ WHY EVERY EMITTER CARRIES ITS OWN FOUR-LINE ACTION ═════════════════════════════
+     This was one global `track()` function first, and it did nothing at all, silently.
+     Measured on a live origin, from inside a `<functions global="true">` body:
+
+       dsx.log(msg)                         no console line, no ring entry
+       dsx.module.route.push({path:'/x'})   no navigation, URL unchanged
+       global.sdEvents = next               read back NULL, before and after
+
+     while the identical three statements in an action body three lines away all worked.
+     A functions body is the EXPRESSION tier: it computes and it reads, and every runner-only
+     callee plus the store-write path is a no-op there. Filed as PLAN.md §6.94.
+
+     So the SIDE EFFECT has to live in an action, and an action is component-local — six
+     components emit, so six copies of the same four lines. What is NOT duplicated is the
+     POLICY: `analyticsBlocked()` and `analyticsSink()` below are pure expressions, they work
+     exactly where a functions body works, and they are the only place the consent rule and
+     the sink choice are written down. Copy the shell; never re-decide the policy.
+
+     ══ CONSENT IS A GATE, NOT A COMMENT ═══════════════════════════════════════════════
+     `Core/Consent` publishes `granted` / `stored`. On the web lane a facet's declared
+     variables land at `global.SCHEME.NAME` (kernel bus.ts: `state.set` writes
+     `global.consent.granted`), and `dsx.module` context reads have no path in the web JSE at
+     all, so the gate reads `global.consent.granted` and NOT the canonical native spelling.
+     With the module absent there is no consent plane and the gate is open — the framework's
+     own documented fail-open — which is correct for a build that also has no sink.
+
+     ══ WHAT IS IN AN EVENT, AND WHAT IS NEVER ═════════════════════════════════════════
+     Ids and numbers. A show id, an episode id, an episode index, a price in coins, a sku, an
+     amount, a lane name, a boolean. NEVER: the viewer subject, an email, a display name, a
+     token, a comment body, a search term, an IP, a device id. The funnel answers "how many
+     people fell out between the paywall and the unlock", which needs no idea who they were,
+     and `identify()` is deliberately never called anywhere in this app. Titles are absent
+     too: a title is one join away from an id, and the id is the stable half.
+
+     ══ THE TEN, AND WHY THESE TEN ═════════════════════════════════════════════════════
+       app_open              once per session, from this mount
+       show_detail_viewed    the detail payload landed (a mount is not a view)
+       episode_started       the viewer reached an episode and got the clip
+       paywall_shown         the viewer reached an episode and got the wall
+       episode_completed     playback ran out, before any auto-advance decides
+       unlock_attempted      a spend was asked for, episode or series
+       unlock_succeeded      the server granted it, with what it cost
+       purchase_started      a checkout was opened
+       purchase_completed    the SETTLE, not the tap: money Stripe confirmed and the
+                             server granted, counted once even when the recovery retries
+       restore               both phases, so a restore that finds nothing is still visible
+
+     `episode_started` and `paywall_shown` are the SAME boundary seen twice, which is the
+     point: their ratio is the paywall conversion, and no other pair in this app measures it.
+
+     ══ HOW A SURFACE EMITS ════════════════════════════════════════════════════════════
+     Copy the four-line shell into the emitting component, then
+
+       dsx.action.track({ name: 'paywall_shown', props: { show: id, episode: ep.id } })
+
+     Mount `<Analytics/>` beside `<Theme/>` at the top of a screen: the mount is what fires
+     `app_open`, and it fires ONCE per session however many screens mount it. -->
+<stack width="0" height="0" on:appear="dsx.action.opened()">
+  <head>
+    <!-- ONCE PER SESSION, not once per screen. Every screen mounts this part so a viewer
+         landing on any deep link is counted, and the flag is what stops the twelfth mount
+         filing a twelfth app_open. It rides `global` rather than a variable because a route
+         change destroys the mount and its store with it. -->
+    <action as="opened">
+      if (global.sdOpened == true) { return }
+      global.sdOpened = true
+      dsx.action.track({ name: 'app_open', props: { lane: os } })
+    </action>
+
+    <!-- THE EMIT SHELL, and the reference copy of it. Four lines, repeated in every
+         component that emits, because a functions body cannot carry a side effect (§6.94). -->
+    <action as="track" inputs="name, props">
+      if (analyticsBlocked()) { return }
+      if (analyticsSink() != '') { dsx.module.posthog.capture({ event: name, properties: props }) }
+      else { dsx.log('funnel', name, props) }
+    </action>
+
+    <!-- BODY CAVEAT (js-core.md): the native parsers do not lift a `<functions>` body as raw
+         JS yet, so no bare `<` and no `&&` in here. Every guard is a separate `if`.
+         PURE EXPRESSIONS ONLY, and that is a law rather than a style — see §6.94. -->
+    <functions global="true">
+      /* THE CONSENT GATE, written once. True when the viewer has a consent plane and has
+         not granted. Absent module = no plane = open, which is the framework fail-open and
+         is also correct in a build that has no sink to send to. */
+      function analyticsBlocked() {
+        if (has('consent') == false) { return false }
+        if (global.consent == null) { return true }
+        return global.consent.granted != true
+      }
+
+      /* WHICH SINK, IF ANY. Empty means the events are draining to dsx.log; the Manage
+         screen reads this so it can name the degradation instead of implying a funnel is
+         being recorded that is not. */
+      function analyticsSink() {
+        if (has('posthog')) { return 'posthog' }
+        return ''
+      }
+    </functions>
+  </head>
+</stack>

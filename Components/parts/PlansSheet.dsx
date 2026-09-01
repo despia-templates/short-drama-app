@@ -135,6 +135,17 @@
       return dsx.variable.paying ? 'Complete the payment…' : 'Contacting Stripe…'
     </formula>
 
+    <!-- THE EMIT SHELL (Components/parts/Analytics.dsx). Four lines, and they are copied
+         rather than shared because a `<functions global="true">` body is the EXPRESSION
+         tier: dsx.log, dsx.module.* and a global write are all silent no-ops there, measured
+         (PLAN.md §6.94). The POLICY is not copied — analyticsBlocked and analyticsSink are
+         pure expressions and live in that one file. -->
+    <action as="track" inputs="name, props">
+      if (analyticsBlocked()) { return }
+      if (analyticsSink() != '') { dsx.module.posthog.capture({ event: name, properties: props }) }
+      else { dsx.log('funnel', name, props) }
+    </action>
+
     <action as="openPlans">
       dsx.variable.toast = ''
       if (catalog.data == null) { catalog.refresh() }
@@ -188,6 +199,7 @@
       dsx.variable.buying = sku
       dsx.variable.toast = ''
       dsx.variable.settleFailed = false
+      dsx.action.track({ name: 'purchase_started', props: { sku: sku, lane: 'stripe', surface: 'plans' } })
       const r = await checkoutCall.send({ sku: sku })
       if (!r.ok) {
         dsx.variable.buying = ''
@@ -225,6 +237,9 @@
     <action as="settle">
       const s = await settleCall.send({ order: dsx.variable.order })
       if (s.ok) {
+        // the settle is the purchase (see Components/Store.dsx); a replay reports
+        // granted false and is deliberately not counted a second time
+        if (s.data.granted) { dsx.action.track({ name: 'purchase_completed', props: { lane: 'stripe', surface: 'plans', days: s.data.days } }) }
         dsx.variable.settleFailed = false
         dsx.variable.order = ''
         dsx.variable.open = false

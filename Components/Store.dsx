@@ -152,6 +152,17 @@
       return dsx.variable.paying ? 'Complete the payment…' : 'Contacting Stripe…'
     </formula>
 
+    <!-- THE EMIT SHELL (Components/parts/Analytics.dsx). Four lines, and they are copied
+         rather than shared because a `<functions global="true">` body is the EXPRESSION
+         tier: dsx.log, dsx.module.* and a global write are all silent no-ops there, measured
+         (PLAN.md §6.94). The POLICY is not copied — analyticsBlocked and analyticsSink are
+         pure expressions and live in that one file. -->
+    <action as="track" inputs="name, props">
+      if (analyticsBlocked()) { return }
+      if (analyticsSink() != '') { dsx.module.posthog.capture({ event: name, properties: props }) }
+      else { dsx.log('funnel', name, props) }
+    </action>
+
     <action as="goBack">
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
       else { dsx.module.route.replace({ path: '/' }) }
@@ -192,6 +203,7 @@
       dsx.variable.buying = sku
       dsx.variable.toast = ''
       dsx.variable.settleFailed = false
+      dsx.action.track({ name: 'purchase_started', props: { sku: sku, lane: 'stripe' } })
       const r = await checkoutCall.send({ sku: sku })
       if (!r.ok) {
         dsx.variable.buying = ''
@@ -226,6 +238,11 @@
     <action as="settle">
       const s = await settleCall.send({ order: dsx.variable.order })
       if (s.ok) {
+        // THE MONEY EVENT IS THE SETTLE, NOT THE TAP. A PaymentIntent that Stripe confirmed
+        // and the server granted is the only thing a funnel may call a purchase; anything
+        // earlier counts intent. `granted` false is a replayed settle, so it is not counted
+        // twice — the server already told us it had applied this order.
+        if (s.data.granted) { dsx.action.track({ name: 'purchase_completed', props: { lane: 'stripe', coins: s.data.coins, days: s.data.days } }) }
         dsx.variable.settleFailed = false
         dsx.variable.order = ''
         wallet.refresh()
@@ -291,6 +308,9 @@
        FIRST CHILD, always: the block registers on instantiate, and this screen reads its
        own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
   <Theme/>
+  <!-- the funnel (Components/parts/Analytics.dsx). The mount is what fires app_open,
+       once per session however many screens mount it. -->
+  <Analytics/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
       <TopNav active="store" visible-if="dsx.variable.wide"/>
