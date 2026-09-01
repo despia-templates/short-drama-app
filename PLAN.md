@@ -2512,3 +2512,80 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      reference. (b) Either give the expression tier the log verb or lint an inline handler
      that calls it. TEMPLATE RULE until then: diagnostics live in `<action>` bodies, and a
      device capture is `simctl launch --console-pty`, never `log stream`.
+
+111. **THE ANDROID ROOT PLAN EXHAUSTED AT 15s OVER A HOME THAT HAD RENDERED, because nothing
+     translated the kernel's own first-render report into `screen.ready`** (found 2026-09-02,
+     API 36 emulator; fixed upstream dev@ff6a3ba2). `despia export android` vendored the open
+     kernel and ZERO modules (`Bootstrapped 1 plugin(s): [route]`), so no screen-phase
+     coordinator existed to turn `surface.viewFinish` into the one vocabulary the root-plan fold
+     reads; the fold sat through its full `timeoutMs` and painted "Root plan exhausted · 0
+     shortdrama.App root.timeout 15.004s" over a screen the viewer had already been looking at
+     for seven seconds. iOS had closed exactly this hole in 5156f03a with a boot-readiness floor
+     in `Router.swift`; the Kotlin twin had never landed. The Android readiness path itself
+     (mount effect, rendered hop, ScreenReadiness, the bus) was measured correct — the report
+     reached nobody. The floor now engages 3.3s after Activity start and stands down the moment a
+     coordinator answers; RouterTest 54/54 with two rows that were red before.
+
+112. **THE ANDROID EXPORT WAS A DIFFERENT APP FROM THE iOS EXPORT** (found 2026-09-02; fixed
+     upstream dev@13870d12 + 4518164d). Measured on the same source: a platform ACTION BAR titled
+     "Short Drama" above the DSX surface (no `android:theme`), no edge-to-edge, NO
+     `shortdrama://` intent filter ("Activity not started, unable to resolve Intent"), no
+     `lifecycle.openURL` translation in the activity and no listener in the Kotlin Router, and
+     ZERO modules bundled while the mandatory ones (Lifecycle, Splash, Security, MenuBar,
+     PullToRefresh, Foundation) are `"mandatory": true`. Now: `Theme.Despia.Export` day/night
+     NoActionBar, `enableEdgeToEdge()`, a VIEW/DEFAULT/BROWSABLE filter on the project scheme on a
+     `singleTask` activity, cold and warm intents forwarded as `lifecycle.openURL`, `Router.openInbound`
+     1:1 with `routePath(fromInbound:)` pinned by `Conformance/router/inbound.json` (18 rows, the
+     first executor of that iOS behaviour on any lane), and the mandatory fold (`Bootstrapped 7
+     plugin(s)`; cold first frame 9.3s → 4.65s). CORRECTED PREMISE, worth keeping: `dsx.config.json
+     packages` is the WEB build's list. Both native exports read the project's `Modules/` folder and
+     the lockfile — this template's four configured packages (Stripe, SocialShare, PostHog, Consent)
+     and Core/Store are therefore absent from every native build, and `has('posthog')` is false on
+     device however the web answers. See §6.115.
+
+113. **THE ANDROID RENDER LANE PAINTED BOXES FOR ICONS, NOTHING FOR POSTERS, ROBOTO FOR INTER AND
+     WHITE FOR A GRADIENT** (found 2026-09-02; fixed upstream dev@a7a7f9b5 · 3ce3c7e7 · fac00c1f ·
+     b627ef28 · e8bcbb92). Four root causes, each pinned red→green: (1) the exported APK carried NO
+     icon catalog — `render/build.gradle.kts` copied `sf-map.json` relative to the framework tree,
+     a path the vendored export never creates, and Gradle's Copy copied nothing silently; and
+     `icons: "unified"` had no vector rung on Android at all. The export now writes the catalog
+     into assets and Android draws the same Boxicons paths iOS draws (300 vectors parse inside the
+     24-box). (2) `ImageElements.loadRemote` validated `src` as-is, so a root-relative
+     `/posters/x.svg` fell to the APK-asset ladder; `resolvedAgainstAppOrigin` is now applied first,
+     rule-for-rule with Image.swift. (3) the export copied neither `Fonts/` nor the registry, and
+     `StackFontBook` read only `families` — the registry root `default`, which iOS honours, had no
+     reading. (4) `background: linear-gradient(…)` reached `StackStyle.color` verbatim, whose
+     terminal fallback is white; the Kotlin bridge now translates gradients line-for-line with the
+     Swift one. STILL OPEN on Android, filed for the next pass: a bound `<pager>` renders its
+     template without row scope (the Home hero is a skeleton), `<picker>` renders a bare glyph,
+     `<functions>` from a child `<Theme/>` mount register after the parent head's holes evaluate
+     (the VIP gem is white), and `border-top` has no native target on either lane (needs a
+     per-edge border attribute, not a bridge mapping).
+
+114. **NESTED SHEETS CASCADE NOW, AND THE ROUTER KNOWS THE OVERLAY LEDGER** — §6.95 asks 1 and 2
+     RESOLVED upstream 2026-09-02 (dev@d21d5eb7 · f1c22794 · d9f1ab5b · 19bd4afc; web f7c7891d ·
+     16885516): one ledger class with one policy switch (`singlePresenter` on iOS, where a view
+     controller presents one thing at a time — a sibling sheet is refused loudly,
+     `overlay.siblings:a,b`), closing a parent takes its children in the same transition, every
+     router verb (push/pop/replace/reset) closes the declared overlays before the swap, and the
+     in-place `replace` (the URL sync after an episode advance) does NOT dismiss — pinned by two
+     corpus rows on all three executors. Ask 3 (an authoring-time lint) is still open. The three
+     manual closes this template carries (`Watch.goShow`/`seeAllGenre`, `SearchOverlay.openShow`,
+     `PlansSheet.openVipPage`) are now redundant and are retired once the SwiftUI half is
+     device-verified; `AdGate.seePlans → close()` stays (it is the reward-accounting decision).
+
+115. **THE LINTER REFUSED A MANDATORY PACKAGE'S OWN GLOBAL, and that one refusal was the whole
+     reason the in-app-purchase lane was missing** (found and fixed 2026-09-02, dev@77f4e65d). The
+     build's registry folds every mandatory package, and Foundation is scheme-less, which is what
+     makes its components the `shared.*` globals; the lint pool folded only the CONFIGURED packages,
+     so `<shared.VipCard>` inside Core/Store — Foundation's own `Components/Core/VipCard.dsx`,
+     documented in its header as "used from any package" — was "no global component 'VipCard'".
+     Re-measured with Core/Store configured: lint 48 files 0 errors, `despia build` writes the
+     artifact, and the iOS and Android exports BUILD. What still stands between this template and a
+     StoreKit/Play Billing lane is §6.112's corrected premise, not a defect: the native exports read
+     `Modules/` and the lockfile, so a package declared by path in `packages` never reaches a device
+     build. THE ASK (upstream): one package declaration, three lanes — the native exports honour the
+     same `packages` list the web build honours, refusing loudly for a package with no lane. Until
+     then `has('store')` is false on device and the purchase surfaces refuse exactly as they do today,
+     and turning the lane on also needs product ids and a RevenueCat secret that only an operator can
+     supply.
