@@ -102,6 +102,7 @@ node scripts/theme.mjs                    # the palette: every named tone and wh
 node scripts/strings.mjs                  # locale coverage per language
 node scripts/strings.mjs --write pt-br    # refresh a locale table against the current source
 node scripts/strings.mjs --unreachable    # the strings the localisation seam cannot reach
+node scripts/strings.mjs --server         # the copy the BACKEND sends to a display point
 ```
 
 **A UI or backend change means rebuild, then restart `npm run serve`** — the site registry is
@@ -381,6 +382,7 @@ papered over.
 | **A `<pager>`'s page order** | index 0 stays at the left in Arabic; the engine pins the viewport `dir="ltr"` deliberately ("one scroll-coordinate model in every engine") and mirrors only the keyboard intent. The hero's prev/next chevrons are the app's only two icons pinned physical, so they agree with the control they drive | engine, by design — §6.103 |
 | **An Arabic *device* that never opened the picker** | gets a mirrored layout from the engine and 34 unmirrored chevrons from the app, because the resolved direction is not readable from DSX and `global.locale` is empty exactly when the device is deciding | engine — §6.102 |
 | **Content in a language the chrome is not** | an English synopsis inside an Arabic frame puts its full stop at the left edge, and a truncated Latin title clips its *start* (`... Billionaire Twin`). Correct per the bidi algorithm, wrong for the reader. A web-only `unicode-bidi: plaintext` would fix ordering and split the column's alignment, so it was not half-done | engine — §6.106 |
+| **A sign or a number at the START of a string** | `+5%` renders `5%+` and `500 coins + 25 bonus` renders `coins + 25 bonus 500` — six of each on the coin-pack grid, measured by per-character sweep. The prices are fine (`$11.99` sweeps as `$11.99`), so this is not "numbers break in RTL": it is specifically a leading sign or digit with no strong character before it. Same fix as the row above; the markup half is fixable today by splitting | engine — §6.108 |
 | **Six counted strings** | want a plural group and cannot have one, because their display points are server-rendered and the SSR renderer emits raw ICU | engine — §6.101 |
 
 ### These translations have not been reviewed by a native speaker
@@ -482,17 +484,70 @@ something:
 
 | | |
 |---|---|
-| **247 viewer** | product copy — what a locale is measured against, and all thirteen are at 100% |
+| **255 viewer** | product copy — what a locale is measured against, and all thirteen are at 100%. Seven of them are the SERVER's words (below) |
 | **44 operator** | rendered only by the Manage surface: an internal tool, deliberately English |
-| **17 developer** | copy that cites a source path, a config key or a ledger entry. Translating "set `authSignInUrl` in App.json `consts`" makes the instruction *wrong* in the target language |
+| **17 developer** | copy that cites a source path — the server's `reason` field is one of them, a config key or a ledger entry. Translating "set `authSignInUrl` in App.json `consts`" makes the instruction *wrong* in the target language |
 | **253 unreachable** | the seam's real boundary, listed by `--unreachable` rather than guessed |
 
-That last row is the honest part. Three things the seam does not reach, each needing a
+That last row is the honest part. Two things the seam does not reach, each needing a
 different answer: **a11y labels** (the kernel localizes display points only, so a screen reader
-hears English on a Spanish device — an upstream ask), **interpolated composites** (`EP 1–{{ n }}
-Free` renders `EP 1–5 Free`, which no table can hold; the scheduled Translate module owns that
-tier), and **copy the server sends** (prices, rejection messages, notice bodies — they localize
-server-side).
+hears English on a Spanish device — an upstream ask) and **interpolated composites**
+(`EP 1–{{ n }} Free` renders `EP 1–5 Free`, which no table can hold; the scheduled Translate
+module owns that tier).
+
+### The price list is the server's words, and it is the same plane
+
+**It used to be a third thing on that list, and that was wrong twice over.** Plan names, the
+term notes and `BEST VALUE` are fields on the rows `server/store.dsx storeCatalog` returns —
+deliberately, because a price list with two copies is the drift that file exists to prevent.
+Nothing extracted a server file, so all thirteen tables reported 248/248 and a Japanese reader
+still bought in English off the screen closest to the money. The note here said server copy
+"localizes server-side". It does not, and it does not need to.
+
+**Under gettext the server is already sending keys.** The English source string *is* the key,
+so "the backend sends English" and "the backend sends a translation key" are one sentence. The
+display point does not care where its template came from: `localizeTemplate` normalizes
+`{{ item.note }}` to `{0}`, misses, renders the hole, and then looks up **the rendered form** —
+the seam's legacy door. So the string the server sent hits the table exactly the way `Save`
+does, and the fix was a *corpus*, not a mechanism.
+
+**Every lane, the same way** — the standing parity goal, checked by reading rather than assumed:
+
+| lane | where the legacy door lives |
+|---|---|
+| web | `kernel/src/strings.ts` `localizeTemplate` |
+| iOS | `Engine/iOS/DSXStrings.swift` — same comment, same ordering |
+| Android | `engine/Strings.kt` — likewise |
+
+One table, one ladder (`global.locale` → device → `en`), the client resolving and the server
+never learning a locale. **SSR needs no special case**: `server/src/render.ts` holds no
+reference to `DSXStrings` on purpose — *"the server is rendering for MANY locales at once and
+knows exactly one of them: the one the app is AUTHORED in"* — so a route serves English and
+`bindDisplay` swaps the translation in at mount, for a markup key and a server key identically.
+
+**Which fields are copy is DECLARED** (`scripts/strings.mjs` `SERVER_COPY`), because nothing can
+infer that a row's `label` is a name and its `id` is a sku. `price` and `bonus` are deliberately
+absent — `$11.99` and `+5%` are formatted numbers, which localise through `Intl` at the point of
+formatting. `reason` is declared and still comes out English, because it cites `REVENUECAT_KEY`
+and a source path and `classify()` files it *developer* by the same rule it applies to markup.
+
+**What was rejected.** *Per-request resolution on the server* (`Accept-Language`, or a locale
+argument) is right for a crawler or an email, and this app sends neither; against it, the header
+is a browser fact, so the native lanes would need an explicit argument and the one plane would
+immediately be two — and `render.ts` refuses the shape structurally, because `exportStatic`
+writes ONE document per route and every reader is served it. *Moving the copy into markup* and
+returning only prices and identifiers re-creates the drift, and hard-codes three tiers into a
+screen whose tier set is operator data; the only thing it was buying is what the plane above
+gives the server for free.
+
+**The cost, named rather than discovered later:** the key set grows with the operator's rows —
+a fourth tier is two more keys in thirteen tables. One ICU template would collapse all six into
+one, and PLAN.md §6.101 has that door shut while the Store is a server-rendered route. So the
+gate makes the cost loud: `npm run verify` boots an origin, calls `/store/catalog`, and requires
+every shipped locale to answer the words that came back — plus a second assertion that the
+extractor can *see* every word the wire sends, which is the door source-reading structurally
+cannot close (a key that leaves the corpus leaves the tables merely *stale*, and stale has never
+been a failure). Both were proved by making them fail. PLAN.md §6.107.
 
 **A ternary is not a composite, and getting that wrong cost 29 strings.** `bindDisplay`
 localizes the string it *renders*, so `<text value="{{ favOn ? 'Saved' : 'Save' }}">` looks up
@@ -620,6 +675,7 @@ most trying to teach.
 | **An Arabic device that never opened the picker** | The resolved layout direction is not readable from DSX and `global.locale` is empty exactly when the device is deciding, so the app cannot turn its own chevrons (§6.102) | Same table; `Theme.dsx isRtl()` says it in the code |
 | **Six counted strings that want a plural** | The message tier is client-only; a `{n, plural, …}` group at a server-rendered display point ships raw ICU in the HTML (§6.101) | The plural section above names all six; `npm run verify` fails if one moves |
 | **Content in a language the chrome is not** | No per-string text direction, so an English synopsis in an Arabic frame puts its full stop on the left and truncates from the front (§6.106) | The *what still does not mirror* table |
+| **A sign or a number at the start of a string** | `+5%` reads `5%+` in Arabic and a count-led phrase throws its number to the far end; a fully translated app still shows it (§6.108) | The *what still does not mirror* table |
 | **A remembered language** | No key-value plane (§6.33), and the cookie the choice rides is a SESSION cookie with no way to ask for durability (§6.100) | The Language row says it forgets when you quit |
 | **`pt-PT` and `zh-TW` devices** | The table ladder tries the full tag then the bare language and nothing between, so a script-qualified table is unreachable from the device step (§6.99) | The Localisation section; the picker reaches them explicitly |
 | **Playback quality** | One rendition in this build | The player's options sheet |
