@@ -60,6 +60,13 @@
     <api as="blockCall" url="/social/block" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="unblockCall" url="/social/unblock" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="commentDeleteCall" url="/social/comment/delete" method="POST" auto="false" headers="global.auth.headers"/>
+    <!-- THE GENRE LEVEL'S DATA — the SAME endpoint the Browse screen reads
+         (server/catalog.dsx browseCatalog), so the payload shape is one shape:
+         { active, genres, tags, items[], total }. `auto="false"` because a url carrying an
+         empty genre is `/catalog/browse/` and nobody asked for it; the open action refreshes
+         after writing the name, which is the idiom `thread` already uses two lines up. -->
+    <api as="genreList" url="/catalog/browse/{{ dsx.variable.genre }}" ssr="false" auto="false"
+         on:success="global.cacheBrowse = genreList.data"/>
 
     <variable as="page">return 0</variable>   <!-- 0-based; the vertical pager owns it -->
     <variable as="showId">return ''</variable>
@@ -105,6 +112,33 @@
     <variable as="toast">return ''</variable>
     <variable as="favTouched">return ''</variable>
     <variable as="plotOpen">return false</variable>
+
+    <!-- ── THE GENRE LEVEL: A SHEET OVER THE DRAWER, and why it is a sheet ──────────────
+         The chip used to be `href="/browse/:genre"`, and a route push from inside an open
+         `<sheet>` is a MEASURED defect on this build (dev@71155a18): the router has no
+         awareness of the overlay ledger — grep `router.ts` for `activateLayer` and it is not
+         there — so /browse mounted underneath and the episode drawer stayed painted over it,
+         scrim, blur and all. Measured at 375x812: frames 2 -> 3, path /browse/Revenge, and
+         `elementFromPoint(w/2, h/2)` still inside `.dsx-sheet-layer`. The viewer tapped
+         Revenge and saw the same drawer.
+
+         It is a sheet for a second reason that survives the bug being fixed: this viewer is
+         MID-EPISODE. A push tears them out of the clip and loses the drawer with it — its
+         detent, its scroll, its tab. A stacked sheet keeps every one of those and returns
+         them with one swipe, which is the whole argument for the instrument.
+
+         THE DESKTOP PANEL LANE KEEPS THE ROUTE, deliberately. At >= 1120 there is no drawer
+         at all — the episode list is a persistent 416px column — so there is no parent sheet
+         to stack on, and /browse/:genre is a shareable, back-navigable page with room to
+         render. Same intent, the container each lane actually has.
+
+         WHAT THE ENGINE DOES NOT DO YET, and is bridged loudly below: closing a parent sheet
+         does NOT close its declared children. Measured on this build — parent closed, child
+         left orphaned at level 1 with `present` still true. So every path that closes the
+         drawer closes this level FIRST, by hand, through `dsx.action.closeDrawer`. Filed as
+         PLAN.md 6.95; delete the hand cascade the day the engine owns it. -->
+    <variable as="genre">return ''</variable>
+    <variable as="genreOpen">return false</variable>
 
     <!-- ── the comment sheet, which is THREE PANES IN ONE SHEET ─────────────────────────
          NOT a second <sheet> over the first. docs/stacked-sheets.md measured what nesting
@@ -253,6 +287,43 @@
     <variable as="showTags" computed="true">
       if (dsx.variable.detailView == null || dsx.variable.detailView.show.tags == null) { return [] }
       return dsx.variable.detailView.show.tags.map(t => ({ name: t }))
+    </variable>
+
+    <!-- ── the genre level's four reads ────────────────────────────────────────────────
+         STALE-THEN-FRESH WITH AN ID GUARD, TWICE. `global.cacheBrowse` is keyed by ENDPOINT
+         and shared with the Browse screen (AGENTS.md), so handing it back for a DIFFERENT
+         genre is the "show B borrows show A's art" defect — and `genreList.data` needs the
+         same guard for the same reason from the other side: it still holds the LAST genre
+         until the refetch lands, so re-opening the level on a new chip would paint the old
+         one for a frame. Both are checked against the name the viewer just tapped. -->
+    <variable as="genreView" computed="true">
+      const live = genreList.data
+      if (live != null) {
+        if (live.active == dsx.variable.genre) { return live }
+      }
+      const cached = global.cacheBrowse
+      if (cached == null) { return null }
+      if (cached.active != dsx.variable.genre) { return null }
+      return cached
+    </variable>
+    <variable as="genreBusy" computed="true">
+      if (dsx.variable.genreView != null) { return false }
+      if (genreList.error != null) { return false }
+      return true
+    </variable>
+    <variable as="genreCount" computed="true">
+      const v = dsx.variable.genreView
+      if (v == null) { return '' }
+      if (v.total == 1) { return '1 series' }
+      return v.total + ' series'
+    </variable>
+    <!-- THREE COLUMNS ON A PHONE, FOUR ON A TABLET — off the SHEET's width, not the
+         screen's: a bottom sheet is capped at 44rem (704px) from 48rem up, so the desktop
+         five of the Browse grid would draw 130px posters in a column that is not there. -->
+    <variable as="genreCols" computed="true">return dsx.variable.bp == 'phone' ? 3 : 4</variable>
+    <!-- the loading grid needs a bindable source, and a repeater row is a DICT (AGENTS.md) -->
+    <variable as="genreSkeleton" computed="true">
+      return [{ id: 'k1' }, { id: 'k2' }, { id: 'k3' }, { id: 'k4' }, { id: 'k5' }, { id: 'k6' }]
     </variable>
     <variable as="panelViews" computed="true">
       if (dsx.variable.detailView == null || dsx.variable.detailView.show.views == null || dsx.variable.detailView.show.views < 1000) { return '' }
@@ -542,6 +613,48 @@
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
       else { dsx.module.route.replace({ path: '/' }) }
     </action>
+
+    <!-- ── THE GENRE LEVEL'S FIVE VERBS ────────────────────────────────────────────────
+         Every one of them exists so that no caller has to remember the cascade. -->
+    <action as="openGenre" inputs="name">
+      if (name == null) { return }
+      if (name == '') { return }
+      dsx.variable.genre = name
+      dsx.variable.genreOpen = true
+      genreList.refresh()
+      dsx.action.track({ name: 'genre_level_opened', props: { genre: name, show: dsx.variable.showId } })
+    </action>
+    <action as="closeGenre">dsx.variable.genreOpen = false</action>
+    <!-- THE HAND-ROLLED CASCADE. The engine does not close a declared child when its parent
+         goes down (PLAN.md 6.95, measured on dev@71155a18: the child is left orphaned at
+         level 1 with its key still true), so the drawer never closes except through here.
+         TOP-DOWN, like the engine will do it: the child first, then the parent. -->
+    <action as="closeDrawer">
+      dsx.variable.genreOpen = false
+      dsx.variable.drawer = false
+    </action>
+    <!-- and the one way IN, so the invariant "the drawer only ever moves through an action
+         that knows about its child" holds structurally rather than by everyone remembering.
+         The pill raises the drawer only in the lane that HAS one — with the panel beside the
+         clip it is a readout, not a control that opens a duplicate list. -->
+    <action as="raiseDrawer">
+      if (dsx.variable.panel) { dsx.action.closeDrawer(); return }
+      dsx.variable.drawer = true
+    </action>
+    <!-- A SERIES IS A DESTINATION, so this one is a ROUTE and not a third level: /show/:id
+         is a whole page — hero, episode grid, related rail — and it SHOULD take over the
+         frame. Both sheets close first, because the router will not do it for us. -->
+    <action as="goShow" inputs="id">
+      dsx.action.closeDrawer()
+      dsx.module.route.push({ path: '/show/' + id })
+    </action>
+    <!-- and the door back out to the full, shareable, deep-linkable page. A sheet has no
+         URL; this row is what keeps that affordance reachable from inside one. -->
+    <action as="seeAllGenre">
+      const g = dsx.variable.genre
+      dsx.action.closeDrawer()
+      dsx.module.route.push({ path: '/browse/' + g })
+    </action>
     <action as="saveNow" epid="dsx.variable.epId" epidx="dsx.variable.cur" locked="dsx.variable.epLocked">
       if (epid == null || epid === '' || locked) { return }
       // A GUEST HAS NOWHERE TO SAVE PROGRESS, and this is the one place where that must be
@@ -568,7 +681,7 @@
       dsx.variable.page = n - 1;
       dsx.variable.pos = 0;
       dsx.variable.paused = false;
-      dsx.variable.drawer = false;
+      dsx.action.closeDrawer();
       thread.refresh();
       dsx.action.syncUrl()
     </action>
@@ -919,6 +1032,27 @@
     <style as="tag" background="rgba(255,255,255,0.1)" radius="6" paddingH="12" paddingV="6" fontSize="13" color="rgba(255,255,255,0.7)"/>
     <style as="synopsisTxt" fontSize="15" color="rgba(255,255,255,0.8)" lineSpacing="6"/>
 
+    <!-- ── the genre level (a sheet over the drawer) ── -->
+    <!-- the SAME 16pt gutter the drawer's own head and tab row carry, so the two levels read
+         as one surface at two depths rather than two unrelated cards -->
+    <style as="genreBody" spacing="14" paddingH="16" paddingTop="4" paddingBottom="28" alignItems="stretch"/>
+    <!-- THE BACK AFFORDANCE. The system close control (close="trailing") is the GESTURE
+         twin — it dismisses the top card — but a bare X cannot say WHERE it goes, and a
+         viewer two levels down needs to be told. 44 tall is the tap floor. -->
+    <style as="genreBack" spacing="4" alignItems="center" minHeight="44"/>
+    <style as="genreBackTxt" fontSize="15" fontWeight="semibold" color="rgba(255,255,255,0.7)"/>
+    <style as="genreCountTxt" fontSize="13" color="rgba(255,255,255,0.5)"/>
+    <style as="genreCard" spacing="6" alignItems="stretch"/>
+    <style as="genreCardTitle" fontSize="13" fontWeight="medium" color="#FFFFFF" lineLimit="2" lineSpacing="2"/>
+    <style as="genreCardMeta" fontSize="12" color="rgba(255,255,255,0.45)"/>
+    <style as="genreSkel" background="#1C1C1E" radius="8"/>
+    <style as="genreState" spacing="8" alignItems="center" paddingV="40"/>
+    <style as="genreStateHead" fontSize="16" fontWeight="semibold" color="#FFFFFF" textAlign="center"/>
+    <style as="genreStateBody" fontSize="13" color="rgba(255,255,255,0.5)" textAlign="center" lineSpacing="4"/>
+    <style as="genreRetry" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="genreAll" background="rgba(255,255,255,0.06)" radius="12" paddingH="14" paddingV="14" spacing="10" alignItems="center" minHeight="44"/>
+    <style as="genreAllTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+
     <!-- ── the options stack ── -->
     <!-- the sheet already insets its content 16 a side; 12 more made the card read
          narrow and the header sat flush against the grabber -->
@@ -1201,7 +1335,7 @@
             </stack>
             <!-- the pill RAISES the drawer only in the lane that has one; with the panel
                  beside the clip it is a readout, not a control that opens a duplicate list -->
-            <hstack class="epPill" on:tap="dsx.variable.drawer = dsx.variable.panel == false"
+            <hstack class="epPill" on:tap="dsx.action.raiseDrawer()"
                     a11yGroup="true" a11yTrait="{{ dsx.variable.panel ? 'text' : 'button' }}"
                     a11yLabel="Episode {{ dsx.variable.cur }} of {{ dsx.variable.total }}">
               <image icon="rectangle.stack.fill" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
@@ -1358,8 +1492,11 @@ Please unlock to watch." class="lockHead"/>
   </hstack>
 
   <!-- ══════ the episode drawer ══════ -->
+  <!-- `on:dismiss` runs the CASCADE, never a bare `drawer = false`: a swipe-dismiss of the
+       parent has to take the genre level with it, and today only the author can do that
+       (PLAN.md 6.95). -->
   <sheet present="dsx.variable.drawer" detents="half,full" background="#141414"
-         on:dismiss="dsx.variable.drawer = false">
+         on:dismiss="dsx.action.closeDrawer()">
     <scroll style="flex: 1; min-height: 0">
       <vstack alignItems="stretch">
         <hstack class="drawerHead">
@@ -1447,33 +1584,32 @@ Please unlock to watch." class="lockHead"/>
                     offsetX="{{ dsx.variable.drawerTab == 'synopsis' ? 0 : -16 }}"
                     anim="easeOut" animDuration="0.2">
               <hstack class="tagRow">
-                <!-- THE GENRE CHIP IS A ROUTE, the same one the desktop panel's chip
-                     takes: /browse/:genre is declared in dsx.config.json and the Browse
-                     screen filters on genre OR tag, so "Revenge" lands on a real result
-                     set. `href` is the link idiom for a chip whose text stays plain
-                     (a <button> is for a CTA that owns its background).
+                <!-- THE GENRE CHIP RAISES A LEVEL, it does not leave. It used to be
+                     `href="/browse/:genre"` and that push is measurably broken from inside
+                     a presented sheet on this build — /browse mounted UNDER the drawer and
+                     the drawer stayed painted over it (the head's `genre` note carries the
+                     measurement). It is also the wrong verb: this viewer is mid-episode.
                      "Series" stays INERT deliberately: it is a FORMAT, not a genre and
-                     not a tag, so /browse/Series would route to an empty Browse — a
-                     control that reaches nothing is worse than a label. -->
+                     not a tag, so /browse/Series would reach an empty Browse — a control
+                     that reaches nothing is worse than a label. -->
                 <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre }}" class="tag"
                       a11yTrait="button"
-                      a11yLabel="Browse {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre }}"
-                      href="/browse/{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre }}"/>
+                      a11yLabel="Browse {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre }}, opens over this drawer"
+                      on:tap="dsx.action.openGenre({ name: dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre })"/>
                 <text value="EP 1–{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.free_until }} Free" class="tag"
                       visible-if="dsx.variable.detailView != null"/>
               </hstack>
-              <!-- THE SHOW'S OWN TAGS, the same flow the wide panel draws (and the same
-                   /browse/:tag destination — browseCatalog matches genre OR tag, so a tag
-                   chip lands on a real result set). They were rendered in the panel lane
-                   ONLY, so a phone viewer never saw a single tag: the drawer and the panel
-                   are one component in two layouts and the house law is that both lanes
-                   render the SAME pieces, or they drift. "Series" is gone with them — it was
-                   a FORMAT label wearing a chip's clothes, and the one chip here that could
-                   not be tapped. -->
+              <!-- THE SHOW'S OWN TAGS, the same flow the wide panel draws, and now the same
+                   DESTINATION as the genre chip beside them: browseCatalog matches genre OR
+                   tag, so one endpoint and one level serve both. They were rendered in the
+                   panel lane ONLY, so a phone viewer never saw a single tag: the drawer and
+                   the panel are one component in two layouts and the house law is that both
+                   lanes render the SAME pieces, or they drift. -->
               <flow class="tagFlow" bind="dsx.variable.showTags" key="name" spacing="6" lineSpacing="6"
                     visible-if="dsx.variable.showTags.length > 0">
                 <text value="{{ item.name }}" class="tagSoft" a11yTrait="button"
-                      a11yLabel="Browse {{ item.name }}" href="/browse/{{ item.name }}"/>
+                      a11yLabel="Browse {{ item.name }}, opens over this drawer"
+                      on:tap="dsx.action.openGenre({ name: item.name })"/>
               </flow>
               <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.synopsis }}" class="synopsisTxt"/>
             </vstack>
@@ -1515,6 +1651,115 @@ Please unlock to watch." class="lockHead"/>
             </vstack>
           </vstack>
         </zstack>
+
+        <!-- ══════ LEVEL 2 — the genre drawer ══════════════════════════════════════════
+             DECLARED INSIDE ITS PARENT'S SLOT, and that placement IS the declaration: on
+             iOS the sheet slot is an escaping closure, so this anchor only exists once the
+             drawer is presented, and UIKit then presents from the drawer's own view
+             controller — which is what stacks the two cards. Two `<sheet>` tags side by
+             side at the screen root are NOT a stack: a view controller presents one thing
+             at a time, so the second would silently do nothing while the first is up.
+
+             ITS POSITION IN THE COLUMN IS ALSO DELIBERATE. The anchor renders at zero size
+             on web (`display: contents`) but is a real 0x0 child of a stack on iOS, where
+             a zero-size child still pays the column's gaps. LAST child of the drawer's
+             SCROLL CONTENT is the one place that costs nothing a reader can see: the gap
+             lands at the end of a scroller. As a sibling of the `<scroll>` it would have
+             opened a visible strip above the sheet's bottom edge.
+
+             MEASURED HERE, on this build, at 375x812: parent level 1 / child level 2,
+             z 10001 / 10002, the parent's portal scope inert + aria-hidden, Escape closing
+             exactly one level at a time, and the document scroll lock surviving both. The
+             engine gives all of that for free. What it does NOT give is the cascade — see
+             `closeDrawer`. -->
+        <!-- `detents="content"`, and that is the detent that makes a STACK legible. A `full`
+             child covers its parent completely, so the viewer pays for the whole card-stack
+             apparatus and then cannot see it; a content-height child hugs its result set —
+             three series draw a short card with the drawer visible above it, twenty-four
+             draw a tall one, and the 90%-of-screen cap turns the inner `<scroll>` on by
+             itself. It is also ONE stop, so a single downward drag dismisses rather than
+             stepping through a half detent first.
+             `title=` is not decoration on a stacked child: it is the panel's accessible
+             name (`aria-labelledby` -> the chrome h2), and a level-2 dialog with no name is
+             disorienting in a way a level-1 one survives. -->
+        <sheet present="dsx.variable.genreOpen" detents="content" background="#141414"
+               title="{{ dsx.variable.genre }}" close="trailing"
+               on:dismiss="dsx.variable.genreOpen = false">
+          <scroll grow="true" style="flex: 1; min-height: 0">
+            <vstack class="genreBody" alignItems="stretch">
+
+              <!-- the BACK affordance. The system close control at the trailing edge is the
+                   gesture twin (and the swipe-down is the third); this row is the only one
+                   of the three that can say where it goes. -->
+              <hstack class="genreBack" on:tap="dsx.action.closeGenre()"
+                      a11yGroup="true" a11yTrait="button" a11yLabel="Back to all episodes">
+                <image icon="chevron.left" iconSize="14" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+                <text value="All episodes" class="genreBackTxt"/>
+              </hstack>
+
+              <text value="{{ dsx.variable.genreCount }}" class="genreCountTxt"
+                    visible-if="dsx.variable.genreCount != ''"/>
+
+              <!-- LOADING: the grid in its real shape, so arrival is a repaint and not a
+                   reflow (the same contract Browse honours on the full page) -->
+              <grid visible-if="dsx.variable.genreBusy" bind="dsx.variable.genreSkeleton" key="id"
+                    columns="{{ dsx.variable.genreCols }}" spacing="12" scroll="false">
+                <vstack class="genreCard">
+                  <vstack class="genreSkel" style="width: 100%; aspect-ratio: 3/4"/>
+                  <vstack class="genreSkel" height="12" style="height: 12px; width: 70%"/>
+                </vstack>
+              </grid>
+
+              <grid visible-if="dsx.variable.genreView != null &amp;&amp; dsx.variable.genreView.total > 0"
+                    bind="dsx.variable.genreView.items" key="id"
+                    columns="{{ dsx.variable.genreCols }}" spacing="12" scroll="false">
+                <vstack class="genreCard" on:tap="dsx.action.goShow({ id: item.id })"
+                        a11yGroup="true" a11yTrait="button"
+                        a11yLabel="{{ item.title }}, {{ item.episodes }} episodes">
+                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
+                         style="width: 100%; aspect-ratio: 3/4; border-radius: 8px; object-fit: cover"/>
+                  <text value="{{ item.title }}" class="genreCardTitle" lineLimit="2"
+                        style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+                  <text value="EP {{ item.episodes }}" class="genreCardMeta"
+                        style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                </vstack>
+              </grid>
+
+              <!-- EMPTY. A tag the server matched to nothing is rare but reachable, and the
+                   way out is the level below, not the app. -->
+              <vstack class="genreState"
+                      visible-if="dsx.variable.genreView != null &amp;&amp; dsx.variable.genreView.total == 0">
+                <image icon="rectangle.stack.fill" iconSize="28" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+                <text value="Nothing in {{ dsx.variable.genre }} yet" class="genreStateHead"/>
+                <text value="New series land here as they go live." class="genreStateBody"/>
+              </vstack>
+
+              <!-- ERROR. It says what is still true — the episode never stopped — because a
+                   failed side-panel is not a dead app, and a viewer who cannot tell the
+                   difference will close the whole player. -->
+              <vstack class="genreState"
+                      visible-if="genreList.error != null &amp;&amp; dsx.variable.genreView == null">
+                <text value="This list could not be loaded." class="genreStateHead"/>
+                <text value="Your episode is still playing behind this sheet — close it and nothing is lost." class="genreStateBody"/>
+                <button label="Retry" class="genreRetry" on:tap="genreList.refresh()"/>
+              </vstack>
+
+              <!-- THE DOOR BACK TO A URL. A sheet has no address, and /browse/:genre is
+                   shareable, deep-linkable and back-navigable — so the affordance the level
+                   replaced stays reachable from inside it, for the viewer who wants the page
+                   rather than the glance. It leaves the player, which is why it is the last
+                   row and not the first. -->
+              <hstack class="genreAll" on:tap="dsx.action.seeAllGenre()"
+                      visible-if="dsx.variable.genreView != null &amp;&amp; dsx.variable.genreView.total > 0"
+                      a11yGroup="true" a11yTrait="button"
+                      a11yLabel="See all {{ dsx.variable.genre }} on the Browse page — leaves the player">
+                <text value="See all in {{ dsx.variable.genre }}" class="genreAllTxt" grow="width" style="flex: 1"/>
+                <image icon="arrow.right" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+              </hstack>
+
+            </vstack>
+          </scroll>
+        </sheet>
       </vstack>
     </scroll>
   </sheet>
