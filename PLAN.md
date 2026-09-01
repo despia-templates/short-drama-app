@@ -2637,3 +2637,29 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      paths, both bridges with `css-bridge.json` rows, and the web `borderDecls` emitter. Both are in
      flight upstream as this is written; the template changes nothing for either — the markup is
      already the right markup.
+
+119. **ANDROID'S ROUTE CHROME, INBOUND LINKS, BOOT SPLASH AND SYSTEM BARS NOW MATCH iOS** (found
+     2026-09-02; fixed upstream dev@bbb14a66 · 10c3b381 · adec03fe). Four findings. (1) `Router.kt
+     materialize()` still seeded a component route's chrome from `meta.title`, so a deep link to a
+     tab root drew "Profile — Short Drama" over the page; `Router.swift` had dropped that fallback
+     in 9952e1a6 and the Kotlin twin never followed. Both `openInbound` twins already RESET to the
+     tab rather than pushing. The "short title + back chevron" iOS shows on `/store` is this
+     template's own markup (`Store.dsx:323`), which Android now draws identically. (2) The inbound
+     resolver: `shortdrama://watch/<id>` lands on Home on BOTH lanes because the row is
+     `/watch/:show/:idx` and a two-segment link matches nothing — the routers now log the
+     unmatched link instead of falling to the entry silently, and `Conformance/router/inbound.json`
+     gained host+param rows plus a `landing` section (depth 1, canPop false, chrome null, vars); the
+     Swift resolver moved to `InboundURL.swift` with its own runner (22 cases), whose first run found
+     Foundation 26 parsing an empty payload to `/` — fixed by requiring a scheme. A link arriving 8s
+     into a cold start is queued behind the launch barrier and lands. (3) The generated activity
+     never claimed `boot.splash`, so the first traversal composed the app root from an EMPTY stack
+     while `DSXAndroidBoot.launch()` raced it; the root sometimes composed twice. The host now
+     presents the claimed splash first and mounts the router surface only when the launch barrier
+     is open; the remaining 1.5s is the configured `splash.min_ms`, the same hold iOS applies. The
+     rest of a slow cold start (Application.onCreate 2.8–14.5s) is the software-GL emulator.
+     (4) `RouterChromeHost` inset the frame by `safeDrawing` and let its Material background show
+     under the system bars — a light lavender band on a light device. `RouterFrameCanvas.kt` paints
+     the page root's declared background full-bleed and insets only the content; bar icons follow
+     the canvas luminance. Both bands measure (0,0,0) on both device themes; `dsx.screen.safeTop/
+     safeBottom` were already the real insets. STILL OPEN after this pass, in flight: the player
+     never leaves `phase == 'loading'` on Android and the For You stage paints no video frame.
