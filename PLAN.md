@@ -2608,3 +2608,32 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      hydration mismatch becomes the exception it was designed to be. Until then this template
      accepts the swap; it does not hide the bars with CSS because the two lanes are different
      TREES, not different styles of one tree.
+
+117. **A BOUND `<pager>` HAD NO ROWS ON ANDROID, AND A CHILD `<Theme/>`'S FUNCTIONS NEVER LEFT ITS
+     OWN STORE** (found 2026-09-02; fixed upstream dev@b2a14107 · 353da3ee). Two Home defects with
+     one screenshot each. (1) `Pager()` read `bind=` as an alias of the page INDEX and always paged
+     the static children, so the hero template rendered once with no `item` — an empty box where
+     iOS and web paint the poster. The decision is now a pure function (`RepeaterSemantics.pagerPages`:
+     `bind` → rows through the shared `bound()` seam, first child = template, page keys = row keys;
+     no `bind` → children; `value=` alone is the index), matching `Pager.swift` and the web's
+     `mountBoundPager`, pinned by `Conformance/layout/repeaters.json` with Kotlin executors (the TS
+     and Swift decisions stay inline — disclosed in the layout README). (2) The VIP gem was white
+     and the picker a bare glyph because `brand()`/`gemLift()`/`languageRows()` — `<functions>`
+     declared by the child `<Theme/>` mount — were registered surface-LOCAL into the child's own
+     store; the dispatch called `JSE.registerFunctions` and never `StackStore.registerHeadFunctions`,
+     the core seam that routes on `global`. The corpus README even claimed it did. Not an ordering
+     problem: computeds re-evaluate per read. Red→green: `HeadFunctionBlockTest — on another surface:
+     expected #E52E2E, got null`. The picker needed no change of its own.
+
+118. **TWO ANDROID GAPS SCOPED, NOT LANDED, so the next pass does not rediscover them.** (a) MAIN-AXIS
+     ALIGNMENT: `justify-content: flex-end` places the hero's copy at the bottom on iOS and web and at
+     the TOP on Android (`parity/android/after-home-5556.png` vs the iOS capture) — the three
+     positional values are not bridged to the Compose arrangement, though the distributions are
+     (§6 "upstream #238"). (b) PER-EDGE BORDERS: `border-top/right/bottom/left` have no native target
+     on either lane — both pipelines draw one uniform stroke and both bridges map only the
+     shorthands, so every 1px hairline in this template (`TabBar.dsx:15`, `App.dsx:743`,
+     `Show.dsx:446/506`, the Profile rows) is web-only and Android logs `border-top … inert` on every
+     Home render. Landing it is a catalog key on four renderers plus three gates, both native stroke
+     paths, both bridges with `css-bridge.json` rows, and the web `borderDecls` emitter. Both are in
+     flight upstream as this is written; the template changes nothing for either — the markup is
+     already the right markup.
