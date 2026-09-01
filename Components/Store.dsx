@@ -398,7 +398,7 @@
           <text value="Unlimited viewing for the length of the pass. One charge, no auto-renewal." class="sectionNote"/>
         </vstack>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <PlansSheet mode="inline"
+          <PlansSheet mode="inline" hostRefuses="{{ true }}"
                       vip="{{ dsx.variable.isVip }}" on:purchased="wallet.refresh()"/>
         </vstack>
       </vstack>

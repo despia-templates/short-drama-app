@@ -2448,3 +2448,53 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      not only for multilingual CONTENT. A monolingual app whose chrome contains a percentage
      badge or a count-led phrase needs it too, which moves it from "nice for content apps"
      to "every RTL app that prints a number".
+
+109. **`on:appear` RAN BEFORE THE SURFACE'S OWN `<api>` WAS CLAIMED ON iOS, AND THE DROPPED
+     VERB SAID NOTHING** (found 2026-09-01 on the Store, iPhone 17 Pro simulator; fixed upstream
+     dev@368b2440 for iOS, the Android twin beside it, the contract in
+     `Conformance/api/mounted-lifecycle.json` with one executor per lane).
+
+     **What shipped.** The VIP tier cards rendered gold on the web and as an empty grey
+     `<Skeleton>` forever on iOS. `PlansSheet` declares `<api as="catalog" auto="false"/>` and
+     its inline root carries `on:appear="dsx.action.load()"`, where `load()` calls
+     `catalog.refresh()` when the data is null — the stale-then-fresh idiom this brief
+     prescribes. The refresh never ran, the phase computed stayed `loading`, and nothing in
+     any log said so.
+
+     **Measured, three arms on one build.** `refresh()` directly in `on:appear` → status
+     `ready`, rows `null`. The same call one tick later (`setTimeout(0)`) → rows 3. Retried
+     every 250ms → rows 3 after 3 tries. Ordering, and nothing else: a component instance's
+     `<api>` is claimed during the render walk, `on:appear` ran inside SwiftUI's `onAppear`,
+     which fires before that walk has reached the claim on a freshly pushed surface, and
+     `apiHandle(named:)` answered nil in silence, so the verb was dropped as if it had
+     succeeded. The web dispatches `appear` from a `queueMicrotask` after mount and never
+     had the race; Android's `LaunchedEffect` on the appearing node ran before a LATER
+     sibling's `DisposableEffect` claimed the handle — the same class, order-dependent.
+
+     **The fix is the web's contract on every lane, not a retry in the app.** iOS hops
+     `JSE.afterRender` before running `on:appear`; Android yields one frame
+     (`withFrameNanos`) first; and a verb on an unclaimed handle now logs in DEBUG
+     (`[dsx.api] catalog.<verb> called before <api as="catalog"> was claimed on this surface —
+     the call is dropped`) instead of vanishing. Re-measured after the fix: arm A loads
+     (rows 3) and the Store's plans branch paints on device. TEMPLATE RULE: an `on:appear`
+     that kicks a manual `<api>` is correct on all three lanes — never wrap it in a timer or
+     a retry loop, and if a screen still sits on its skeleton, read the console first.
+
+110. **`dsx.log` IS `Swift.print` ON iOS, SO IT REACHES THE PROCESS STDOUT AND NOT THE
+     UNIFIED LOG — AND AN INLINE `on:change` RUNS AT THE EXPRESSION TIER, WHERE THE CALL
+     EMITS NOTHING** (found 2026-09-01 while probing §109; both measured on the simulator).
+
+     `log stream --predicate 'subsystem contains "dsx"'` shows nothing for a `dsx.log(...)`
+     line that `xcrun simctl launch --console-pty` prints immediately — the verb writes to
+     stdout, which the unified log never sees. Separately, the same `dsx.log(...)` placed in
+     an inline `<watch on:change="dsx.log(...)">` printed nothing at all, while the identical
+     call inside an `<action>` body invoked from that watch printed every time: an inline
+     handler is evaluated at the expression tier, and the log verb has no effect there.
+     Neither is a rendering defect, but together they cost an hour of "the code path is not
+     running" against code that was running fine.
+
+     **THE ASK.** (a) Route `dsx.log` through `os.Logger` (subsystem `dsx`) on iOS so both
+     `log stream` and the console see it, or document the stdout route in the debugging
+     reference. (b) Either give the expression tier the log verb or lint an inline handler
+     that calls it. TEMPLATE RULE until then: diagnostics live in `<action>` bodies, and a
+     device capture is `simctl launch --console-pty`, never `log stream`.

@@ -34,6 +34,11 @@
     <attribute as="headers" default="global.auth.headers"/>
     <attribute as="vip" default="false"/>         <!-- is the viewer already a member -->
     <attribute as="vipUntil" default="''"/>
+    <!-- A host that already prints the purchasing refusal above its own grids (Store does,
+         for the coin packs as well) passes hostRefuses="{{ true }}" so the inline lane does
+         not say it a second time under the VIP heading. A markup attribute arrives as a
+         STRING, so the consumer accepts both spellings (hostSaysWhy below). -->
+    <attribute as="hostRefuses" default="false"/>
 
     <event as="purchased" payload="days"/>
     <event as="failed" payload="message"/>
@@ -75,6 +80,7 @@
     <variable as="detail">return false</variable>
 
     <variable as="isInline" computed="true">return dsx.attribute.mode == 'inline'</variable>
+    <variable as="hostSaysWhy" computed="true">return dsx.attribute.hostRefuses == true || dsx.attribute.hostRefuses == 'true'</variable>
     <variable as="phase" computed="true">
       if (catalog.error != null) { return 'error' }
       if (catalog.data == null) { return 'loading' }
@@ -386,7 +392,7 @@
          and this template says that on the purchase surface rather than quietly opening a
          card sheet. The seam is two lines of dsx.config.json plus one backend secret; the
          note names both (Article 7: the degradation is named where the viewer reads it). -->
-    <vstack class="laneCard" visible-if="dsx.variable.payLane == 'blocked'">
+    <vstack class="laneCard" visible-if="dsx.variable.payLane == 'blocked' &amp;&amp; !dsx.variable.hostSaysWhy">
       <text value="Purchasing is off in this build" class="laneTitle"/>
       <text value="{{ dsx.variable.payNote }}" class="retryBody"/>
     </vstack>
