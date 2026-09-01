@@ -97,6 +97,29 @@
       dsx.variable.open = false
       dsx.action.clearSearch()
     </action>
+    <!-- ── OPENING A RESULT CLOSES THE OVERLAY FIRST, and it has to be written out ──────
+         The rows here were `href="/show/:id"`, which pushed the route and left this cover
+         sheet painted over the screen it had just mounted. Measured at 375x812 on
+         dev@71155a18: tapping the first Hot Movie row took frames 1 -> 2 and the path to
+         /show/5b95..., while `elementFromPoint(w/2, h/2)` still resolved inside
+         `.dsx-sheet-layer` and the document scroll lock was still on. The viewer tapped a
+         result and appeared to go nowhere.
+
+         The cause is not this component: `router.ts` has no awareness of the overlay
+         ledger — `activateLayer`, `deactivateLayer` and `dsx-overlay-layer` appear nowhere
+         in it — so no push, pop or reset closes an open modal. Filed as PLAN.md 6.95 with
+         the player's drawer, which had the same defect from the other side. Until the
+         router owns it, every navigation out of a sheet in this app goes through an action
+         that closes the sheet first.
+
+         A ROUTE IS THE RIGHT VERB HERE, unlike the player's genre chips. /show/:id is a
+         destination — hero, episode grid, related rail, a shareable URL — and a search
+         result is a viewer who has finished searching. Nothing about the overlay is worth
+         preserving behind it, so there is nothing for a level to keep. -->
+    <action as="openShow" inputs="id">
+      dsx.action.closeSearch()
+      dsx.module.route.push({ path: '/show/' + id })
+    </action>
 
     <style as="stage" background="#000000" alignItems="stretch" paddingTop="18"/>
     <style as="barRow" spacing="12" alignItems="center" paddingBottom="18"/>
@@ -177,8 +200,8 @@
         <vstack class="panel" visible-if="dsx.variable.results == null">
           <text value="Hot Movie" class="panelHead"/>
           <grid bind="home.data.trending" key="id" columns="{{ dsx.variable.hotCols }}" spacing="6" scroll="false">
-            <hstack class="hotRow" href="/show/{{ item.id }}" a11yGroup="true"
-                    a11yLabel="Number {{ item.rank }}, {{ item.title }}">
+            <hstack class="hotRow" on:tap="dsx.action.openShow({ id: item.id })" a11yGroup="true"
+                    a11yTrait="button" a11yLabel="Number {{ item.rank }}, {{ item.title }}">
               <zstack>
                 <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
                        style="width: 60px; height: 80px; border-radius: 8px; object-fit: cover"/>
@@ -211,7 +234,8 @@
         <vstack visible-if="dsx.variable.results != null" alignItems="stretch" spacing="16">
           <text value="{{ dsx.variable.statusMsg }}" class="status" visible-if="dsx.variable.statusMsg != ''"/>
           <grid bind="dsx.variable.results" key="id" columns="{{ dsx.variable.resCols }}" spacing="18" scroll="false">
-            <vstack class="card" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="{{ item.title }}">
+            <vstack class="card" on:tap="dsx.action.openShow({ id: item.id })" a11yGroup="true"
+                    a11yTrait="button" a11yLabel="{{ item.title }}">
               <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
                      style="width: 100%; aspect-ratio: 3/4; border-radius: 16px; object-fit: cover"/>
               <vstack spacing="4" alignItems="stretch">

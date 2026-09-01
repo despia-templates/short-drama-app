@@ -308,6 +308,20 @@
          deliberately not wired to `broke`, because "this ad is inappropriate" and "this ad
          failed to load" are different facts and a moderation queue needs to tell them
          apart. -->
+    <!-- THE HOUSE AD'S ONE LINK OUT, and it closes the cover first. `href="/vip"` pushed
+         the route and left this cover sheet painted over the page it had just mounted —
+         the router does not consult the overlay ledger, so no navigation closes an open
+         modal (measured on two other surfaces this pass; PLAN.md 6.95). Here it was worse
+         than a stuck sheet: the ad video would have gone on playing behind it.
+         It routes through `close()` rather than a bare `playing = false` so the ad is
+         accounted for exactly as the X accounts for it — a viewer who leaves for the
+         paywall part-way through has not earned the reward, and `close()` is the one place
+         that decides. And a ROUTE is right here: /vip is a destination, and someone who
+         taps out of an ad to read a paywall is done with the ad. -->
+    <action as="seePlans">
+      dsx.action.close()
+      dsx.module.route.push({ path: '/vip' })
+    </action>
     <action as="report">
       global.adOptOut = true
       dsx.variable.paused = true
@@ -458,7 +472,9 @@
                 visible-if="dsx.variable.complete == false && dsx.variable.stalled == false"/>
           <text value="Tap to play the ad" class="claimBtn"
                 visible-if="dsx.variable.stalled" a11yTrait="button" on:tap="dsx.action.tapPlay()"/>
-          <text value="See VIP plans" class="lanePill" href="/vip"/>
+          <text value="See VIP plans" class="lanePill" a11yTrait="button"
+                a11yLabel="See VIP plans — closes this ad"
+                on:tap="dsx.action.seePlans()"/>
         </vstack>
       </vstack>
     </zstack>
