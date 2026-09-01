@@ -2589,3 +2589,22 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      then `has('store')` is false on device and the purchase surfaces refuse exactly as they do today,
      and turning the lane on also needs product ids and a RevenueCat secret that only an operator can
      supply.
+
+116. **THE SERVER RENDERS THE DESKTOP CHROME FOR A PHONE, AND THE CLIENT SWAPS IT AFTER
+     HYDRATION** (measured 2026-09-02 on the local origin). `curl` with an iPhone user agent
+     returns a page carrying 18 `TopNav`-owned nodes and 13 `TabBar`-owned nodes; a 390px
+     Playwright client then logs `[dsx hydrate] mismatch in <App> at <TabBar>#217: visible-if
+     diverged (client true, server rendered nothing) — dsx.variable.wide == false — subtree
+     replace-mount`, `<AuthSeam>#218: component root missing or mis-owned — replace-mounted`,
+     and `<vstack>#0: 2 unmatched server element(s) removed`. The server has no viewport, so
+     `bp` resolves to the wide lane at render time and every phone load paints desktop chrome
+     for one frame before the tab bar mounts. The engine fails open exactly as documented — this
+     is not a hydration bug, it is the cost of choosing a lane by `dsx.screen.width` on a plane
+     that has none at SSR time.
+
+     **THE ASK (upstream):** seed `dsx.screen.width` at SSR from what the request DOES carry —
+     `Sec-CH-Viewport-Width` / `Viewport-Width` client hints where present, else a mobile user
+     agent → the phone breakpoint — so `bp` computes the same lane the client will, and the
+     hydration mismatch becomes the exception it was designed to be. Until then this template
+     accepts the swap; it does not hide the bars with CSS because the two lanes are different
+     TREES, not different styles of one tree.
