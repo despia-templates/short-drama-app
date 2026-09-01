@@ -66,7 +66,14 @@
     <variable as="draft">return ''</variable>
     <variable as="captions">return true</variable>
     <variable as="pip">return true</variable>
-    <variable as="autoUnlock">return true</variable>
+    <!-- OFF by default, and that is a deliberate divergence from the category. `onEnded`
+         spends the viewer's balance on the next episode with no confirmation, at the moment
+         an episode ends — defaulting that ON is the sharpest dark pattern this genre has, and
+         it is the one users complain about. Opt-in costs the template nothing (the toggle sits
+         right on the paywall, where someone who wants to binge will find it) and it is the
+         difference between a reference other people copy and a reference that teaches them to
+         drain a wallet quietly. -->
+    <variable as="autoUnlock">return false</variable>
     <variable as="unlocking">return false</variable>
     <variable as="toast">return ''</variable>
     <variable as="favTouched">return ''</variable>

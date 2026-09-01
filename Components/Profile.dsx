@@ -252,7 +252,10 @@
               </vstack>
               <vstack class="stat" style="flex: 1">
                 <text value="{{ dsx.variable.bonus == null ? '—' : dsx.variable.bonus }}" class="statNum" color="#FFFFFF"/>
-                <text value="Bonus · 7-day" class="statCap"/>
+                <!-- was "Bonus · 7-day". Purchased currency may not expire (App Store
+                     3.1.1), and the server stopped expiring anything this pass — so the
+                     label was promising a rule the app does not apply. -->
+                <text value="Bonus" class="statCap"/>
               </vstack>
             </hstack>
             <hstack spacing="10" alignItems="stretch">
@@ -278,7 +281,11 @@
                 <text value="{{ dsx.variable.bonus == null ? '—' : dsx.variable.bonus }}" class="stripNum"/>
               </hstack>
               <spacer/>
-              <text value="Bonus coins expire 7 days after they land" class="note"/>
+              <!-- The 7-day expiry claim is gone: it was never implemented, and for coins
+                   bought with money it is not permitted — App Store 3.1.1, verbatim, "Any
+                   credits or in-game currencies purchased via in-app purchase may not
+                   expire." Earned coins now keep the same promise as bought ones. -->
+              <text value="Coins never expire — bought or earned" class="note"/>
             </hstack>
           </vstack>
 
