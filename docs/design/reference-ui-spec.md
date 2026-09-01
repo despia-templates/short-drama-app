@@ -22,6 +22,43 @@ every gap found.
 
 ---
 
+## −1 · The custom-UI law (founder, 2026-09-02): NO native theming, anywhere
+
+"Drama apps come with custom UI — Netflix, DramaBox, ReelShort — 1:1 on web, iOS and Android."
+This app is `design: "custom"` and that means the SAME pixels on every lane, drawn by the DSX
+design, never by the platform's theme:
+
+- **No platform chrome.** No system navigation bar, no Material action bar or app bar, no
+  system tab bar tint, no Material colour roles reaching the page (`background`/`surface` are
+  the app's tokens, §0). System bars are transparent over the app's ground, icons follow the
+  ground's luminance. Splash is the app's own brand screen on both platforms.
+- **No platform controls.** Toggles, checkboxes, pickers, segmented tabs, sliders, text fields,
+  alerts, toasts, menus and option lists are the DSX custom-design components with the geometry
+  below — never `UISwitch`, never an M3 `Switch`, never a Material dialog, never a system menu
+  picker, never a native alert. A selection list is a sheet of rows with a check (§3d).
+- **Sheets are the app's.** Bottom sheets keep the presentation mechanics (detents, drag to
+  dismiss, cascade) but paint the app's chrome identically: panel fill, top radius 20, a grabber
+  36×4 `#48484A` centred 8pt below the top edge, dim `rgba(0,0,0,.6)` behind, no system tint.
+- **Fonts and icons are the app's** on every lane (Inter via the registry; unified icon paths).
+- **If a lane leaks the platform look, the ENGINE is wrong**, not the markup: the fix goes into
+  the custom-design lane of that renderer with a pixel-parity corpus row, and PLAN.md §6 records
+  it. Comparing the three lanes side by side on the same screen is part of every gate.
+
+Custom control geometry (measured on the reference's More sheet and permission sheet):
+- **Toggle**: track 51×31, radius 15.5; off `#39393D`, on gold `#F5C518` (a members-only
+  toggle carries the crown 14 to its left); knob 27 white with shadow `0 2 4 rgba(0,0,0,.3)`,
+  2pt inset; 0.2s ease.
+- **Checkbox**: 20×20, radius 5; on = accent fill with a white check 12; off = 1.5pt `#48484A`
+  outline on card fill.
+- **Check mark (selected row)**: 16pt ink glyph, trailing, row 52.
+- **Text field** (search): §1 geometry; focus ring none, caret ink, clear button 16 ink-3.
+- **Segmented/tab strip**: labels 17 semibold, 2pt underline, no pill.
+- **Slider/seek**: track 4 `rgba(255,255,255,.3)`, fill ink, thumb 14 white (the player).
+- **Toast**: card fill, radius 10, 13 ink, padding 10×14, centred 88pt above the safe bottom,
+  1.5s.
+- **Alert / confirm**: a centred card 300 wide, radius 16, panel fill, title 17 semibold,
+  body 15 ink-2, buttons as 48pt rows separated by hairlines — never the system alert.
+
 ## 0 · Palette and type ramp (shared by every screen)
 
 | token | value | used for |
