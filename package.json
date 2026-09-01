@@ -22,6 +22,8 @@
   },
   "scripts": {
     "build": "despia build",
+    "postbuild": "node scripts/dist-guard.mjs",
+    "guard:dist": "node scripts/dist-guard.mjs",
     "dev": "despia dev",
     "lint": "despia lint --strict",
     "review": "node scripts/review.mjs",

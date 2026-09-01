@@ -92,7 +92,11 @@
     <attribute as="cap" default="10"/>
     <attribute as="reward" default="15"/>
     <attribute as="headers" default="{}"/>      <!-- the caller's auth headers -->
-    <attribute as="creative" default="'/media/heiress.mp4'"/>
+    <!-- The house ad plays from /promo, not /media. /media/* is entitlement-gated now (a
+         paid episode's bytes are refused without a ticket), and the house creative is
+         nobody's episode — pointing it at an episode file meant the ad itself 403'd and
+         played black. /promo aliases the same bytes with no new binary. -->
+    <attribute as="creative" default="'/promo/house-ad.mp4'"/>
     <!-- the viewer's entitlement, passed in by the screen that owns the wallet read. A
          markup attribute arrives as a STRING and `default=` is a JSE expression, so the
          consumer accepts BOTH spellings (AGENTS.md) — a component cannot make its callers

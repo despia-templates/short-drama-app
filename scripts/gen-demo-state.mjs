@@ -63,9 +63,16 @@ const rewards = {
     { id: "t2", title: "Add a series to My List", reward: 10, claimed: false },
   ],
 };
+// FIELD NAMES HELD TO SOURCE, per this file's own rule — and one of them was a compliance
+// leak, not just a wrong name. These rows carried `expires`, which the ledger screen renders
+// as "· expires in 7 days"; App Store 3.1.1 forbids expiring purchased currency and the
+// server stopped expiring anything (server/wallet.dsx's header). A demo seed that keeps
+// making the promise is the promise, on the one lane (native, non-App-Store) where nobody is
+// watching for it. The real shape is `source`/`created_at`, never `label`/`at`/`expires` —
+// see server/wallet.dsx ledgerRows.
 const ledger = { rows: [
-  { id: "d1", kind: "bonus", label: "Daily check-in", amount: 5, at: "2026-08-30", expires: "2026-09-06" },
-  { id: "d2", kind: "coin", label: "Episode unlocked", amount: -45, at: "2026-08-30", expires: null },
+  { id: "d1", kind: "bonus", source: "checkin", ref: "2026-08-30", amount: 5, created_at: "2026-08-30T09:00:00.000Z" },
+  { id: "d2", kind: "coin", source: "unlock", ref: "demo-ep", amount: -45, created_at: "2026-08-30T09:12:00.000Z" },
 ] };
 
 const js = (v) => JSON.stringify(v);

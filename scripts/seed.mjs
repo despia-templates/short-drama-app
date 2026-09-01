@@ -11,11 +11,21 @@
 //  KEY ART" placeholder. It now reads the existing rows first, matches on title, and passes
 //  the id: run it as often as you like, and it converges the database onto the manifest.
 //
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { SHOWS, epTitle , metricsFor, tagsFor } from "./catalogue.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:8787";
-const session = JSON.parse(readFileSync("public/dev-session.json", "utf8"));
+// The session moved out of `public/`: `despia build` copies that directory into `dist/`,
+// which `despia deploy cloudflare` uploads, so the operator token was shipping with every
+// deployment (scripts/dev-session.mjs's header has the whole story; scripts/dist-guard.mjs
+// is the gate that now refuses it). It lives at the repo root, gitignored, read here off
+// disk — the seeder is a local operator tool and never goes through the origin for it.
+const SESSION_FILE = ".dev-session.json";
+if (!existsSync(SESSION_FILE)) {
+  console.error(`[seed] ${SESSION_FILE} is missing — run \`npm run session\` first.`);
+  process.exit(1);
+}
+const session = JSON.parse(readFileSync(SESSION_FILE, "utf8"));
 const OP = session.operator.token;
 
 const call = async (path, body) => {

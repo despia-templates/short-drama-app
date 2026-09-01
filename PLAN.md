@@ -1447,3 +1447,106 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     MoboReels, GoodShort) and it is the two market leaders that are silent; and no app in the
     set ships a TV app or casting, with DramaBox actively refusing to cast citing copyright.
 
+
+82. UPSTREAM ASK 2026-09-01 — **a `<server>` action has no crypto seam, so the declared lane
+    cannot mint a signed URL.** `actions.ts moduleTable` binds exactly four heads: `data`,
+    `queue`, `secret` and declared packages. There is no HMAC, no digest, no signature — so
+    the one thing every media paywall in the category does, `playSource` cannot do: return
+    `https://cdn/…?Expires=…&Signature=…` and let the edge verify it with no round trip.
+    The kernel already HAS the vocabulary (`kernel/src/crypto-core.ts` carries the digest and
+    MAC tables, and `CRYPTO_MAC_DIGESTS` names sha256/384/512), it is simply not bound on the
+    server side. ASK: `dsx.module.crypto.hmac({ digest, key, message })` and
+    `dsx.module.crypto.digest(...)` in the server module table, with the key read through the
+    existing `<secret>` seam so a body still cannot name a secret it did not declare.
+    WORKED AROUND LOUDLY, not silently: the template mints a `playticket` ROW instead. A
+    `gen_random_uuid()` id is the same 122 bits of unguessability as a signature and the row
+    carries its own expiry — it just costs a database lookup per media request, which a CDN
+    signature does not. `unique (owner_id, episode)` keeps the table the size of the unlock
+    table rather than growing once per play. The whole trade is written in place at the
+    entity (server/wallet.dsx) and at the gate (scripts/serve.mjs), with the three real
+    production shapes named (CloudFront signed URLs, Cloudflare Stream tokens, Mux signed
+    playback JWTs). It dies the day the seam lands.
+
+83. UPSTREAM ASK 2026-09-01 — **`<index>` can express neither UNIQUE nor COMPOSITE, and
+    every once-only rule in a real backend needs both.** The grammar is one attribute
+    (`server-document.ts` line 34: `index: ["on"]`), the emitter writes
+    `create index if not exists`, and `on="a b"` produces two SEPARATE single-column indexes
+    rather than one composite. So a declared backend can say "index this column" and cannot
+    say the only thing that actually enforces a business rule.
+    THIS IS NOT COSMETIC. A declared action has no transaction seam (§6.38 — postgres.ts sets
+    the caller identity per STATEMENT), so every "once per day", "once per episode", "once per
+    order" guard is a read-then-write that two concurrent requests both pass. Measured in this
+    template before the fix: two simultaneous `/rewards/checkin` calls both granted; two
+    simultaneous `/wallet/unlock` calls both debited and the viewer paid twice for one
+    episode. Application code cannot fix it. Only a unique index can.
+    ASK: `<index unique="true" on="owner_id day"/>`, composite (one index from the whole
+    `on` list), plus a `where=` predicate for the partial case — two of the nine constraints
+    this template needs are partial (`dsx_order (intent) where intent <> ''`, because the
+    order row is now written before the Stripe call; and `dsx_ledger (owner_id, kind, source,
+    ref) where source in ('pack','vip')`, because only the payment grants must be
+    exactly-once). `owner_id` must be nameable even though it is emitter-generated, since
+    every owner-scoped constraint is scoped by it.
+    BRIDGED IN PLACE: `server/policies.local.sql`, beside the comment-policy addendum, with
+    the same "dies when upstream lands" labelling — it is already the sanctioned place for
+    app-level DDL the generator cannot emit, and already re-runnable. Nine constraints, each
+    with the defect it closes written above it. `npm run verify` now races the origin against
+    itself and asserts each one behaviourally rather than trusting the SQL was applied.
+
+84. UPSTREAM ASK 2026-09-01 — **a `<tool>` row has no authority model, so the MCP face is a
+    second door onto anything a route gates.** `createMcpFace` checks exactly one thing
+    (`mcp-face.ts:196`: `row.auth === "required" && ctx.identity === null` → 401) and has no
+    notion of `reach`, no role check, and no way for a row to say who may call it. Every
+    `<tool>` in this template is an admin verb, and two of them read the unpublished
+    catalogue — so closing the HTTP routes with `reach=""` left the identical reads open over
+    `/mcp` to any signed-in viewer's token. The declaration says the same word (`auth`) on
+    both rows and means materially different things on each, which is the worst version of
+    this: an author who gated the route reasonably believes they gated the tool.
+    ASK: `<tool>` accepts `reach` (and, when §6.2 lands, `auth="role:…"`), and the face
+    applies the host's own gateway — service role or internal key, 404 otherwise.
+    BRIDGED IN PLACE: `scripts/serve.mjs` owns the local mount and holds the whole face to
+    that test, with the reasoning at the call site. It is the whole face rather than per-tool
+    because every tool here is an admin verb; a project with viewer-facing tools would need
+    the upstream fix rather than this.
+
+85. HANDOVER 2026-09-01 — **the coin economy must stop promising expiry, and three lines of
+    copy are the remaining half.** App Store Review Guideline 3.1.1, verbatim: *"Any credits
+    or in-game currencies purchased via in-app purchase may not expire."* 3.2.1(iii) permits
+    an expiry window only for the rental of specific approved content; a coin balance is not
+    that. The backend was writing a 7-day `expires` onto every granted-bonus ledger row and
+    nothing ever read it — which the production audit filed as a bug to FIX by implementing a
+    sweeper. Implementing it would have been the App Store rejection: `bonus` is not a
+    purely-granted bucket, because a coin pack's "+5% free" is credited there by
+    `settleOrder`, so an expiry sweeper on that balance expires money someone paid for.
+    DONE (server): the `expires` field is removed from the `ledger` entity and from all three
+    grant writes — the capability is gone, not merely unexercised. `npm run verify` asserts
+    both (no `expires` column in the emitted ledger schema, no `expires:` in engage.dsx). The
+    two balances stay separate, because spend order is a real product rule (granted first, so
+    purchased coins outlive free ones) and because keeping the purchased balance nameable is
+    what makes 3.1.1 provable.
+    STILL TO DO (Components/, not owned by that pass): `Components/Profile.dsx:255`, `:281`
+    and `:303` still tell the customer bonus coins expire in 7 days. Every one of them must
+    drop the expiry clause — "Bonus coins are spent first" is the true and sufficient
+    sentence. Until they change, the app promises something the server no longer does, which
+    is the same defect pointing the other way.
+    ALSO CHECKED, and clean: the spin is FREE (one a day, no coin cost anywhere in
+    `spinWheel`), so it is not a loot box under 3.1.1 — a randomised reward is only one when
+    it can be obtained with PURCHASED currency, and declaring one forces an 18+ rating in
+    Brazil and 16+ in Australia. The rule is now written at the action and the odds are
+    published in `rewardsState` (`spinOdds`, `spinCost: 0`) so a future "buy a spin" cannot
+    land without someone reading it.
+
+86. GAP NAMED 2026-09-01 — **restore exists for the Stripe lane and does not exist for the
+    native store lanes.** App Store 3.1.1 also requires a restore mechanism for restorable
+    purchases. Most of it is true here by construction: VIP and every unlock are server-side,
+    account-scoped rows, so a reinstall that signs back in already has its entitlements. The
+    real hole was an order the provider CHARGED and this backend never granted — the app
+    closed between the payment sheet's success and the settle call, and that money was taken
+    and invisible with no way for the viewer to ask for it. `restoreOrders` (`POST
+    /store/restore`) closes it: walk the caller's own unsettled orders, ask Stripe, grant the
+    ones that succeeded, exactly-once through the same ledger lock as `settleOrder`.
+    WHAT REMAINS, named rather than implied: a purchase made through StoreKit, Play Billing
+    or RevenueCat never creates one of those rows, so there is nothing here to restore. That
+    receiver is a hosted-lane integration this template does not have — the standalone server
+    compiler has no `<webhook>` tag (§6.6), so the verification callback cannot be declared.
+    An adopter shipping to either store must wire it before submitting, and there is now a
+    `<route>` and an action shaped exactly like the thing it will plug into.

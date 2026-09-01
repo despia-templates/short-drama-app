@@ -3,7 +3,7 @@ dist/
 deploy/
 server/generated/
 .env.local
-public/dev-session.json
+.dev-session.json
 .agents/
 .claude/skills/
 public/posters/*.png

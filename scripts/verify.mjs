@@ -14,21 +14,89 @@
 //      six shows fell through to one shared fallback.
 //  Every one of them is a shape assertion away from being caught. That is this file.
 //
+//  A FOURTH CLASS ARRIVED, and it is the reason half this file now exists. The production
+//  audit found that every static gate was green while the app served every paid episode's
+//  media URL to anonymous callers, wrote a service_role token into the deploy artefact, and
+//  granted twice on every concurrent daily reward. None of those is bad source: each is a
+//  RUNTIME agreement — between a payload and a paywall, between a build and a deploy,
+//  between two requests that arrive together — and a source-reading gate cannot see any of
+//  them. So this file now signs in, spends money, races itself, and reads the artefact.
+//
+//  THE SHAPE OF AN ASSERTION HERE. It fails on the DEFECT, not on the fix. "The payload has
+//  no `video` for a locked episode" would pass if `episodes` were empty; "no locked episode
+//  anywhere in the catalogue carries a source, and there is at least one locked episode"
+//  cannot. Every negative below is paired with the positive that proves it was reachable.
+//
 //  It boots its own server on a spare port so it never depends on one already running, and
 //  kills it on the way out — including on a failed assertion.
 //
 import { spawn } from "node:child_process";
-import { resolve, dirname } from "node:path";
+import { createHmac, randomUUID } from "node:crypto";
+import { existsSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { request as httpRequest } from "node:http";
+import { tmpdir } from "node:os";
+import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import pg from "pg";
+import { scanDistForSecrets } from "./dist-guard.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = Number(process.env.VERIFY_PORT ?? 8799);
 const base = `http://localhost:${PORT}`;
 
+// the same .env.local fold serve.mjs and dev-session.mjs do — this file now needs the JWT
+// secret (to mint its own callers) and the database URL (to arrange fixtures), and the
+// documented run order does not source the file into the shell
+if (existsSync(resolve(root, ".env.local"))) {
+  for (const line of readFileSync(resolve(root, ".env.local"), "utf8").split("\n")) {
+    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2];
+  }
+}
+
 let failures = 0;
 const ok = (name) => console.log(`  ok   ${name}`);
 const bad = (name, detail) => { failures += 1; console.error(`  FAIL ${name}\n       ${detail}`); };
 const check = (name, cond, detail) => (cond ? ok(name) : bad(name, detail));
+
+// ── THE CALLERS ────────────────────────────────────────────────────────────────────────
+// A FRESH SUBJECT PER RUN, minted here rather than read from .dev-session.json. Three
+// reasons, all learned the hard way while writing these tests against the shared demo
+// viewer: the daily guards (check-in, spin) are once-per-DAY, so a second run the same day
+// would assert against a viewer who had already used them; the unlock tests need an account
+// whose entitlements are known; and a gate must never mutate the identity a developer is
+// looking at in the browser. `sub` MUST be a UUID — owner RLS stores `owner_id uuid` and
+// postgres.ts refuses a non-UUID subject outright (docs/auth.md).
+const secret = process.env.DSX_JWT_SECRET;
+if (!secret) { console.error("[verify] DSX_JWT_SECRET is required (it is what the origin verifies against)"); process.exit(1); }
+const b64u = (buf) => Buffer.from(buf).toString("base64url");
+const mint = (claims) => {
+  const header = b64u(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const now = Math.floor(Date.now() / 1000);
+  const payload = b64u(JSON.stringify({ iat: now, exp: now + 900, ...claims }));
+  return `${header}.${payload}.${createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url")}`;
+};
+const viewerSub = randomUUID();
+const viewer = { authorization: `Bearer ${mint({ sub: viewerSub })}`, "content-type": "application/json" };
+const operator = { authorization: `Bearer ${mint({ sub: randomUUID(), role: "service_role" })}`, "content-type": "application/json" };
+const anon = { "content-type": "application/json" };
+
+const GET = (path, headers) => fetch(`${base}${path}`, { headers });
+const POST = (path, headers, body) =>
+  fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body ?? {}) });
+const asJson = async (res) => ({ status: res.status, body: await res.json().catch(() => null) });
+
+// ── FIXTURES ───────────────────────────────────────────────────────────────────────────
+// A few assertions need a wallet with money in it, and there is deliberately no route that
+// credits one from the client — that is the whole trust shape (`server/wallet.dsx`: the
+// client never grants). So the fixture goes in through the database, service-scope, exactly
+// as an operator grant or a settled payment would. This is a TEST HARNESS reaching past the
+// API on purpose; nothing in the app can do it.
+const pool = process.env.DSX_DATABASE_URL ? new pg.Pool({ connectionString: process.env.DSX_DATABASE_URL }) : null;
+const sql = async (text, params) => {
+  if (pool === null) return null;
+  return pool.query(text, params);
+};
 
 /** the page's visible text, script tags stripped — what a reader actually gets */
 const bodyText = (html) => {
@@ -190,6 +258,386 @@ for (const [name, req] of [
 
 check("an unauthenticated unlock is refused", unlock.status >= 400,
   `POST /wallet/unlock answered ${unlock.status} with no token — entitlement must never be the client's word`);
+
+// ── 4 · THE PAYWALL PROTECTS THE MEDIA, NOT THE PLAYER ─────────────────────────────────
+// The audit's G1, and the worst thing that has shipped in this template. `showDetail`
+// returned `video_url` for EVERY episode on an `auth="none"` route — so
+// `curl /catalog/show/:id | jq '.episodes[].video'` handed a stranger all 24 paid episodes
+// of a series, and `GET /media/bride.mp4` answered 200 with 991,017 bytes and no token.
+// Both halves are asserted, and each negative is paired with the positive that proves the
+// path was reachable at all — "no locked episode carries a source" passes trivially against
+// an empty catalogue.
+console.log("\nentitlement");
+{
+  let lockedSeen = 0;
+  let lockedWithSource = 0;
+  let freeWithSource = 0;
+  let sampleShow = null;
+  let sampleFree = null;
+  let sampleLocked = null;
+  for (const c of home.latest) {
+    const d = await fetch(`${base}/catalog/show/${c.id}`).then((r) => r.json());
+    for (const e of d.episodes) {
+      if (e.free) { if (e.video != null) freeWithSource += 1; if (sampleFree === null) { sampleFree = e; sampleShow = d; } }
+      else { lockedSeen += 1; if (e.video != null) lockedWithSource += 1; if (sampleLocked === null) sampleLocked = e; }
+    }
+  }
+  check("the catalogue actually has locked episodes to protect", lockedSeen > 0,
+    "every episode in the seed is free — this section would pass vacuously; check scripts/catalogue.mjs freeUntil");
+  check("NO locked episode carries a playable source in the public payload", lockedWithSource === 0,
+    `${lockedWithSource} of ${lockedSeen} locked episodes still ship a URL from an auth="none" route — the paywall is markup, not enforcement`);
+  check("free episodes DO carry a source (the funnel still works)", freeWithSource > 0,
+    "no free episode has a source either — the gate closed on the hook as well as the paywall");
+  check("the discover reel carries a source only for free first episodes", await (async () => {
+    const feed = await fetch(`${base}/catalog/discover`).then((r) => r.json());
+    return Array.isArray(feed.cards) && feed.cards.length > 0 && feed.cards.some((c) => c.video != null);
+  })(), "the discover reel has no playable card at all — its first episodes are free by construction");
+
+  // THE MEDIA PLANE. Five requests, one per way in.
+  const mediaPath = sampleFree.video.split("?")[0];
+  const bare = await fetch(`${base}${mediaPath}`);
+  check("bare media is refused", bare.status === 403,
+    `GET ${mediaPath} answered ${bare.status} with no episode named — public/media was an open bucket`);
+  const asFree = await fetch(`${base}${sampleFree.video}`, { headers: { range: "bytes=0-1023" } });
+  check("a free episode's own source plays", asFree.status === 206 || asFree.status === 200,
+    `the free source answered ${asFree.status} — the gate closed on the funnel's hook`);
+  check("ranged playback survives the gate", asFree.status === 206,
+    "the gate answered 200 to a Range request — AVFoundation treats that as unseekable and native playback breaks (site-node.ts)");
+  const asLocked = await fetch(`${base}${mediaPath}?ep=${sampleLocked.id}`);
+  check("a locked episode's media is refused without a ticket", asLocked.status === 403,
+    `answered ${asLocked.status} — knowing a paid episode's id must not be enough to play it`);
+  const wrongFile = await fetch(`${base}/media/bride.mp4?ep=${sampleFree.id}`);
+  check("a free episode's id does not unlock a DIFFERENT file", wrongFile.status === 403,
+    "one free episode id opened another file — three MP4s back 352 episodes here, so that is a master key");
+
+  // THE ENTITLED DOOR. A brand-new viewer owns nothing.
+  const playAnon = await fetch(`${base}/wallet/play/${sampleLocked.id}`);
+  check("the play endpoint refuses an anonymous caller", playAnon.status === 401,
+    `answered ${playAnon.status} — the source of a paid episode is not public`);
+  const playUnentitled = await asJson(await GET(`/wallet/play/${sampleLocked.id}`, viewer));
+  check("the play endpoint refuses a signed-in caller who has not paid", playUnentitled.status === 403,
+    `answered ${playUnentitled.status} ${JSON.stringify(playUnentitled.body)} — a token is not an entitlement`);
+  const playFree = await asJson(await GET(`/wallet/play/${sampleFree.id}`, viewer));
+  check("the play endpoint answers for a free episode", playFree.status === 200 && typeof playFree.body?.source === "string",
+    `answered ${playFree.status} ${JSON.stringify(playFree.body)}`);
+  check("the issued source carries a ticket and an expiry", await (async () => {
+    if (playFree.status !== 200) return false;
+    if (!/ticket=[0-9a-f-]{36}/.test(playFree.body.source)) return false;
+    const ttl = new Date(playFree.body.expires).getTime() - Date.now();
+    return ttl > 0 && ttl <= 10 * 60_000;              // short-lived, per the signed-URL shape it stands in for
+  })(), `source=${playFree.body?.source} expires=${playFree.body?.expires} — a grant with no expiry is a permanent shareable link`);
+  // (a forged ticket is asserted in §6, against a PAID episode — a free episode needs no
+  //  ticket at all, so forging one there proves nothing)
+
+  // THE THREE COPIES OF THE FREE RULE. `price === 0 || idx <= free_until` is spelled in
+  // server/catalog.dsx, in server/wallet.dsx and again in scripts/serve.mjs — across two
+  // languages, so nothing can share it. Two formulas that must agree and do not is exactly
+  // the class this file exists for, so the agreement is asserted rather than assumed.
+  let disagreed = 0;
+  for (const e of sampleShow.episodes) {
+    const path = `/media/${sampleShow.episodes[0].video.split("/").pop().split("?")[0]}`;
+    const r = await fetch(`${base}${path}?ep=${e.id}`, { method: "HEAD" });
+    const originSaysFree = r.status !== 403;
+    if (originSaysFree !== e.free) disagreed += 1;
+  }
+  check("the payload's free flag and the origin's free rule agree on every episode", disagreed === 0,
+    `${disagreed} episode(s) disagree — server/catalog.dsx, server/wallet.dsx and scripts/serve.mjs each spell the free window separately`);
+}
+
+// ── 5 · EMBARGOED CONTENT IS NOT ONE AUTHENTICATED REQUEST AWAY ────────────────────────
+// The audit's G2. `show` is ownership="public-read", whose SELECT policy is `using (true)`,
+// and the public reads filter `state:'live'` in APPLICATION code that the admin reads do not
+// run — so any signed-in viewer could read the unpublished catalogue through /admin/shows,
+// and the same two actions were reachable over /mcp.
+console.log("\noperator authority");
+{
+  for (const path of ["/admin/stats", "/admin/shows"]) {
+    const asViewer = await POST(path, viewer);
+    check(`${path} is invisible to a viewer`, asViewer.status === 404,
+      `answered ${asViewer.status} to a plain viewer token — drafts, artwork and free-episode windows leak`);
+  }
+  const stats = await asJson(await POST("/admin/stats", operator));
+  check("/admin/stats still answers the operator", stats.status === 200 && typeof stats.body?.shows === "number",
+    `${stats.status} ${JSON.stringify(stats.body)} — the gate closed on the operator too, which breaks Manage`);
+  const shows = await asJson(await POST("/admin/shows", operator));
+  check("/admin/shows still answers the operator", shows.status === 200 && Array.isArray(shows.body?.rows),
+    `${shows.status} ${JSON.stringify(shows.body).slice(0, 120)}`);
+  const mcpViewer = await POST("/mcp", viewer, { jsonrpc: "2.0", id: 1, method: "tools/list" });
+  check("/mcp is invisible to a viewer", mcpViewer.status === 404,
+    `answered ${mcpViewer.status} — createMcpFace checks only auth="required", so the admin tools were the same leak by another door`);
+}
+
+// ── 6 · A GUARD THAT ONLY EXISTS IN AN `if` IS NOT A GUARD ─────────────────────────────
+// The audit's S2. Every once-per-day / once-only rule was a read-then-write with a plain
+// index behind it; a declared action has no transaction seam (PLAN.md §6.38), so two
+// requests that arrive together both read "not yet" and both grant. These fire the pairs
+// CONCURRENTLY — a sequential retry passes even on the broken code.
+console.log("\nconcurrency");
+{
+  const both = await Promise.all([POST("/rewards/checkin", viewer), POST("/rewards/checkin", viewer)].map(async (p) => asJson(await p)));
+  const granted = both.filter((r) => r.status === 200);
+  check("two simultaneous check-ins grant exactly once", granted.length === 1,
+    `${granted.length} of 2 succeeded (${both.map((r) => r.status).join(", ")}) — unique (owner_id, day) on dsx_checkin is the lock; is server/policies.local.sql applied?`);
+  check("the loser is told why", both.some((r) => r.status === 409 || r.body?.reason === "conflict"),
+    `got ${JSON.stringify(both.map((r) => r.body?.reason))} — a refused grant must be a declared rejection the UI can render`);
+
+  const spins = await Promise.all([POST("/rewards/spin", viewer), POST("/rewards/spin", viewer)].map(async (p) => asJson(await p)));
+  check("two simultaneous spins grant exactly once", spins.filter((r) => r.status === 200).length === 1,
+    `${spins.filter((r) => r.status === 200).length} of 2 succeeded — unique (owner_id, day) on dsx_spin`);
+
+  const favs = await Promise.all([POST("/viewer/favorite", viewer, { show: detail.show.id }), POST("/viewer/favorite", viewer, { show: detail.show.id })].map(async (p) => asJson(await p)));
+  const rows = await sql("select count(*)::int as n from dsx_favorite where owner_id = $1 and show = $2", [viewerSub, detail.show.id]);
+  check("two simultaneous favorites leave exactly one row", rows === null || rows.rows[0].n <= 1,
+    `${rows?.rows[0].n} rows — two made the heart un-clearable (the next tap deletes one and the other keeps it filled)`);
+  void favs;
+
+  // THE MONEY RACE. A fresh viewer, funded through the database, unlocking one paid episode
+  // twice at once. Before the fix both calls debited and the viewer paid twice for one
+  // episode; the unlock row is now written BEFORE the charge, so the loser charges nothing.
+  const target = await (async () => {
+    for (const c of home.latest) {
+      const d = await fetch(`${base}/catalog/show/${c.id}`).then((r) => r.json());
+      const p = d.episodes.find((e) => !e.free && e.price > 0);
+      if (p) return p;
+    }
+    return null;
+  })();
+  if (target === null || pool === null) {
+    check("the double-unlock race charges once", false,
+      pool === null ? "DSX_DATABASE_URL is unset — this assertion needs to fund a wallet" : "no priced episode in the catalogue");
+  } else {
+    const fund = target.price * 3;
+    await sql(
+      "insert into dsx_wallet (owner_id, coins, bonus) values ($1, $2, 0) on conflict (owner_id) do update set coins = $2, bonus = 0",
+      [viewerSub, fund],
+    );
+    const before = (await asJson(await GET("/wallet/state", viewer))).body;
+    const two = await Promise.all([
+      POST("/wallet/unlock", viewer, { episode: target.id }),
+      POST("/wallet/unlock", viewer, { episode: target.id }),
+    ].map(async (p) => asJson(await p)));
+    const after = (await asJson(await GET("/wallet/state", viewer))).body;
+    const spent = (before.coins + before.bonus) - (after.coins + after.bonus);
+    check("two simultaneous unlocks charge for ONE episode", spent === target.price,
+      `spent ${spent} for a ${target.price}-coin episode (${two.map((r) => r.status).join(", ")}) — the grant must be written before the debit so the loser is refused by unique (owner_id, episode)`);
+    const held = await sql("select count(*)::int as n from dsx_unlock where owner_id = $1 and episode = $2", [viewerSub, target.id]);
+    check("and leave exactly one unlock row", held.rows[0].n === 1,
+      `${held.rows[0].n} unlock rows for one episode`);
+    const paidPlay = await asJson(await GET(`/wallet/play/${target.id}`, viewer));
+    check("the episode is now playable and the earlier refusal was real",
+      paidPlay.status === 200 && typeof paidPlay.body?.source === "string",
+      "a paid-for episode did not become playable — the gate is refusing an entitled viewer");
+    // THE TICKET IS A CAPABILITY, tested where it matters: on a PAID episode, where it is
+    // the only thing between the request and the bytes. (On a free episode there is no
+    // ticket to forge — the origin serves it on the episode id alone.)
+    check("the entitled source plays", (await fetch(`${base}${paidPlay.body.source}`, { headers: { range: "bytes=0-1023" } })).status === 206,
+      "an entitled viewer's own ticketed source did not stream");
+    const forged = await fetch(`${base}${paidPlay.body.source.replace(/ticket=[0-9a-f-]+/, `ticket=${randomUUID()}`)}`);
+    check("a forged ticket on a PAID episode is refused", forged.status === 403,
+      `answered ${forged.status} — the ticket must be a capability, not a formality`);
+    const stripped = await fetch(`${base}${paidPlay.body.source.replace(/&ticket=[0-9a-f-]+/, "")}`);
+    check("dropping the ticket from a paid source is refused", stripped.status === 403,
+      `answered ${stripped.status} — knowing the URL must not be enough`);
+    // AN UNAFFORDABLE UNLOCK IS REFUSED, and refused BEFORE the grant — otherwise the
+    // lock-first ordering would hand out episodes nobody paid for.
+    await sql("update dsx_wallet set coins = 0, bonus = 0 where owner_id = $1", [viewerSub]);
+    const broke = await (async () => {
+      for (const c of home.latest) {
+        const d = await fetch(`${base}/catalog/show/${c.id}`).then((r) => r.json());
+        const p = d.episodes.find((e) => !e.free && e.price > 0 && e.id !== target.id);
+        if (p) return p;
+      }
+      return null;
+    })();
+    const refused = await asJson(await POST("/wallet/unlock", viewer, { episode: broke.id }));
+    check("an unlock with no balance is refused and grants nothing", refused.status >= 400, `answered ${refused.status}`);
+    const ghost = await sql("select count(*)::int as n from dsx_unlock where owner_id = $1 and episode = $2", [viewerSub, broke.id]);
+    check("...and writes no unlock row", ghost.rows[0].n === 0,
+      "a broke viewer got a free grant — the affordability check must run before the lock insert");
+  }
+}
+
+// ── 7 · A RETRIED PAYMENT MUST NOT CHARGE TWICE ────────────────────────────────────────
+// The audit's G5. `settleOrder` checked `status === 'paid'` and then wrote — two concurrent
+// settles both passed and both granted — and nothing verified that the amount Stripe
+// confirmed matched the amount the order recorded.
+// A full round trip needs STRIPE_KEY, which a clone does not have, so what is asserted here
+// is the MECHANISM the settle depends on: the ledger row is the exactly-once lock, and the
+// already-paid path grants nothing.
+console.log("\npayment idempotency");
+if (pool === null) {
+  bad("the payment grant lock", "DSX_DATABASE_URL is unset");
+} else {
+  const orderId = randomUUID();
+  await sql(
+    "insert into dsx_order (id, owner_id, sku, kind, amount_cents, coins, bonus, days, status, intent) " +
+    "values ($1,$2,'coins_500','coins',499,500,25,0,'paid',$3)",
+    [orderId, viewerSub, `pi_verify_${orderId.slice(0, 8)}`],
+  );
+  const first = await asJson(await POST("/store/settle", viewer, { order: orderId }));
+  const second = await asJson(await POST("/store/settle", viewer, { order: orderId }));
+  check("settling an already-paid order grants nothing, twice over",
+    first.status === 200 && first.body?.already === true && second.body?.already === true,
+    `${JSON.stringify(first)} / ${JSON.stringify(second)}`);
+
+  // THE LOCK ITSELF. The grant writes `(kind, source='pack', ref=<order id>)` before it
+  // touches the wallet; a second grant for the same order must be refused by the database,
+  // because that is the only thing standing between a replayed settle and doubled coins.
+  const ref = randomUUID();
+  await sql("insert into dsx_ledger (owner_id, kind, amount, source, ref) values ($1,'coin',500,'pack',$2)", [viewerSub, ref]);
+  let refused = false;
+  try {
+    await sql("insert into dsx_ledger (owner_id, kind, amount, source, ref) values ($1,'coin',500,'pack',$2)", [viewerSub, ref]);
+  } catch { refused = true; }
+  check("a duplicate payment grant is refused by the database", refused,
+    "a second (owner, kind, source=pack, ref=order) ledger row was accepted — dsx_ledger_grant_once in server/policies.local.sql is missing, so a replayed settle doubles the coins");
+  // ...and the constraint is PARTIAL, so it must not catch the sources that legitimately repeat
+  let unlockRepeats = true;
+  try {
+    await sql("insert into dsx_ledger (owner_id, kind, amount, source, ref) values ($1,'coin',-60,'unlock',$2)", [viewerSub, ref]);
+    await sql("insert into dsx_ledger (owner_id, kind, amount, source, ref) values ($1,'coin',-60,'unlock',$2)", [viewerSub, ref]);
+  } catch { unlockRepeats = false; }
+  check("the grant lock does not catch ordinary spend rows", unlockRepeats,
+    "an 'unlock' ledger row collided — the unique index must be partial (where source in ('pack','vip'))");
+  const bonusToo = await sql(
+    "insert into dsx_ledger (owner_id, kind, amount, source, ref) values ($1,'bonus',25,'pack',$2) returning id", [viewerSub, ref],
+  ).then(() => true).catch(() => false);
+  check("a pack's coin row and its bonus row can coexist", bonusToo,
+    "kind must be part of the unique key — a coin pack legitimately writes two rows for one order");
+}
+
+// ── 8 · NEITHER BALANCE EXPIRES (App Store 3.1.1) ──────────────────────────────────────
+// "Any credits or in-game currencies purchased via in-app purchase may not expire." The
+// backend used to stamp a 7-day expiry on every granted-bonus ledger row, and `bonus` is
+// NOT a purely-granted bucket — a coin pack's "+5% free" lands there — so an expiry sweeper
+// on it would have expired purchased value. The capability is gone, and this asserts it is
+// gone rather than merely unused: the column must not exist in the emitted schema, and no
+// grant may write one.
+console.log("\ncurrency does not expire");
+{
+  const migration = readFileSync(resolve(root, "server/generated/migration.sql"), "utf8");
+  check("the ledger schema has no expiry column", !/dsx_ledger[\s\S]*?expires/.test(migration.slice(migration.indexOf("create table if not exists dsx_ledger"), migration.indexOf("create table if not exists dsx_notice"))),
+    "dsx_ledger still emits an `expires` column — a balance that CAN expire is one refactor from expiring a purchased one");
+  const grants = readFileSync(resolve(root, "server/engage.dsx"), "utf8");
+  check("no rewards grant writes an expiry", !/expires\s*:/.test(grants),
+    "a grant in server/engage.dsx still writes `expires:` — see the compliance note at the top of server/wallet.dsx");
+  // AND THE PAYLOAD, not just the schema. `migration.sql` is additive and never drops a
+  // column, so an already-deployed database still HAS dsx_ledger.expires with old values in
+  // it — and the ledger screen renders "· expires in 7 days" for any row that carries the
+  // key. A dropped field is only gone once the payload stops naming it.
+  const led = await asJson(await GET("/wallet/ledger", viewer));
+  check("the ledger payload carries no expiry field", led.status === 200
+    && (led.body?.rows ?? []).every((r) => r.expires === undefined),
+    `${JSON.stringify((led.body?.rows ?? [])[0] ?? null)} — a legacy column is reaching the screen as a live promise`);
+  if (pool !== null) {
+    const rows = await sql("select count(*)::int as n from information_schema.columns where table_name = 'dsx_ledger' and column_name = 'expires'");
+    if (rows.rows[0].n > 0) {
+      console.log("  note  dsx_ledger.expires still exists in THIS database (the migration is additive and never drops); nothing reads or writes it");
+    }
+  }
+}
+
+// ── 9 · THE DECLARED CEILINGS ARE REAL ─────────────────────────────────────────────────
+// The audit's G4: `rate=` is supported grammar and was unused on all 32 routes, so one
+// authenticated caller could create 25,000 Stripe PaymentIntents and take payments down for
+// every customer. A declared limit is only a limit if the store behind it counts durably —
+// installPostgresPool fills RateLimitSeam.store, and this proves the wiring end to end.
+console.log("\nrate ceilings");
+{
+  const grinder = { authorization: `Bearer ${mint({ sub: randomUUID() })}`, "content-type": "application/json" };
+  let sawRefusal = false;
+  let attempts = 0;
+  for (let i = 0; i < 14 && !sawRefusal; i += 1) {
+    attempts += 1;
+    const r = await POST("/rewards/checkin", grinder);
+    if (r.status === 429) sawRefusal = true;
+  }
+  check("a declared rate ceiling actually refuses", sawRefusal,
+    `${attempts} calls to /rewards/checkin (rate="10/h") and never a 429 — the declared limit is not being counted; check that installPostgresPool ran and dsx_rate_counter exists`);
+  const headed = await POST("/rewards/checkin", grinder);
+  check("the refusal carries the retry advisory", headed.headers.get("retry-after") !== null || headed.headers.get("x-ratelimit-reset") !== null,
+    "a 429 with no Retry-After/X-RateLimit-Reset gives a client nothing to back off against");
+  check("the ceiling is PER CALLER, not global", await (async () => {
+    const other = { authorization: `Bearer ${mint({ sub: randomUUID() })}`, "content-type": "application/json" };
+    return (await POST("/rewards/checkin", other)).status !== 429;
+  })(), "a second identity was refused too — the bucket must key on the verified `sub`, or one abuser locks everybody out");
+  check("anonymous public reads are bucketed by ADDRESS, not shared globally", await (async () => {
+    // clientAddress is supplied by scripts/serve.mjs; without it every anonymous caller
+    // shares ONE bucket per route and a limit on the storefront is a self-inflicted outage.
+    for (let i = 0; i < 8; i += 1) { if ((await fetch(`${base}/catalog/home`)).status === 429) return false; }
+    return true;
+  })(), "eight ordinary storefront reads hit the ceiling — clientAddress is not wired, so every anonymous caller shares one bucket");
+}
+
+// ── 10 · THE DEPLOY ARTEFACT CARRIES NO CREDENTIAL ─────────────────────────────────────
+// The audit's A2. `dist/` is what `despia deploy cloudflare` uploads, and the session
+// minter wrote a `role: service_role` JWT into it. `.gitignore` covered the path, which is
+// exactly what made it look handled. Measured while fixing it: `despia build` also COPIES
+// `public/` into `dist/`, so moving the file to `public/` — the audit's own suggestion —
+// would have changed nothing.
+console.log("\ndeploy artefact");
+{
+  const dist = resolve(root, process.env.DSX_SITE_DIR ?? "dist");
+  const findings = scanDistForSecrets(dist);
+  check("no privileged token in the build output", findings.length === 0,
+    findings.map((f) => `${f.file}: ${f.what}`).join(" · ") + " — run `node scripts/dist-guard.mjs` for the fix");
+  check("no dev-session file in the build output", !existsSync(join(dist, "dev-session.json")),
+    "dist/dev-session.json exists — the operator token ships with the site; the origin serves it at runtime instead");
+  // THE GUARD ITSELF IS PROVEN, not just its silence. A scanner that never fires is
+  // indistinguishable from a scanner that cannot.
+  const planted = mkdtempSync(join(tmpdir(), "dsx-guard-"));
+  try {
+    writeFileSync(join(planted, "session.json"), JSON.stringify({ token: mint({ sub: randomUUID(), role: "service_role" }) }));
+    const caught = scanDistForSecrets(planted);
+    check("the guard catches a planted service_role token", caught.length > 0,
+      "scripts/dist-guard.mjs scanned a file containing an operator JWT and found nothing");
+  } finally {
+    rmSync(planted, { recursive: true, force: true });
+  }
+}
+
+// ── 11 · THE LOCAL SESSION IS SERVED, NOT SHIPPED ──────────────────────────────────────
+console.log("\nlocal session seam");
+{
+  const local = await fetch(`${base}/dev-session.json`);
+  check("the origin serves the dev session to a loopback caller", local.status === 200 || local.status === 404,
+    `answered ${local.status}`);
+  if (local.status === 404) {
+    console.log("  note  no .dev-session.json on disk — run `npm run session`; the endpoint itself is asserted below");
+  } else {
+    const body = await local.json();
+    check("the served session carries the viewer the app needs", typeof body?.viewer?.token === "string",
+      JSON.stringify(body).slice(0, 120));
+  }
+  // `Host` is a FORBIDDEN HEADER NAME for fetch() — the runtime silently drops it and the
+  // request goes out as localhost, so the assertion would pass against a wide-open origin.
+  // node:http lets a client set it, which is exactly the request this gate must simulate.
+  const asHost = (hostHeader) => new Promise((done) => {
+    const req = httpRequest(
+      { host: "127.0.0.1", port: PORT, path: "/dev-session.json", method: "GET", headers: { host: hostHeader } },
+      (res) => { res.resume(); done(res.statusCode); },
+    );
+    req.on("error", () => done(0));
+    req.end();
+  });
+  check("a public host cannot fetch the dev session", await asHost("shortdrama.example.com") === 404,
+    "a public Host header was served the local session — the network IS the credential here (there is no token yet), so anything outside loopback/RFC1918 must get the prober's 404");
+  check("...and a LAN device still can", [200, 404].includes(await asHost("192.168.1.42:8799")),
+    "an RFC1918 host was refused — that breaks testing a phone against this origin, which is the reason the check is a network test and not a loopback test");
+}
+
+if (pool !== null) {
+  // leave nothing behind: this run's throwaway identity, and nothing else
+  await sql("delete from dsx_ledger where owner_id = $1", [viewerSub]);
+  await sql("delete from dsx_unlock where owner_id = $1", [viewerSub]);
+  await sql("delete from dsx_playticket where owner_id = $1", [viewerSub]);
+  await sql("delete from dsx_favorite where owner_id = $1", [viewerSub]);
+  await sql("delete from dsx_checkin where owner_id = $1", [viewerSub]);
+  await sql("delete from dsx_spin where owner_id = $1", [viewerSub]);
+  await sql("delete from dsx_order where owner_id = $1", [viewerSub]);
+  await sql("delete from dsx_wallet where owner_id = $1", [viewerSub]);
+  await pool.end();
+}
 
 console.log(`\n[verify] ${failures === 0 ? "all checks passed" : `${failures} check(s) FAILED`}`);
 stop();

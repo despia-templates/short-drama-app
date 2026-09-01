@@ -30,6 +30,16 @@
     <api as="session" url="/dev-session.json" ssr="false"/>
     <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
     <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <!-- THE ENTITLED SOURCE. /catalog/show/:id no longer ships a paid episode's video_url to
+         anyone who asks — it returns `video: null` and `locked: true`, because the paywall
+         used to be enforced in this markup only and the API handed every paid MP4 to a bare
+         curl. So a paid episode's source now comes from a per-viewer, auth="required"
+         endpoint that re-runs the same free/VIP/unlock check server-side and mints a
+         short-lived playback ticket. Keyed to the ACTIVE episode: one ticket at a time, not
+         one per mounted pager page. Free episodes never come through here — they keep their
+         public source, which is the funnel's hook and is public by design. -->
+    <api as="play" url="/wallet/play/{{ dsx.variable.needsTicket }}" ssr="false"
+         needs="session" headers="dsx.variable.authHeaders" skip="dsx.variable.needsTicket == ''"/>
     <api as="thread" url="/social/comments/{{ dsx.variable.epId }}" ssr="false" auto="false"/>
     <api as="unlockCall" url="/wallet/unlock" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
     <api as="progressCall" url="/viewer/progress" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
@@ -272,6 +282,19 @@
       if (thread.data == null) { return 0 }
       return thread.data.count
     </variable>
+    <!-- '' when the active episode carries its own public source (free) or when there is no
+         episode yet — the api block is skipped on that value, so a free binge never asks the
+         server for a ticket it does not need. -->
+    <variable as="needsTicket" computed="true">
+      const ep = dsx.variable.episode
+      if (ep == null || ep.video != null) { return '' }
+      return ep.id
+    </variable>
+    <variable as="playSrc" computed="true">
+      if (play.data == null) { return '' }
+      if (play.data.episode != dsx.variable.needsTicket) { return '' }
+      return play.data.source
+    </variable>
     <variable as="stageArt" computed="true">
       const d = dsx.variable.detailView
       if (d != null && d.show.hero_tall != null) { return d.show.hero_tall }
@@ -349,6 +372,15 @@
     <!-- the whole style is ONE formula (a {{ }} hole spanning a ';' inside a compound
          style is shredded by the pre-interpolation split — PLAN.md §6.17): locked pages
          frost their art, unlocked pages show it plain until the clip covers it -->
+    <!-- A row's playable source. Public when the episode carries one (free), the ticketed
+         source when it does not AND this row is the one playing, and empty otherwise — an
+         off-screen paid page must never hold a source, which is what keeps one ticket alive
+         at a time instead of one per mounted page. -->
+    <formula as="rowSource" v="item.video" i="item.idx">
+      if (v != null) { return v }
+      if (i != Number(dsx.variable.cur)) { return '' }
+      return dsx.variable.playSrc
+    </formula>
     <formula as="stageArtFx" locked="gridLocked">
       const frost = locked ? '; filter: blur(16px) brightness(0.4)' : ''
       return 'width: 100%; height: ' + dsx.variable.clipH + 'px; object-fit: cover' + frost
@@ -697,7 +729,8 @@
                      height="{{ dsx.variable.clipH }}" style="{{ stageArtFx }}"/>
               <!-- a locked page never mounts a source: entitlement is the server's word -->
               <video visible-if="gridLocked == false"
-                     src="{{ item.video }}" active="{{ item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false }}"
+                     src="{{ rowSource }}"
+                     active="{{ item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false }}"
                      muted="{{ dsx.variable.wMuted }}" paused="dsx.variable.paused"
                      bind="dsx.variable.pos" time="dsx.variable.time" duration="dsx.variable.duration"
                      buffering="dsx.variable.buffering"

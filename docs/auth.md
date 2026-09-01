@@ -33,7 +33,26 @@ Supabase both do, in their default modes) needs one of:
 
 ## What to replace, concretely
 
-`public/dev-session.json` is the only artifact the client knows about (the script writes the same JSON to `dist/dev-session.json` so a built site serves it too). Its shape:
+`GET /dev-session.json` is the only thing the client knows about. It is **served at runtime
+by the dev origin**, never built and never deployed: `scripts/dev-session.mjs` writes
+`.dev-session.json` at the repo root (gitignored) and `scripts/serve.mjs` answers that one
+path from it.
+
+> **This used to be a shipped file, and it shipped the operator's token.** The minter wrote
+> `public/dev-session.json` *and* `dist/dev-session.json`. `dist/` is what
+> `despia deploy cloudflare` uploads — and `despia build` copies `public/` into `dist/`, so
+> moving it to `public/` alone would have changed nothing. Every deployment published a
+> full-write `role: service_role` JWT at a guessable URL for twelve hours. The warning below
+> ("do not ship a static operator token anywhere a viewer can fetch it") was already in this
+> file; prose is not a gate. `scripts/dist-guard.mjs` is: it runs as npm's `postbuild`, fails
+> the build on any privileged token in the output, and `npm run verify` asserts it again.
+
+The runtime endpoint is gated by the **network**, because the caller has no token yet and
+there is nothing else to gate on: loopback, `*.local`, or an RFC1918 address, and never
+under `NODE_ENV=production`. Anything else gets a 404 — the same prober's answer host.ts
+gives an internal route. A phone on the dev LAN can still reach it, which is the point.
+
+Its shape:
 
 ```json
 { "viewer":   { "sub": "<uuid>", "token": "<jwt>" },
@@ -71,6 +90,24 @@ Production replaces the FETCH of that file with your provider's session:
   and, locally, the `/internal/admin/*` twins in `scripts/serve.mjs` (the documented
   side-door pending upstream role-scoped route authority — PLAN.md §6.2). Anything else
   answering a non-operator is a 404 indistinguishable from an absent route.
+
+  **`auth="required"` is NOT what makes that true — `reach=""` is.** Every `/admin/*` row
+  now carries it, and the difference is not academic: `show`, `episode` and `notice` are
+  `ownership="public-read"`, whose SELECT policy is literally `using (true)`, and the public
+  catalogue filters `state:'live'` in *application code* the admin reads do not run. So with
+  `auth="required"` alone, any signed-in viewer could read the unpublished catalogue through
+  `/admin/shows`. `reach=""` moves the decision to the host's gateway, which admits only a
+  service-role identity or `DSX_INTERNAL_KEY` and answers everyone else 404.
+
+  Note the two planes are different and only one of them reads the `role` claim. The gateway
+  does. Postgres does not: `runAs` sets `set local role authenticated` for **every**
+  user-scope query regardless of the token, so a declared action never executes as
+  `service_role` — which is why the admin *writes* fail closed even for the operator, and why
+  the local twins reach `serviceRepo()` directly. That is PLAN.md §6.7.
+
+  `<tool>` rows have neither gate: `createMcpFace` checks `auth` and a non-null identity and
+  nothing else, so `/mcp` was the same leak by another door. `scripts/serve.mjs` holds the
+  whole face to the gateway's test until upstream lands (PLAN.md §6.84).
 
 `DSX_INTERNAL_KEY` is the host's *internal* caller key (server-to-server jobs); it is
 optional locally and distinct from the operator role — a job holding the key can call

@@ -392,10 +392,22 @@
       return { unlocked: true, spent: price }
     </action>
 
+    <!-- SHAPED, NOT RAW — and the reason is a live compliance leak, not tidiness.
+         This used to return the row object straight off the wire. The `expires` FIELD is
+         gone from the entity, but `migration.sql` is additive by construction and never
+         drops a column, so an already-deployed database still HAS `dsx_ledger.expires` with
+         values in it from before this pass — and pg happily returns it. The screen renders
+         "· expires in 7 days" whenever that key is non-null, so a database with history
+         would keep making a promise the server no longer keeps (App Store 3.1.1). Naming
+         the fields the payload carries is what makes a dropped field actually gone. -->
     <action as="ledgerRows">
       const rows = await dsx.module.data.ledger.list({ limit: 100 })
       const sorted = (rows.ok ? rows.data : []).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-      return { rows: sorted.slice(0, 50) }
+      return {
+        rows: sorted.slice(0, 50).map(r => ({
+          id: r.id, kind: r.kind, amount: r.amount, source: r.source, ref: r.ref, created_at: r.created_at
+        }))
+      }
     </action>
   </head>
 

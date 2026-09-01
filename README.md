@@ -124,11 +124,21 @@ PLAN.md §6.39.)
 ### The two local identities (the auth seam)
 
 `scripts/dev-session.mjs` is the **auth-provider seam**: it mints a viewer (no role) and
-an operator (`role: service_role`) into `public/dev-session.json`, which the screens fetch
-as their session. A real deployment replaces that file's role with an identity provider —
-the server only ever **verifies**. The exact token contract, and what swapping in
-Clerk/Supabase/your IdP actually requires, is written down in
-[docs/auth.md](docs/auth.md).
+an operator (`role: service_role`) into **`.dev-session.json` at the repo root** (gitignored),
+and the dev origin serves it at `/dev-session.json` — but only to a loopback, `.local` or
+RFC1918 host, and never under `NODE_ENV=production`. The screens fetch that URL as their
+session. A real deployment replaces that endpoint with an identity provider — the server
+only ever **verifies**. The exact token contract, and what swapping in Clerk/Supabase/your
+IdP actually requires, is written down in [docs/auth.md](docs/auth.md).
+
+**Why the file is not in `public/`, which is where you would put it.** It used to be — and
+`scripts/dev-session.mjs` also wrote a copy into `dist/`. `dist/` is what `npm run deploy`
+uploads, and `despia build` *copies `public/` into `dist/`*, so **both** paths published a
+full-write `service_role` JWT at a guessable URL on every deployment. `.gitignore` covered
+them, which is exactly what made it look handled. `npm run build` now fails if any
+privileged token appears in the output (`scripts/dist-guard.mjs`, wired as `postbuild`), and
+`npm run verify` asserts it again — a rule that is only written down is a rule that ships
+broken once.
 
 ### Deploying
 

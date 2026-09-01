@@ -14,8 +14,15 @@
 //  deployment. Nothing in the pipeline objected; docs/auth.md warned about it in prose and
 //  prose is not a gate.
 //
-//  Now it writes ONE file, `public/dev-session.json`, which is a SOURCE directory and never
-//  shipped. The local app still gets its session because the dev origin serves that file at
+//  AND `public/` IS NOT SAFE EITHER — measured, not assumed. The first version of this fix
+//  wrote only `public/dev-session.json` and the build guard failed anyway: `despia build`
+//  COPIES `public/` into `dist/`, so the "source directory" was a publishing directory all
+//  along. That is why the file now lives at the repo ROOT as `.dev-session.json`, outside
+//  every tree the build walks. (The audit reported this as "stop writing dist/"; stopping
+//  there would have left the token shipping exactly as before, which is the whole argument
+//  for gating a rule instead of documenting it.)
+//
+//  The local app still gets its session because the dev origin serves that file at
 //  `/dev-session.json` at runtime, behind a private-network host check and dev-only
 //  (scripts/serve.mjs — the same host-gating precedent as the `/internal/admin/*` twins,
 //  PLAN.md §6.7). `scripts/seed.mjs` reads the same file directly off disk.
@@ -26,7 +33,7 @@
 //  scrolls past and the token still ships.
 //
 import { createHmac } from "node:crypto";
-import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { writeFileSync, existsSync, readFileSync, rmSync } from "node:fs";
 
 // the same .env.local fold serve.mjs does — the README's step order relies on it
 // (measured: the documented sequence exited 1 here, because only serve loaded the file)
@@ -55,14 +62,17 @@ const session = {
   operator: { sub: "22222222-2222-4222-8222-222222222222", token: mint({ sub: "22222222-2222-4222-8222-222222222222", role: "service_role" }) },
 };
 
-// public/ ONLY. Never dist/ — see the header. If a previous run of the old script left one
-// behind, remove it here rather than waiting for the build guard to fail: a stale artefact
-// from before the fix is exactly the case a person will not think to check.
-if (!existsSync("public")) mkdirSync("public", { recursive: true });
-writeFileSync("public/dev-session.json", JSON.stringify(session, null, 2));
-if (existsSync("dist/dev-session.json")) {
-  rmSync("dist/dev-session.json");
-  console.warn("[dev-session] removed a stale dist/dev-session.json left by an older run — that file was the deploy artefact");
+// THE REPO ROOT, dot-prefixed, gitignored — outside `public/` (which the build copies) and
+// outside `dist/` (which the deploy uploads). Both of the old locations are removed on
+// sight rather than left for the build guard to find: a stale artefact from before this fix
+// is exactly the case nobody thinks to check.
+export const SESSION_FILE = ".dev-session.json";
+writeFileSync(SESSION_FILE, JSON.stringify(session, null, 2));
+for (const stale of ["public/dev-session.json", "dist/dev-session.json"]) {
+  if (existsSync(stale)) {
+    rmSync(stale);
+    console.warn(`[dev-session] removed ${stale} — an older run put the operator token on a path the build publishes`);
+  }
 }
-console.log("[dev-session] minted viewer + operator (12h) → public/dev-session.json");
-console.log("[dev-session] the origin serves it at /dev-session.json for LOOPBACK AND PRIVATE-NETWORK hosts only; it is never built into dist/");
+console.log(`[dev-session] minted viewer + operator (12h) → ${SESSION_FILE}`);
+console.log("[dev-session] the origin serves it at /dev-session.json for LOOPBACK AND PRIVATE-NETWORK hosts only; it never enters public/ or dist/");

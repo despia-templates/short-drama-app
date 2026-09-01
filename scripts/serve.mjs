@@ -169,6 +169,23 @@ const host = createHost({
   handlers: { ...handlers, opsx: opsHandlers },
   spend: spendBudgets,
   internalKey: env("DSX_INTERNAL_KEY"),
+  // WITHOUT THIS, EVERY DECLARED `rate=` ON A PUBLIC ROUTE IS A GLOBAL LIMIT.
+  // host.ts buckets an identified caller by their verified `sub`, and everyone else by
+  // `clientAddress(req)` — and when that is not supplied it buckets them by the EMPTY
+  // STRING, so all anonymous callers share one counter per route. The storefront reads are
+  // `auth="none"`, so declaring a ceiling on them before filling this seam would have
+  // turned a defence into a self-inflicted outage: one crawler would 429 every reader.
+  // x-forwarded-for first (a real deployment sits behind a proxy and the socket address is
+  // then the proxy's), leftmost hop, falling back to the peer address `toWebRequest` stamps
+  // onto the request. It is stamped on the REQUEST rather than held in a module variable on
+  // purpose: a Web Request carries no peer address, and a shared `let` would be read after
+  // an await by whichever request happened to be in flight. Locally every caller is ::1,
+  // which is correct — one machine is one caller.
+  clientAddress: (req) => {
+    const fwd = req.headers.get("x-forwarded-for");
+    if (typeof fwd === "string" && fwd !== "") return fwd.split(",")[0].trim();
+    return req.headers.get(PEER_HEADER) ?? null;
+  },
 });
 const resolveIdentity = createIdentityResolver(env);
 
@@ -231,6 +248,9 @@ const refreshSiteIfRebuilt = () => {
   console.log("[serve] dist/ was rebuilt — SSR registry reloaded (stale sheet ids avoided)");
 };
 
+/** The peer address, carried on the request so `clientAddress` can bucket rate limits. */
+const PEER_HEADER = "x-dsx-peer-address";
+
 function toWebRequest(req, body) {
   const url = `http://${req.headers.host ?? "localhost"}${req.url ?? "/"}`;
   const headers = new Headers();
@@ -238,6 +258,8 @@ function toWebRequest(req, body) {
     if (typeof v === "string") headers.set(k, v);
     else if (Array.isArray(v)) for (const one of v) headers.append(k, one);
   }
+  // Stamped LAST so a client cannot supply its own and choose which rate bucket to spend.
+  headers.set(PEER_HEADER, req.socket?.remoteAddress ?? "");
   const init = { method: req.method ?? "GET", headers };
   if (init.method !== "GET" && init.method !== "HEAD" && body.length > 0) init.body = body;
   return new Request(url, init);
@@ -250,6 +272,157 @@ async function writeWebResponse(webRes, res) {
   const buf = Buffer.from(await webRes.arrayBuffer());
   res.end(buf);
 }
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+//  THE MEDIA PLANE — what a CDN would do, done here, badly enough to be honest about it.
+//
+//  THE DEFECT THIS CLOSES. `public/media/*` was served flat by the static handler, so
+//  `curl http://localhost:8787/media/bride.mp4` returned 991,017 bytes with no token, no
+//  referrer check and no entitlement of any kind. Combined with `showDetail` returning
+//  every paid episode's `video_url` on an `auth="none"` route, the coin economy was
+//  decorative: the paywall protected the PLAYER and the media was an open bucket behind it.
+//  server/catalog.dsx closed the payload half. This is the other half — without it, closing
+//  the payload just means the URLs have to be guessed instead of read, and there are three
+//  of them.
+//
+//  THE RULE. Every media request must name the EPISODE it is claiming (`?ep=<uuid>`), and
+//  that episode's own `video_url` must be this path. Then:
+//     · the episode is FREE (price 0, or index inside the show's free window) → serve. A
+//       free episode is the funnel's hook; it is public on purpose, to anyone, signed in or
+//       not, exactly like the poster art.
+//     · otherwise → a `&ticket=<uuid>` naming an UNEXPIRED playticket row for that same
+//       episode. The ticket is minted by `GET /wallet/play/:episode` (server/wallet.dsx),
+//       which re-runs free/VIP/unlock server-side. No ticket, wrong episode, expired: 403.
+//  The `ep` is not decoration and not redundant with the ticket: one file backs many
+//  episodes here (three MP4s stand in for 352), so without it a single free episode's id
+//  would open every file in the bucket.
+//
+//  WHAT A PRODUCTION DEPLOYMENT DOES INSTEAD, precisely. It never routes bytes through the
+//  origin at all. `playSource` returns a SIGNED CDN URL and the edge verifies it with no
+//  round trip and no database:
+//     · CloudFront  — `?Expires=…&Signature=…&Key-Pair-Id=…`, verified at the POP;
+//     · Cloudflare Stream / R2 — a signed URL token, or Access with a service token;
+//     · Mux / Bitmovin — a signed playback JWT scoped to one playback id and TTL.
+//  All three are the same shape as this: a capability with an expiry, checked before the
+//  first byte. The difference is only WHERE it is checked. The reason this template checks
+//  it at the origin rather than signing is named in server/wallet.dsx and filed as PLAN.md
+//  §6.82: a declared `<server>` action's module table is `data` · `queue` · `secret` ·
+//  declared packages, with no crypto seam, so a signature cannot be computed in the
+//  declared lane. A row id from `gen_random_uuid()` is the same 122 bits of unguessability;
+//  it just costs a lookup.
+//
+//  The lookups are memoised because a `<video>` opens a media file with several RANGE
+//  requests and re-deriving entitlement per range would be absurd. Episode facts for 60s
+//  (an operator republishing takes effect within a minute); a ticket until its own expiry,
+//  which is the only correct TTL for it.
+const EP_TTL_MS = 60_000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const epFacts = new Map();      // episode id → { at, free, path }
+const ticketFacts = new Map();  // ticket id  → { episode, expiresMs }
+
+/** The pathname an episode's stored `video_url` points at, query and origin removed. */
+const mediaPathOf = (videoUrl) => {
+  if (typeof videoUrl !== "string" || videoUrl === "") return null;
+  try { return new URL(videoUrl, "http://x").pathname; } catch { return null; }
+};
+
+async function episodeFacts(id) {
+  const hit = epFacts.get(id);
+  if (hit !== undefined && Date.now() - hit.at < EP_TTL_MS) return hit;
+  const ep = await svc.get("episode", id);
+  if (ep === null || ep.state !== "live") {
+    const miss = { at: Date.now(), free: false, path: null };
+    epFacts.set(id, miss);
+    return miss;
+  }
+  const show = await svc.get("show", ep.show);
+  // The SAME free rule server/catalog.dsx and server/wallet.dsx spell, third and last copy.
+  // It is duplicated across the language boundary, not shared, so `npm run verify` asserts
+  // the three agree rather than trusting that they do (the twin-divergence class that cost
+  // two dropped columns once — see this file's stats handler and verify.mjs's header).
+  const free = ep.price === 0 || (show !== null && ep.idx <= show.free_until);
+  const facts = { at: Date.now(), free, path: mediaPathOf(ep.video_url) };
+  epFacts.set(id, facts);
+  return facts;
+}
+
+async function ticketOk(id, episode) {
+  const hit = ticketFacts.get(id);
+  // A cached ticket is trusted only while it is still valid. `playSource` ROLLS a ticket's
+  // expiry forward rather than minting a new row (that is what keeps the table bounded), so
+  // a memo that outlived its own window would report the refreshed ticket as expired and
+  // stall playback mid-episode. Past the window, re-read.
+  if (hit !== undefined && hit.expiresMs > Date.now()) return hit.episode === episode;
+  const row = await svc.get("playticket", id);
+  if (row === null) return false;
+  const expiresMs = row.expires === null || row.expires === undefined ? 0 : new Date(row.expires).getTime();
+  ticketFacts.set(id, { episode: row.episode, expiresMs });
+  return row.episode === episode && expiresMs > Date.now();
+}
+
+/** null ⇒ serve it; a Response ⇒ refuse, with the reason a developer needs. */
+async function refuseMedia(path, url) {
+  const ep = url.searchParams.get("ep") ?? "";
+  const ticket = url.searchParams.get("ticket") ?? "";
+  const no = (message) => new Response(JSON.stringify({ reason: "forbidden", message }), {
+    status: 403,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
+  if (!UUID_RE.test(ep)) {
+    return no(
+      "this media is entitlement-gated: a player asks GET /wallet/play/:episode for a source URL. " +
+      "If you are trying to play a HOUSE AD CREATIVE, that is not episode media — serve it from /promo/ " +
+      "(scripts/serve.mjs PROMO_ALIAS; Components/parts/AdGate.dsx's `creative` attribute still points at /media/).",
+    );
+  }
+  const facts = await episodeFacts(ep);
+  // The episode must actually be the one this file belongs to — otherwise one free
+  // episode's id would be a master key to the whole bucket.
+  if (facts.path !== path) return no("that episode does not play this file");
+  if (facts.free) return null;
+  if (!UUID_RE.test(ticket)) return no("this episode is locked — unlock it, then ask GET /wallet/play/:episode");
+  if (!(await ticketOk(ticket, ep))) return no("that playback ticket is expired or not yours — ask GET /wallet/play/:episode again");
+  return null;
+}
+
+// THE HOUSE AD CREATIVE IS NOT EPISODE CONTENT, and now that /media is gated it cannot
+// live there. `/promo/*` is the public creative lane, and `/promo/house-ad.mp4` is an
+// ALIAS onto one of the demo's episode stand-ins — zero new bytes in a repo that already
+// carries 3 MB of them (the audit's M11), and a real destination for the one-line change
+// `Components/parts/AdGate.dsx` needs (its creative is `/media/heiress.mp4` today, which
+// is the audit's M10: a drama clip wearing an "AD" tag). Aliasing by REWRITING the request
+// keeps the static handler's Range support, which a readFileSync would throw away.
+const PROMO_ALIAS = { "/promo/house-ad.mp4": "/media/heiress.mp4" };
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+//  THE LOCAL SESSION, SERVED AT RUNTIME — never built, never deployed.
+//
+//  `scripts/dev-session.mjs` used to write the operator's service_role JWT into `public/`
+//  AND `dist/`. `despia build` copies the first into the second and `despia deploy
+//  cloudflare` uploads it, so a full-write token shipped at a guessable URL on every
+//  deployment. The file now lives at the repo root (`.dev-session.json`), outside every
+//  tree the build walks, and this handler is how the local app still finds it.
+//
+//  THE GATE IS THE PRECEDENT ALREADY IN THIS FILE. `/internal/admin/*` is host-gated
+//  because §6.7 leaves no declared way to hold service authority; this is the same shape
+//  for the same reason. It cannot use the host's own gateway — the whole point of the
+//  endpoint is that the caller has no token yet — so the credential is the NETWORK:
+//  loopback, `.local`, or an RFC1918 address. A device on the dev LAN can reach it (which
+//  is how you test a phone against this origin); anything with a public hostname cannot.
+//  Plus a hard refusal under NODE_ENV=production, because this origin is not what should be
+//  answering there at all.
+const SESSION_FILE = resolve(process.cwd(), ".dev-session.json");
+const privateHost = (hostHeader) => {
+  const name = String(hostHeader ?? "").replace(/:\d+$/, "").replace(/^\[|\]$/g, "").toLowerCase();
+  if (name === "localhost" || name === "127.0.0.1" || name === "::1" || name === "0.0.0.0") return true;
+  if (name.endsWith(".local") || name.endsWith(".localhost")) return true;
+  if (/^10\.\d+\.\d+\.\d+$/.test(name)) return true;
+  if (/^192\.168\.\d+\.\d+$/.test(name)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(name)) return true;
+  if (/^127\.\d+\.\d+\.\d+$/.test(name)) return true;
+  if (name.startsWith("fe80:") || name.startsWith("fd") || name.startsWith("fc")) return true;
+  return false;
+};
 
 const server = createServer((req, res) => {
   // DSX_DEV_LOG_REQUESTS=1 — one line per request, for tracing what a DEVICE actually
@@ -267,8 +440,46 @@ const server = createServer((req, res) => {
       }
       chunks.push(chunk);
     }
-    const webReq = toWebRequest(req, Buffer.concat(chunks));
-    const path = new URL(webReq.url).pathname;
+    let webReq = toWebRequest(req, Buffer.concat(chunks));
+    const reqUrl = new URL(webReq.url);
+    let path = reqUrl.pathname;
+
+    // THE LOCAL SESSION — before everything, because the site handler would 404 it and the
+    // API host would answer `unknown_route`, and neither says what is actually wrong.
+    if (path === "/dev-session.json") {
+      const allowed = process.env.NODE_ENV !== "production" && privateHost(req.headers.host);
+      if (!allowed) {
+        // 404, not 403: a public host must not learn that this endpoint exists here, the
+        // same posture host.ts takes for a reach:[] route.
+        res.writeHead(404, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        res.end(JSON.stringify({ reason: "unknown_route", message: "no route matches GET /dev-session.json" }));
+        return;
+      }
+      let body;
+      try {
+        body = readFileSync(SESSION_FILE, "utf8");
+      } catch {
+        res.writeHead(404, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        res.end(JSON.stringify({ reason: "not_found", message: "no local session — run `npm run session`" }));
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(body);
+      return;
+    }
+
+    // THE HOUSE CREATIVE ALIAS — rewrite before anything else looks at the path, so the
+    // static handler serves it with its Range support intact.
+    if (PROMO_ALIAS[path] !== undefined) {
+      reqUrl.pathname = PROMO_ALIAS[path];
+      path = reqUrl.pathname;
+      webReq = new Request(reqUrl.toString(), { method: webReq.method, headers: webReq.headers });
+    } else if (path.startsWith("/media/")) {
+      // THE ENTITLEMENT GATE, in front of the bytes. Delegates to the static handler on a
+      // pass so ranged playback keeps working; answers 403 with a usable message on a fail.
+      const refused = await refuseMedia(path, reqUrl);
+      if (refused !== null) { await writeWebResponse(refused, res); return; }
+    }
     // THE LOCAL LANE HAS NO SERVICE WORKER (PLAN.md §6.13a). `despia build` emits a
     // precaching SW; against a rebuilt origin it replays a stale bundle whose style
     // tokens no longer match the freshly rendered markup, and correct DSX then looks
@@ -312,7 +523,30 @@ const server = createServer((req, res) => {
       if (served !== null) { await writeWebResponse(served, res); return; }
     }
     const identity = await resolveIdentity(webReq);
-    if (mcp !== null) {
+    // Scoped to the MCP path itself: `mcp()` answers null for anything it does not own, so
+    // a gate that ran before the call would 404 every API route in the app.
+    if (mcp !== null && (path === "/mcp" || path.startsWith("/mcp/"))) {
+      // ══ THE MCP FACE IS OPERATOR-ONLY, AND THE FRAMEWORK CANNOT SAY THAT YET ══════════
+      // Every `<tool>` row in this project is an admin verb (server/admin.dsx), and two of
+      // them — adminStats and adminListShows — read the UNPUBLISHED catalogue: `show` is
+      // ownership="public-read", whose SELECT policy is `using (true)`, and the public
+      // reads filter `state:'live'` in application code that these actions do not run.
+      // The declared HTTP routes now close that with `reach=""` (the host's gateway: service
+      // role or the internal key, 404 to everyone else). createMcpFace has no equivalent —
+      // it checks `auth === "required"` and a NON-NULL identity and nothing else, with no
+      // notion of `reach` and no role check — so the same two reads stayed reachable over
+      // /mcp with any signed-in viewer's token. Same leak, different door.
+      // The mount is this file's to own, so the gate goes here: the whole face is held to
+      // the same test host.ts applies to an internal route. Upstream ask: a `<tool>` row
+      // needs the route gateway's authority model — PLAN.md §6.84. This block dies with it.
+      const role = identity !== null && typeof identity === "object" ? identity.role : null;
+      const key = env("DSX_INTERNAL_KEY");
+      const byKey = typeof key === "string" && key !== "" && webReq.headers.get("x-dsx-internal-key") === key;
+      if (role !== "service_role" && !byKey) {
+        res.writeHead(404, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        res.end(JSON.stringify({ reason: "unknown_route", message: `no route matches ${webReq.method} ${path}` }));
+        return;
+      }
       const served = await mcp(webReq, { identity, env });
       if (served !== null) { await writeWebResponse(served, res); return; }
     }
