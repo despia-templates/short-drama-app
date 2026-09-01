@@ -304,11 +304,17 @@
          THE TAG IS THE FILENAME, lowercase, and the kernel ladder tries the full tag
          then the bare language — so `de` also catches de-AT and de-CH, while `pt-br`
          and `zh-hant` are reachable from this picker and NOT from a device whose system
-         language is pt-PT or zh-TW (also §6.98). Arabic is deliberately absent: it needs
-         the RTL layout plane, and a mirrored-layout locale shipped onto an LTR-only build
-         is a broken app, not a partial one. */
+         language is pt-PT or zh-TW (also §6.98).
+
+         `ar` IS THE ROW THAT TURNS THE APP AROUND, and it needs no code here. Picking it
+         writes `global.locale = 'ar'` exactly like every other row; the framework's
+         direction plane reads that SAME state through DSXStrings.direction() and sets
+         `dir="rtl"` on the document element (web), `.environment(\layoutDirection)` (iOS)
+         and `LocalLayoutDirection` (Compose). Text and layout cannot disagree because
+         they resolve one locale. What that plane does NOT mirror is named in the README
+         and in PLAN.md §6.101-§6.103. */
       function localeTags() {
-        return ['en', 'es', 'pt-br', 'ja', 'de', 'fr', 'ko', 'zh-hant', 'id', 'th', 'it', 'tr', 'vi']
+        return ['en', 'es', 'pt-br', 'ja', 'de', 'fr', 'ko', 'zh-hant', 'id', 'th', 'it', 'tr', 'vi', 'ar']
       }
 
       function languageRows() {
@@ -326,7 +332,8 @@
           { id: 'th', label: 'ไทย' },
           { id: 'it', label: 'Italiano' },
           { id: 'tr', label: 'Türkçe' },
-          { id: 'vi', label: 'Tiếng Việt' }
+          { id: 'vi', label: 'Tiếng Việt' },
+          { id: 'ar', label: 'العربية' }
         ]
       }
 
@@ -351,6 +358,7 @@
         if (l == 'it') { return 'Lingua del dispositivo' }
         if (l == 'tr') { return 'Cihaz dili' }
         if (l == 'vi') { return 'Ngôn ngữ thiết bị' }
+        if (l == 'ar') { return 'لغة الجهاز' }
         return 'Device language'
       }
     </functions>
