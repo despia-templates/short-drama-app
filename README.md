@@ -2,73 +2,66 @@
 
 [![gates](https://github.com/despia-templates/short-drama-app/actions/workflows/ci.yml/badge.svg)](https://github.com/despia-templates/short-drama-app/actions/workflows/ci.yml)
 
-A ReelShort/DramaWave-class vertical drama app in pure DSX: SSR web storefront (Popular /
-New / Ranking), TikTok-style For-You feed, a full-screen vertical player with a
-server-enforced coin paywall, **real Stripe web checkout**, VIP, a rewards loop (check-in
-streaks, capped rewarded ads, the wheel, tasks), comments, a notifications inbox, and a
-**Manage View** operator surface — all over one declared backend (`server/*.dsx`: entities
-with RLS, actions, routes, MCP tools). The founding program docs live in [PLAN.md](PLAN.md)
-and `docs/`.
+A ReelShort/DramaBox-class vertical drama app in pure DSX — 28 components and 7 server
+documents, one source, native on iOS, Android, web and desktop. SSR web storefront
+(Popular / New / Ranking), a TikTok-style For-You feed, a full-screen vertical player with
+a **server-enforced coin paywall**, VIP, a rewards loop (check-in streaks, capped rewarded
+ads, the wheel, tasks), comments with the four UGC-safety controls the stores require, a
+notifications inbox, account deletion, and a **Manage View** operator surface — all over one
+declared backend (`server/*.dsx`: 17 entities with Postgres RLS, 45 routes, 6 MCP tools and
+one inbound webhook). The founding program docs live in [PLAN.md](PLAN.md) and `docs/`.
 
-**Status: working local slice, production-shaped.** Every flow runs against real Postgres
-with real RLS and verified JWTs — nothing is mocked, and money is never granted on the
-client's word. The native lanes (iOS/Android apps, AdMob, RevenueCat, OneSignal) are
-specified in `docs/` and land with the framework's native template lane.
+**Status: a complete local slice, production-shaped, with every gap named where you meet
+it.** Every flow runs against real Postgres with real RLS and verified JWTs — nothing is
+mocked, and money is never granted on the client's word. Where a lane cannot be delivered
+today the app says so *in the UI* rather than in a comment; §"What is honestly degraded"
+lists every one of them, and each is filed in PLAN.md §6.
 
-## Requirements
+---
 
-- **Node ≥ 22.18** and a local **PostgreSQL** you can `createdb` against.
-- **The framework checkout, built, as a sibling of this repo** — the DSX packages are not
-  on npm yet, so `package.json` resolves them by the layout below (`npm install` runs a
-  preflight that names anything missing):
+## What actually ships
 
-  ```
-  <parent>/
-    despia_dsx/despia-framework/    # git clone, then: cd OpenSource/Web && npm install && npm run build
-    short-drama-app/                # this repo
-  ```
+| Surface | What is real |
+|---|---|
+| **Home** `/` | Hero pager, phone tab row Popular / New / Ranking, Continue Watching with a resume bar, New Release, a TOP rail with ranked numerals, per-genre shelves, footer |
+| **Discover** `/discover` | Vertical pager over EP 1 of every live show, muted autoplay, caption bound to the resting index |
+| **Browse** `/browse`, `/browse/:genre` | Genre and tag chips derived from the catalogue with counts, filtered grid |
+| **Show** `/show/:id` | Key art, plot, tags, a 6-column episode grid, My List, and a **bulk series unlock at a server-priced quote** |
+| **Watch** `/watch/:show/:idx` | Vertical pager over episodes, drag scrubber off one measured box, speed, subtitles and PiP as real `<video>` booleans, a right rail, the range-pill drawer, a **persistent two-column panel ≥1120**, the paywall sheet, comments with report / block / delete-own, and a safety-filter level |
+| **Store** `/store` | Server price table, Stripe PaymentIntent, an **idempotent settle with a recovery card**, restore |
+| **VIP** `/vip` | Masthead, benefits (every claim true), free-with-VIP rail, plans sheet, an honest restore row |
+| **Rewards** `/rewards` | 7-day check-in curve, the wheel (server-declared prize table), tasks, rewarded ads capped per day and **VIP-gated**, with the App Store 2.5.18 report-this-ad seam |
+| **My List** `/list` | History rail with resume, favourites grid |
+| **Profile** `/profile` | Identity, wallet, transaction ledger, **a working language switcher**, Manage, Account |
+| **Account** `/account`, `/auth/:pane` | Sign in / sign up / sign out, restore purchases, terms, privacy, support, **and account deletion that provably empties the account** |
+| **Notices** `/notices` | Operator broadcast inbox |
+| **Manage** `/admin` | Catalogue table, create show, add episode, notice composer, the MCP tool list, **a moderation queue**, and a funnel readout |
+| **Search** | An overlay on every screen, not a route |
 
-  A checkout elsewhere: symlink it (`ln -s /path/to/checkout/.. ../despia_dsx`) — the
-  preflight's `DSX_FRAMEWORK_DIR` override covers the scripts, but npm's `file:` deps
-  read only the relative path.
+**The trust shape, which is why this template exists.** The client never decides anything
+about money or entitlement. Every grant, spend and unlock is a ledger row plus a wallet fold
+on the server; a paid episode's media URL is not in any anonymous payload and the player
+fetches a short-lived play ticket per episode; entitlement is granted only after Stripe
+confirms, through a settle the UI can always safely retry; a viewer probing the operator
+routes gets a 404 indistinguishable from an absent route. The Manage bridge and the MCP tool
+rows are projections of the same declared actions — UI, AI and HTTP share one contract.
 
-  **No access to the private framework repo?** There is a public Apache-2.0 drop
-  (`despia-native/despia`), and you should know two things before reaching for it.
-
-  It is the *contents* of `OpenSource/` with no wrapping directory, so it is cloned **into**
-  `OpenSource` — one level higher lands every package where nothing looks for it, and the
-  preflight catches that case by name:
-
-  ```sh
-  git clone https://github.com/despia-native/despia despia_dsx/despia-framework/OpenSource
-  ```
-
-  And **the drop currently lags the `dev` branch this template is written against.** Measured
-  2026-08-30: its attribute census lists 30 universal attributes where `dev` lists 38, missing
-  `href` among them — so a clean build from the drop fails with 38 lint errors on markup that
-  is correct and shipping. It also carries no `ClosedSource/`, so Stripe and SocialShare cannot
-  be configured (`node scripts/ci-open-drop.mjs` removes them and prints what that degrades).
-  Filed upstream as [issue 275](https://github.com/despia-native/despia-framework/issues/275)
-  with the ask that the drop track `dev` — or better, that the packages publish to npm and
-  retire the sibling-checkout convention entirely. Until then the framework `dev` branch is
-  the only lane that builds this template, which is why CI uses it.
-- **Stripe web checkout** builds against the `Core/Payments/Stripe` module from the full
-  Despia distribution (`ClosedSource/`). Without it, drop `"stripe"` from `modules` and
-  the `packages` entry in `dsx.config.json`: everything else builds, and the Store shows
-  the server's honest refusal instead of a payment sheet.
+---
 
 ## Run it locally
 
+**Requirements:** Node ≥ 22.18, a local PostgreSQL you can `createdb` against, and the
+framework checkout built as a sibling of this repo (see "The framework checkout" below).
+
 ```sh
-npm install                       # preflight checks the layout first and prints any fix
+npm install                       # a preflight checks the layout first and prints any fix
 createdb shortdrama_dev
-cp .env.local.example .env.local  # set DSX_DATABASE_URL and DSX_JWT_SECRET (both required);
-                                  # add STRIPE_KEY/STRIPE_PUBLISHABLE (test mode) for checkout
-npm run build                     # compiles Components/**.dsx AND server/*.dsx → dist/, server/generated/
+cp .env.local.example .env.local  # set DSX_DATABASE_URL and DSX_JWT_SECRET (both required)
+npm run build                     # compiles Components/**.dsx AND server/*.dsx
 psql -d shortdrama_dev -f server/generated/migration.sql   # re-runnable by construction
-psql -d shortdrama_dev -f server/policies.local.sql        # the app's policy addendum (PLAN.md §6.25)
+psql -d shortdrama_dev -f server/policies.local.sql        # the app's policy addendum
 npm run session                   # mints the LOCAL viewer + operator JWTs (reads .env.local)
-npm run serve                     # one origin: SSR site + API @ :8787 (stays in the foreground)
+npm run serve                     # one origin: SSR site + API @ :8787 (foreground)
 ```
 
 Then, **in a second terminal**:
@@ -77,188 +70,371 @@ Then, **in a second terminal**:
 npm run seed                      # 14 demo shows, 352 episodes, via the admin routes; idempotent
 ```
 
-Open http://localhost:8787 — Home, `/discover`, `/browse` (and `/browse/:genre`), `/vip`,
-`/store`, `/rewards`, `/list`, `/profile`, `/notices`, `/show/:id`, `/watch/:show/:idx`, and
-the operator bridge at `/admin`. Search is an OVERLAY on every screen, not a route. `npm run serve` sets `DSX_DEV_NO_SW=1` so the local origin never installs the
-precaching service worker — a stale bundle against fresh SSR is the classic "correct
-markup looks broken" trap (PLAN.md §6.13a — the item is retracted as a *layout* defect; its service-worker
-finding is the part that stands).
+Open <http://localhost:8787>. **Reset the demo** with `dropdb shortdrama_dev && createdb
+shortdrama_dev`, re-apply both SQL files and re-seed; the seed converges the database onto
+`scripts/catalogue.mjs` (idempotent by title) and `scripts/gen-art.mjs` regenerates every
+piece of key art deterministically from the same manifest.
 
-**The numbers on the storefront are demo values.** Every series carries a view count and a
-rating (home hero, detail screen, browse cards). They are seeded from `scripts/catalogue.mjs`
-and nothing increments them — there is no telemetry in this template. A real deployment
-replaces that table with its own counter; the wire shape (`show.views`, `show.rating`) is
-unchanged.
+### The gates
 
-**Typography.** `despia build` resolves the framework's bundled Inter, copies it to
-`dist/fonts/` (OFL licence travelling with the bytes) and links it from every page, so the
-served site and the static export render in the same face rather than whatever the OS
-supplies. Nothing to configure.
-
-**Reset the demo:** `dropdb shortdrama_dev && createdb shortdrama_dev`, re-apply the
-migration and the addendum, re-run `npm run seed`. The seed converges the database onto
-`scripts/catalogue.mjs` (idempotent by title), and `scripts/gen-art.mjs` regenerates all
-key art deterministically from the same manifest.
-
-**Gates** (all five must pass before a change is done — CI runs the same five):
+All five must pass before a change is done, and CI runs the same five.
 
 ```sh
 npm run lint          # despia lint --strict — zero warnings
-npm run check:styles  # every style property, and every icon, against the framework catalogs
+npm run check:styles  # every style property, every icon, and every colour against its name
 npm run review        # the design bar (a11y, tap targets, type scale, palette)
 npm run build         # compiles Components/**.dsx AND server/*.dsx
-npm run verify        # BEHAVIOURAL: boots an origin and asserts payloads, SSR content, money authority
+npm run verify        # BEHAVIOURAL: boots an origin, signs in, spends money, races itself
 ```
 
-The first three read the source; `verify` runs the thing. It boots its own server on a spare
-port, then asks the questions a human would — does every route answer, does the SSR html carry
-real content, do the payloads still have the fields the screens read, is an anonymous unlock
-refused. Three defects shipped in one week that every static gate passed, because each was a
-runtime disagreement rather than bad source; `scripts/verify.mjs` names all three at the top.
+The first three read the source; `verify` runs the thing. It boots its own origin on a spare
+port, then asks the questions a human would — does every route answer, does the SSR html
+carry real content, is an anonymous unlock refused, does a double settle grant twice, is a
+paid episode's URL in the payload, is a shipped locale complete. Several defects have shipped
+here that every static gate passed, because each was a runtime disagreement rather than bad
+source; `scripts/verify.mjs` names them at the top.
 
-A UI or backend change means **rebuild, then restart `npm run serve`** — the site registry is
-read at boot. (The dev origin now reloads it when `dist/` changes and says so, because a page
+Two smaller tools, not gates:
+
+```sh
+node scripts/theme.mjs                    # the palette: every named tone and where it is painted
+node scripts/strings.mjs                  # locale coverage per language
+node scripts/strings.mjs --write es       # refresh a locale table against the current source
+node scripts/strings.mjs --unreachable    # the strings the localisation seam cannot reach
+```
+
+**A UI or backend change means rebuild, then restart `npm run serve`** — the site registry is
+read at boot. (The dev origin reloads it when `dist/` changes and says so, because a page
 served from an older build than the bundle beside it wears the wrong styles *silently* —
-PLAN.md §6.39.)
+PLAN.md §6.39.) `npm run serve` also sets `DSX_DEV_NO_SW=1` so the local origin never installs
+the precaching service worker; a stale bundle against fresh SSR is the classic "correct markup
+looks broken" trap.
 
-### The two local identities (the auth seam)
+### The framework checkout
 
-`scripts/dev-session.mjs` is the **auth-provider seam**: it mints a viewer (no role) and
-an operator (`role: service_role`) into **`.dev-session.json` at the repo root** (gitignored),
-and the dev origin serves it at `/dev-session.json` — but only to a loopback, `.local` or
-RFC1918 host, and never under `NODE_ENV=production`. The screens fetch that URL as their
-session. A real deployment replaces that endpoint with an identity provider — the server
-only ever **verifies**. The exact token contract, and what swapping in Clerk/Supabase/your
-IdP actually requires, is written down in [docs/auth.md](docs/auth.md).
+The DSX packages are not on npm yet, so `package.json` resolves them by this layout:
 
-**Why the file is not in `public/`, which is where you would put it.** It used to be — and
-`scripts/dev-session.mjs` also wrote a copy into `dist/`. `dist/` is what `npm run deploy`
-uploads, and `despia build` *copies `public/` into `dist/`*, so **both** paths published a
-full-write `service_role` JWT at a guessable URL on every deployment. `.gitignore` covered
-them, which is exactly what made it look handled. `npm run build` now fails if any
-privileged token appears in the output (`scripts/dist-guard.mjs`, wired as `postbuild`), and
-`npm run verify` asserts it again — a rule that is only written down is a rule that ships
-broken once.
+```
+<parent>/
+  despia_dsx/despia-framework/    # git clone, then: cd OpenSource/Web && npm install && npm run build
+  short-drama-app/                # this repo
+```
 
-### Deploying
+A checkout elsewhere: symlink it (`ln -s /path/to/checkout/.. ../despia_dsx`) — the
+preflight's `DSX_FRAMEWORK_DIR` override covers the scripts, but npm's `file:` deps read only
+the relative path.
 
-`despia build` emits a complete Cloudflare Workers lane into `deploy/cloudflare/`
-(gitignored — it regenerates every build): a wrangler manifest and a worker that serves
-the site and the whole route table from one deploy. `npm run deploy` runs
-`despia deploy cloudflare`, which walks provisioning (it prints the `wrangler secret put`
-commands for the env the server needs). The hosted database is any Postgres with the
-migration applied.
+**No access to the private framework repo?** There is a public Apache-2.0 drop
+(`despia-native/despia`). Two things to know first. It is the *contents* of `OpenSource/` with
+no wrapping directory, so it is cloned **into** `OpenSource` (the preflight catches the other
+case by name):
 
-### What is honestly degraded on web, by design
+```sh
+git clone https://github.com/despia-native/despia despia_dsx/despia-framework/OpenSource
+```
 
-- **Rewarded ads** — mediation SDKs are native-lane; the web serves a real house creative
-  with a watch requirement and a server-verified grant, and the card names its lane
-  (`Components/parts/AdGate.dsx` — capability first, platform second).
-- **Native store billing** — RevenueCat rides the native lane; the web sells through
-  Stripe with server-created PaymentIntents and idempotent settlement.
-- **Push / Live Activities** — OneSignal journeys ride the hosted lane; notices queue in
-  the admin surface and land in the in-app inbox meanwhile.
-- **Demo media** — CC-licensed sample clips in `public/media/` stand in for episodes; the
-  hosted lane swaps `video_url` to Cloudflare Stream HLS (the CDN base is data, so the
-  swap is a seed change, not a code change).
+And **the drop lags the `dev` branch this template is written against** — measured 2026-08-30,
+its attribute census listed 30 universal attributes where `dev` listed 38, missing `href`, so
+a clean build failed with 38 lint errors on markup that was correct and shipping. It also
+carries no `ClosedSource/`, so Stripe and SocialShare cannot be configured
+(`node scripts/ci-open-drop.mjs` removes them and prints what that degrades). Filed as
+[issue 275](https://github.com/despia-native/despia-framework/issues/275).
 
-## The trust shape (why this template exists)
+---
 
-The client never decides anything about money or entitlement. Every grant, spend and
-unlock is a ledger row + a wallet fold on the server (`server/wallet.dsx`,
-`server/engage.dsx`, `server/store.dsx`); entitlement is granted only after Stripe
-confirms, through an idempotent settle the UI can always safely retry; the player mounts
-a source only for entitled episodes; a viewer probing the operator routes gets a 404
-indistinguishable from an absent route (the host's internal gate). The Manage bridge
-(`/admin`) and the MCP tool rows in `server/admin.dsx` are projections of the same
-declared actions — UI, AI and HTTP share one contract.
+## The auth seam
 
-## Known framework items
+`Components/parts/AuthSeam.dsx` is the identity boundary: **one file owns the session for the
+whole app**, and every screen mounts it instead of carrying its own. The contract is one
+shape:
 
-Everything discovered while building this template is filed in [PLAN.md](PLAN.md) §6 —
-per the program's no-hacks law, none of it is worked around silently in template code;
-where a bridge exists it is labeled in place and dies when the upstream lands. **45 ledger
-entries: 43 measured findings, every one filed as an upstream issue, and 2 retracted where
-they stood rather than quietly deleted.** The issue bodies live in `docs/upstream/`, one
-file per finding, each with its repro and its measurement.
+```
+provider → { viewer: { sub, token, name?, email? }, operator?: { sub, token } }
+```
 
-Ten are still open and are the ones a DSX author is most likely to hit: the api cache dies
-with the mount (§6.30), `await` in a ternary silently yields a non-ok result (§6.31), a route
-param is unreadable from a `<variable>` initializer (§6.32), there is no cross-platform
-key-value storage (§6.33), `<video>` can select neither a rendition nor a track (§6.36), a
-declared web package needs `boot: true` to be reachable at all (§6.37), there is no
-transaction seam for a multi-row spend (§6.38), atomic style ids are positional and
-unversioned (§6.39), and a hydrated `<scroll>` never gets its scroll plane, so `on:scroll`
-is inert on the page a viewer lands on (§6.40), and the public Apache-2.0 drop mirrors a
-branch behind `dev`, so the documented fallback checkout cannot build this template (§6.41).
+`sub` must be a **UUID** (owner RLS stores `owner_id uuid`) and the token an **HS256 JWS
+signed with `DSX_JWT_SECRET`**. That is the only thing the backend knows about identity: **the
+server verifies, it never issues.**
+
+Four keys in `App.json` `consts` are the swap point, and a local build may override them in
+`dsx.config.json` `consts` without touching the file that ships:
+
+| key | what it is |
+|---|---|
+| `authSessionUrl` | GET → the payload above. Called at boot when a session is expected. Defaults to the local provider. |
+| `authSignInUrl` | POST `{ email, password }` → the same payload. **Set this and the credential form becomes real**; leave it unset and the screen says so instead of accepting any password. |
+| `authSignUpUrl` | POST → the same payload. |
+| `authSignOutUrl` | POST → anything; the client drops its token either way. |
+
+Locally, `scripts/dev-session.mjs` **is** the provider: it mints a viewer (no role) and an
+operator (`role: service_role`) into `.dev-session.json` at the repo root (gitignored), and the
+dev origin serves it at `/dev-session.json` — but only to a loopback, `.local` or RFC1918 host,
+and never under `NODE_ENV=production`.
+
+**Guest browsing is the default, on purpose.** App Store 5.1.1(v): if an app has no significant
+account-based features, let people use it without a login. Home, Discover, Browse, every show
+page and every free episode work with no account at all — and so does *buying*, because a
+purchase needs a subject and an anonymous session is a subject. Sign-in is the upsell after the
+money lands, never the toll in front of it.
+
+**Why the token is not persisted.** Only the DECISION rides a cookie (`in` | `guest`); the token
+itself lives in memory and is re-fetched from the provider on every cold start. That is how a
+real IdP session works, and it keeps a bearer JWT out of a JavaScript-readable cookie.
+
+The exact token contract, and what swapping in Clerk / Supabase / your own IdP requires, is in
+[docs/auth.md](docs/auth.md).
+
+**One thing that bit hard enough to gate.** `.dev-session.json` used to live in `public/`, and
+`scripts/dev-session.mjs` also wrote a copy into `dist/`. `despia build` copies `public/` into
+`dist/`, and `dist/` is what `npm run deploy` uploads — so **both** paths published a full-write
+`service_role` JWT at a guessable URL on every deployment. `.gitignore` covered them, which is
+exactly what made it look handled. `npm run build` now fails if any privileged token appears in
+the output (`scripts/dist-guard.mjs`, wired as `postbuild`) and `npm run verify` asserts it
+again. A rule that is only written down is a rule that ships broken once.
+
+---
+
+## The payment lane
+
+**There are two, and the platform decides which — not this app's convenience.**
+
+**Web: Stripe, and it is real.** `server/store.dsx` creates the PaymentIntent server-side with
+an idempotency key, the client opens the payment sheet through `Core/Payments/Stripe`, and the
+grant happens in `settleOrder`, which is idempotent (the order row is the lock) and verifies
+the confirmed amount against the order before it credits anything. The Store's recovery card
+exists because money Stripe confirmed and the server has not yet granted must never be a dead
+end. Set `STRIPE_KEY` and `STRIPE_PUBLISHABLE` (test mode) in `.env.local`; leave them unset and
+the Store shows the server's honest refusal instead of a payment sheet.
+
+**Native: RevenueCat, and the backend is built and waiting.** App Store 3.1.1 names in-game
+currencies and premium-content unlocks as in-app-purchase products, so coins and the VIP pass
+may **not** be sold through Stripe inside an iOS or Android build; Stripe is legal on the web
+storefront only. The server half is done: `POST /store/native` verifies a transaction against
+RevenueCat's own API (a single server-to-server GET — RevenueCat has already validated the
+receipt with Apple or Google, so the app never parses one), and a `verify="bearer"` webhook at
+`/webhooks/revenuecat` receives renewal, cancellation and refund into the same single granter.
+Two secrets turn it on, both documented in `.env.local.example`: `REVENUECAT_KEY` (**never
+reaches a client — it is a full-account credential**) and `REVENUECAT_WEBHOOK_SECRET` (a shared
+value RevenueCat echoes; paste the same string into its dashboard).
+
+**What is NOT wired, and it is not a choice.** The client half needs `Core/Store`, and adding
+that module to `dsx.config.json` **aborts the build**: the package ships 20 Paywall components
+and one of them mounts `<shared.VipCard>`, which nothing in the module tree defines. Tried
+2026-09-01, recorded verbatim in `dsx.config.json`. So `has('store')` is false on every lane and
+the purchase surfaces **refuse on native and say why**, rather than falling back to a card sheet
+that would be a rejection. Re-add the package the day it compiles; nothing else changes.
+
+---
+
+## Analytics
+
+`Components/parts/Analytics.dsx` declares the funnel — ten events, at the boundaries a drama
+app actually turns on:
+
+```
+app_open · show_detail_viewed · episode_started · paywall_shown · episode_completed
+unlock_attempted · unlock_succeeded · purchase_started · purchase_completed · restore
+```
+
+`episode_started` and `paywall_shown` are the **same boundary seen twice** — a viewer arriving
+at an episode either gets the clip or gets the wall — so the ratio between them is the paywall
+conversion, and nothing else in the app measures it. `purchase_completed` fires on the
+**settle**, never the tap: money Stripe confirmed and the server granted, counted once even
+when the recovery card retries.
+
+The transport is `dsx.module.posthog.capture` — the framework's own product-analytics verb —
+chosen by capability (`has('posthog')`), never by platform, with `Core/Consent` as the gate.
+**Ids and numbers only**: a show id, an episode id, an index, a price, a sku, a lane. Never a
+subject, an email, a display name, a comment body or a search term, and `identify()` is
+deliberately never called.
+
+**Nothing can reach a sink today, and the Manage screen says so in those words.** Both
+`Core/PostHog` and `Core/Consent` ship a complete `web/index.js` and neither manifest declares a
+`web.entry`, so the CLI emits no chunk and `has()` is false on every web build — the identical
+defect `Core/SocialShare` records about itself and has since had fixed. Filed as PLAN.md §6.92,
+three lines per manifest. Until it lands every event drains to `dsx.log`, the framework
+diagnostic spine, which is a drain and not a transport: open devtools, walk the funnel, and
+watch it.
+
+---
+
+## Localisation
+
+**This template is written in English and it is fully localisable, because in DSX those are the
+same sentence.** Localisation is gettext-shaped: apps are written in English, the **English
+source string is the key**, and the kernel resolves it at the display points — a text value or
+its inner text, a button label, a field placeholder — live, static markup included. Nothing is
+annotated and nothing is rewritten.
+
+A locale is one file: `Strings.<lowercase-bcp47>.json` at the repo root, flat
+`{ "Sign in": "Iniciar sesión" }`. **File presence is the declaration** — `despia build` folds
+every one it finds into the registry. Switching is one state write, `global.locale`, and the
+Profile screen's Language row does exactly that.
+
+`Strings.es.json` ships, complete. `node scripts/strings.mjs` reports the split:
+
+| | |
+|---|---|
+| **210 viewer** | product copy — what a locale is measured against, and Spanish is at 100% |
+| **36 operator** | rendered only by the Manage surface: an internal tool, deliberately English |
+| **17 developer** | copy that cites a source path, a config key or a ledger entry. Translating "set `authSignInUrl` in App.json `consts`" makes the instruction *wrong* in the target language |
+| **248 unreachable** | the seam's real boundary, listed by `--unreachable` rather than guessed |
+
+That last row is the honest part. Three things the seam does not reach, each needing a
+different answer: **a11y labels** (the kernel localizes display points only, so a screen reader
+hears English on a Spanish device — an upstream ask), **interpolated composites** (`{{ x ? 'a'
+: 'b' }}` resolves before the lookup; the scheduled Translate module owns that tier), and
+**copy the server sends** (prices, rejection messages, notice bodies — they localize
+server-side).
+
+**A half-locale cannot ship.** `npm run verify` reads the built registry and fails if any
+shipped locale is missing one viewer string, because a language chip that returns a
+half-Spanish app is a control that promises something it does not do. Adding a language is
+adding a file and a chip.
+
+Numbers and dates are locale **formatting**, not translation: `compactCount()` and
+`shortDate()` in `Components/parts/Theme.dsx` run through `Intl` and read the same
+`global.locale`. What is still out of reach is **content** language — the dubbed audio and the
+subtitle track — because `<video>` can select neither a rendition nor a track (PLAN.md §6.36).
+The Language row says so instead of implying it covers them.
+
+---
+
+## One vocabulary, one palette
+
+`Components/parts/Theme.dsx` is the app's presentation vocabulary, declared once as an
+app-wide function library and mounted as the **first child** of every screen:
+
+- **breakpoints and layout** — `bpOf` · `isWide` · `gutterOf` · `shellOf` · `railShellOf` ·
+  `panelAt`. Phone < 768 · tablet < 1120 · desktop. This used to be a byte-identical block in
+  fifteen files, so changing the desktop gutter was a fifteen-file edit.
+- **the palette** — 38 tones named by their JOB (`brand`, `coin`, `surfaceCard`, `onGold`), so
+  a re-skin is a value change and never a rename.
+- **formatting** — `compactCount` · `shortDate` · `activeLocale`.
+
+Every colour a screen writes in **markup** calls a tone by name. Every colour inside a
+`<style as="…">` declaration is still a literal, because **a `<style>` attribute cannot carry
+an interpolation** — the compiler drops the declaration silently (measured; PLAN.md §6.91). So
+those literals are **checked mirrors** rather than second sources: `npm run check:styles` fails
+on any hex in `Components/**` that Theme.dsx does not name, and `npm run review` reads the same
+table for its brand-palette waiver. Run `node scripts/theme.mjs` to see every tone and where it
+is painted.
+
+---
+
+## What is honestly degraded, and where you meet it
+
+Every one of these is named **in the UI** at the point a user or an operator would otherwise
+assume it worked. That is Article 7 of the program law, and it is the habit this template is
+most trying to teach.
+
+| Lane | State | Where it says so |
+|---|---|---|
+| **Native in-app purchase** | The backend is built; the client module aborts the build upstream | `Components/Store.dsx` and `parts/PlansSheet.dsx` refuse and explain |
+| **Analytics sink** | The funnel is wired; no module can be loaded (§6.92) | The Funnel card on `/admin` |
+| **Rewarded ads** | Mediation SDKs are native-lane; the web serves a real house creative with a watch requirement and a server-verified grant | `parts/AdGate.dsx` names its lane |
+| **Push** | Notices queue and land in the in-app inbox; nothing is delivered to a device | The Manage composer, and Notices |
+| **Moderator remedy** | An operator can read the queue and cannot hide a comment: a declared action carries no service authority (§6.7), so the token is scoped like a viewer's — measured, `POST /social/comment/delete` answers 403 | The moderation queue card |
+| **Content language** | `<video>` can select neither a rendition nor a track (§6.36) | The Language row |
+| **Playback quality** | One rendition in this build | The player's options sheet |
+| **Demo media** | CC-licensed sample clips stand in for episodes; the hosted lane swaps `video_url` to a CDN, which is a seed change and not a code change | The Manage screen |
+| **View counts and ratings** | Seeded demo values; nothing increments them | The Manage screen |
+
+---
+
+## Deploying
+
+`despia build` emits a complete Cloudflare Workers lane into `deploy/cloudflare/` (gitignored —
+it regenerates every build): a wrangler manifest and a worker that serves the site and the whole
+route table from one deploy. `npm run deploy` runs `despia deploy cloudflare`, which walks
+provisioning and prints the `wrangler secret put` commands the server needs. The hosted database
+is any Postgres with the migration and `server/policies.local.sql` applied.
+
+**Before you deploy, set these** — all of them are seams the template deliberately leaves empty,
+because a placeholder reads as a wired integration:
+
+| Where | Key | Why |
+|---|---|---|
+| `App.json` `consts` | `authSessionUrl`, `authSignInUrl`, `authSignUpUrl`, `authSignOutUrl` | your identity provider |
+| `App.json` `consts` | `termsUrl`, `privacyUrl` | both stores require them in-app beside a paid plan |
+| `App.json` `consts` | `supportUrl` | App Store 1.2 requires published contact info for an app with comments |
+| `App.json` | `host` | the native lane has no origin of its own |
+| env | `DSX_JWT_SECRET`, `DSX_DATABASE_URL` | required |
+| env | `STRIPE_KEY`, `STRIPE_PUBLISHABLE` | the web storefront |
+| env | `REVENUECAT_KEY`, `REVENUECAT_WEBHOOK_SECRET` | the native store lane |
+
+---
 
 ## The native lane
 
 `despia export ios` and `despia export android` turn this project into a real Xcode / Android
-Studio project — kernel vendored, all 18 components bundled, nothing withheld. Both build today:
+Studio project — kernel vendored, every component bundled, nothing withheld.
 
 ```sh
 npx despia export ios --out ../shortdrama-ios
 npx despia export android --out ../shortdrama-android
 ```
 
-**The native lane renders — proven end-to-end on 2026-08-31.** An exported app was blank
-because `despia export` shipped no element library (`<vstack>`/`<text>` are Foundation
-components only Runtime.app ever bundled — the bisect and fix live on
-[issue 278](https://github.com/despia-native/despia-framework/issues/278), fixed in
-`dev@69581687`). With the fold in place: this app builds, boots, fetches over its App.json
-origin, renders its phone chrome on an iPhone 17 Pro — logo, search pill, tab row, the full
-tab bar with catalog icons — and an iPad Pro 13″ mounts the DESKTOP lane, TopNav and footer,
-from the same source. What is still dark is the content the 252 `style=""` declarations size
-(the §6.43 port): rails and posters get their boxes as the port lands, screen by screen.
-
-**These eighteen screens DO render on iOS — measured.** All of them were staged as fixtures into
-the framework's own parity corpus and run through its hosted iOS capture plane
-(`RuntimeParityTests`, the same harness the parity contract uses): every screen parsed, and the
-capture measured **830 nodes, 775 with a real non-zero box** — Home alone is 116 nodes, 112 sized,
-with the root at 390×844, the nav at 390×80 and the authored 18×3 tab dash exactly where the
-markup puts it.
-
-**What does not work is the bare exported app.** The same components mounted inside a
-`despia export` build render nothing, while the host view measures 402×874, foreground-active,
-visible — and a plain SwiftUI banner placed behind it paints. The renderer is fine and this
-template is fine; something the render path needs is registered by the framework's own host
-catalog rather than by the kernel, and an export reports `0 module(s)`. Filed with both
-measurements as [issue 278](https://github.com/despia-native/despia-framework/issues/278). Until
-it lands the native lane is "builds, boots, and renders under the framework's harness", not
-"ships".
+**The native lane renders — proven end-to-end.** All the screens were staged as fixtures into
+the framework's own parity corpus and run through its hosted iOS capture plane: every screen
+parsed, and the capture measured **830 nodes, 775 with a real non-zero box** — Home alone is 116
+nodes, 112 sized, with the root at 390×844. What is still dark in a *bare exported* app is
+tracked on [issue 278](https://github.com/despia-native/despia-framework/issues/278): the same
+components inside a `despia export` build render nothing while the host view measures 402×874,
+foreground-active and visible. Until it lands the native lane is "builds, boots, and renders
+under the framework's harness", not "ships".
 
 **`App.json` is the native half of the contract.** The web lane is same-origin by construction;
 the native lane has no origin, so `host` is what a root-relative `<api url="/x">` — and every
-`<image src="/posters/…">` — resolves against. Point it at your deployed https origin.
+`<image src="/posters/…">` — resolves against. It is deliberately **not** `localhost`: a device
+cannot reach your laptop by that name, and the export ships no assets of its own
+([issue 279](https://github.com/despia-native/despia-framework/issues/279)), so the origin serves
+the art as well as the data. To test against a local server use your machine's LAN address and
+add an ATS exception — the generated Info.plist declares none.
 
-It is deliberately **not** `localhost`: a device cannot reach your laptop by that name, and the
-export ships no assets of its own ([issue 279](https://github.com/despia-native/despia-framework/issues/279)),
-so the origin serves the art as well as the data. To test against a local server, use your
-machine's LAN address (`http://192.168.x.x:8787`) and add an ATS exception — the generated
-Info.plist declares none.
+**Tablets are already in scope.** The export builds universal with all four iPad orientations,
+and the app's own breakpoints put iPad portrait on the tablet lane and iPad Pro landscape on the
+desktop lane — the same vocabulary the web uses, no second layout.
 
-**Tablets are already in scope.** The export builds universal
-(`TARGETED_DEVICE_FAMILY = "1,2"`) with all four iPad orientations, and the app's own breakpoints
-(`phone <768 · tablet <1120 · desktop`) put iPad portrait on the tablet lane and iPad Pro
-landscape on the desktop lane — the same vocabulary the web uses, no second layout.
+---
 
-## Localisation
+## Known framework items
 
-This build ships **one locale**, and the Profile screen says so rather than offering a picker
-that cannot deliver.
+Everything discovered while building this template is filed in [PLAN.md](PLAN.md) §6 — per the
+program's no-hacks law, none of it is worked around silently: where a bridge exists it is
+labelled in place and dies when the upstream lands. **94 numbered entries, every one measured, and 34 of them
+marked RESOLVED, CORRECTED or RETRACTED in place rather than deleted.** The issue bodies live in
+`docs/upstream/`, one file per finding, each with its repro and its measurement.
 
-Two different things hide behind "language" in this category:
+The most recent four, and the ones a DSX author is most likely to hit:
 
-- **Content language** — the dubbed audio and the subtitle track. Unreachable today:
-  `<video>` can select neither a rendition nor a track (PLAN.md §6.36, issue 270), so a picker
-  would change nothing about what plays.
-- **UI language** — the app's own chrome. Reachable, and the seam is declared:
-  `dsx.global.strings.*` is the framework's white-label plane (defaults ⊕ `global.strings` ⊕
-  per-call payload, so one write re-skins every adopting module). To localise this template,
-  write that global at boot and read `{{ global.strings.x }}` at each of the ~180 literals in
-  `Components/`.
+- **§6.91** — a `<style as="…">` attribute cannot carry an interpolation; the declaration is
+  dropped silently, with no error and no lint warning. This is why a design token cannot reach
+  a named style class.
+- **§6.92** — `Core/PostHog`, `Core/Consent` and `Core/Telemetry` each ship a complete web facet
+  that no build can load, because their manifests declare no `web.entry`.
+- **§6.93** — a bracket write whose key contains a dot is stored as a nested path. Every ad
+  report in the moderation queue read a null flag count, because every creative path ends in
+  `.mp4`.
+- **§6.94** — a `<functions global="true">` body is the expression tier: `dsx.log`,
+  `dsx.module.*` and every `global.*` write are silent no-ops there, while the identical
+  statements in an `<action>` body work.
 
-What this template will not do is ship the control with one locale behind it. A dropdown that
-switches to Spanish and returns a half-Spanish app is the same defect as the priced quality
-ladder that was deleted from the player: a control that promises something it does not do.
+Older ones still open and still worth knowing: the api cache dies with the mount (§6.30),
+`await` in a ternary silently yields a non-ok result (§6.31), a route param is unreadable from a
+`<variable>` initializer (§6.32), `<video>` can select neither a rendition nor a track (§6.36),
+there is no transaction seam for a multi-row spend (§6.38), atomic style ids are positional and
+unversioned (§6.39), and a hydrated `<scroll>` never gets its scroll plane (§6.40).
+
+---
+
+## Typography and art
+
+`despia build` resolves the framework's bundled Inter, copies it to `dist/fonts/` (the OFL
+licence travelling with the bytes) and links it from every page, so the served site and the
+static export render in the same face rather than whatever the OS supplies. Nothing to
+configure.
+
+Key art is generated deterministically from `scripts/catalogue.mjs` by `scripts/gen-art.mjs`, at
+the ratio each frame displays: a 2:3 poster in a 3:4 frame under `object-fit: cover` loses a
+quarter of its height, so both are generated rather than one being stretched.
