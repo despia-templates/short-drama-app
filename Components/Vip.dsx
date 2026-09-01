@@ -325,13 +325,15 @@
             <text value="{{ dsx.variable.termLine }}" class="benefitNote" style="flex: 1; min-width: 0"/>
           </hstack>
 
-          <!-- RESTORE PURCHASES — required on a subscription sign-up screen, and now REAL.
-               This row used to call `wallet.refresh()` and admit, in its own third line,
-               that there was no sign-in anywhere so a pass bought on another account could
-               not be reached. Both halves are fixed: <RestoreRow> calls POST /store/restore
-               (the unsettled-order sweep), and a signed-out tap raises the sign-in sheet —
-               which is precisely the "sign in OR restore" pair App Store 3.1.2 asks for on
-               a subscription surface. -->
+          <!-- RESTORE PURCHASES — required on a subscription sign-up screen, and now REAL
+               on BOTH lanes. This row used to call `wallet.refresh()` and admit, in its own
+               third line, that there was no sign-in anywhere so a pass bought on another
+               account could not be reached. It now picks its lane by capability and runs the
+               sweep that lane can ask — POST /store/restore against Stripe on the web, plus
+               POST /store/restore/native against RevenueCat in a build that has the store
+               module — and it prints, per lane, what restore cannot reach and why. A
+               signed-out tap raises the sign-in, which is precisely the "sign in OR restore"
+               pair App Store 3.1.2 asks for on a subscription surface. -->
           <RestoreRow on:restored="wallet.refresh()"/>
 
           <!-- TERMS AND PRIVACY — required in-app beside a subscription (App Store 3.1.2,

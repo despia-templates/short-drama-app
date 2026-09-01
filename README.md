@@ -225,6 +225,42 @@ and one of them mounts `<shared.VipCard>`, which nothing in the module tree defi
 the purchase surfaces **refuse on native and say why**, rather than falling back to a card sheet
 that would be a rejection. Re-add the package the day it compiles; nothing else changes.
 
+**Restore: two routes, one verb, and neither asks who you are.** App Store 3.1.1 wants a restore
+mechanism, and the founder's constraint is sharper than the guideline — it has to work with **no
+login**, because most of this product's revenue comes from viewers who never make an account.
+`auth="required"` verifies a *token*; it does not ask for a human behind it, so both routes are
+reachable by an anonymous session. Neither takes an argument naming a purchase: the caller id is
+read server-side off a row the caller owns.
+
+| Lane | Route | Asks | Recovers |
+|---|---|---|---|
+| Web | `POST /store/restore` | Stripe, about orders this backend opened | a charge Stripe confirmed that never got granted |
+| Native | `POST /store/restore/native` | RevenueCat, about what this subject owns | a store purchase that was paid for and never landed |
+
+A native build runs **both**, because a viewer who bought on the web storefront and came back on
+their phone has an unsettled order on the same account. Both sweeps are bounded and resumable —
+twenty Stripe reads, five native grants against the 64-call cap — and both report `done`, so the
+row can say "tap again" instead of reporting a half-finished restore as finished.
+
+**What restore cannot do, on any lane, and why that is the answer rather than a gap.** Apple keys
+a receipt to an **Apple ID** and Google keys a purchase token to a **Google account** — never to
+a device — so the platform genuinely can recognise a returning buyer with no app login. But every
+product here is a **consumable**: StoreKit leaves consumables out of `currentEntitlements`, Play
+stops returning a purchase token once a pack is *consumed* (which it must be, or the viewer can
+never buy another), and replaying one would be wrong even where RevenueCat still remembers it —
+a consumable was **delivered**. Someone who bought 1,000 coins and spent 400 holds a balance of
+600, not a 1,000-coin receipt, so re-granting mints fresh coins on every reinstall.
+`unique (intent)` in `server/policies.local.sql` refuses that by design. **A reinstall is an
+identity problem, not a purchase problem** — the coins are safe on the subject that bought them,
+and the job is reaching that subject. `parts/RestoreRow.dsx` says this on screen, per lane, and
+`npm run verify` fails if the line leaves `/store` or `/vip`.
+
+**The one client half that is missing.** `<AuthSeam>` `publishGuest` publishes
+`{ ok: false, headers: {} }`, so this build mints **no anonymous session** and a guest carries no
+token — both routes would 401. The server is ready for the anonymous buyer; the seam is not. The
+row names which half is missing rather than firing a call that cannot succeed, and the checklist
+below carries the row.
+
 ---
 
 ## Analytics
@@ -573,6 +609,8 @@ most trying to teach.
 | Lane | State | Where it says so |
 |---|---|---|
 | **Native in-app purchase** | The backend is built; the client module aborts the build upstream | `Components/Store.dsx` and `parts/PlansSheet.dsx` refuse and explain |
+| **Restore for an anonymous buyer** | Both restore routes take a subject rather than a login and are ready for one; `<AuthSeam>` mints no anonymous session, so a guest has no token to send (§6.86) | `parts/RestoreRow.dsx` names the missing half and offers the sign-in that works today |
+| **Restoring a consumable after a reinstall** | Not possible on any lane, by platform design and by product truth — the value was delivered, and `unique (intent)` refuses a replay | `parts/RestoreRow.dsx`'s per-lane ceiling line, asserted by `verify` on `/store` and `/vip` |
 | **Analytics sink** | The funnel is wired; no module can be loaded (§6.92) | The Funnel card on `/admin` |
 | **Rewarded ads** | Mediation SDKs are native-lane; the web serves a real house creative with a watch requirement and a server-verified grant | `parts/AdGate.dsx` names its lane |
 | **Push** | Notices queue and land in the in-app inbox; nothing is delivered to a device | The Manage composer, and Notices |
@@ -609,7 +647,12 @@ because a placeholder reads as a wired integration:
 | `App.json` | `host` | the native lane has no origin of its own |
 | env | `DSX_JWT_SECRET`, `DSX_DATABASE_URL` | required |
 | env | `STRIPE_KEY`, `STRIPE_PUBLISHABLE` | the web storefront |
-| env | `REVENUECAT_KEY`, `REVENUECAT_WEBHOOK_SECRET` | the native store lane |
+| env | `REVENUECAT_KEY` | the native store lane **and its restore** — with it unset, `POST /store/restore/native` refuses out loud rather than answering "nothing to restore" to someone who has paid |
+| env | `REVENUECAT_WEBHOOK_SECRET` | the inbound half; paste the same value into the RevenueCat dashboard |
+| RevenueCat | product ids matching `storeCatalog` (`vip_pass_7/30/365`, `coins_500`…`coins_10000`) | `grantStore` refuses a sku the price table does not sell, so a product created in App Store Connect and not here fails loudly in the drain rather than crediting a guess |
+| RevenueCat | `app_user_id` = the DSX subject | it is what `settleNative` and `restoreNative` look the caller up by, and what stops viewer A redeeming viewer B's receipt |
+| `<AuthSeam>` | an anonymous session, if you want restore and checkout to work without a login | the routes already accept one; the client does not mint one (§6.86). Until it does, a guest is sent to sign-in and told why |
+| Sandbox | one real sandbox purchase through `POST /store/native` before submitting | the RevenueCat read was written from the documented shape and has never run against a live account; every branch fails closed, so a wrong field guess refuses a legitimate purchase |
 
 ---
 

@@ -213,6 +213,14 @@ seeing: every one was a sell surface that had drifted from what the player actua
 - **Every route gained a rate limit**, and a `playticket` TTL entity plus
   `/wallet/play/:episode` now stand between an entitled viewer and a source URL.
 
+**D6 · Restore — CLOSED 2026-09-01.** `<RestoreRow>` calls the real routes on both lanes:
+`POST /store/restore` (Stripe) everywhere, plus `POST /store/restore/native` (RevenueCat) in a
+build carrying the store module. Neither is gated on a login — `auth="required"` verifies a token
+and does not ask for a human — and the row names, per lane, what no restore can reach: a
+consumable was delivered, so a reinstall is an identity problem rather than a purchase one. The
+one half still missing is an anonymous session for a guest to hold; it is named on screen, in the
+deploy checklist, and in PLAN.md §6.86.
+
 ### Still open
 
 | # | Defect | Evidence | Fix |
@@ -221,7 +229,6 @@ seeing: every one was a sell surface that had drifted from what the player actua
 | D3 | **Comments show a like count with no way to like.** `server/social.dsx:15` declares `likes`, `:40` returns it, the sheet renders "N likes" — and no action increments it | — | Ship the like, or drop the count |
 | D4 | **Resume position is stored, displayed, and never applied.** `server/viewer.dsx` writes `position`, `continueWatching` returns it, `MyList.dsx:175` draws a resume bar from it, and **`Watch.dsx` never sets `<video start=>`** | `start` is in the element census; grep for `start=` in `Watch.dsx` returns nothing | One attribute (§7, T10) |
 | D5 | **Auto-unlock still defaults on and spends without confirmation.** `Watch.dsx:69` is `return true`; `Watch.dsx:429` spends on episode end the moment the balance covers it | This is the category's sharpest dark pattern, shipped. See §5, item 1 | Default off; persist per show |
-| D6 | **Restore is a local refresh wearing the word "Restore".** `Vip.dsx:351` calls `wallet.refresh()`, while `/store/restore` → `restoreOrders` exists unused (`server/store.dsx:383`) | The row's own comment is honest about the limit, which is the right instinct — but the server verb it needs is already there, and `dsx.module.store.restore` is the native half | Wire the row to the route, then to the module on native (§7, T5) |
 | D7 | **The comment thread is never seeded**, so every demo thread is empty | `scripts/seed.mjs` contains no comment rows | Seed a handful per show |
 | D8 | **The coin ladder is ReelShort's whale curve, verbatim.** `server/store.dsx:44` and `server/engage.dsx:110` both sell $99.99 → 10,000 + 10,000 bonus (+100%) | The exact top rung of the measured ReelShort ladder, where the top tier costs half per coin what the entry tier does | See §5, "Also rejected" |
 

@@ -1611,21 +1611,59 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     published in `rewardsState` (`spinOdds`, `spinCost: 0`) so a future "buy a spin" cannot
     land without someone reading it.
 
-86. GAP NAMED 2026-09-01 — **restore exists for the Stripe lane and does not exist for the
-    native store lanes.** App Store 3.1.1 also requires a restore mechanism for restorable
-    purchases. Most of it is true here by construction: VIP and every unlock are server-side,
-    account-scoped rows, so a reinstall that signs back in already has its entitlements. The
-    real hole was an order the provider CHARGED and this backend never granted — the app
-    closed between the payment sheet's success and the settle call, and that money was taken
-    and invisible with no way for the viewer to ask for it. `restoreOrders` (`POST
-    /store/restore`) closes it: walk the caller's own unsettled orders, ask Stripe, grant the
-    ones that succeeded, exactly-once through the same ledger lock as `settleOrder`.
-    WHAT REMAINS, named rather than implied: a purchase made through StoreKit, Play Billing
-    or RevenueCat never creates one of those rows, so there is nothing here to restore. That
-    receiver is a hosted-lane integration this template does not have — the standalone server
-    compiler has no `<webhook>` tag (§6.6), so the verification callback cannot be declared.
-    An adopter shipping to either store must wire it before submitting, and there is now a
-    `<route>` and an action shaped exactly like the thing it will plug into.
+86. RESOLVED 2026-09-01 — **restore now reaches the native lane, and the ceiling it cannot
+    cross is named on screen.** App Store 3.1.1 requires a restore mechanism for restorable
+    purchases; the founder's constraint is sharper — *"restore purchases should work
+    anonymously too, no login needed — the majority of revenue will come from non-logged-in
+    users"* — so it may not sit behind an account.
+    Most of the guideline is true here by construction: VIP and every unlock are server-side,
+    account-scoped rows, so anything reaching the same subject already has its entitlements.
+    The Stripe hole (`restoreOrders`, `POST /store/restore`) was closed a pass ago.
+    THE STALE HALF OF THIS ENTRY, corrected: it said the native receiver "is a hosted-lane
+    integration this template does not have" because the standalone server compiler has no
+    `<webhook>` tag. That is no longer true — the `verify="bearer"` receiver, its drain and
+    `settleNative` all landed since, and the build emits them. What was genuinely missing was
+    not the receiver but the SWEEP.
+    DONE: `restoreNative` (`POST /store/restore/native`) is the native twin of `restoreOrders`
+    — one RevenueCat read for the caller's own subscriber record, then a grant for every
+    non-subscription this deployment has not granted, through the same `grantStore` and the
+    same two database locks. It takes NO argument: the caller id is read off `owner_id` on a
+    row the caller owns, which is also the RevenueCat `app_user_id`. Bounded at five grants
+    per call against the 64-call cap, resumable, `rate="20/h"` sized to the sweep. A native
+    build runs BOTH sweeps, because a viewer who bought on the web storefront and came back on
+    their phone has an unsettled order on the same account.
+    ANONYMOUS BY CONSTRUCTION ON THE SERVER: `auth="required"` verifies a TOKEN and never asks
+    for a human, so an anonymous session reaches both routes exactly as a signed-in one does.
+    THE CEILING, and it is the answer rather than an obstacle. Apple keys a receipt to an
+    APPLE ID and Google keys a purchase token to a GOOGLE ACCOUNT — per-account, never
+    per-device — so the platform really can recognise a returning buyer with no app login. But
+    every product here is a CONSUMABLE (coin packs by nature; the VIP pass by design, which is
+    what makes a bearer receiver sufficient). StoreKit leaves consumables out of
+    `currentEntitlements`; Play stops returning a purchase token once a pack is CONSUMED,
+    which it must be or the viewer can never buy another. And replaying one would be wrong
+    even where RevenueCat still remembers it: a consumable was DELIVERED. Someone who bought
+    1,000 coins and spent 400 holds a balance of 600, not a 1,000-coin receipt, so re-granting
+    the transaction mints fresh coins on every reinstall — `unique (intent)` refuses that by
+    design, and the refusal is correct. **A reinstall is an identity problem, not a purchase
+    problem.** `<RestoreRow>` prints that per lane, and `verify` fails if the line leaves
+    `/store` or `/vip`.
+    TWO DEFECTS FOUND WHILE BUILDING IT, both fixed here: `settleNative` granted on SANDBOX
+    purchases while the webhook path skipped them, so the two server-to-server paths disagreed
+    about the same purchase and the pull path was a coin faucet for anyone who can run a
+    sandbox transaction; and two of `restoreOrders`'s three returns were short (no `vipDays`,
+    no `done`), which under total arithmetic answers the wrong number about someone's money
+    rather than throwing.
+    STILL OPEN, and it is the last mile of the founder's requirement — **this build mints no
+    anonymous session.** `<AuthSeam>` `publishGuest` publishes `{ ok: false, headers: {} }`,
+    so a guest carries no token and both restore routes (and checkout) would 401. The SERVER
+    is ready for the anonymous buyer; the CLIENT seam is not. `<RestoreRow>` says which half
+    is missing rather than firing a call that cannot succeed, and the README deploy checklist
+    carries the row. The shape of the fix, for whoever takes it: mint a durable subject at
+    first run and publish it as a session — durable being the hard half, because a subject
+    that changes on reinstall makes the identity problem above permanent, and there is no
+    key-value plane in DSX today (§6.33). Until then, an adopter whose revenue depends on
+    logged-out buyers wires it at the provider seam, which is exactly where docs/auth.md says
+    identity decisions belong.
 
 87. MEASURED 2026-09-01 — **Dynamic module dispatch does not exist, and both ways round it
     fail silently as SUCCESS.** Writing account deletion (App Store 5.1.1(v)) needs the same
@@ -2346,3 +2384,67 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      plus a documented note that alignment stays with the UI while ORDERING follows the
      content, which is the behaviour every mature app converges on. Corpus-pinnable in
      `Conformance/strings/direction.json` as a per-string case beside the per-app ladder.
+
+107. **THE SERVER TIER HAD NO CATALOGUE, AND THE PRICE LIST WAS THE PROOF** (found and
+     closed 2026-09-01; the plane is `scripts/strings.mjs SERVER_COPY`, the gate is the
+     `/store/catalog` block in `scripts/verify.mjs`). Filed as a LEDGER ENTRY rather than an
+     ask, because nothing upstream had to change — this is the record of a template-side
+     blind spot that every DSX app with a backend will have by default.
+
+     Plan names, the term notes and `BEST VALUE` are fields on the rows
+     `server/store.dsx storeCatalog` returns. No extractor read a server file, so all
+     thirteen tables reported **248/248 viewer keys (100%)** while the Store and VIP screens
+     sold in English in every one of them — the most visible untranslated surface in the app
+     and the closest to the money, passing four static gates and a behavioural one.
+
+     **The seam already reached them and nobody had looked.** `localizeTemplate` normalizes
+     `{{ item.note }}` to `{0}`, misses, renders the hole, and then looks up the RENDERED
+     form — the "legacy door", present with the same comment and the same ordering in
+     `kernel/src/strings.ts`, `Engine/iOS/DSXStrings.swift` and `engine/Strings.kt`. So the
+     English an action sends IS a gettext key on all three renderers, and the fix was a
+     corpus rather than a mechanism: 248 → 255 viewer keys, thirteen locales back to 100%.
+     Measured live at 390px afterwards, `uiLocale=ja` and `uiLocale=ar`: `7日間パス` /
+     `اشتراك 7 أيام`, notes and badge translated on both /store and /vip, `scrollWidth`
+     390 = `clientWidth` 390, no clipping, every string one line.
+
+     **THE COST, so the next author does not rediscover it.** The key set grows with the
+     operator's rows: a fourth tier is two more keys in thirteen tables. One ICU template
+     (`{days, plural, other {#-day pass}}`) would collapse all six into one, and §6.101 has
+     that door shut while the Store is a server-rendered route. The gate is what makes the
+     cost loud instead of silent.
+
+108. **A LATIN-INITIAL OR SIGN-INITIAL RUN IN THE APP'S OWN CHROME REORDERS UNDER RTL, and
+     a fully translated app still shows it** (measured 2026-09-01 at 390px, `uiLocale=ar`,
+     per-character `Range` sweep on /store — the same method that caught `19 - 1` on the
+     episode grid). Same underlying gap as §6.106 and the same ask; filed separately because
+     the TRIGGER is different and that difference is what makes it easy to miss.
+
+     §6.106 is about content in a language the chrome is not — an English synopsis inside an
+     Arabic frame — so it reads as a data problem an app with complete translations does not
+     have. It is not. Two live cases on the coin-pack grid, where every word IS translated:
+
+     | logical | renders as | what it is |
+     |---|---|---|
+     | `+5%` · `+10%` · `+20%` | `5%+` · `10%+` · `20%+` | server data (`storeCatalog.packs[].bonus`) |
+     | `500 coins + 25 bonus` | `coins + 25 bonus 500` | markup composite, Components/Store.dsx |
+
+     Six instances of each. The leading `+` is bidi class ES and, not sitting between two
+     EN runs, resolves to the paragraph level and lands at the far end; a leading digit run
+     does the same to the whole phrase. The prices themselves are FINE — `$11.99` and
+     `$199.99` sweep as `$11.99` and `$199.99`, because `$` is ET and binds to the digits —
+     so this is not "numbers break in RTL", it is specifically a sign or a number at the
+     START of a string that has no strong character before it.
+
+     **Two different fixes, and only one of them is upstream.** The markup composite is an
+     APP defect fixable today and exactly as the episode grid's `{{ n }} free` → `free 5`
+     was: split it so each child starts with a strong character (it also makes `coins` and
+     `bonus` reachable keys, which they are not today). The `+5%` badge is not — it is one
+     server string with no strong character anywhere in it, and the only honest fix is
+     §6.106's `textDirection="auto"` on the text family. A web-only `unicode-bidi: isolate`
+     would fix the browser and leave iOS and Android wrong, which is the shape of answer
+     this template does not ship.
+
+     **THE ASK** is §6.106's, unchanged, plus one line in its rationale: the attribute is
+     not only for multilingual CONTENT. A monolingual app whose chrome contains a percentage
+     badge or a count-led phrase needs it too, which moves it from "nice for content apps"
+     to "every RTL app that prints a number".

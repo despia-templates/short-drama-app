@@ -432,10 +432,12 @@
       </vstack>
 
       <!-- RESTORE PURCHASES — App Store 3.1.1 wants it on the surface that sells, and
-           <RestoreRow> calls POST /store/restore for real: it walks this account's unsettled
-           orders, asks Stripe about each, and grants the ones that were actually paid. That
-           is the money a viewer cannot otherwise reach — charged while the app was closed
-           between the payment sheet and the settle call. -->
+           <RestoreRow> calls the real routes: POST /store/restore walks this account's
+           unsettled Stripe orders and grants the ones that were actually paid, and on a
+           build with the store module POST /store/restore/native asks RevenueCat the same
+           question about the platform store. That is the money a viewer cannot otherwise
+           reach — charged while the app was closed between the payment sheet and the settle
+           call. Neither route asks who the caller is; both need a subject, not a login. -->
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <vstack class="earnCard">

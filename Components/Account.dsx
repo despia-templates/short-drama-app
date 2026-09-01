@@ -10,7 +10,9 @@
 
        identity        who the account is, read from the verified session — never the word
                        of the client. Guest gets the sign-in card instead.
-       restore         App Store 3.1.1. <RestoreRow> calls POST /store/restore for real.
+       restore         App Store 3.1.1, on both lanes. <RestoreRow> runs the sweep its
+                       build can ask — Stripe on the web, RevenueCat in a native build —
+                       and names, per lane, the purchases no restore can reach.
        legal           Terms · Privacy · Support, from App.json `consts`, degrading honestly
                        when a deployment has not set them (<LegalLinks>).
        provider        the one paragraph an adopter needs: what mints the session in this
