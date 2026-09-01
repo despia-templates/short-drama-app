@@ -2708,3 +2708,25 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      pause the clip before measuring anything inside the drawer, and a `present -> 0` with
      `reason=programmatic` and no `[dsx.tap]` beside it is author code — grep the router's
      `replace … in place` line next to it before blaming the sheet.
+
+121. **THE ANDROID PLAYER NEVER LEFT `loading`, THE FOR YOU STAGE WAS BLACK, AND THE FIRST CLIP END
+     REMOUNTED THE SCREEN THIRTY TIMES** (found 2026-09-02; fixed upstream dev@c7022949 · b9d39b8a ·
+     a2e2924b). Three root causes, none of them the `on:appear` contract (which fires for `<video>`
+     on Android; `boot()` ran). (1) `<api as="detail" url="/catalog/show/{{ vars.show }}">` sat
+     GATED forever on `vars` missing: the router seeds `vars` on the frame's SURFACE store, and
+     Android birthed every component-instance store bare, so the route-mounted screen read
+     `vars.show == null` one level below the seed — the Kotlin twin of §6.120's iOS defect, now the
+     same frame-params plane (`RouteVars.kt`: inherit at birth, reseed on replace, release on
+     dispose), executed against the same `Conformance/router/params.json`. (2) `MediaElements.kt`
+     handed the root-relative `/media/x.mp4?ep=…` to ExoPlayer verbatim, which opened it as a LOCAL
+     FILE (`FileDataSourceException … ENOENT`); it now resolves against `App.json host` first, as
+     `Video.swift` does — the same class as §6.113's image origin. (3) Android's `Router.replace`
+     re-minted the frame on every call, so the episode advance's URL sync (`replace /watch/x/2`)
+     rebuilt the screen, whose mount-time sync replaced the same URL again — 30 ExoPlayer
+     Init/Release pairs in 35s. `Router.swift` already had the same-URL no-op and the same-component
+     in-place branches; Kotlin has them now, RouterTest 56/56. Measured after: For You shows the
+     clip, Watch plays EP.3 with header, rail, seek bar and drawer trigger, advances 2→3→4→5 with
+     three Init/Release pairs, and the EP.6 paywall fires the same funnel as iOS. STILL OPEN: the
+     clip band sits at the top of the Android page where iOS centres it, and the locked key art hugs
+     its intrinsic width inside the pager page instead of filling the band — a layout question
+     (`grow` / `width: 100%` inside pager pages), filed for the next pass.
