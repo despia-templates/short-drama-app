@@ -493,7 +493,12 @@ const server = createServer((req, res) => {
     // The site answers static assets and pages, and returns null for what it does not own;
     // the API host stays last because it always answers. API-shaped paths skip the site so
     // a stale asset can never shadow a route.
-    const apiShaped = ["/catalog/", "/viewer/", "/wallet/", "/rewards/", "/admin/", "/internal/", "/mcp", "/health"].some((p) => path === p || path.startsWith(p));
+    // `/webhooks/` belongs here for the reason this list exists at all — a stale asset must
+    // never shadow a route — and a RECEIVER is the one route where that must never be in
+    // doubt: a sender retries a shadowed delivery into a 200 and the event is lost silently.
+    // It also keeps the body off the site handler's path; the signed bytes verify only if
+    // nothing upstream reads or rebuilds the stream.
+    const apiShaped = ["/catalog/", "/viewer/", "/wallet/", "/rewards/", "/admin/", "/internal/", "/webhooks/", "/mcp", "/health"].some((p) => path === p || path.startsWith(p));
     if (!apiShaped) {
       refreshSiteIfRebuilt();
       // ── ART NEGOTIATION: PNG for native, SVG for the web (founder decision, 2026-08-31).
