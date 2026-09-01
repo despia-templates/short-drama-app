@@ -32,7 +32,7 @@ lists every one of them, and each is filed in PLAN.md §6.
 | **VIP** `/vip` | Masthead, benefits (every claim true), free-with-VIP rail, plans sheet, an honest restore row |
 | **Rewards** `/rewards` | 7-day check-in curve, the wheel (server-declared prize table), tasks, rewarded ads capped per day and **VIP-gated**, with the App Store 2.5.18 report-this-ad seam |
 | **My List** `/list` | History rail with resume, favourites grid |
-| **Profile** `/profile` | Identity, wallet, transaction ledger, **a real language picker over thirteen shipped locales**, Manage, Account |
+| **Profile** `/profile` | Identity, wallet, transaction ledger, **a real language picker over fourteen shipped locales**, Manage, Account |
 | **Account** `/account`, `/auth/:pane` | Sign in / sign up / sign out, restore purchases, terms, privacy, support, **and account deletion that provably empties the account** |
 | **Notices** `/notices` | Operator broadcast inbox |
 | **Manage** `/admin` | Catalogue table, create show, add episode, notice composer, the MCP tool list, **a moderation queue**, and a funnel readout |
@@ -90,7 +90,8 @@ npm run verify        # BEHAVIOURAL: boots an origin, signs in, spends money, ra
 The first three read the source; `verify` runs the thing. It boots its own origin on a spare
 port, then asks the questions a human would — does every route answer, does the SSR html
 carry real content, is an anonymous unlock refused, does a double settle grant twice, is a
-paid episode's URL in the payload, is a shipped locale complete. Several defects have shipped
+paid episode's URL in the payload, is a shipped locale complete, does an Arabic plural carry
+every category its language can select. Several defects have shipped
 here that every static gate passed, because each was a runtime disagreement rather than bad
 source; `scripts/verify.mjs` names them at the top.
 
@@ -260,8 +261,8 @@ watch it.
 
 ## Localisation
 
-**This template is written in English and it ships in thirteen languages, because in DSX those
-are the same sentence.** Localisation is gettext-shaped: apps are written in English, the
+**This template is written in English and it ships in fourteen languages, one of which runs
+right to left, because in DSX those are the same sentence.** Localisation is gettext-shaped: apps are written in English, the
 **English source string is the key**, and the kernel resolves it at the display points — a text
 value or its inner text, a button label, a field placeholder — live, static markup included.
 Nothing is annotated and nothing is rewritten. Not one literal in `Components/**` was converted
@@ -274,24 +275,77 @@ Profile screen's Language row does exactly that.
 
 ### What ships
 
-Twelve tables plus the English source, chosen by this category's revenue rather than by speaker
-count — the markets ReelShort, DramaBox and ShortMax actually operate in:
+Thirteen tables plus the English source, chosen by this category's revenue rather than by
+speaker count — the markets ReelShort, DramaBox and ShortMax actually operate in:
 
 | tier | locales |
 |---|---|
 | 1 | `es` Español · `pt-br` Português (Brasil) · `ja` 日本語 · `de` Deutsch · `fr` Français |
 | 2 | `ko` 한국어 · `zh-hant` 繁體中文 · `id` Bahasa Indonesia · `th` ไทย · `it` Italiano |
-| 3 | `tr` Türkçe · `vi` Tiếng Việt |
+| 3 | `tr` Türkçe · `vi` Tiếng Việt · `ar` العربية |
 
 **`zh-Hans` is deliberately absent.** The category does not ship Simplified Chinese as a locale;
 it ships a separate domestic app under a separate licence, which is a different product, not a
 translation.
 
-**`ar` is deliberately absent too, and this one is a gap rather than a decision.** Arabic needs
-the RTL layout plane — mirrored leading/trailing, mirrored chevrons, mirrored progress fills,
-bidi-correct interpolation — and this build has none of it. A locale that renders every string
-correctly inside a layout that runs the wrong way is not a partial translation, it is a broken
-app; the honest move is to ship it the day the layout plane lands, not before.
+**`ar` is Modern Standard Arabic, and that is a market decision rather than a linguistic one.**
+A dialect would read better to the readers who speak it and foreign to everyone else: Egyptian
+in the Gulf, Gulf in the Maghreb. MSA is what every regional streaming service ships its chrome
+in for exactly that reason, and this category sells across all three markets at once. Where MSA
+would sound stiff, the copy leans on the imperative — اشحن · شاهد · افتح — which is how the
+category's own Arabic apps talk and is a register MSA carries perfectly well.
+
+**Arabic was held back from the twelve-locale pass on purpose, and this is what changed.** The
+framework's direction plane now decides layout direction from the same locale the string tables
+read (an app pin over `global.locale` over the device; script subtag over language) and applies
+it at every root — `dir`+`lang` on the document element on web, `.environment(\.layoutDirection)`
+on iOS, `LocalLayoutDirection` on Compose. The web's `:dir(rtl)` sheets and logical properties
+had existed for a while and were dead because nothing set the attribute. What that plane does
+and does not reach is measured below rather than assumed.
+
+### What RTL actually does, measured
+
+Not "it looks mirrored". Every number below is a live reading in Chrome at 390px with
+`global.locale = 'ar'` restored from the cookie on a cold load, against the identical reading
+in English.
+
+| claim | measured |
+|---|---|
+| the document turns | `<html dir="rtl" lang="ar">`, `getComputedStyle(body).direction === 'rtl'` |
+| nothing overflows | `documentElement.scrollWidth` 390 = `clientWidth` 390 on Home, Browse, Store, VIP, Rewards, Profile, My List, Notices, Account and Show. Zero elements outside a horizontal scroller escape the viewport |
+| no Arabic string clips or wraps | a sweep of every leaf text node carrying Arabic on those nine screens: 0 clipped, 0 wrapped to a second line. (English demo *titles* still ellipsise, identically in both directions — that is the design) |
+| the tab bar reverses | DOM order Home/For You/VIP/My List/Profile lands at x-centres **354 · 275 · 195 · 115 · 36**; the mirror image of English. Widest caption الرئيسية at 38px against the 58px box |
+| the top nav reverses | at 1440: wordmark x 1189, links 1097 → 1051 → 976 → 916 → 832 → 750, Get-Coins CTA at x 86 |
+| rails start at the right | both Home rails compute `direction: rtl` with `scrollLeft 0` at rest and their first child at x −1640 / −1790 — the track hangs off to the left and the reader starts at the right edge |
+| the episode grid reverses | EP 1 at the right of each row, EP 5 at the left, reading right to left |
+| a back chevron turns | `chevron.right` at x 362 in a 390 viewport (English: `chevron.left` at x 22) |
+| a menu-row chevron turns | nine disclosure chevrons render `chevron.left` at x 19 |
+| numerals stay Latin | `Intl.NumberFormat('ar')` gives `2.6` and `1,880` — bare `ar` is `latn` in current CLDR, so the app never mixes digit systems. The date carries its own RLM marks (`1‏/9‏/2026`) |
+| Latin runs read correctly inside Arabic | `EP 1–5 Free` renders `EP 1–5 Free`; the RTL paragraph does not disturb a Latin-initial run |
+| the bottom sheet mirrors | the episode drawer's poster sits right, its CTA left, its tabs right-to-left; the panel itself is full-width, so it has no leading edge to mirror |
+
+**Two bidi defects were found this way and fixed**, both on the episode grid head, both caught
+by a per-character `Range` sweep rather than by looking at a screenshot:
+
+- `1 - {{ n }}` rendered **`19 - 1`**. A spaced hyphen between two numbers takes the RTL
+  paragraph level and the numbers swap — a range that is *wrong*, not merely odd. `1-{{ n }}`
+  renders `1-19`, and the player drawer's own range pills had always spelled it that way.
+- `{{ n }} free` rendered **`free 5`** (a leading number takes the paragraph level too), and it
+  was untranslatable besides. Split into two `hstack` children so `free` becomes a static key
+  the seam reaches: measured in Arabic, `5` at x 49 and `مجانية` at x 16 — "5 مجانية" read
+  right to left.
+
+**And here is what still does not mirror.** Every one is filed with its measurement; none is
+papered over.
+
+| what | where it bites | whose |
+|---|---|---|
+| **The player seek bar** | the fill anchors at the LEFT and grows away from the reader's start edge; the thumb lands at **x 471–485 in a 390px viewport** — 95px past the end of its own track, off-screen. `transformOrigin="leading"` compiles to the physical `left center` while `align="leading"` compiles to the logical `start`, and `offsetX` has no logical twin | engine — §6.104 |
+| **The episode drawer's tab underline** | same cause: the rail's `align="leading"` mirrors, the rule's `offsetX` does not, so it sits at x 375–426 under the *other* tab and half off the panel | engine — §6.104 |
+| **A `<pager>`'s page order** | index 0 stays at the left in Arabic; the engine pins the viewport `dir="ltr"` deliberately ("one scroll-coordinate model in every engine") and mirrors only the keyboard intent. The hero's prev/next chevrons are the app's only two icons pinned physical, so they agree with the control they drive | engine, by design — §6.103 |
+| **An Arabic *device* that never opened the picker** | gets a mirrored layout from the engine and 34 unmirrored chevrons from the app, because the resolved direction is not readable from DSX and `global.locale` is empty exactly when the device is deciding | engine — §6.102 |
+| **Content in a language the chrome is not** | an English synopsis inside an Arabic frame puts its full stop at the left edge, and a truncated Latin title clips its *start* (`... Billionaire Twin`). Correct per the bidi algorithm, wrong for the reader. A web-only `unicode-bidi: plaintext` would fix ordering and split the column's alignment, so it was not half-done | engine — §6.106 |
+| **Six counted strings** | want a plural group and cannot have one, because their display points are server-rendered and the SSR renderer emits raw ICU | engine — §6.101 |
 
 ### These translations have not been reviewed by a native speaker
 
@@ -329,6 +383,11 @@ to give, with the faithful longer form each one displaced:
 | tr | `Saved` · `Following` | Kayıtlı · Takipte | Kaydedildi · Takip ediliyor |
 | tr | `Restore purchases` | Alımları geri yükle | Satın Alınanları Geri Yükle (Apple TR's own, 27) |
 | vi | `For You` · `My List` | Cho bạn · Danh sách | Dành cho bạn · Danh sách của tôi |
+| ar | `For You` | لك | مقترح لك (the two-letter form is what the category's own Arabic builds use) |
+| ar | `Profile` | حسابي | مركزي الشخصي (kept nothing — `Personal Center` took صفحتي) |
+| ar | `Get coins` | اشحن | اشحن عملات (the lowercase key is the nowrap 2-up pill row; the title-case `Get Coins` keeps the full form in the top nav) |
+| ar | `Hot` · `Popular` | رائج · شائع | الأكثر رواجًا · الأكثر شعبية (both are chips) |
+| ar | `LEGAL` | قانوني | الشؤون القانونية (a section header, not a page title) |
 
 Two that were left over budget on purpose, because the control has the room: fr
 `Supprimer mon commentaire` (25 against a 23.8 guideline, in a full-width sheet row) and
@@ -336,6 +395,14 @@ id `Baru di sini?` (13 against 12.6 — every shorter option meant something els
 
 Where we are least confident, in order:
 
+0. **`ar` Arabic, and it is now the weakest of the fourteen** — for two reasons that have
+   nothing to do with the layout. First, MSA is a *register* decision as much as a dialect one,
+   and consumer entertainment is exactly where MSA is hardest to keep punchy; a native editor
+   would rewrite half the CTAs shorter. Second, the plural forms are the only place in this
+   corpus where grammar is doing real work — the paucity plural under `few` (`بقيت 3 أحرف`,
+   feminine-singular verb) and the accusative *tamyīz* under `many` (`بقي 11 حرفًا`) are correct
+   by rule, and rules are exactly what a machine gets right while sounding wrong. Everything
+   else in the table is one sentence at a time; those six forms are one sentence per count.
 1. **`th` Thai** — the most distant from the rest and the hardest to self-check: word breaking
    is implicit, so caption widths were verified by measurement rather than by reading, and the
    register (polite-neutral, no ค่ะ/ครับ particles in chrome) is a judgement call.
@@ -352,11 +419,11 @@ Where we are least confident, in order:
 ### The switcher
 
 Profile's Language row is a real `<picker>` — a `<select>` on the web, the system menu on iOS
-and Android — with fourteen rows: **Device language** first, then twelve endonyms and English.
+and Android — with fifteen rows: **Device language** first, then thirteen endonyms and English.
 
 - Every language is named **in itself** (`Deutsch`, `日本語`, `Tiếng Việt`), because a Japanese
   reader hunting for German is looking for `Deutsch`. The rows are DATA
-  (`Components/parts/Theme.dsx languageRows()`), which is why thirteen endonyms do not enter
+  (`Components/parts/Theme.dsx languageRows()`), which is why fourteen endonyms do not enter
   the string corpus — and also the only thing they could be, since a choice control's option
   labels never reach the localization seam (PLAN.md §6.98).
 - **The device row is the default and it is real.** The kernel ladder is `global.locale` →
@@ -379,10 +446,10 @@ something:
 
 | | |
 |---|---|
-| **244 viewer** | product copy — what a locale is measured against, and all twelve are at 100% |
+| **247 viewer** | product copy — what a locale is measured against, and all thirteen are at 100% |
 | **44 operator** | rendered only by the Manage surface: an internal tool, deliberately English |
 | **17 developer** | copy that cites a source path, a config key or a ledger entry. Translating "set `authSignInUrl` in App.json `consts`" makes the instruction *wrong* in the target language |
-| **256 unreachable** | the seam's real boundary, listed by `--unreachable` rather than guessed |
+| **253 unreachable** | the seam's real boundary, listed by `--unreachable` rather than guessed |
 
 That last row is the honest part. Three things the seam does not reach, each needing a
 different answer: **a11y labels** (the kernel localizes display points only, so a screen reader
@@ -399,23 +466,77 @@ all showed English on `Follow`, `Claim`, `See plans` and `Restore purchases`. It
 literal arms of a ternary when the attribute is exactly one hole and each arm is a whole
 literal; a concatenation fragment still is not a rendered form and stays out.
 
+### The plural plane, and why Arabic is the reason it exists
+
+Three of those 247 keys are **message templates** rather than sentences:
+
+```
+{0, plural, one {# character left} other {# characters left}}
+```
+
+The template *is* the table key, holes intact; one entry serves every value of `n`, the count
+resolves after the table hit, and each locale picks its own CLDR category. English is correct
+with no table at all, because the source string is already a complete plural message.
+
+**Ten of the fourteen locales never need more than two forms. Arabic needs six** —
+zero/one/two/few (n%100 = 3–10)/many (11–99)/other — and a `{{ n == 1 ? … : … }}` ternary can
+express exactly two. Worse, the ternary this replaced could not even be *translated*: the
+extractor lifts a whole branch literal but never a concatenation fragment, so twelve tables
+carried `Flagged by 1 reader` and every count above one stayed English in every language.
+
+The comment composer's 500-character budget reaches all six **by typing**, which is why it
+carries the demonstration. Measured live at 390px with locale `ar`:
+
+| left | category | rendered |
+|---|---|---|
+| 0 | zero | لم يبقَ أي حرف |
+| 1 | one | بقي حرف واحد |
+| 2 | two | بقي حرفان |
+| 3 | few | بقيت 3 أحرف |
+| 11 | many | بقي 11 حرفًا |
+| 100+ | other | بقي 100 حرف |
+
+**Only three display points converted, and the reason is the ceiling, not the appetite.** The
+message tier lives in the client mount; the SSR renderer does not run it. Probed with one
+caption on `/show` before believing it: the delivered HTML carried
+`{dsx.variable.freeCount, plural, one {# free} other {# free}}` *verbatim*, replaced only when
+the bundle hydrated. So the three groups live in sheets that mount on a tap and appear nowhere
+in a server-rendered body — and `npm run verify` asserts that confinement over the delivered
+bytes of seven routes, so the next author who writes one at a server-rendered point is told.
+Six further counted strings are named in PLAN.md §6.101 and wait for that gap:
+`1-{{ n }}` and the free count on the grid head, `EP 1 — {{ n }} episodes`,
+`Unlock all {{ n }} remaining episodes`, `All {{ n }} Episodes` and `{{ n }} day streak`.
+
+Two gates guard the three that shipped, because one is not enough. A **category** gate asserts
+every category the locale's CLDR rule can actually select is declared — the wanted set is swept
+out of the kernel rather than typed — and a **distinctness** gate asserts Arabic's six render as
+six different strings. Deleting `two` from one entry proved they are not redundant: the category
+gate failed and the distinctness gate did not, because the fallback to `other` still produced
+six different strings.
+
 The **known next tier**, named rather than quietly skipped: a display bound to
 `{{ dsx.variable.vipLine }}` renders one of the literal sentences that computed returns, so the
 seam would hit those too — roughly 25 strings, listed by `--unreachable`. Following a computed's
 returns needs a rule that cannot mistake an enum key or a CSS string for copy, and a half-safe
-rule puts junk in twelve tables, so it waits.
+rule puts junk in thirteen tables, so it waits.
 
 **A half-locale cannot ship, and neither can a fake one.** `npm run verify` reads the built
 registry and fails if a shipped locale is missing one viewer string, if the picker offers a
 language whose table nobody wrote (or ships a table nobody can select), if a locale is missing
 from the device-row map, or if more than 30% of a table's values are byte-identical to their
 English key — because completeness is a count, and a count is satisfiable by pasting the key
-into the value 244 times. Adding a language is: write the table, add the row and the tag in
-`Theme.dsx`, add the device-row label, run the gates.
+into the value 247 times. It also fails if a plural entry is short a category its language can
+select, or if Arabic's six forms are not six distinct strings, or if any server-rendered route
+carries a raw message template. Adding a language is: write the table, add the row and the tag
+in `Theme.dsx`, add the device-row label, run the gates.
 
 Numbers and dates are locale **formatting**, not translation: `compactCount()` and
 `shortDate()` in `Components/parts/Theme.dsx` run through `Intl` and read the same
-`global.locale`. What is still out of reach is **content** language — the dubbed audio and the
+`global.locale`. Measured in Arabic, `Intl` keeps Latin digits for a bare `ar` (`2.6`, `1,880`)
+— current CLDR makes `latn` the default numbering system for the language without a region —
+so the app never mixes digit systems against the episode numbers, which are plain `String(n)`.
+An `ar-EG` device would get Arabic-Indic digits from `Intl` and Latin ones from those, which is
+the shape of a defect worth knowing about before you add a regional table. What is still out of reach is **content** language — the dubbed audio and the
 subtitle track — because `<video>` can select neither a rendition nor a track (PLAN.md §6.36).
 The Language row says so instead of implying it covers them.
 
@@ -457,7 +578,10 @@ most trying to teach.
 | **Push** | Notices queue and land in the in-app inbox; nothing is delivered to a device | The Manage composer, and Notices |
 | **Moderator remedy** | An operator can read the queue and cannot hide a comment: a declared action carries no service authority (§6.7), so the token is scoped like a viewer's — measured, `POST /social/comment/delete` answers 403 | The moderation queue card |
 | **Content language** | `<video>` can select neither a rendition nor a track (§6.36) | The Language row |
-| **Arabic and every RTL locale** | No RTL layout plane in this build: mirrored leading/trailing, chevrons, progress fills, bidi interpolation | The Localisation section above — the locale is withheld rather than shipped broken |
+| **The player seek bar and the drawer tab underline, in RTL** | `transformOrigin="leading"` compiles to the physical `left` and `offsetX` has no logical twin, so a measured-box affordance travels the wrong way: the seek thumb renders at x 471 in a 390px viewport, the tab rule under the wrong tab (§6.104) | The Localisation section's *what still does not mirror* table |
+| **An Arabic device that never opened the picker** | The resolved layout direction is not readable from DSX and `global.locale` is empty exactly when the device is deciding, so the app cannot turn its own chevrons (§6.102) | Same table; `Theme.dsx isRtl()` says it in the code |
+| **Six counted strings that want a plural** | The message tier is client-only; a `{n, plural, …}` group at a server-rendered display point ships raw ICU in the HTML (§6.101) | The plural section above names all six; `npm run verify` fails if one moves |
+| **Content in a language the chrome is not** | No per-string text direction, so an English synopsis in an Arabic frame puts its full stop on the left and truncates from the front (§6.106) | The *what still does not mirror* table |
 | **A remembered language** | No key-value plane (§6.33), and the cookie the choice rides is a SESSION cookie with no way to ask for durability (§6.100) | The Language row says it forgets when you quit |
 | **`pt-PT` and `zh-TW` devices** | The table ladder tries the full tag then the bare language and nothing between, so a script-qualified table is unreachable from the device step (§6.99) | The Localisation section; the picker reaches them explicitly |
 | **Playback quality** | One rendition in this build | The player's options sheet |
