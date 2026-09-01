@@ -320,7 +320,7 @@
           <!-- /store is a PUSHED route on every width (motion: ios), so the back control
                exists on every width too — a desktop viewer mid-paywall deserves the same
                way out as a phone -->
-          <image icon="chevron.left" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
+          <image icon="{{ chevBack() }}" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
                  a11yLabel="Back" a11yTrait="button"/>
           <text value="Store" class="h1"/>
           <text value="VIP" class="vipChip" visible-if="dsx.variable.isVip"/>

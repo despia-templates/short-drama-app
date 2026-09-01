@@ -429,10 +429,27 @@
             </hstack>
           </hstack>
 
+          <!-- ══ TWO BIDI FIXES, BOTH MEASURED IN ARABIC BEFORE THEY WERE BELIEVED ══
+               (1) THE RANGE LOST ITS SPACES. `1 - {{ n }}` is a number, a NEUTRAL run and
+               another number; inside an RTL paragraph the Unicode bidi algorithm gives the
+               spaced hyphen the paragraph level and the two numbers swap. Measured with a
+               per-character Range sweep at 390px: logical "1 - 19" rendered "19 - 1" — a
+               backwards range, wrong rather than merely odd. `1-19` keeps the digits in one
+               run and renders "1-19"; the drawer's own range pills have always spelled it
+               that way (`start + '-' + end`), so this is the outlier conforming.
+               (2) THE COUNT AND ITS WORD BECAME TWO CHILDREN. `{{ n }} free` renders
+               "free 5" in Arabic (a leading number takes the paragraph's RTL level), and
+               it was untranslatable anyway — an interpolated composite never reaches the
+               string seam. As an hstack the number is one child and "free" is a static key
+               the seam DOES reach, the row mirrors like any other, and an Arabic reader
+               gets "5 مجانية" reading right to left. -->
           <hstack class="gridHead" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px">
-            <text value="1 - {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.episodes.length }}" class="gridRange"/>
+            <text value="1-{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.episodes.length }}" class="gridRange"/>
             <spacer/>
-            <text value="{{ dsx.variable.freeCount }} free" class="gridAll"/>
+            <hstack class="gridAllRow">
+              <text value="{{ dsx.variable.freeCount }}" class="gridAll"/>
+              <text value="free" class="gridAll"/>
+            </hstack>
           </hstack>
 
           <stack class="skeleton" visible-if="detail.loading" style="height: 160px"/>
@@ -452,7 +469,7 @@
               visible-if="dsx.variable.wide == false && dsx.variable.phase != 'error' && dsx.variable.phase != 'empty'">
         <!-- a deep-linked phone has no TopNav: the back bar is the only way out -->
         <hstack class="phoneBar">
-          <image icon="chevron.left" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
+          <image icon="{{ chevBack() }}" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
                  a11yLabel="Back" a11yTrait="button"/>
           <text value="{{ show == null ? 'Details' : show.title }}" class="phoneBarTitle"
                 style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0"/>
@@ -487,9 +504,12 @@
           </hstack>
           <text value="{{ show == null ? '' : show.synopsis }}" class="plotBody"/>
           <hstack class="gridHead" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px">
-            <text value="1 - {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.episodes.length }}" class="gridRange"/>
+            <text value="1-{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.episodes.length }}" class="gridRange"/>
             <spacer/>
-            <text value="{{ dsx.variable.freeCount }} free" class="gridAll"/>
+            <hstack class="gridAllRow">
+              <text value="{{ dsx.variable.freeCount }}" class="gridAll"/>
+              <text value="free" class="gridAll"/>
+            </hstack>
           </hstack>
           <!-- the cell is the grid's DIRECT child (a wrapper loses the column width); this
                grid is deliberately DUPLICATED from the wide panel — an inline <component>

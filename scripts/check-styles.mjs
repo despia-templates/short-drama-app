@@ -34,6 +34,17 @@ for (const g of JSON.parse(readFileSync(CATALOG, "utf8")).groups) {
   for (const p of g.properties) { valid.add(p.key); for (const a of p.aliases ?? []) valid.add(a); }
 }
 
+// ── THE FUNCTION LIBRARY IS WHERE A RUNTIME ICON NAME IS STILL A LITERAL ──────────────
+// Theme.dsx's `<functions global="true">` block is the app's one vocabulary, and it hands
+// out icon names two ways: a helper that RETURNS one (`chevBack()`) and a data row that
+// CARRIES one (the VIP benefit list). Both spellings put the name outside the `icon="…"`
+// regex above, so both used to escape the catalog check entirely. Every dotted lowercase
+// string literal in that block is treated as an icon name and checked; the same read
+// collects the function names, so an interpolated `icon=` can be traced back to one.
+const themeSrc = readFileSync("Components/parts/Theme.dsx", "utf8");
+const themeFunctions = new Set([...themeSrc.matchAll(/function\s+([A-Za-z_][\w]*)\s*\(/g)].map((m) => m[1]));
+const themeIconLiterals = [...themeSrc.matchAll(/'([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+)'/g)].map((m) => m[1]);
+
 const files = [];
 (function walk(dir) {
   for (const e of readdirSync(dir)) {
@@ -88,11 +99,28 @@ for (const f of files.sort()) {
     }
   }
 
-  // interpolated names (icon="{{ … }}") are a runtime value; only literals are checkable
   for (const m of src.matchAll(/\bicon(?::\w+)?="([^"{}]+)"/g)) {
     if (!iconNames.has(m[1])) {
       say(f, `icon="${m[1]}" is not in the shared catalog — it has no per-platform twin, ` +
              "so it renders on web and is missing on iOS and Android");
+    }
+  }
+
+  // AN INTERPOLATED ICON NAME IS STILL AN ICON NAME. This gate used to stop at the literal
+  // form and say so — "a runtime value; only literals are checkable" — which was true of
+  // the regex and false of the risk: the moment `chevBack()`/`chevFwd()`/`arrowFwd()`
+  // arrived so the chevrons could turn with the locale, THIRTY-FOUR sites left the gate in
+  // one commit, and three more (`bolt.fill`, `lock.open.fill`, `dollarsign.circle.fill`)
+  // had been outside it since the VIP benefit rows became data. A helper is a runtime value
+  // only in WHICH name it picks; the names themselves are literals in Theme.dsx, so the
+  // check moves there: every dotted lowercase literal in the function library must be a
+  // catalog name, and an interpolated `icon=` must call a function that library declares.
+  for (const m of src.matchAll(/\bicon(?::\w+)?="\{\{([^"]*)\}\}"/g)) {
+    for (const call of m[1].matchAll(/([A-Za-z_][\w]*)\s*\(/g)) {
+      if (!themeFunctions.has(call[1])) {
+        say(f, `icon="{{ ${m[1].trim()} }}" calls ${call[1]}(), which Theme.dsx does not declare — ` +
+               "an icon chosen at runtime is only checkable through the function library that names it");
+      }
     }
   }
 
@@ -103,7 +131,14 @@ for (const f of files.sort()) {
   }
 }
 
+for (const name of themeIconLiterals) {
+  if (!iconNames.has(name)) {
+    say("Components/parts/Theme.dsx", `'${name}' reads as an icon name and is not in the shared catalog — ` +
+        "a name handed out by the function library needs a per-platform twin like any other");
+  }
+}
+
 console.log(problems === 0
-  ? `check:styles — ${files.length} files, 0 problems (${TONES.size} named tones, 0 unnamed hexes)`
+  ? `check:styles — ${files.length} files, 0 problems (${TONES.size} named tones, ${themeIconLiterals.length} library icon names, 0 unnamed hexes)`
   : `check:styles — ${problems} problem(s)${unnamed > 0 ? `, ${unnamed} unnamed colour(s)` : ""}`);
 process.exit(problems === 0 ? 0 : 1);

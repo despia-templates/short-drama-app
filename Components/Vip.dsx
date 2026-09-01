@@ -241,7 +241,7 @@
           <hstack spacing="4" alignItems="center" on:tap="dsx.module.route.reset({ path: '/profile' })"
                   a11yGroup="true" a11yTrait="button" a11yLabel="View your wallet">
             <text value="View wallet" class="watchLink"/>
-            <image icon="chevron.right" iconSize="12" color="{{ gold() }}" a11yHidden="true"/>
+            <image icon="{{ chevFwd() }}" iconSize="12" color="{{ gold() }}" a11yHidden="true"/>
           </hstack>
         </hstack>
       </vstack>

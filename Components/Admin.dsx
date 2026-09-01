@@ -249,7 +249,7 @@
           <text value="Operator surface — Manage View bridge" class="sub"/>
         </vstack>
         <hstack class="backChip" on:tap="dsx.action.goBack()" a11yGroup="true" a11yTrait="button" a11yLabel="Back">
-          <image icon="chevron.left" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
+          <image icon="{{ chevBack() }}" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
           <text value="App" class="backChipLabel"/>
         </hstack>
       </hstack>

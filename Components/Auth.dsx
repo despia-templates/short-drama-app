@@ -76,7 +76,7 @@
     <vstack class="page" style="{{ dsx.variable.shell }}">
       <hstack class="backRow" on:tap="dsx.action.back()"
               a11yGroup="true" a11yTrait="button" a11yLabel="Back">
-        <image icon="chevron.left" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+        <image icon="{{ chevBack() }}" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
         <text value="Back" class="backTxt"/>
       </hstack>
 

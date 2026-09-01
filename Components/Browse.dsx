@@ -165,7 +165,7 @@
 
       <!-- a deep-linked phone has no TopNav: the back bar is the only way out -->
       <hstack class="phoneBar" visible-if="dsx.variable.wide == false">
-        <image icon="chevron.left" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
+        <image icon="{{ chevBack() }}" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
                a11yLabel="Back" a11yTrait="button"/>
         <text value="Browse" class="h1" style="font-size: 20px"/>
       </hstack>

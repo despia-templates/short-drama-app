@@ -259,6 +259,47 @@
         return String(l)
       }
 
+      /* ── THE DIRECTION VOCABULARY, AND WHY THE APP HAS TO OWN ONE ─────────────────
+         The framework RESOLVES the layout direction (DSXStrings.direction(): an app pin
+         over the locale, script subtag over language) and applies it at each root — web
+         `dir=`, SwiftUI `.environment(\layoutDirection)`, Compose LocalLayoutDirection.
+         Everything that is a LAYOUT fact then mirrors for free, and measured, it does:
+         the tab bar reverses, `align="leading"` moves to the right edge, rails start at
+         the right, logical padding swaps.
+
+         AN ICON NAME IS NOT A LAYOUT FACT. `chevron.left` is a shape, the shared catalog
+         (Conformance/icons/sf-map.json, 115 names) has no logical pair to swap it for —
+         no `chevron.forward`/`chevron.backward` — and no renderer mirrors a physical
+         name. Measured in Arabic at 390px: all 37 directional icons in this template
+         pointed the wrong way, back chevrons included. So the app picks the GLYPH, which
+         is the one mirroring mechanism that works identically on all three lanes.
+
+         AND THE RESOLVED DIRECTION IS NOT READABLE FROM DSX. The plane publishes nothing
+         into the store, and `global.locale` is empty EXACTLY when the device is deciding
+         — so this function knows the direction of a choice made IN THE APP and cannot
+         know the direction of an Arabic device that never opened the picker. That device
+         gets a correctly mirrored layout from the engine and unmirrored chevrons from
+         this app. Named in the README, filed as PLAN.md §6.102, and deliberately not
+         papered over with a boot-time write of the device tag into `global.locale` —
+         that would delete the kernel ladder's device step for every locale at once. */
+      function rtlLangs() { return ['ar', 'he', 'iw', 'fa', 'ur', 'ps', 'prs', 'sd', 'ug', 'yi', 'ji', 'dv', 'ckb'] }
+
+      function isRtl() {
+        const l = activeLocale()
+        if (l == '') { return false }
+        const lower = String(l).toLowerCase()
+        const cut = lower.indexOf('-')
+        const bare = cut == -1 ? lower : lower.slice(0, cut)
+        return rtlLangs().indexOf(bare) != -1
+      }
+
+      /* BACK and FORWARD as READING directions, not as compass points. `chevBack` is the
+         one on a nav bar and a sheet header; `chevFwd` is the disclosure on a menu row;
+         `arrowFwd` is the "this opens something" glyph beside a link. */
+      function chevBack() { if (isRtl()) { return 'chevron.right' } return 'chevron.left' }
+      function chevFwd() { if (isRtl()) { return 'chevron.left' } return 'chevron.right' }
+      function arrowFwd() { if (isRtl()) { return 'arrow.backward' } return 'arrow.right' }
+
       /* a view count at glance width. The K/M suffixes stay Latin because the compact
          notation Intl would give us is NOT in the framework number formatter (its options
          are style/currency/fraction digits/grouping), so inventing `notation: compact`

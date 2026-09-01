@@ -234,6 +234,7 @@
   "Your wallet is unavailable.": "Cüzdanın kullanılamıyor.",
   "Your wallet: the coin balance, the bonus balance and your VIP pass.": "Cüzdanın: jeton bakiyesi, bonus bakiyesi ve VIP paketin.",
   "coins": "jeton",
+  "free": "ücretsiz",
   "guest": "misafir",
   "offline demo": "çevrimdışı demo",
   "operator": "operatör",

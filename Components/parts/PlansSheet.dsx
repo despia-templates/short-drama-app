@@ -529,7 +529,7 @@
 
           <hstack class="detailBack" on:tap="dsx.action.closeDetail()"
                   a11yGroup="true" a11yTrait="button" a11yLabel="Back to the plans">
-            <image icon="chevron.left" iconSize="14" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+            <image icon="{{ chevBack() }}" iconSize="14" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
             <text value="Back to plans" class="detailBackTxt"/>
           </hstack>
 
@@ -561,7 +561,7 @@
                   a11yGroup="true" a11yTrait="button"
                   a11yLabel="Open the full VIP page — closes the plans">
             <text value="Open the full VIP page" class="detailPageTxt" grow="width" style="flex: 1"/>
-            <image icon="arrow.right" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+            <image icon="{{ arrowFwd() }}" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
           </hstack>
 
         </vstack>

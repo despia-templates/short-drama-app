@@ -375,19 +375,19 @@
                     a11yTrait="button" a11yGroup="true" a11yLabel="My list and history">
               <image icon="bookmark.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
               <text value="My List &amp; History" class="menuLabel" style="flex: 1"/>
-              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+              <image icon="{{ chevFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
             <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)" href="/notices"
                     a11yGroup="true" a11yLabel="Notifications">
               <image icon="bell.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
               <text value="Notifications" class="menuLabel" style="flex: 1"/>
-              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+              <image icon="{{ chevFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
             <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
                     on:tap="dsx.module.route.push({ path: '/rewards' })" a11yGroup="true" a11yTrait="button" a11yLabel="Rewards">
               <image icon="gift.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
               <text value="Rewards" class="menuLabel" style="flex: 1"/>
-              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+              <image icon="{{ chevFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
             <!-- ══ LANGUAGE, AND WHAT THE ROW IS ALLOWED TO PROMISE ═════════════════
                  Two different things hide behind that one word, and only one of them is
@@ -456,7 +456,7 @@
               <image icon="gearshape" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
               <text value="Manage this app" class="menuLabel" style="flex: 1"/>
               <text value="operator" class="menuValue" color="{{ coin() }}"/>
-              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+              <image icon="{{ chevFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
             <!-- ACCOUNT IS THE LAST ROW, and it is the one a store reviewer looks for: sign
                  in, sign out, restore purchases, terms, privacy, and DELETE ACCOUNT — two
@@ -471,7 +471,7 @@
                 <text value="Sign in or out · restore purchases · terms &amp; privacy · delete account" class="menuNote"/>
               </vstack>
               <text value="{{ dsx.variable.signedIn ? 'signed in' : 'guest' }}" class="menuValue"/>
-              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+              <image icon="{{ chevFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
           </vstack>
         </vstack>

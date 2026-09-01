@@ -1142,7 +1142,7 @@
                 class="stateWrap {{ dsx.variable.stageArt == '' ? 'stateWrapBare' : 'stateWrapOverArt' }}"
                 height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                 style="width: 100%; margin-left: auto; margin-right: auto; z-index: 3">
-          <image icon="chevron.left" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()"
+          <image icon="{{ chevBack() }}" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()"
                  a11yLabel="Back" a11yTrait="button" style="align-self: flex-start"/>
           <spacer/>
           <spinner color="{{ brand() }}" visible-if="dsx.variable.phase == 'loading'"/>
@@ -1233,7 +1233,7 @@
                 height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                 style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
           <hstack class="topBar" paddingTop="{{ dsx.variable.wide ? 0 : (dsx.screen.safeTop || 0) }}" style="pointer-events: auto">
-            <image icon="chevron.left" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
+            <image icon="{{ chevBack() }}" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
             <text value="EP.{{ dsx.variable.cur }}" class="epLabel"/>
             <spacer/>
             <hstack class="speedChip" on:tap="dsx.variable.sheet = 'speed'; dsx.variable.menu = true"
@@ -1693,7 +1693,7 @@ Please unlock to watch." class="lockHead"/>
                    of the three that can say where it goes. -->
               <hstack class="genreBack" on:tap="dsx.action.closeGenre()"
                       a11yGroup="true" a11yTrait="button" a11yLabel="Back to all episodes">
-                <image icon="chevron.left" iconSize="14" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+                <image icon="{{ chevBack() }}" iconSize="14" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
                 <text value="All episodes" class="genreBackTxt"/>
               </hstack>
 
@@ -1754,7 +1754,7 @@ Please unlock to watch." class="lockHead"/>
                       a11yGroup="true" a11yTrait="button"
                       a11yLabel="See all {{ dsx.variable.genre }} on the Browse page — leaves the player">
                 <text value="See all in {{ dsx.variable.genre }}" class="genreAllTxt" grow="width" style="flex: 1"/>
-                <image icon="arrow.right" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+                <image icon="{{ arrowFwd() }}" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
               </hstack>
 
             </vstack>
@@ -1846,7 +1846,7 @@ Please unlock to watch." class="lockHead"/>
       <!-- speed -->
       <vstack visible-if="dsx.variable.sheet == 'speed'" alignItems="stretch">
         <hstack alignItems="center" paddingBottom="8">
-          <image icon="chevron.left" iconSize="19" paddingV="12" paddingH="12" color="#FFFFFF" on:tap="dsx.variable.sheet = ''" a11yLabel="Back" a11yTrait="button"/>
+          <image icon="{{ chevBack() }}" iconSize="19" paddingV="12" paddingH="12" color="#FFFFFF" on:tap="dsx.variable.sheet = ''" a11yLabel="Back" a11yTrait="button"/>
           <text value="Playback Speed" class="menuHead"/>
         </hstack>
         <list bind="dsx.variable.speedOptions" key="id" scroll="false" spacing="2">
@@ -1990,7 +1990,7 @@ Please unlock to watch." class="lockHead"/>
         <hstack class="cHead">
           <vstack class="cBack" style="justify-content: center" on:tap="dsx.action.setPane({ next: 'thread' })"
                   a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
-            <image icon="chevron.left" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
+            <image icon="{{ chevBack() }}" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
           </vstack>
           <text value="Report or block" class="cTitle" grow="width" style="flex: 1"/>
         </hstack>
@@ -2068,7 +2068,7 @@ Please unlock to watch." class="lockHead"/>
             <hstack class="cOptRow" visible-if="dsx.variable.pickHandled"
                     on:tap="dsx.action.setPane({ next: 'thread' })"
                     a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
-              <image icon="chevron.left" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+              <image icon="{{ chevBack() }}" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
               <text value="Back to the comments" class="cOptTxt" grow="width" style="flex: 1"/>
             </hstack>
 
@@ -2085,7 +2085,7 @@ Please unlock to watch." class="lockHead"/>
         <hstack class="cHead">
           <vstack class="cBack" style="justify-content: center" on:tap="dsx.action.setPane({ next: 'thread' })"
                   a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
-            <image icon="chevron.left" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
+            <image icon="{{ chevBack() }}" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
           </vstack>
           <text value="Safety &amp; filters" class="cTitle" grow="width" style="flex: 1"/>
         </hstack>

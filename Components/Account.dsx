@@ -140,7 +140,7 @@
       </hstack>
       <hstack class="backRow" visible-if="dsx.variable.wide == false" on:tap="dsx.action.back()"
               a11yGroup="true" a11yTrait="button" a11yLabel="Back to Profile">
-        <image icon="chevron.left" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+        <image icon="{{ chevBack() }}" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
         <text value="Profile" class="backTxt"/>
       </hstack>
 
@@ -195,7 +195,7 @@
             <text value="Sign out" class="menuLabel"/>
             <text value="Keeps everything on the account. You can sign back in any time." class="menuNote"/>
           </vstack>
-          <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+          <image icon="{{ chevFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
         </hstack>
 
         <!-- DELETION IS A TOP-LEVEL ROW, not a link inside a paragraph. Apple rejects a
@@ -209,7 +209,7 @@
             <text value="Delete account" class="dangerLabel"/>
             <text value="Erases the account record and everything on it — wallet, coins, unlocks, history, list and comments. Permanent." class="menuNote"/>
           </vstack>
-          <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+          <image icon="{{ chevFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
         </hstack>
       </vstack>
     </vstack>
