@@ -31,7 +31,7 @@
     </formula>
     <formula as="rowDate" at="item.at">
       if (at == null) { return '' }
-      return String(at).slice(0, 10)
+      return shortDate(at)
     </formula>
 
     <action as="goBack">

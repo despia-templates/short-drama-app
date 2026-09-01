@@ -1,5 +1,6 @@
-<!-- Theme — THE app's design vocabulary, once. Breakpoints, gutters, page shells and the
-     brand palette, as APP-WIDE FUNCTIONS every surface calls instead of re-deriving.
+<!-- Theme — THE app's presentation vocabulary, once. Breakpoints, gutters, page shells,
+     the brand palette and the locale-aware formatters, as APP-WIDE FUNCTIONS every surface
+     calls instead of re-deriving.
 
      WHAT THIS REPLACES. Thirteen screens each carried a byte-identical copy of `bp`,
      `wide`, `gutter` and `shell` — AGENTS.md says "responsive is one vocabulary per
@@ -167,6 +168,52 @@
       function rankBronze() { return '#CE8B5C' }
       function gemLift() { return '#FF7BAA' }         /* the VIP gem gradient, top stop */
       function gemDeep() { return '#B3103A' }         /* ... and its end stop */
+
+      /* ── LOCALE-AWARE FORMATTING ──────────────────────────────────────────────────
+         Numbers and dates are locale FORMATTING, not translation, and the string table
+         cannot help with either: `1.2M` and `2026-09-01` are composed at render time and
+         resolve before the lookup. JSE carries the real thing — Intl.NumberFormat,
+         Intl.DateTimeFormat and toLocaleDateString are all in the builtin table on every
+         renderer — so these are the twins of the four hand-rolled formatters this template
+         used to carry (`Math.round(v / 100) / 10 + 'M'` and `String(iso).slice(0, 10)`,
+         which print an American number and an ISO date to every reader on earth). */
+
+      /* the ACTIVE locale, or empty for "let the device decide" — the same ladder the
+         kernel string seam walks (global.locale, then the device, then en) */
+      function activeLocale() {
+        const l = global.locale
+        if (l == null) { return '' }
+        return String(l)
+      }
+
+      /* a view count at glance width. The K/M suffixes stay Latin because the compact
+         notation Intl would give us is NOT in the framework number formatter (its options
+         are style/currency/fraction digits/grouping), so inventing `notation: compact`
+         here would work on web and silently print the raw number on a device. What IS
+         portable is the NUMERAL, which is what actually differs: es-ES writes 1,2 M. */
+      function compactCount(v) {
+        if (v == null) { return '' }
+        if (v >= 1000000) { return decimalOne(v / 1000000) + 'M' }
+        if (v >= 1000) { return decimalOne(v / 1000) + 'K' }
+        return String(v)
+      }
+
+      function decimalOne(n) {
+        const loc = activeLocale()
+        const opts = { maximumFractionDigits: 1 }
+        if (loc == '') { return new Intl.NumberFormat(undefined, opts).format(n) }
+        return new Intl.NumberFormat(loc, opts).format(n)
+      }
+
+      /* an ISO timestamp as a date the reader recognises. Slicing the first ten characters
+         gave every reader 2026-09-01; this gives 01/09/2026 in es and 9/1/2026 in en-US. */
+      function shortDate(iso) {
+        if (iso == null) { return '' }
+        if (iso == '') { return '' }
+        const loc = activeLocale()
+        if (loc == '') { return new Date(iso).toLocaleDateString() }
+        return new Date(iso).toLocaleDateString(loc)
+      }
     </functions>
   </head>
 </stack>

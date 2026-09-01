@@ -77,7 +77,7 @@
     </variable>
     <variable as="vipUntil" computed="true">
       if (dsx.variable.walletView == null || dsx.variable.walletView.vipUntil == null) { return '' }
-      return String(dsx.variable.walletView.vipUntil).slice(0, 10)
+      return shortDate(dsx.variable.walletView.vipUntil)
     </variable>
     <variable as="vipLine" computed="true">
       if (dsx.variable.isVip == false) { return 'Every episode, no coin math, no ads.' }
@@ -93,6 +93,16 @@
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
+    <!-- THE ACTIVE UI LOCALE. `global.locale` is the kernel's own override key (the ladder
+         is global.locale -> device language -> en), so this reads the switch rather than
+         keeping a second copy of it. Unset means the device is deciding, and the row shows
+         English because that is this app's source language and its only certain fallback. -->
+    <variable as="uiLocale" computed="true">
+      const l = global.locale
+      if (l == null) { return 'en' }
+      if (l == '') { return 'en' }
+      return String(l).slice(0, 2)
+    </variable>
     <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
     <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
     <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
@@ -173,6 +183,7 @@
     <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
     <style as="menuRow" alignItems="center" paddingV="12" spacing="11"/>
+    <style as="langChip" radius="14" paddingH="14" paddingV="7" fontSize="13" fontWeight="semibold"/>
     <style as="menuLabel" fontSize="13" color="#FFFFFF"/>
     <style as="menuNote" fontSize="12" color="rgba(255,255,255,0.42)"/>
     <style as="menuValue" fontSize="12" color="rgba(255,255,255,0.42)"/>
@@ -354,32 +365,55 @@
               <text value="Rewards" class="menuLabel" style="flex: 1"/>
               <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
-            <!-- LANGUAGE IS NAMED, NOT FAKED (Article 7, the Quality-row precedent in
-                 Watch.dsx). Every reference app in the category ships a language picker, and
-                 two different things hide behind that one word:
+            <!-- ══ LANGUAGE, AND WHAT THE ROW IS ALLOWED TO PROMISE ═════════════════
+                 Two different things hide behind that one word, and only one of them is
+                 reachable — so the row does one and names the other.
 
-                 · CONTENT language — the dubbed audio and the subtitle track. Unreachable:
-                   `<video>` can select neither a rendition nor a track today (PLAN.md §6.36),
-                   so a picker here would change nothing about what plays.
-                 · UI language — the app's own chrome. Reachable, and the seam is declared:
-                   `dsx.global.strings.*` is the framework's white-label plane ("defaults ⊕
-                   global.strings ⊕ per-call payload"), so one write re-skins every adopting
-                   module. An adopter localises this template by writing that global at boot
-                   and reading `{{ global.strings.x }}` at each of the ~180 literals here.
+                 · UI LANGUAGE is real now. DSX localisation is gettext-shaped: the app is
+                   written in English, the ENGLISH SOURCE STRING IS THE KEY, and the kernel
+                   resolves it at the display points (a text value, a button label, a field
+                   placeholder). A locale is a flat `Strings.<tag>.json` at the app root that
+                   the build folds into the registry. So this template did not have to
+                   convert a single literal — it had to ship a table. `Strings.es.json`
+                   carries all 208 viewer strings (node scripts/strings.mjs reports the
+                   coverage, and the Manage surface stays English on purpose). Switching is
+                   ONE STATE WRITE: `global.locale`, and every live display string
+                   re-resolves, static markup included.
 
-                 What this build will not do is ship the picker with one locale behind it. A
-                 dropdown that switches to Spanish and returns a half-Spanish app is the same
-                 defect as the priced quality ladder Phase 1 deleted: a control that promises
-                 something it does not do. The row states what is true and points at the seam.
-                 See README "Localisation". -->
-            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
-                    a11yGroup="true" a11yLabel="Language: English. This build ships one locale; audio and subtitle tracks need renderer support that is not available yet.">
-              <image icon="globe" iconSize="15" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
-              <vstack spacing="2" style="flex: 1" alignItems="stretch">
-                <text value="Language" class="menuLabel" color="rgba(255,255,255,0.4)"/>
-                <text value="English — one locale in this build" class="menuNote"/>
-              </vstack>
-            </hstack>
+                 · CONTENT LANGUAGE — the dubbed audio and the subtitle track — is still
+                   unreachable: `<video>` can select neither a rendition nor a track
+                   (PLAN.md §6.36), so a picker for it would change nothing about what plays.
+                   The note says so rather than implying this row covers it.
+
+                 THE ROW ONLY OFFERS A LOCALE THE BUILD ACTUALLY CARRIES, which is the whole
+                 reason the earlier version refused to render a picker at all: "a dropdown
+                 that switches to Spanish and returns a half-Spanish app is the same defect
+                 as the priced quality ladder Phase 1 deleted." That objection is answered by
+                 coverage, not by argument — `npm run verify` fails the build if any viewer
+                 string is missing from a shipped table, so a half-locale cannot reach a
+                 release. Add a language by adding a file; add the chip here beside it. -->
+            <vstack class="menuRow" spacing="9" alignItems="stretch"
+                    style="border-bottom: 1px solid rgba(255,255,255,0.05)">
+              <hstack spacing="11" alignItems="center">
+                <image icon="globe" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+                <vstack spacing="2" style="flex: 1" alignItems="stretch">
+                  <text value="Language" class="menuLabel"/>
+                  <text value="The app's own words. Audio and subtitle tracks are a separate control the renderer cannot offer yet." class="menuNote"/>
+                </vstack>
+              </hstack>
+              <hstack spacing="8" alignItems="center">
+                <text value="English" class="langChip" a11yTrait="button"
+                      a11yLabel="Show the app in English"
+                      color="{{ dsx.variable.uiLocale == 'en' ? onGold() : ink() }}"
+                      background="{{ dsx.variable.uiLocale == 'en' ? coin() : surfaceChipOn() }}"
+                      on:tap="global.locale = 'en'"/>
+                <text value="Español" class="langChip" a11yTrait="button"
+                      a11yLabel="Mostrar la aplicación en español"
+                      color="{{ dsx.variable.uiLocale == 'es' ? onGold() : ink() }}"
+                      background="{{ dsx.variable.uiLocale == 'es' ? coin() : surfaceChipOn() }}"
+                      on:tap="global.locale = 'es'"/>
+              </hstack>
+            </vstack>
             <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)" href="/admin"
                     a11yGroup="true" a11yLabel="Manage this app — operator surface">
               <image icon="gearshape" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>

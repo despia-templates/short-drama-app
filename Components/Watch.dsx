@@ -257,8 +257,7 @@
     <variable as="panelViews" computed="true">
       if (dsx.variable.detailView == null || dsx.variable.detailView.show.views == null || dsx.variable.detailView.show.views < 1000) { return '' }
       const v = dsx.variable.detailView.show.views
-      if (v < 1000000) { return Math.round(v / 100) / 10 + 'K' }
-      return Math.round(v / 100000) / 10 + 'M'
+      return compactCount(v)
     </variable>
     <variable as="stageH" computed="true">
       if (dsx.variable.wide) { return dsx.screen.height - 62 }

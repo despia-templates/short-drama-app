@@ -118,7 +118,7 @@
          until real formatting lands (G18). -->
     <variable as="vipUntil" computed="true">
       if (dsx.variable.walletView == null || dsx.variable.walletView.vipUntil == null) { return '' }
-      return String(dsx.variable.walletView.vipUntil).slice(0, 10)
+      return shortDate(dsx.variable.walletView.vipUntil)
     </variable>
     <variable as="statusLine" computed="true">
       if (dsx.variable.vipUntil == '') { return 'VIP active' }

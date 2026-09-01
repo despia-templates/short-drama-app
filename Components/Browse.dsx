@@ -106,8 +106,7 @@
     </formula>
     <formula as="cardViews" v="item.views">
       if (v == null || v < 1000) { return '' }
-      if (v < 1000000) { return '  ·  ' + Math.round(v / 100) / 10 + 'K' }
-      return '  ·  ' + Math.round(v / 100000) / 10 + 'M'
+      return '  ·  ' + compactCount(v)
     </formula>
     <formula as="cardFx" id="item.id">
       const on = dsx.variable.hovId == id

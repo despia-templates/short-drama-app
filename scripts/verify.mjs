@@ -36,7 +36,7 @@ import { existsSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from "no
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { resolve, dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
 import { scanDistForSecrets } from "./dist-guard.mjs";
 
@@ -753,6 +753,35 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
   check("...and the queue publishes the community-fold threshold",
     typeof withAd.body?.threshold === "number" && withAd.body.threshold > 1,
     "listReports must return `threshold` — the Manage screen renders WITHHELD against it, and a hard-coded 3 on the client is the second copy this template exists to avoid");
+
+  // ── EVERY SHIPPED LOCALE IS COMPLETE, OR IT DOES NOT SHIP ────────────────────────────
+  // Profile renders a language chip per locale the build carries, and the objection the
+  // earlier version raised against a picker was exactly right: "a dropdown that switches to
+  // Spanish and returns a half-Spanish app is a control that promises something it does not
+  // do." That objection is answered by COVERAGE rather than by argument, and only if
+  // something enforces the coverage — so this is the enforcement. A locale table with one
+  // viewer string missing fails the build, and the chip cannot reach a release half-filled.
+  //
+  // The build folds every Strings.<tag>.json at the app root into the registry, so the
+  // assertion reads the SHIPPED artefact and not the source: a table that failed to parse
+  // is skipped silently by the loader (fail-open, Article 7), and an app that silently
+  // stayed English is precisely what this catches.
+  {
+    const { extract, classify, tableFiles } = await import(pathToFileURL(resolve(root, "scripts/strings.mjs")).href);
+    const { keys } = extract();
+    const viewer = [...keys.keys()].filter((k) => classify(k, keys.get(k)) === "viewer");
+    const registry = JSON.parse(readFileSync(resolve(root, "dist/registry.json"), "utf8"));
+    const shipped = registry.strings ?? {};
+    const declared = tableFiles(root).map((t) => t.tag);
+    check("every locale table the source declares is in the built registry",
+      declared.every((t) => shipped[t] !== undefined),
+      `declared ${JSON.stringify(declared)} but the build folded ${JSON.stringify(Object.keys(shipped))} — an unparsable table is skipped SILENTLY and the app just stays English`);
+    for (const tag of Object.keys(shipped)) {
+      const missing = viewer.filter((k) => typeof shipped[tag][k] !== "string" || shipped[tag][k] === "");
+      check(`the ${tag} locale carries every viewer string (${viewer.length})`, missing.length === 0,
+        `${missing.length} missing, e.g. ${missing.slice(0, 3).map((k) => JSON.stringify(k.slice(0, 44))).join(" · ")} — run node scripts/strings.mjs --write ${tag}`);
+    }
+  }
 
   // 1.2(d) — PUBLISHED CONTACT INFORMATION needs somewhere to be published FROM. The value
   // ships empty on purpose (a placeholder URL reads as a broken promise to a reviewer); the

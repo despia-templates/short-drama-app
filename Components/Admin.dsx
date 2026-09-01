@@ -124,7 +124,7 @@
          spelling, which produces nothing and takes the whole attribute with it. -->
     <formula as="modWhen" at="item.at">
       if (at == null) { return '' }
-      return String(at).slice(0, 10) + ' ' + String(at).slice(11, 16)
+      return shortDate(at) + ' ' + String(at).slice(11, 16)
     </formula>
     <formula as="modHead" kind="item.kind" reason="item.reason" flags="item.flags">
       const what = kind == 'ad' ? 'Ad creative' : 'Comment'
