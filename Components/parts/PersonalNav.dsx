@@ -4,10 +4,15 @@
      the two pages read as ONE center.
 
      DATA COMES DOWN AS ATTRIBUTES. The first version fetched its own session and wallet,
-     so every wide Profile render fired /dev-session.json and /wallet/state twice — once
+     so every wide Profile render fired the session endpoint and /wallet/state twice — once
      for the page, once for its own sidebar. A part renders what its owner already knows;
      it does not shop for its own facts. (A component attribute whose whole value is one
      {{ }} carries the VALUE, so numbers arrive as numbers.)
+
+     The identity half of that is now <AuthSeam>'s published `global.auth`, so a caller
+     passes `uid` from one place rather than from its own session block — and My List, which
+     used to mount this with NO attributes at all and therefore read "Signed out" beside a
+     signed-in viewer's own list (audit G11), passes them too.
 
      Lateral moves inside the center REPLACE: Wallet → My list → Wallet through href
      would stack three entries and turn the back gesture into a tour of the sidebar. -->

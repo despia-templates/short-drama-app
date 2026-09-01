@@ -7,7 +7,7 @@
       "path": "/",
       "component": "shortdrama.App",
       "meta": {
-        "title": "Short Drama — binge-worthy vertical series"
+        "title": "Short Drama \u2014 binge-worthy vertical series"
       },
       "motion": {
         "mobile": "none",
@@ -18,7 +18,7 @@
       "path": "/discover",
       "component": "shortdrama.Discover",
       "meta": {
-        "title": "Discover — Short Drama"
+        "title": "Discover \u2014 Short Drama"
       },
       "motion": {
         "mobile": "none",
@@ -29,7 +29,7 @@
       "path": "/vip",
       "component": "shortdrama.Vip",
       "meta": {
-        "title": "VIP — Short Drama"
+        "title": "VIP \u2014 Short Drama"
       },
       "motion": {
         "mobile": "none",
@@ -40,14 +40,14 @@
       "path": "/store",
       "component": "shortdrama.Store",
       "meta": {
-        "title": "Store — Short Drama"
+        "title": "Store \u2014 Short Drama"
       }
     },
     {
       "path": "/rewards",
       "component": "shortdrama.Rewards",
       "meta": {
-        "title": "Rewards — Short Drama"
+        "title": "Rewards \u2014 Short Drama"
       },
       "motion": {
         "mobile": "none",
@@ -58,7 +58,7 @@
       "path": "/list",
       "component": "shortdrama.MyList",
       "meta": {
-        "title": "My List — Short Drama"
+        "title": "My List \u2014 Short Drama"
       },
       "motion": {
         "mobile": "none",
@@ -69,7 +69,7 @@
       "path": "/profile",
       "component": "shortdrama.Profile",
       "meta": {
-        "title": "Profile — Short Drama"
+        "title": "Profile \u2014 Short Drama"
       },
       "motion": {
         "mobile": "none",
@@ -80,42 +80,56 @@
       "path": "/notices",
       "component": "shortdrama.Notices",
       "meta": {
-        "title": "Notifications — Short Drama"
+        "title": "Notifications \u2014 Short Drama"
+      }
+    },
+    {
+      "path": "/account",
+      "component": "shortdrama.Account",
+      "meta": {
+        "title": "Account \u2014 Short Drama"
+      }
+    },
+    {
+      "path": "/auth/:pane",
+      "component": "shortdrama.Auth",
+      "meta": {
+        "title": "Account \u2014 Short Drama"
       }
     },
     {
       "path": "/browse/:genre",
       "component": "shortdrama.Browse",
       "meta": {
-        "title": "Browse — Short Drama"
+        "title": "Browse \u2014 Short Drama"
       }
     },
     {
       "path": "/browse",
       "component": "shortdrama.Browse",
       "meta": {
-        "title": "Browse — Short Drama"
+        "title": "Browse \u2014 Short Drama"
       }
     },
     {
       "path": "/show/:id",
       "component": "shortdrama.Show",
       "meta": {
-        "title": "Show — Short Drama"
+        "title": "Show \u2014 Short Drama"
       }
     },
     {
       "path": "/watch/:show/:idx",
       "component": "shortdrama.Watch",
       "meta": {
-        "title": "Watch — Short Drama"
+        "title": "Watch \u2014 Short Drama"
       }
     },
     {
       "path": "/admin",
       "component": "shortdrama.Admin",
       "meta": {
-        "title": "Manage — Short Drama"
+        "title": "Manage \u2014 Short Drama"
       }
     }
   ],

@@ -21,12 +21,13 @@
   <head>
     <expects variable="nav"/>
 
-    <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="state" url="/rewards/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheRewards = state.data"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
-    <api as="checkinCall" url="/rewards/checkin" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
-    <api as="spinCall" url="/rewards/spin" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
-    <api as="claimCall" url="/rewards/task" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+    <!-- the seam owns the token (<AuthSeam/> at the foot of this file); every authenticated
+         read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
+    <api as="state" url="/rewards/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheRewards = global.auth.ok == true ? state.data : null"/>
+    <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
+    <api as="checkinCall" url="/rewards/checkin" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="spinCall" url="/rewards/spin" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="claimCall" url="/rewards/task" method="POST" auto="false" headers="global.auth.headers"/>
 
     <variable as="toast">return ''</variable>
     <variable as="wheelTurn">return 0</variable>     <!-- accumulated rotation, degrees -->
@@ -39,19 +40,24 @@
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
          last good payload lives in the app-wide store and is the FIRST PAINT while the
          refetch runs. Read walletView, never wallet.data, or the blank frame returns. -->
+    <!-- signed out is the seam's answer now, not a 404 on a static file; `authKnown` keeps
+         the boot frame out of it (docs/auth.md) -->
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <variable as="authKnown" computed="true">return global.auth != null &amp;&amp; global.auth.state != null</variable>
+    <variable as="signedOut" computed="true">
+      return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
+    </variable>
+    <!-- viewer-scoped stashes never survive the viewer (docs/auth.md) -->
     <variable as="walletView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (wallet.data != null) { return wallet.data }
       return global.cacheWallet
     </variable>
     <variable as="stateView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (state.data != null) { return state.data }
       return global.cacheRewards
     </variable>
-    <variable as="authHeaders" computed="true">
-      if (session.data == null) { return {} }
-      return { authorization: 'Bearer ' + session.data.viewer.token }
-    </variable>
-    <variable as="signedOut" computed="true">return session.error != null</variable>
     <!-- ENTITLEMENT, read from the wallet — never assumed, never remembered. It drives two
          things on this screen: the ad lane switches off (VIP is sold as "no ads", so it has
          to BE no ads) and the sell card stops pitching a pass the viewer already holds.
@@ -303,12 +309,9 @@
       <!-- signed out: one honest card, nothing else -->
       <vstack class="section" visible-if="dsx.variable.phase == 'signedout'">
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <vstack class="signCard">
-            <image icon="gift.fill" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
-            <text value="Rewards belong to an account" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-            <text value="Streaks, spins and coins need somewhere to land. Sign in and start earning." class="empty" textAlign="center"/>
-            <button label="Reload session" class="signBtn" on:tap="session.refresh()"/>
-          </vstack>
+          <SignInCard icon="gift.fill"
+                      title="Rewards belong to an account"
+                      note="Streaks, spins and coins need somewhere to land. Sign in and start earning — nothing here costs money."/>
         </vstack>
       </vstack>
 
@@ -388,7 +391,6 @@
                   today="{{ dsx.variable.stateView == null ? 0 : dsx.variable.stateView.adsToday }}"
                   cap="{{ dsx.variable.stateView == null ? 10 : dsx.variable.stateView.adCap }}"
                   reward="{{ dsx.variable.stateView == null ? 15 : dsx.variable.stateView.adReward }}"
-                  headers="{{ dsx.variable.authHeaders }}"
                   vip="{{ dsx.variable.isVip }}"
                   on:granted="dsx.action.adGranted()"
                   on:failed="dsx.action.adFailed()"
@@ -453,4 +455,5 @@
            a11yLabel="Dismiss message" a11yTrait="button"/>
   </hstack>
   <TabBar active="" visible-if="dsx.variable.wide == false"/>
+  <AuthSeam/>
 </vstack>

@@ -1,0 +1,34 @@
+<!-- SignInCard — the ONE signed-out state, used everywhere a screen needs identity.
+
+     WHAT IT REPLACES. Three screens each carried their own signed-out card, and all three
+     offered a button labelled "Reload session" — because `signedOut` was defined as
+     `session.error != null`, i.e. as a 404 on a static JSON file. The state was a network
+     error wearing a person's clothes and the affordance re-fetched the missing file. This
+     card is a real signed-out state with a real way out: it raises <AuthSeam>'s sheet.
+
+     IT NEVER BLOCKS BROWSING. Every mount of this card sits inside a screen that keeps
+     working without an account — the catalogue, the show pages and the free episodes are
+     all open to a guest (App Store 5.1.1(v)). The card explains what an account adds, on
+     the one section that needs one, and says the rest stays open.
+
+     The host passes `title` and `note` so the reason is specific ("Your list lives on your
+     account", not "Sign in required"): a signed-out state that names what the viewer was
+     reaching for is the difference between an invitation and a wall. -->
+<vstack class="card" alignItems="center">
+  <head>
+    <attribute as="title" default="'Sign in to continue'"/>
+    <attribute as="note" default="''"/>
+    <attribute as="icon" default="'person.crop.circle'"/>
+
+    <style as="card" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="24"/>
+    <style as="title" fontSize="15" fontWeight="semibold" color="#FFFFFF" textAlign="center"/>
+    <style as="note" fontSize="13" color="rgba(255,255,255,0.45)" textAlign="center" lineSpacing="3"/>
+    <style as="signBtn" background="#FF2C55" radius="20" paddingH="24" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+  </head>
+
+  <image icon="{{ dsx.attribute.icon }}" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+  <text value="{{ dsx.attribute.title }}" class="title"/>
+  <text value="{{ dsx.attribute.note }}" class="note" visible-if="dsx.attribute.note != ''"/>
+  <button label="Sign in" class="signBtn" on:tap="dsx.module.route.push({ path: '/auth/signin' })"
+          a11yLabel="Sign in or create an account"/>
+</vstack>

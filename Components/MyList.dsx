@@ -4,9 +4,10 @@
      words is a bug report waiting to happen. -->
 <vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
-    <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheFavs = favs.data"/>
-    <api as="continue" url="/viewer/continue" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheContinue = continue.data"/>
+    <!-- the seam owns the token (<AuthSeam/> at the foot of this file); every authenticated
+         read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
+    <api as="favs" url="/viewer/list" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheFavs = global.auth.ok == true ? favs.data : null"/>
+    <api as="continue" url="/viewer/continue" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheContinue = global.auth.ok == true ? continue.data : null"/>
 
     <variable as="hovId">return ''</variable>
 
@@ -16,22 +17,47 @@
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
          last good payload lives in the app-wide store and is the FIRST PAINT while the
          refetch runs. Read continueView, never continue.data, or the blank frame returns. -->
+    <!-- signed-out is its own state: the personal reads never resolve without a session,
+         and an empty-guard on data != null hides the empty copy in exactly that case —
+         two headings over void, indistinguishable from a bug. It used to be defined as
+         `session.error != null`, i.e. as a 404 on a static file; it is now the answer the
+         seam publishes, with `authKnown` separating "no account" from "not asked yet". -->
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <variable as="authKnown" computed="true">return global.auth != null &amp;&amp; global.auth.state != null</variable>
+    <variable as="signedOut" computed="true">
+      return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
+    </variable>
+    <!-- viewer-scoped stashes never survive the viewer (docs/auth.md) -->
     <variable as="continueView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (continue.data != null) { return continue.data }
       return global.cacheContinue
     </variable>
     <variable as="favsView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (favs.data != null) { return favs.data }
       return global.cacheFavs
     </variable>
-    <variable as="authHeaders" computed="true">
-      if (session.data == null) { return {} }
-      return { authorization: 'Bearer ' + session.data.viewer.token }
+    <!-- for the sidebar only: this screen does not fetch the wallet, so it reports the last
+         one any wallet screen saw (null = em dash, never a fake 0) -->
+    <variable as="uid" computed="true">
+      if (dsx.variable.signedIn == false) { return '' }
+      const s = global.auth.sub
+      return s == null ? '' : String(s).slice(0, 8)
     </variable>
-    <!-- signed-out is its own state: the personal reads never resolve without a session,
-         and an empty-guard on data != null hides the empty copy in exactly that case —
-         two headings over void, indistinguishable from a bug -->
-    <variable as="signedOut" computed="true">return session.error != null</variable>
+    <variable as="walletView" computed="true">
+      return dsx.variable.signedIn == false ? null : global.cacheWallet
+    </variable>
+    <variable as="coins" computed="true">
+      return dsx.variable.walletView == null ? null : dsx.variable.walletView.coins
+    </variable>
+    <variable as="bonus" computed="true">
+      return dsx.variable.walletView == null ? null : dsx.variable.walletView.bonus
+    </variable>
+    <variable as="isVip" computed="true">
+      if (dsx.variable.walletView == null) { return false }
+      return dsx.variable.walletView.vip === true
+    </variable>
     <!-- A FAILED READ IS NOT A SLOW READ. This tested data-nullness only, and neither
          `favs.error` nor `continue.error` was read anywhere in the file — so a failed
          /viewer/list skeletoned FOREVER with no message and no retry. The error lane now
@@ -126,17 +152,24 @@
       </hstack>
 
       <hstack class="split">
-        <PersonalNav active="list" visible-if="dsx.variable.wide"/>
+        <!-- THE SIDEBAR USED TO CLAIM "Signed out" ON EVERY VISIT (audit G11): it was mounted
+             with no attributes at all, so a signed-in viewer with coins read the denial right
+             beside the list that proved otherwise. Identity now comes from the seam, and the
+             balance from the app-wide wallet stash — no extra fetch, and a number that is
+             either true or an em dash, never a wrong one. -->
+        <PersonalNav active="list" visible-if="dsx.variable.wide"
+                     uid="{{ dsx.variable.uid }}" coins="{{ dsx.variable.coins }}"
+                     bonus="{{ dsx.variable.bonus }}" vip="{{ dsx.variable.isVip }}"/>
 
         <vstack class="content" style="flex: 1; min-width: 0">
           <text value="My List" class="h1" visible-if="dsx.variable.wide == false"/>
 
-          <vstack class="signCard" visible-if="dsx.variable.signedOut">
-            <image icon="person.crop.circle" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
-            <text value="Your list lives on your account" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-            <text value="Sign in and everything you save or start watching lands here." class="empty" textAlign="center"/>
-            <button label="Reload" class="signBtn" on:tap="session.refresh()"/>
-          </vstack>
+          <!-- the shared signed-out card; its button raises the seam sheet, where "Reload"
+               used to re-fetch the static session file that defined the state -->
+          <SignInCard visible-if="dsx.variable.signedOut"
+                      icon="bookmark.fill"
+                      title="Your list lives on your account"
+                      note="Sign in and everything you save or start watching lands here — on this device and any other."/>
 
           <vstack spacing="20" alignItems="stretch" visible-if="dsx.variable.listLoading">
             <Skeleton height="20" radius="6"/>
@@ -209,4 +242,5 @@
     </vstack>
   </scroll>
   <TabBar active="list" visible-if="dsx.variable.wide == false"/>
+  <AuthSeam/>
 </vstack>

@@ -19,9 +19,11 @@
 <vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="home" url="/catalog/home" on:success="dsx.action.homeLanded()"/>
-    <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="continue" url="/viewer/continue" ssr="false" needs="session"
-         headers="dsx.variable.authHeaders" on:success="global.cacheContinue = continue.data"/>
+    <!-- the seam owns the token (<AuthSeam/> at the foot of this file); every authenticated
+         read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
+    <api as="continue" url="/viewer/continue" ssr="false"
+         auto="global.auth.ok == true" headers="global.auth.headers"
+         on:success="global.cacheContinue = global.auth.ok == true ? continue.data : null"/>
 
     <variable as="heroPage">return 0</variable>
     <variable as="hovId">return ''</variable>   <!-- the card under the pointer -->
@@ -34,7 +36,11 @@
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
          last good payload lives in the app-wide store and is the FIRST PAINT while the
          refetch runs. Read continueView, never continue.data, or the blank frame returns. -->
+    <!-- a guest has no Continue rail, and the app-wide stash is one person, so the
+         rail empties the instant the token drops (docs/auth.md) -->
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
     <variable as="continueView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (continue.data != null) { return continue.data }
       return global.cacheContinue
     </variable>
@@ -107,10 +113,6 @@
     </variable>
     <variable as="posterBox" computed="true">
       return 'width: ' + dsx.variable.posterW + 'px; height: ' + dsx.variable.posterH + 'px; justify-content: flex-end'
-    </variable>
-    <variable as="authHeaders" computed="true">
-      if (session.data == null) { return {} }
-      return { authorization: 'Bearer ' + session.data.viewer.token }
     </variable>
     <!-- CONTENT SURVIVES A REVISIT. `<api cache>` is keyed by the per-MOUNT store
          (mount.ts makes a new ReactiveStore per component, and the api cache is a WeakMap
@@ -739,4 +741,7 @@ One source. Native on iOS, Android, web and desktop." class="footCopy"/>
     </vstack>
   </scroll>
   <TabBar active="home" visible-if="dsx.variable.wide == false"/>
+  <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of
+       the layout, so a zero-height child here cannot disturb any chrome. -->
+  <AuthSeam/>
 </vstack>

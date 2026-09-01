@@ -1550,3 +1550,28 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     compiler has no `<webhook>` tag (§6.6), so the verification callback cannot be declared.
     An adopter shipping to either store must wire it before submitting, and there is now a
     `<route>` and an action shaped exactly like the thing it will plug into.
+
+87. MEASURED 2026-09-01 — **Dynamic module dispatch does not exist, and both ways round it
+    fail silently as SUCCESS.** Writing account deletion (App Store 5.1.1(v)) needs the same
+    sweep over twelve owner-scoped entities, so the obvious spelling is a loop over table
+    names. Probed on a live origin, in a throwaway action, per the probe-before-you-generalise
+    rule:
+      · `dsx.module.data[name].list(...)` → the whole expression is NULL. `await null` is null,
+        `.ok` is false, and a twelve-table sweep deletes nothing while returning
+        `{deleted:true}`. AGENTS.md already recorded bracket-read MUTATION as a no-op; this is
+        the read side, on the module namespace.
+      · `const n = await count(dsx.module.data.favorite)` — passing the table object into a
+        lambda → ok with ZERO rows. The object loses the caller RLS scope as a value.
+      · literal `dsx.module.data.favorite.list(...)` → ok, 5 rows.
+    Both failures are indistinguishable from "nothing to delete", which for a deletion is the
+    worst possible outcome. The action is unrolled, twelve literal blocks, and the finding is
+    now an AGENTS.md rule.
+
+    TWO MORE, from the same work. A request gets 64 module calls (ACTION_CALL_CAP, and a spec
+    may only LOWER it), so the first correct version blew the budget mid-sweep: 20 unlocks
+    gone, wallet and My List left behind, 503 to the caller — an account half deleted, which
+    is exactly the "deactivate" 5.1.1(v) refuses. Deletion is now bounded per call and reports
+    `done`, and the client loops until it flips. And the route ceiling has to follow the
+    ACTION, not the intent: `rate="3/h"` looked right for a once-in-a-lifetime decision and
+    rate-limited the viewer out of finishing their own deletion on pass two.
+

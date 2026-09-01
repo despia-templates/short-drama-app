@@ -18,11 +18,12 @@
   <head>
     <expects variable="nav"/>
 
-    <api as="session" url="/dev-session.json" ssr="false"/>
+    <!-- the seam owns the token (<AuthSeam/> at the foot of this file); every authenticated
+         read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
     <api as="catalog" url="/store/catalog" on:success="global.cacheCatalog = catalog.data"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
-    <api as="checkoutCall" url="/store/checkout" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
-    <api as="settleCall" url="/store/settle" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+    <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
+    <api as="checkoutCall" url="/store/checkout" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="settleCall" url="/store/settle" method="POST" auto="false" headers="global.auth.headers"/>
 
     <variable as="toast">return ''</variable>
     <variable as="buying">return ''</variable>       <!-- the sku currently in checkout -->
@@ -31,13 +32,22 @@
     <variable as="settleFailed">return false</variable>
     <variable as="hovId">return ''</variable>
 
+    <!-- signed in is the seam, not the presence of a fetched JSON file (docs/auth.md) -->
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <variable as="authKnown" computed="true">return global.auth != null &amp;&amp; global.auth.state != null</variable>
+    <variable as="signedOut" computed="true">
+      return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
+    </variable>
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
          last good payload lives in the app-wide store and is the FIRST PAINT while the
          refetch runs. Read catalogView, never catalog.data, or the blank frame returns. -->
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
          last good payload lives in the app-wide store and is the FIRST PAINT while the
          refetch runs. Read walletView, never wallet.data, or the blank frame returns. -->
+    <!-- viewer-scoped stash: a signed-out frame must not read the last balance out of
+         the app-wide store (docs/auth.md) -->
     <variable as="walletView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (wallet.data != null) { return wallet.data }
       return global.cacheWallet
     </variable>
@@ -45,11 +55,6 @@
       if (catalog.data != null) { return catalog.data }
       return global.cacheCatalog
     </variable>
-    <variable as="authHeaders" computed="true">
-      if (session.data == null) { return {} }
-      return { authorization: 'Bearer ' + session.data.viewer.token }
-    </variable>
-    <variable as="signedIn" computed="true">return session.data != null</variable>
     <variable as="bp" computed="true">
       const w = dsx.screen.width
       if (w >= 1120) { return 'desktop' }
@@ -109,7 +114,10 @@
     <action as="buy" sku="item.id" label="item.label">
       if (dsx.variable.buying != '') { return }
       if (dsx.variable.signedIn == false) {
-        dsx.variable.toast = 'Sign in first — coins and VIP belong to an account, and this session has none.'
+        // A PURCHASE NEEDS AN ACCOUNT TO LAND ON, so the tap raises the sign-in sheet
+        // rather than farming a refusal toast. This used to be a toast that told the
+        // viewer to sign in on a build where nothing could.
+        dsx.module.route.push({ path: '/auth/signin' })
         return
       }
       dsx.variable.buying = sku
@@ -225,6 +233,14 @@
 
         <!-- a toast the viewer can dismiss; a new action overwrites it -->
 
+        <!-- A GUEST STILL SEES THE PRICES — hiding the shop from someone who has not signed
+             in is the fastest way to lose them — but the screen says what buying needs, once,
+             before they tap. The card is the same one every screen uses. -->
+        <SignInCard visible-if="dsx.variable.signedOut" style="margin-top: 12px"
+                    icon="dollarsign.circle.fill"
+                    title="Purchases land on an account"
+                    note="Browse the packs and plans freely. Signing in is what gives coins and VIP somewhere to live, so they are still yours on your next device."/>
+
         <!-- THE RECOVERY CARD. Stripe confirmed the charge, the settle call failed
              (network blip, server restart): the order id is still here, settle is
              idempotent, and this card stays until the grant lands. Money is never
@@ -264,7 +280,7 @@
           <text value="Unlimited viewing while your plan is active. Cancel anytime." class="sectionNote"/>
         </vstack>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <PlansSheet mode="inline" headers="{{ dsx.variable.authHeaders }}"
+          <PlansSheet mode="inline"
                       vip="{{ dsx.variable.isVip }}" on:purchased="wallet.refresh()"/>
         </vstack>
       </vstack>
@@ -294,6 +310,20 @@
               <text value="{{ cardBusyLabel }}" class="busyLineDark" visible-if="cardBusyLabel != ''"/>
             </vstack>
           </grid>
+        </vstack>
+      </vstack>
+
+      <!-- RESTORE PURCHASES — App Store 3.1.1 wants it on the surface that sells, and
+           <RestoreRow> calls POST /store/restore for real: it walks this account's unsettled
+           orders, asks Stripe about each, and grants the ones that were actually paid. That
+           is the money a viewer cannot otherwise reach — charged while the app was closed
+           between the payment sheet and the settle call. -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <vstack class="earnCard">
+            <RestoreRow on:restored="wallet.refresh()"/>
+            <LegalLinks variant="line"/>
+          </vstack>
         </vstack>
       </vstack>
 
@@ -333,4 +363,7 @@
     <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
            a11yLabel="Dismiss message" a11yTrait="button"/>
   </hstack>
+  <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of
+       the layout, so a zero-height child here cannot disturb any chrome. -->
+  <AuthSeam/>
 </vstack>

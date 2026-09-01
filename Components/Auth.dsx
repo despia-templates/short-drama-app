@@ -1,0 +1,95 @@
+<!-- Auth — the route `/auth/:pane` (`signin` · `signout` · `delete`). A shell: chrome, a
+     back affordance, and one mount of <AuthSeam mode="page">, which owns every word and
+     every action inside it.
+
+     WHY A ROUTE. The seam's header has the long version; the short one is that a modal
+     driven by a global renders once per LIVE FRAME, and a pushed route keeps the screen
+     under it alive (that is what makes back instant) while the router seeds a root frame
+     under a deep link. Measured: two identical panes stacked at the same coordinates. A
+     route is exactly-once by construction — the framework's guarantee, not a protocol of
+     mine — and it costs nothing that mattered, because a pushed frame restores the screen
+     beneath it on pop, so the player never loses its place.
+
+     It also buys something real: `/auth/signin` is a URL. It survives a reload, it can be
+     the redirect target an OAuth provider hands back, and a support reply can link to it.
+
+     PARAMETERISED FIRST. There is no bare `/auth`, but the rule that put `/browse/:genre`
+     above `/browse` is the same one that keeps this route unambiguous (PLAN.md §6.32b). -->
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <!-- the router publishes nav.canPop / nav.depth; back reads it -->
+    <expects variable="nav"/>
+
+    <!-- A ROUTE PARAM IS NOT READABLE IN A PLAIN variable INITIALIZER (PLAN.md §6.32a) —
+         an initializer runs before the param is in scope and reads empty. Seed from a
+         computed instead, which re-derives once the router has published it. -->
+    <variable as="pane" computed="true">
+      const p = vars.pane
+      if (p == 'signout') { return 'signout' }
+      if (p == 'delete') { return 'delete' }
+      return 'signin'
+    </variable>
+    <variable as="heading" computed="true">
+      if (dsx.variable.pane == 'signout') { return 'Sign out' }
+      if (dsx.variable.pane == 'delete') { return 'Delete account' }
+      return 'Sign in'
+    </variable>
+
+    <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
+    <variable as="bp" computed="true">
+      const w = dsx.screen.width
+      if (w >= 1120) { return 'desktop' }
+      if (w >= 768) { return 'tablet' }
+      return 'phone'
+    </variable>
+    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="gutter" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
+      return 16
+    </variable>
+    <!-- a login form is a NARROW column at every width: a 1440px-wide email field is not a
+         wider form, it is a worse one -->
+    <variable as="shell" computed="true">
+      const g = dsx.variable.gutter
+      return 'width: 100%; max-width: 520px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+    </variable>
+
+    <!-- The canonical back (writing-an-app.md §5): POP when there is history, REPLACE when
+         the screen was deep-linked, so a dismiss never teleports home and never stacks a
+         second copy of where you came from. Back is never href — href pushes. -->
+    <action as="back">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/' }) }
+    </action>
+    <!-- Every outcome lands the viewer back where they asked from — including a completed
+         sign-in, which is the whole point: the paywall, the buy button or the comment box
+         they tapped is still exactly where they left it. -->
+    <action as="done">
+      dsx.action.back()
+    </action>
+
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
+    <style as="scroller" alignItems="stretch"/>
+    <style as="page" spacing="16" paddingTop="16" paddingBottom="32" alignItems="stretch"/>
+    <style as="backRow" spacing="8" alignItems="center" paddingV="8"/>
+    <style as="backTxt" fontSize="14" color="rgba(255,255,255,0.7)"/>
+  </head>
+
+  <TopNav active="" visible-if="dsx.variable.wide"/>
+  <scroll class="scroller" style="flex: 1; min-height: 0">
+    <vstack class="page" style="{{ dsx.variable.shell }}">
+      <hstack class="backRow" on:tap="dsx.action.back()"
+              a11yGroup="true" a11yTrait="button" a11yLabel="Back">
+        <image icon="chevron.left" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+        <text value="Back" class="backTxt"/>
+      </hstack>
+
+      <AuthSeam mode="page" pane="{{ dsx.variable.pane }}" on:done="dsx.action.done()"/>
+    </vstack>
+  </scroll>
+
+  <!-- NO TAB BAR: /auth/:pane is a PUSHED route, and on the phone lane a push TRANSFORMS the
+       whole frame — global chrome inside it would slide in with the page. The back row above
+       is the way out on every width. -->
+</vstack>

@@ -12,9 +12,13 @@
      out, the screen says so and offers the reload; it never renders headings over void. -->
 <vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
-    <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
-    <api as="ledger" url="/wallet/ledger" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheLedger = ledger.data"/>
+    <!-- THE SEAM, NOT A SESSION BLOCK. <AuthSeam> (mounted at the foot of this file) owns
+         the token; every authenticated read here is gated on `global.auth.ok` and carries
+         `global.auth.headers`. `auto=` is re-evaluated whenever its read set changes, so
+         these fire the moment a sign-in lands and stop the moment a sign-out drops it —
+         no needs= edge, no per-screen authHeaders copy, no session block. docs/auth.md. -->
+    <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
+    <api as="ledger" url="/wallet/ledger" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheLedger = global.auth.ok == true ? ledger.data : null"/>
 
     <variable as="toast">return ''</variable>
 
@@ -24,22 +28,35 @@
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
          last good payload lives in the app-wide store and is the FIRST PAINT while the
          refetch runs. Read ledgerView, never ledger.data, or the blank frame returns. -->
+    <!-- SIGNED OUT IS A PERSON, NOT A 404. This used to read `session.error != null` — the
+         app defined its own logged-out state as a static JSON file failing to load, which is
+         why the card below offered "Reload session". Now it is the seam's own answer, with
+         `authKnown` separating "no account" from "we have not asked yet" so no screen flashes
+         a sign-in card for the frame before the seam resolves. -->
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <variable as="authKnown" computed="true">return global.auth != null &amp;&amp; global.auth.state != null</variable>
+    <variable as="signedOut" computed="true">
+      return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
+    </variable>
+    <!-- THE VIEWER-SCOPED STASHES ARE VIEWER-SCOPED. `global.cache*` outlives the mount so a
+         tab revisit paints stale-then-fresh (PLAN.md §6.30) — which means a signed-out frame
+         would otherwise read the previous viewer's balance straight out of it. The seam nulls
+         these five on sign-out; this guard is the second half, so the answer is right on the
+         frame the token drops rather than one action later (docs/auth.md). -->
     <variable as="ledgerView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (ledger.data != null) { return ledger.data }
       return global.cacheLedger
     </variable>
     <variable as="walletView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (wallet.data != null) { return wallet.data }
       return global.cacheWallet
     </variable>
-    <variable as="authHeaders" computed="true">
-      if (session.data == null) { return {} }
-      return { authorization: 'Bearer ' + session.data.viewer.token }
-    </variable>
-    <variable as="signedOut" computed="true">return session.error != null</variable>
     <variable as="uid" computed="true">
-      if (session.data == null) { return '' }
-      return session.data.viewer.sub.slice(0, 8)
+      if (dsx.variable.signedIn == false) { return '' }
+      const s = global.auth.sub
+      return s == null ? '' : String(s).slice(0, 8)
     </variable>
     <!-- `wallet.error` was read nowhere: a failed /wallet/state left an em dash beside
          "Coins" forever, which reads as "you have none" rather than "we could not ask".
@@ -164,7 +181,6 @@
     <style as="amount" fontSize="13" fontWeight="semibold"/>
     <style as="empty" fontSize="13" color="rgba(255,255,255,0.45)"/>
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="signCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="24" alignItems="center"/>
 
     <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
@@ -193,13 +209,12 @@
           <text value="Profile" class="h1" visible-if="dsx.variable.wide == false"/>
 
 
-          <!-- signed out: the state has words and a way forward -->
-          <vstack class="signCard" visible-if="dsx.variable.signedOut">
-            <image icon="person.crop.circle" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
-            <text value="You're not signed in" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-            <text value="Coins, VIP and your history live on your account. The catalogue is open either way." class="empty" textAlign="center"/>
-            <button label="Reload session" class="retryBtn" on:tap="session.refresh()"/>
-          </vstack>
+          <!-- signed out: one shared card, and its button now signs you IN. It used to say
+               "Reload session" and re-fetch a missing file, because the state it announced
+               was that file 404ing rather than a person without an account. -->
+          <SignInCard visible-if="dsx.variable.signedOut"
+                      title="You are browsing as a guest"
+                      note="Coins, VIP, your list and your history live on an account, so they follow you to another device. The catalogue is open either way."/>
 
           <!-- phone identity (the sidebar carries this on wide) -->
           <vstack class="card" visible-if="dsx.variable.wide == false && dsx.variable.signedOut == false && dsx.variable.walletFailed == false">
@@ -219,9 +234,12 @@
                interruption, and the viewer should land back on their wallet the moment
                they decide either way. <PlansSheet> owns the tiers, the checkout and the
                settle-recovery; this card is just its trigger (passed as children). -->
-          <PlansSheet visible-if="dsx.variable.signedOut == false"
-                      headers="{{ dsx.variable.authHeaders }}"
-                      vip="{{ dsx.variable.isVip }}" vipUntil="{{ dsx.variable.vipUntil }}"
+          <!-- A GUEST SEES THE OFFER TOO. It used to be hidden when signed out, which was
+               right when there was no way to sign in — hiding the funnel beat sending a
+               viewer at a checkout that would 401. Now <PlansSheet> raises the sign-in sheet
+               on a guest tap, which is also the shape App Store 3.1.2 asks for: a
+               subscription surface lets a current subscriber sign in or restore. -->
+          <PlansSheet vip="{{ dsx.variable.isVip }}" vipUntil="{{ dsx.variable.vipUntil }}"
                       on:purchased="dsx.action.planBought()" on:failed="dsx.action.planFailed()">
             <vstack class="vipCard"
                     a11yLabel="{{ dsx.variable.isVip ? 'Your VIP membership' : 'Go VIP' }}"
@@ -316,9 +334,13 @@
 
           <!-- lanes note + settings -->
           <vstack class="cardTight" visible-if="dsx.variable.signedOut == false">
-            <text value="Purchases ride Stripe on the web and the RevenueCat store lane in the iOS and Android apps — one wallet either way. Signing in rides your identity provider in production; this build mints a local session." class="note" paddingV="8"/>
+            <text value="Purchases ride Stripe on the web and the RevenueCat store lane in the iOS and Android apps — one wallet either way. Identity rides your provider in production; this build mints a local session (Account, below)." class="note" paddingV="8"/>
           </vstack>
-          <vstack class="cardFlush" visible-if="dsx.variable.signedOut == false">
+          <!-- THE MENU IS NOT GATED ON A SESSION. It used to be, so a guest saw a screen with
+               one card on it and no way anywhere — including no way to the Account page,
+               where signing in lives. Every row here works without an account; the ones that
+               need one say so when you arrive. -->
+          <vstack class="cardFlush">
             <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)" href="/list"
                     a11yGroup="true" a11yLabel="My list and history">
               <image icon="bookmark.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
@@ -363,10 +385,26 @@
                 <text value="English — one locale in this build" class="menuNote"/>
               </vstack>
             </hstack>
-            <hstack class="menuRow" href="/admin" a11yGroup="true" a11yLabel="Manage this app — operator surface">
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)" href="/admin"
+                    a11yGroup="true" a11yLabel="Manage this app — operator surface">
               <image icon="gearshape" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
               <text value="Manage this app" class="menuLabel" style="flex: 1"/>
               <text value="operator" class="menuValue" color="#F7C948"/>
+              <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+            </hstack>
+            <!-- ACCOUNT IS THE LAST ROW, and it is the one a store reviewer looks for: sign
+                 in, sign out, restore purchases, terms, privacy, and DELETE ACCOUNT — two
+                 taps from the tab bar (App Store 5.1.1(v) wants deletion findable in-app,
+                 never behind a support ticket). The value column says which side of the
+                 session you are on, so the row answers before it is tapped. -->
+            <hstack class="menuRow" href="/account" a11yGroup="true"
+                    a11yLabel="Account — sign in or out, restore purchases, terms, privacy, and delete your account">
+              <image icon="person.crop.circle" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+              <vstack spacing="2" style="flex: 1" alignItems="stretch">
+                <text value="Account" class="menuLabel"/>
+                <text value="Sign in or out · restore purchases · terms &amp; privacy · delete account" class="menuNote"/>
+              </vstack>
+              <text value="{{ dsx.variable.signedIn ? 'signed in' : 'guest' }}" class="menuValue"/>
               <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
           </vstack>
@@ -390,4 +428,7 @@
            a11yLabel="Dismiss message" a11yTrait="button"/>
   </hstack>
   <TabBar active="profile" visible-if="dsx.variable.wide == false"/>
+  <!-- THE SEAM. One mount per screen, at the foot of the root where a zero-height child
+       cannot disturb the chrome; its sheet portals out of the layout anyway. -->
+  <AuthSeam/>
 </vstack>

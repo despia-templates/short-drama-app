@@ -91,7 +91,10 @@
     <attribute as="today" default="0"/>
     <attribute as="cap" default="10"/>
     <attribute as="reward" default="15"/>
-    <attribute as="headers" default="{}"/>      <!-- the caller's auth headers -->
+    <!-- THE SEAM IS THE DEFAULT. A caller may still pass its own headers, but it no
+         longer has to: `global.auth.headers` is what <AuthSeam> publishes, so this part
+         reads the one session the app has instead of a copy plumbed down per mount. -->
+    <attribute as="headers" default="global.auth.headers"/>
     <!-- The house ad plays from /promo, not /media. /media/* is entitlement-gated now (a
          paid episode's bytes are refused without a ticket), and the house creative is
          nobody's episode — pointing it at an episode file meant the ad itself 403'd and

@@ -22,7 +22,9 @@
 <vstack alignItems="stretch">
   <head>
     <attribute as="mode" default="'sheet'"/>      <!-- sheet | inline -->
-    <attribute as="headers" default="{}"/>        <!-- the host's auth headers -->
+    <!-- THE SEAM IS THE DEFAULT (see <AuthSeam>): a host no longer plumbs headers down
+         per mount, and the three surfaces that raise this sheet all buy with one session. -->
+    <attribute as="headers" default="global.auth.headers"/>
     <attribute as="vip" default="false"/>         <!-- is the viewer already a member -->
     <attribute as="vipUntil" default="''"/>
 
@@ -76,6 +78,13 @@
 
     <action as="buy" sku="item.id">
       if (dsx.variable.buying != '') { return }
+      // A SUBSCRIPTION NEEDS AN ACCOUNT TO LIVE ON. Raising the sign-in sheet is both the
+      // right product move and the half of App Store 3.1.2 that says a sign-up surface must
+      // let a current subscriber sign in (the other half, restore, is the row below).
+      if (global.auth.ok != true) {
+        dsx.module.route.push({ path: '/auth/signin' })
+        return
+      }
       dsx.variable.buying = sku
       dsx.variable.toast = ''
       dsx.variable.settleFailed = false
@@ -259,6 +268,14 @@
           <text value="{{ tierBusy }}" class="busyLine" visible-if="tierBusy != ''"/>
         </vstack>
       </list>
+
+      <!-- SIGN IN OR RESTORE, on the surface that sells the subscription — App Store 3.1.2
+           asks for exactly this pair, and both are real: the tier tap raises the sign-in
+           sheet for a guest, and this row calls POST /store/restore. -->
+      <RestoreRow variant="compact" visible-if="dsx.variable.phase == 'content'"/>
+
+      <!-- Terms + Privacy beside the price, which is where Apple requires them. -->
+      <LegalLinks variant="line" visible-if="dsx.variable.phase == 'content'"/>
 
       <!-- the full page still exists for the benefit story; the sheet just isn't it -->
       <text value="See everything VIP includes" class="benefitsLink"

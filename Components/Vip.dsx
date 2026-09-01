@@ -21,8 +21,9 @@
   <head>
     <expects variable="nav"/>
 
-    <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
+    <!-- the seam owns the token (<AuthSeam/> at the foot of this file); every authenticated
+         read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
+    <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
     <api as="catalog" url="/store/catalog" on:success="global.cacheCatalog = catalog.data"/>
     <api as="home" url="/catalog/home" on:success="global.cacheHome = home.data"/>
 
@@ -77,7 +78,14 @@
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
          last good payload lives in the app-wide store and is the FIRST PAINT while the
          refetch runs. Read walletView, never wallet.data, or the blank frame returns. -->
+    <!-- signed in is the seam, and a viewer-scoped stash never survives the viewer -->
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <variable as="authKnown" computed="true">return global.auth != null &amp;&amp; global.auth.state != null</variable>
+    <variable as="signedOut" computed="true">
+      return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
+    </variable>
     <variable as="walletView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (wallet.data != null) { return wallet.data }
       return global.cacheWallet
     </variable>
@@ -88,10 +96,6 @@
     <variable as="homeView" computed="true">
       if (home.data != null) { return home.data }
       return global.cacheHome
-    </variable>
-    <variable as="authHeaders" computed="true">
-      if (session.data == null) { return {} }
-      return { authorization: 'Bearer ' + session.data.viewer.token }
     </variable>
     <variable as="bp" computed="true">
       const w = dsx.screen.width
@@ -160,19 +164,6 @@
       for (const t of c.vip) { days = days == '' ? String(t.days) : days + ', ' + String(t.days) }
       return 'Every plan is a one-time charge for a dated pass — ' + days + ' days. This build has no auto-renewal.' + tail
     </variable>
-    <!-- RESTORE, honestly. Apple requires "a way for current subscribers to sign in or
-         restore purchases" on a subscription sign-up screen. Entitlement here is not a
-         StoreKit receipt — it is a column on the caller's wallet row, so the real restore is
-         "re-read this account", which is exactly what this does and all it can do. The half
-         that is missing is the OTHER half of Apple's sentence: there is no sign-in anywhere
-         in this app (the session is a static JSON file — docs/auth.md), so a member on a new
-         device cannot reach their account to restore onto it. The row says both. -->
-    <variable as="restoreLine" computed="true">
-      if (wallet.loading) { return 'Checking this account…' }
-      if (dsx.variable.walletView == null) { return 'Could not read this account. Try again.' }
-      if (dsx.variable.isVip) { return 'Found: ' + dsx.variable.statusLine + '.' }
-      return 'No active pass on this account.'
-    </variable>
     <variable as="posterW" computed="true">return dsx.variable.bp == 'phone' ? 150 : 186</variable>
     <variable as="phase" computed="true">
       if (catalog.error != null || home.error != null) { return 'error' }
@@ -213,7 +204,6 @@
     <!-- the disclosure rows: same rhythm as a benefit row, deliberately not the same voice —
          no gold icon, no white headline unless the row is itself a control -->
     <style as="discRow" spacing="14" alignItems="flex-start" paddingV="12"/>
-    <style as="restoreBtn" background="#26262C" radius="18" paddingH="16" paddingV="12" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
 
     <style as="tierCard" radius="14" paddingH="18" paddingV="18" spacing="8" alignItems="flex-start"/>
     <style as="tierName" fontSize="15" fontWeight="semibold" color="#3A2A08"/>
@@ -242,7 +232,15 @@
       </vstack>
 
       <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-        <hstack class="watchCard">
+        <!-- A GUEST GETS THE INVITATION, NOT AN EM DASH. The wallet card renders "—" for a
+             balance it has not read yet, which is honest for a signed-in viewer waiting on
+             the network and misleading for someone with no account at all: the answer is not
+             unknown, it is "there is nothing to read". -->
+        <SignInCard visible-if="dsx.variable.signedOut"
+                    icon="crown.fill"
+                    title="VIP belongs to an account"
+                    note="Sign in and a pass follows you to every device you watch on. You can read the plans and the benefits either way."/>
+        <hstack class="watchCard" visible-if="dsx.variable.signedOut == false">
           <vstack spacing="4" style="flex: 1">
             <text value="Your wallet" class="watchCap"/>
             <hstack spacing="6" alignItems="flex-end">
@@ -337,32 +335,22 @@
             <text value="{{ dsx.variable.termLine }}" class="benefitNote" style="flex: 1; min-width: 0"/>
           </hstack>
 
-          <!-- RESTORE PURCHASES — required on a subscription sign-up screen, and here it is
-               the real (small) thing this backend supports: re-read the account's
-               entitlement. The second line names the half that is missing rather than
-               letting the button imply a device-to-device restore it cannot do. -->
-          <hstack class="discRow">
-            <image icon="arrow.clockwise" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
-            <vstack spacing="3" style="flex: 1; min-width: 0">
-              <text value="Restore purchases" class="benefitLabel"/>
-              <text value="{{ dsx.variable.restoreLine }}" class="benefitNote"/>
-              <text value="VIP is held on your account, not on this device, so restoring re-reads the account you are signed in to. This build has no sign-in yet, so a pass bought on another account cannot be reached from here." class="benefitNote"/>
-            </vstack>
-            <button label="Restore" class="restoreBtn" on:tap="wallet.refresh()"/>
-          </hstack>
+          <!-- RESTORE PURCHASES — required on a subscription sign-up screen, and now REAL.
+               This row used to call `wallet.refresh()` and admit, in its own third line,
+               that there was no sign-in anywhere so a pass bought on another account could
+               not be reached. Both halves are fixed: <RestoreRow> calls POST /store/restore
+               (the unsettled-order sweep), and a signed-out tap raises the sign-in sheet —
+               which is precisely the "sign in OR restore" pair App Store 3.1.2 asks for on
+               a subscription surface. -->
+          <RestoreRow on:restored="wallet.refresh()"/>
 
-          <!-- TERMS AND PRIVACY — required in-app beside a subscription, and genuinely
-               absent: no URL exists in App.json, dsx.json or dsx.config.json, and there is
-               no legal surface anywhere in Components/. A placeholder link would be worse
-               than nothing, so the row states the gap the way the player's Quality row and
-               Profile's Language row state theirs (Article 7). This app cannot be submitted
-               to either store until an adopter fills it in, and now that fact is visible in
-               the product instead of only in an audit. -->
-          <hstack class="discRow" a11yGroup="true"
-                  a11yLabel="Terms of Use and Privacy Policy: this build ships no legal links. An adopter must add them before submitting to a store.">
-            <image icon="lock.shield" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
-            <text value="Terms of Use and Privacy Policy — not set in this build. Both stores require them in-app beside a paid plan; an adopter points these at their own URLs before submitting." class="benefitNote" style="flex: 1; min-width: 0"/>
-          </hstack>
+          <!-- TERMS AND PRIVACY — required in-app beside a subscription (App Store 3.1.2,
+               and Play for the privacy policy). There is now a real surface for them:
+               <LegalLinks> renders the links when a deployment has set `termsUrl` /
+               `privacyUrl` / `supportUrl` in App.json `consts`, and names the missing key
+               when it has not. Rows here rather than the compact line, because this screen
+               is the benefit story and has room for the disclosure. -->
+          <LegalLinks/>
         </vstack>
       </vstack>
 
@@ -371,11 +359,12 @@
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <text value="Choose your plan" class="sectionTitle"/>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" spacing="12">
-          <PlansSheet mode="inline" headers="{{ dsx.variable.authHeaders }}"
+          <PlansSheet mode="inline"
                       vip="{{ dsx.variable.isVip }}" on:purchased="wallet.refresh()"/>
         </vstack>
       </vstack>
     </vstack>
   </scroll>
   <TabBar active="vip" visible-if="dsx.variable.wide == false"/>
+  <AuthSeam/>
 </vstack>

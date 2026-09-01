@@ -1,0 +1,141 @@
+<!-- LegalLinks — Terms of Use, Privacy Policy and Support, from config, degrading honestly.
+
+     WHY THIS EXISTS. There was no legal surface anywhere in this project: zero occurrences of
+     "privacy", "terms", "support" or "contact" across Components/. Both stores require them,
+     and one of the two places Apple requires them is IN THE APP beside a paid plan:
+
+       · App Store 3.1.2 — a subscription's sign-up surface carries a functional link to the
+         Terms of Use (EULA) and to the Privacy Policy, and the same links go in the App
+         Store Connect metadata.
+       · Google Play — a privacy policy link in the store listing AND in the app for any app
+         that touches personal or sensitive data.
+       · App Store 1.2 (UGC) — published contact information, which is what `supportUrl` is.
+
+     THE CONFIG. Three keys in App.json `consts` (overridable per build in dsx.config.json
+     `consts`): `termsUrl`, `privacyUrl`, `supportUrl`. A deployment MUST set them; they ship
+     empty on purpose, because a placeholder URL is worse than an absent one — it looks
+     satisfied to an adopter and reads as a broken promise to a reviewer.
+
+     THE DEGRADATION IS NAMED (Article 7). An unset link is not a dead link and not a hidden
+     row: it renders as a statement of what is missing and which key sets it, in the same
+     grammar the player's Quality row and Profile's Language row use. That way the gap is
+     visible in the product, not only in an audit.
+
+     LINK MECHANICS. `href` with an absolute URL is a real `<a>` on web; on native a path the
+     route table does not match falls through to the app's configured web surface, so one
+     spelling works on every renderer (StackReference, "the anchor attribute").
+
+     ONE CAVEAT, MEASURED, AND GUARDED: the SSR renderer does not seed the `dsx.const.*`
+     plane — only the client bootloader does (`cli/src/build.ts` hands `consts` to `bootDsx`;
+     `server/src/page-render.ts` seeds nothing) — so on a server-rendered first paint every
+     key reads null. Unguarded, an adopter who HAS set these would server-render "not set"
+     and then flip, which is a wrong claim rather than a late one. `constsKnown` tests the
+     whole plane (absent server-side, a dict on the client) and this component renders
+     nothing until it is answerable. Filed for PLAN.md §6 as the SSR-consts ask. -->
+<vstack spacing="0" alignItems="stretch">
+  <head>
+    <!-- line: one compact sentence for a purchase sheet · rows: tappable settings rows -->
+    <attribute as="variant" default="'rows'"/>
+
+    <variable as="terms" computed="true">
+      const u = dsx.const.termsUrl
+      return u == null ? '' : u
+    </variable>
+    <variable as="privacy" computed="true">
+      const u = dsx.const.privacyUrl
+      return u == null ? '' : u
+    </variable>
+    <variable as="support" computed="true">
+      const u = dsx.const.supportUrl
+      return u == null ? '' : u
+    </variable>
+    <variable as="constsKnown" computed="true">return dsx.const != null</variable>
+    <variable as="isLine" computed="true">return dsx.attribute.variant == 'line'</variable>
+    <variable as="bothSet" computed="true">
+      return dsx.variable.terms != '' &amp;&amp; dsx.variable.privacy != ''
+    </variable>
+
+    <style as="rows" spacing="0" alignItems="stretch"/>
+    <style as="row" alignItems="center" paddingV="13" spacing="11"/>
+    <style as="label" fontSize="13" color="#FFFFFF"/>
+    <style as="labelOff" fontSize="13" color="rgba(255,255,255,0.4)"/>
+    <style as="note" fontSize="12" color="rgba(255,255,255,0.42)" lineSpacing="3"/>
+    <style as="lineWrap" spacing="6" alignItems="center" paddingTop="2"/>
+    <style as="lineTxt" fontSize="12" color="rgba(255,255,255,0.42)" lineSpacing="4"/>
+    <style as="lineLink" fontSize="12" fontWeight="semibold" color="rgba(255,255,255,0.7)" lineSpacing="4"/>
+  </head>
+
+  <!-- ══ LINE — the purchase-sheet spelling ═══════════════════════════════════════════ -->
+  <!-- TWO LINES, NOT ONE SENTENCE WITH LINKS IN IT. The obvious spelling — prose and links
+       interleaved in one hstack — does not wrap: measured at 375pt, "…and the Privacy
+       Policy" ran off the right edge of the sheet with the second link unreachable. An
+       hstack is one line by construction on every renderer, so the sentence is prose and the
+       links are their own row underneath, which also gives each one a full-width tap target
+       on a phone. -->
+  <vstack spacing="6" alignItems="stretch" visible-if="dsx.variable.isLine &amp;&amp; dsx.variable.constsKnown">
+    <vstack spacing="6" alignItems="stretch" visible-if="dsx.variable.bothSet">
+      <text value="By continuing you agree to our Terms of Use and Privacy Policy." class="lineTxt"/>
+      <hstack class="lineWrap">
+        <text value="Terms of Use" class="lineLink" href="{{ dsx.variable.terms }}"
+              a11yTrait="link" a11yLabel="Terms of Use — opens in your browser"/>
+        <text value="·" class="lineTxt"/>
+        <text value="Privacy Policy" class="lineLink" href="{{ dsx.variable.privacy }}"
+              a11yTrait="link" a11yLabel="Privacy Policy — opens in your browser"/>
+      </hstack>
+    </vstack>
+    <text class="lineTxt" visible-if="dsx.variable.bothSet == false"
+          value="Terms of Use and Privacy Policy — not set in this build. Both stores require them in-app beside a paid plan; set `termsUrl` and `privacyUrl` in App.json `consts` before submitting."/>
+  </vstack>
+
+  <!-- ══ ROWS — the settings spelling ═════════════════════════════════════════════════ -->
+  <vstack class="rows" visible-if="dsx.variable.isLine == false &amp;&amp; dsx.variable.constsKnown">
+    <hstack class="row" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
+            visible-if="dsx.variable.terms != ''" href="{{ dsx.variable.terms }}"
+            a11yGroup="true" a11yTrait="link" a11yLabel="Terms of Use — opens in your browser">
+      <image icon="note.text" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+      <text value="Terms of Use" class="label" style="flex: 1"/>
+      <image icon="arrow.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+    </hstack>
+    <hstack class="row" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
+            visible-if="dsx.variable.terms == ''"
+            a11yGroup="true" a11yLabel="Terms of Use: no URL is set in this build. An adopter sets termsUrl in App.json consts.">
+      <image icon="note.text" iconSize="15" color="rgba(255,255,255,0.3)" a11yHidden="true"/>
+      <vstack spacing="2" style="flex: 1" alignItems="stretch">
+        <text value="Terms of Use" class="labelOff"/>
+        <text value="Not set — App.json `consts.termsUrl`" class="note"/>
+      </vstack>
+    </hstack>
+
+    <hstack class="row" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
+            visible-if="dsx.variable.privacy != ''" href="{{ dsx.variable.privacy }}"
+            a11yGroup="true" a11yTrait="link" a11yLabel="Privacy Policy — opens in your browser">
+      <image icon="lock.shield" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+      <text value="Privacy Policy" class="label" style="flex: 1"/>
+      <image icon="arrow.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+    </hstack>
+    <hstack class="row" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
+            visible-if="dsx.variable.privacy == ''"
+            a11yGroup="true" a11yLabel="Privacy Policy: no URL is set in this build. An adopter sets privacyUrl in App.json consts. Google Play will not accept a submission without one.">
+      <image icon="lock.shield" iconSize="15" color="rgba(255,255,255,0.3)" a11yHidden="true"/>
+      <vstack spacing="2" style="flex: 1" alignItems="stretch">
+        <text value="Privacy Policy" class="labelOff"/>
+        <text value="Not set — App.json `consts.privacyUrl`" class="note"/>
+      </vstack>
+    </hstack>
+
+    <hstack class="row" visible-if="dsx.variable.support != ''" href="{{ dsx.variable.support }}"
+            a11yGroup="true" a11yTrait="link" a11yLabel="Support and contact — opens in your browser">
+      <image icon="info.circle.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+      <text value="Support &amp; contact" class="label" style="flex: 1"/>
+      <image icon="arrow.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+    </hstack>
+    <hstack class="row" visible-if="dsx.variable.support == ''"
+            a11yGroup="true" a11yLabel="Support and contact: no URL is set in this build. An adopter sets supportUrl in App.json consts. App Store guideline 1.2 requires published contact information for an app carrying user comments.">
+      <image icon="info.circle.fill" iconSize="15" color="rgba(255,255,255,0.3)" a11yHidden="true"/>
+      <vstack spacing="2" style="flex: 1" alignItems="stretch">
+        <text value="Support &amp; contact" class="labelOff"/>
+        <text value="Not set — App.json `consts.supportUrl`. Guideline 1.2 requires it for an app with comments." class="note"/>
+      </vstack>
+    </hstack>
+  </vstack>
+</vstack>

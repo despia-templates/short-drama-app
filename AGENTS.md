@@ -44,6 +44,23 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   nothing; write back `byKey[k] = (byKey[k] == null ? [] : byKey[k]).concat([v])`.
   Literal paths (`obj.list.push(v)`) work.
 - **Never pass `field: null` in `data.create` values** — omit the key.
+- **There is NO dynamic module dispatch, and both workarounds fail SILENTLY as success.**
+  `dsx.module.data[name]` (a bracket read on the module namespace) resolves the WHOLE
+  expression to null, so `await` yields null, every `.ok` reads false, and a loop over table
+  names does nothing and returns success. Passing the table object into a lambda —
+  `count(dsx.module.data.favorite)` — is worse: the call succeeds and returns ZERO rows,
+  because the object loses the caller's RLS scope travelling as a value. Probed on a live
+  origin: literal path 5 rows · bracket read NULL · via-lambda 0. Name every entity literally,
+  even when that means unrolling twelve near-identical blocks. Verbose beats a sweep that lies.
+- **No apostrophe in a `//` comment inside an action body.** The lint balance check counts
+  quotes without skipping comments, so one "the route's own ceiling" makes the body report
+  `unbalanced (){}[] or unterminated string` and points at the action, not the comment.
+- **A request gets 64 module calls** (`ACTION_CALL_CAP`; a spec can lower it, never raise it),
+  so anything that touches a row per iteration must be BOUNDED AND RESUMABLE — return a
+  `done` flag and let the caller loop. A blown budget is a 503 with the work half-finished:
+  measured, an account deletion removed 20 unlocks and abandoned the wallet. And size the
+  route's `rate=` to the SWEEP, not to the intent — `3/h` on a one-decision action locked the
+  viewer out of finishing their own deletion on pass two.
 - **Never name a local `item`** in a server action or an action body. `item` is the reserved
   ROW-SCOPE identifier; a local `let item` is SILENTLY shadowed and every read returns the
   whole scope object, so `item == null` is false for a null and the rejection branch is

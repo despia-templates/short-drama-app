@@ -1,0 +1,234 @@
+<!-- Account — the settings screen identity lives on: who you are, how to leave, and how to
+     erase. Reached from the last row of the Profile menu, which is where a reviewer looks.
+
+     WHY IT IS ITS OWN ROUTE. App Store 5.1.1(v) requires account deletion to be findable in
+     the app, and Apple rejects flows buried behind a support ticket or an email. "Profile →
+     Account → Delete account" is two taps from the tab bar on a phone and two clicks from
+     the top nav on a desktop, which is the shape every reviewed app in the category uses.
+
+     WHAT IS HERE AND WHY EACH ROW EXISTS:
+
+       identity        who the account is, read from the verified session — never the word
+                       of the client. Guest gets the sign-in card instead.
+       restore         App Store 3.1.1. <RestoreRow> calls POST /store/restore for real.
+       legal           Terms · Privacy · Support, from App.json `consts`, degrading honestly
+                       when a deployment has not set them (<LegalLinks>).
+       provider        the one paragraph an adopter needs: what mints the session in this
+                       build and which two config keys replace it.
+       sign out        raises the seam. Nothing is deleted; everything waits on the account.
+       delete          raises the seam. The whole account record and its personal data.
+
+     EVERY IDENTITY WRITE GOES THROUGH <AuthSeam>. This screen reaches its panes by pushing
+     `/auth/signout` and `/auth/delete`; it never touches `global.auth` or the session
+     cookie, so the app has exactly one place where a viewer is created or destroyed. -->
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <!-- the router publishes nav.canPop / nav.depth; back reads it -->
+    <expects variable="nav"/>
+
+    <api as="wallet" url="/wallet/state" ssr="false"
+         auto="global.auth.ok == true" headers="global.auth.headers"
+         on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
+
+    <variable as="toast">return ''</variable>
+
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <!-- 'boot' is a real third state: publishing it means no screen has to flash a
+         signed-out card for the frame before the seam answers. -->
+    <variable as="authKnown" computed="true">return global.auth != null &amp;&amp; global.auth.state != null</variable>
+    <variable as="signedOut" computed="true">
+      return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
+    </variable>
+    <variable as="uid" computed="true">
+      if (dsx.variable.signedIn == false) { return '' }
+      const s = global.auth.sub
+      return s == null ? '' : String(s).slice(0, 8)
+    </variable>
+    <variable as="who" computed="true">
+      if (dsx.variable.signedIn == false) { return 'Guest' }
+      const n = global.auth.name
+      if (n != null &amp;&amp; n != '') { return n }
+      const e = global.auth.email
+      if (e != null &amp;&amp; e != '') { return e }
+      return 'Viewer'
+    </variable>
+    <variable as="whoNote" computed="true">
+      if (dsx.variable.signedIn == false) { return 'Browsing without an account' }
+      return dsx.variable.uid == '' ? 'Signed in' : 'UID ' + dsx.variable.uid
+    </variable>
+    <!-- stale-then-fresh, and viewer-scoped: a signed-out frame must never read the last
+         viewer's balance out of the app-wide stash (docs/auth.md). -->
+    <variable as="walletView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
+      if (wallet.data != null) { return wallet.data }
+      return global.cacheWallet
+    </variable>
+    <variable as="isVip" computed="true">
+      if (dsx.variable.walletView == null) { return false }
+      return dsx.variable.walletView.vip === true
+    </variable>
+    <variable as="balanceLine" computed="true">
+      const w = dsx.variable.walletView
+      if (w == null) { return '' }
+      const total = w.coins + w.bonus
+      if (dsx.variable.isVip) { return total + ' coins on this account, plus an active VIP pass.' }
+      return total + ' coins on this account.'
+    </variable>
+
+    <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
+    <variable as="bp" computed="true">
+      const w = dsx.screen.width
+      if (w >= 1120) { return 'desktop' }
+      if (w >= 768) { return 'tablet' }
+      return 'phone'
+    </variable>
+    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="gutter" computed="true">
+      if (dsx.variable.bp == 'desktop') { return 86 }
+      if (dsx.variable.bp == 'tablet') { return 40 }
+      return 16
+    </variable>
+    <variable as="shell" computed="true">
+      const g = dsx.variable.gutter
+      return 'width: 100%; max-width: 720px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+    </variable>
+
+    <action as="back">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/profile' }) }
+    </action>
+    <action as="restored">
+      wallet.refresh()
+      dsx.variable.toast = 'Your purchases were re-checked against this account.'
+    </action>
+
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
+    <style as="scroller" alignItems="stretch"/>
+    <style as="page" spacing="18" paddingTop="20" paddingBottom="28" alignItems="stretch"/>
+
+    <style as="crumb" fontSize="13" color="rgba(255,255,255,0.5)"/>
+    <style as="crumbOn" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
+    <style as="crumbRow" spacing="7" alignItems="center"/>
+    <style as="backRow" spacing="8" alignItems="center" paddingV="8"/>
+    <style as="backTxt" fontSize="14" color="rgba(255,255,255,0.7)"/>
+    <style as="h1" fontSize="22" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
+
+    <style as="card" background="#141419" radius="12" paddingH="16" paddingV="16" spacing="12" alignItems="stretch"/>
+    <style as="cardFlush" background="#141419" radius="12" paddingH="16" paddingV="4" spacing="0" alignItems="stretch"/>
+    <style as="sectionCap" fontSize="12" fontWeight="semibold" color="rgba(255,255,255,0.45)" paddingLeading="4"/>
+
+    <style as="idRow" alignItems="center" spacing="12"/>
+    <style as="avatar" background="#232329" radius="24" width="48" height="48" alignItems="center"/>
+    <style as="whoName" fontSize="16" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="whoNote" fontSize="12" color="rgba(255,255,255,0.45)"/>
+    <style as="vipChip" background="#F6B63D" radius="10" paddingH="8" paddingV="4" fontSize="11" fontWeight="bold" color="#2A1D04"/>
+    <style as="note" fontSize="12" color="rgba(255,255,255,0.42)" lineSpacing="4"/>
+
+    <style as="menuRow" alignItems="center" paddingV="13" spacing="11"/>
+    <style as="menuLabel" fontSize="13" color="#FFFFFF"/>
+    <style as="dangerLabel" fontSize="13" color="#FF6B8A"/>
+    <style as="menuNote" fontSize="12" color="rgba(255,255,255,0.42)" lineSpacing="3"/>
+
+    <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
+    <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
+  </head>
+
+  <TopNav active="profile" visible-if="dsx.variable.wide"/>
+  <scroll class="scroller" style="flex: 1; min-height: 0">
+    <vstack class="page" style="{{ dsx.variable.shell }}">
+
+      <hstack class="crumbRow" visible-if="dsx.variable.wide">
+        <text value="Personal Center" class="crumb" a11yTrait="button"
+              on:tap="dsx.module.route.reset({ path: '/profile' })"/>
+        <text value="/" class="crumb"/>
+        <text value="Account" class="crumbOn"/>
+      </hstack>
+      <hstack class="backRow" visible-if="dsx.variable.wide == false" on:tap="dsx.action.back()"
+              a11yGroup="true" a11yTrait="button" a11yLabel="Back to Profile">
+        <image icon="chevron.left" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+        <text value="Profile" class="backTxt"/>
+      </hstack>
+
+      <text value="Account" class="h1"/>
+
+      <!-- ── who ─────────────────────────────────────────────────────────────────── -->
+      <vstack class="card" visible-if="dsx.variable.signedIn">
+        <hstack class="idRow">
+          <vstack class="avatar" style="justify-content: center">
+            <image icon="person.crop.circle" iconSize="26" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+          </vstack>
+          <vstack spacing="4" style="flex: 1; min-width: 0" alignItems="stretch">
+            <text value="{{ dsx.variable.who }}" class="whoName"
+                  style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+            <text value="{{ dsx.variable.whoNote }}" class="whoNote"/>
+          </vstack>
+          <text value="VIP" class="vipChip" visible-if="dsx.variable.isVip"/>
+        </hstack>
+        <text value="{{ dsx.variable.balanceLine }}" class="note" visible-if="dsx.variable.balanceLine != ''"/>
+      </vstack>
+
+      <SignInCard visible-if="dsx.variable.signedOut"
+                  title="You are browsing as a guest"
+                  note="An account is what makes coins, VIP, My List and your history follow you to another device. The catalogue is open either way."/>
+
+      <!-- ── purchases ───────────────────────────────────────────────────────────── -->
+      <text value="PURCHASES" class="sectionCap"/>
+      <vstack class="card">
+        <RestoreRow on:restored="dsx.action.restored()"/>
+      </vstack>
+
+      <!-- ── legal ───────────────────────────────────────────────────────────────── -->
+      <text value="LEGAL" class="sectionCap"/>
+      <vstack class="cardFlush">
+        <LegalLinks/>
+      </vstack>
+
+      <!-- ── the seam, for whoever forks this ────────────────────────────────────── -->
+      <vstack class="card">
+        <text class="note"
+              value="Identity in this build comes from the local provider that `scripts/dev-session.mjs` mints — one demo viewer, signed with the same HS256 secret the server verifies. A real deployment points `authSessionUrl` and `authSignInUrl` (App.json `consts`) at its own identity provider; nothing in `server/*.dsx` changes, because the backend only ever sees a verified subject. docs/auth.md is the whole contract."/>
+      </vstack>
+
+      <!-- ── leaving ─────────────────────────────────────────────────────────────── -->
+      <text value="THIS ACCOUNT" class="sectionCap" visible-if="dsx.variable.signedIn"/>
+      <vstack class="cardFlush" visible-if="dsx.variable.signedIn">
+        <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
+                on:tap="dsx.module.route.push({ path: '/auth/signout' })"
+                a11yGroup="true" a11yTrait="button" a11yLabel="Sign out of this account">
+          <image icon="lock.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
+          <vstack spacing="2" style="flex: 1" alignItems="stretch">
+            <text value="Sign out" class="menuLabel"/>
+            <text value="Keeps everything on the account. You can sign back in any time." class="menuNote"/>
+          </vstack>
+          <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+        </hstack>
+
+        <!-- DELETION IS A TOP-LEVEL ROW, not a link inside a paragraph. Apple rejects a
+             deletion path that is hard to find, and "hard to find" is decided by a reviewer
+             with a stopwatch, not by whether the affordance technically exists. -->
+        <hstack class="menuRow" on:tap="dsx.module.route.push({ path: '/auth/delete' })"
+                a11yGroup="true" a11yTrait="button"
+                a11yLabel="Delete account — permanently erases this account and everything held against it">
+          <image icon="trash" iconSize="15" color="#FF6B8A" a11yHidden="true"/>
+          <vstack spacing="2" style="flex: 1" alignItems="stretch">
+            <text value="Delete account" class="dangerLabel"/>
+            <text value="Erases the account record and everything on it — wallet, coins, unlocks, history, list and comments. Permanent." class="menuNote"/>
+          </vstack>
+          <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+        </hstack>
+      </vstack>
+    </vstack>
+  </scroll>
+
+  <!-- the toast lives OUTSIDE the scroll so an answer reaches the person who caused it -->
+  <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
+    <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
+    <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+           a11yLabel="Dismiss message" a11yTrait="button"/>
+  </hstack>
+  <!-- NO <TabBar> HERE, and that is the rule rather than an omission: a PUSHED route mounts
+       no tab bar, because the phone lane transforms the whole frame and chrome inside it
+       slides in with the page (UIKit calls it hidesBottomBarWhenPushed). /notices is the
+       same shape. The phone lane gets the back row at the top instead. -->
+  <AuthSeam/>
+</vstack>

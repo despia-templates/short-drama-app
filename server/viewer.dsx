@@ -91,6 +91,239 @@
       return { favorite: true }
     </action>
 
+    <!-- ACCOUNT DELETION — App Store 5.1.1(v), and the rule is specific about the shape:
+         "Offer to delete the entire account record, along with associated personal data…
+         only offering to temporarily deactivate or disable an account is insufficient."
+         Self-service, in-app, no support ticket: the regulated-industry carve-out of
+         5.1.1(ix) is banking, healthcare, gambling, cannabis, air travel and crypto, and a
+         drama app is in none of them.
+
+         EVERY owner-scoped entity in this backend is swept, not just this document's two —
+         a viewer's data does not respect file boundaries, and a deletion that leaves the
+         wallet behind is the "deactivate" the rule refuses. RLS scopes each read and delete
+         to the caller, so this cannot reach another account even if the id were wrong.
+
+         PAGED, because LIST_LIMIT clamps a read to 100 and says nothing (AGENTS.md): a
+         viewer with 300 unlocks would otherwise keep 200 of them and the call would report
+         success. Each entity drains until a page comes back empty, and the loop is bounded
+         so a delete that silently fails can never spin forever — it reports what is left
+         instead, because a half-deletion reported as success is the worst outcome here.
+
+         An unspent coin balance is NOT grounds to refuse: the wallet goes with everything
+         else, and the UI says so before the viewer confirms.
+
+         WHY THIS IS UNROLLED INSTEAD OF A LOOP OVER TABLE NAMES. Both obvious spellings
+         PROBED FALSE on this origin, and both fail SILENTLY as success — the worst possible
+         failure for a deletion:
+           · `dsx.module.data[name]` — a bracket read on the module namespace resolves the
+             whole expression to NULL, so `await` yields null, every `.ok` reads false, and a
+             loop over 12 table names deletes nothing and returns `{deleted:true}`. Measured:
+             literal path 5 rows, bracket read NULL. (AGENTS.md records bracket-read MUTATION
+             as a no-op; this is the read side, on the module namespace.)
+           · passing the table object into a lambda — `const n = await count(dsx.module.data
+             .favorite)` — returns ok with ZERO rows, because the object loses the caller's
+             RLS scope when it travels as a value. Measured: literal 5, via-lambda 0.
+         So every table below is named literally. Verbose beats a deletion that lies. -->
+
+    <action as="deleteAccount" inputs="confirm">
+      if (confirm !== 'DELETE') { throw { reason: 'invalid', message: 'confirmation required' } }
+      // BOUNDED AND RESUMABLE. A request gets 64 module calls (ACTION_CALL_CAP, and a spec can
+      // only lower it) — twelve list calls plus one delete per row blows that on any real
+      // account, and a blown budget is a 503 with the account HALF DELETED, which is the one
+      // outcome worse than not starting. Measured: the first attempt removed 20 unlocks and
+      // then aborted, leaving the wallet and My List behind.
+      //
+      // So each call sweeps up to DELETES_PER_CALL rows and reports `done`. `done` is true only
+      // when every table listed empty in the same pass, so the caller loops until it flips and
+      // the account is provably empty rather than presumed so.
+      const DELETES_PER_CALL = 45
+      let budget = DELETES_PER_CALL
+      let removed = 0
+      let stuck = []
+      let done = true
+      if (budget > 0) {
+        const pg_playticket = await dsx.module.data.playticket.list({ limit: 100 })
+        if (pg_playticket.ok && pg_playticket.data.length > 0) {
+          done = false
+          let i_playticket = 0
+          while (i_playticket < pg_playticket.data.length && budget > 0) {
+            const g_playticket = await dsx.module.data.playticket.delete({ id: pg_playticket.data[i_playticket].id })
+            if (g_playticket.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['playticket']); i_playticket = pg_playticket.data.length }
+            budget = budget - 1
+            i_playticket = i_playticket + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_unlock = await dsx.module.data.unlock.list({ limit: 100 })
+        if (pg_unlock.ok && pg_unlock.data.length > 0) {
+          done = false
+          let i_unlock = 0
+          while (i_unlock < pg_unlock.data.length && budget > 0) {
+            const g_unlock = await dsx.module.data.unlock.delete({ id: pg_unlock.data[i_unlock].id })
+            if (g_unlock.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['unlock']); i_unlock = pg_unlock.data.length }
+            budget = budget - 1
+            i_unlock = i_unlock + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_ledger = await dsx.module.data.ledger.list({ limit: 100 })
+        if (pg_ledger.ok && pg_ledger.data.length > 0) {
+          done = false
+          let i_ledger = 0
+          while (i_ledger < pg_ledger.data.length && budget > 0) {
+            const g_ledger = await dsx.module.data.ledger.delete({ id: pg_ledger.data[i_ledger].id })
+            if (g_ledger.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['ledger']); i_ledger = pg_ledger.data.length }
+            budget = budget - 1
+            i_ledger = i_ledger + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_wallet = await dsx.module.data.wallet.list({ limit: 100 })
+        if (pg_wallet.ok && pg_wallet.data.length > 0) {
+          done = false
+          let i_wallet = 0
+          while (i_wallet < pg_wallet.data.length && budget > 0) {
+            const g_wallet = await dsx.module.data.wallet.delete({ id: pg_wallet.data[i_wallet].id })
+            if (g_wallet.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['wallet']); i_wallet = pg_wallet.data.length }
+            budget = budget - 1
+            i_wallet = i_wallet + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_order = await dsx.module.data.order.list({ limit: 100 })
+        if (pg_order.ok && pg_order.data.length > 0) {
+          done = false
+          let i_order = 0
+          while (i_order < pg_order.data.length && budget > 0) {
+            const g_order = await dsx.module.data.order.delete({ id: pg_order.data[i_order].id })
+            if (g_order.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['order']); i_order = pg_order.data.length }
+            budget = budget - 1
+            i_order = i_order + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_progress = await dsx.module.data.progress.list({ limit: 100 })
+        if (pg_progress.ok && pg_progress.data.length > 0) {
+          done = false
+          let i_progress = 0
+          while (i_progress < pg_progress.data.length && budget > 0) {
+            const g_progress = await dsx.module.data.progress.delete({ id: pg_progress.data[i_progress].id })
+            if (g_progress.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['progress']); i_progress = pg_progress.data.length }
+            budget = budget - 1
+            i_progress = i_progress + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_favorite = await dsx.module.data.favorite.list({ limit: 100 })
+        if (pg_favorite.ok && pg_favorite.data.length > 0) {
+          done = false
+          let i_favorite = 0
+          while (i_favorite < pg_favorite.data.length && budget > 0) {
+            const g_favorite = await dsx.module.data.favorite.delete({ id: pg_favorite.data[i_favorite].id })
+            if (g_favorite.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['favorite']); i_favorite = pg_favorite.data.length }
+            budget = budget - 1
+            i_favorite = i_favorite + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_checkin = await dsx.module.data.checkin.list({ limit: 100 })
+        if (pg_checkin.ok && pg_checkin.data.length > 0) {
+          done = false
+          let i_checkin = 0
+          while (i_checkin < pg_checkin.data.length && budget > 0) {
+            const g_checkin = await dsx.module.data.checkin.delete({ id: pg_checkin.data[i_checkin].id })
+            if (g_checkin.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['checkin']); i_checkin = pg_checkin.data.length }
+            budget = budget - 1
+            i_checkin = i_checkin + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_spin = await dsx.module.data.spin.list({ limit: 100 })
+        if (pg_spin.ok && pg_spin.data.length > 0) {
+          done = false
+          let i_spin = 0
+          while (i_spin < pg_spin.data.length && budget > 0) {
+            const g_spin = await dsx.module.data.spin.delete({ id: pg_spin.data[i_spin].id })
+            if (g_spin.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['spin']); i_spin = pg_spin.data.length }
+            budget = budget - 1
+            i_spin = i_spin + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_taskclaim = await dsx.module.data.taskclaim.list({ limit: 100 })
+        if (pg_taskclaim.ok && pg_taskclaim.data.length > 0) {
+          done = false
+          let i_taskclaim = 0
+          while (i_taskclaim < pg_taskclaim.data.length && budget > 0) {
+            const g_taskclaim = await dsx.module.data.taskclaim.delete({ id: pg_taskclaim.data[i_taskclaim].id })
+            if (g_taskclaim.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['taskclaim']); i_taskclaim = pg_taskclaim.data.length }
+            budget = budget - 1
+            i_taskclaim = i_taskclaim + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_adview = await dsx.module.data.adview.list({ limit: 100 })
+        if (pg_adview.ok && pg_adview.data.length > 0) {
+          done = false
+          let i_adview = 0
+          while (i_adview < pg_adview.data.length && budget > 0) {
+            const g_adview = await dsx.module.data.adview.delete({ id: pg_adview.data[i_adview].id })
+            if (g_adview.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['adview']); i_adview = pg_adview.data.length }
+            budget = budget - 1
+            i_adview = i_adview + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_comment = await dsx.module.data.comment.list({ limit: 100 })
+        if (pg_comment.ok && pg_comment.data.length > 0) {
+          done = false
+          let i_comment = 0
+          while (i_comment < pg_comment.data.length && budget > 0) {
+            const g_comment = await dsx.module.data.comment.delete({ id: pg_comment.data[i_comment].id })
+            if (g_comment.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['comment']); i_comment = pg_comment.data.length }
+            budget = budget - 1
+            i_comment = i_comment + 1
+          }
+        }
+      } else { done = false }
+
+      return { deleted: done, done: done, removed: removed, stuck: stuck }
+    </action>
+
     <action as="myList">
       const favs = await dsx.module.data.favorite.list({ limit: 100 })
       const items = []
@@ -116,4 +349,10 @@
   <route method="GET"  path="/viewer/continue"  action="continueWatching" auth="required" rate="60/m"/>
   <route method="POST" path="/viewer/favorite"  action="toggleFavorite"   auth="required" rate="60/m"/>
   <route method="GET"  path="/viewer/list"      action="myList"           auth="required" rate="60/m"/>
+  <!-- 60/h, and the number follows the ACTION not the intent. Deletion is one decision, so
+       3/h looked right — but a request gets 64 module calls, so a large account is SWEPT
+       across several passes and 3/h rate-limited the viewer out of finishing their own
+       deletion. Measured: pass 1 refused, account left half-empty. 60 passes clears ~2700
+       rows, still refuses a scripted wipe, and cannot strand someone mid-delete. -->
+  <route method="POST" path="/viewer/delete"    action="deleteAccount"    auth="required" rate="60/h"/>
 </server>

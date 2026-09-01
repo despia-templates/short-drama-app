@@ -27,9 +27,10 @@
     <expects variable="nav"/>
 
     <api as="detail" url="/catalog/show/{{ vars.show }}" on:success="dsx.action.detailLanded()"/>
-    <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
-    <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
+    <!-- the seam owns the token (<AuthSeam/> at the foot of this file); every authenticated
+         read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
+    <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers"/>
+    <api as="favs" url="/viewer/list" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers"/>
     <!-- THE ENTITLED SOURCE. /catalog/show/:id no longer ships a paid episode's video_url to
          anyone who asks — it returns `video: null` and `locked: true`, because the paywall
          used to be enforced in this markup only and the API handed every paid MP4 to a bare
@@ -39,12 +40,12 @@
          one per mounted pager page. Free episodes never come through here — they keep their
          public source, which is the funnel's hook and is public by design. -->
     <api as="play" url="/wallet/play/{{ dsx.variable.needsTicket }}" ssr="false"
-         needs="session" headers="dsx.variable.authHeaders" skip="dsx.variable.needsTicket == ''"/>
+         auto="global.auth.ok == true &amp;&amp; dsx.variable.needsTicket != ''" headers="global.auth.headers"/>
     <api as="thread" url="/social/comments/{{ dsx.variable.epId }}" ssr="false" auto="false"/>
-    <api as="unlockCall" url="/wallet/unlock" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
-    <api as="progressCall" url="/viewer/progress" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
-    <api as="favCall" url="/viewer/favorite" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
-    <api as="commentCall" url="/social/comment" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+    <api as="unlockCall" url="/wallet/unlock" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="progressCall" url="/viewer/progress" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="favCall" url="/viewer/favorite" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="commentCall" url="/social/comment" method="POST" auto="false" headers="global.auth.headers"/>
 
     <variable as="page">return 0</variable>   <!-- 0-based; the vertical pager owns it -->
     <variable as="showId">return ''</variable>
@@ -310,10 +311,8 @@
       const ep = dsx.variable.episode
       return (ep == null ? '' : ep.price) + '  Unlock Now'
     </variable>
-    <variable as="authHeaders" computed="true">
-      if (session.data == null) { return {} }
-      return { authorization: 'Bearer ' + session.data.viewer.token }
-    </variable>
+    <!-- signed in is the seam (docs/auth.md): one publication, no session block -->
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
     <!-- The drawer's range pills, chunked at FIFTY. Measured live 2026-09-01 on two
          references: ReelShort renders "1 - 50" / "51 - 62" for a 62-episode show, and
          ShortMax renders "1-50" / "All Episodes". The 30 that used to be here matched
@@ -425,6 +424,11 @@
     </action>
     <action as="saveNow" epid="dsx.variable.epId" epidx="dsx.variable.cur" locked="dsx.variable.epLocked">
       if (epid == null || epid === '' || locked) { return }
+      // A GUEST HAS NOWHERE TO SAVE PROGRESS, and this is the one place where that must be
+      // SILENT: a resume position is not something a viewer asked for, so interrupting a
+      // free episode with a login sheet to save it would be the wall guest browsing exists
+      // to avoid (App Store 5.1.1(v)).
+      if (dsx.variable.signedIn == false) { return }
       await progressCall.send({ episode: epid, show: dsx.variable.showId, idx: Number(epidx), position: dsx.variable.time })
     </action>
     <!-- THE ADDRESS BAR TRACKS THE EPISODE. `vars.idx` was read once at mount and never
@@ -476,6 +480,13 @@
     <action as="unlockNow">
       const ep = dsx.variable.episode
       if (ep == null || dsx.variable.unlocking) { return }
+      // AN UNLOCK IS OWNED BY AN ACCOUNT. A guest tap raises the sign-in sheet rather than
+      // spending a round trip to be told 401 — the paywall stays exactly where it is, so
+      // the viewer lands back on this episode the moment they are in (docs/auth.md).
+      if (dsx.variable.signedIn == false) {
+        dsx.module.route.push({ path: '/auth/signin' })
+        return
+      }
       dsx.variable.unlocking = true
       const r = await unlockCall.send({ episode: ep.id })
       dsx.variable.unlocking = false
@@ -483,6 +494,10 @@
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Unlock failed' }
     </action>
     <action as="toggleFav">
+      if (dsx.variable.signedIn == false) {
+        dsx.module.route.push({ path: '/auth/signin' })
+        return
+      }
       const r = await favCall.send({ show: dsx.variable.showId })
       if (r.ok) { dsx.variable.favTouched = r.data.favorite ? 'y' : 'n' }
     </action>
@@ -502,6 +517,12 @@
     <action as="postComment">
       const text = dsx.variable.draft
       if (text == null || text === '') { return }
+      // A COMMENT CARRIES AN IDENTITY, so posting needs one. Reading the thread does not:
+      // /social/comments is auth="none" and a guest sees the whole conversation.
+      if (dsx.variable.signedIn == false) {
+        dsx.module.route.push({ path: '/auth/signin' })
+        return
+      }
       const r = await commentCall.send({ show: dsx.variable.showId, episode: dsx.variable.epId, body: text })
       if (r.ok) { dsx.variable.draft = ''; thread.refresh() }
       else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Could not post' }
@@ -1312,11 +1333,19 @@ Please unlock to watch." class="lockHead"/>
       </scroll>
       <hstack style="padding: 12px 16px 20px 16px">
         <hstack class="cField" style="flex: 1">
-          <textfield bind="dsx.variable.draft" placeholder="Enter your comment here..." color="#FFFFFF"
+          <!-- READING IS OPEN, POSTING NEEDS AN IDENTITY (/social/comments is auth="none";
+               /social/comment is not). The composer stays for a guest — a disabled field
+               beside a thread is a dead end — and the placeholder says which tap will ask,
+               so the sign-in sheet is expected rather than a surprise. -->
+          <textfield bind="dsx.variable.draft" color="#FFFFFF"
+                     placeholder="{{ dsx.variable.signedIn ? 'Enter your comment here...' : 'Sign in to join the conversation' }}"
                      style="flex: 1" on:submit="dsx.action.postComment()"/>
           <button label="Submit" class="cSend" on:tap="dsx.action.postComment()"/>
         </hstack>
       </hstack>
     </vstack>
   </sheet>
+  <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of
+       the layout, so a zero-height child here cannot disturb any chrome. -->
+  <AuthSeam/>
 </vstack>

@@ -1,0 +1,563 @@
+<!-- AuthSeam — THE identity boundary. One file owns the session for the whole app.
+
+     WHAT THIS REPLACES. Nine screens each carried `<api as="session" url="/dev-session.json">`
+     and their own copy of an `authHeaders` computed, and three of them defined "signed out"
+     as *that file 404ing* — so the app's own logged-out state was a network error and its
+     only affordance was a "Reload session" button. There was no sign-in, no sign-out and no
+     way to reach an account from another device. This file is the whole of that, once.
+
+     THE CONTRACT (docs/auth.md). The server VERIFIES tokens; it never issues them. Everything
+     here is one side of a documented seam:
+
+       provider → { viewer: { sub, token, name?, email? }, operator?: { sub, token } }
+
+     `sub` must be a UUID (owner RLS stores `owner_id uuid`), the token an HS256 JWS signed
+     with DSX_JWT_SECRET. That is the ONLY thing the backend knows about identity.
+
+     ══ THE SWAP POINT, IN ONE PLACE ═══════════════════════════════════════════════════
+     Four keys in App.json `consts` (a local build may override them in dsx.config.json
+     `consts` without touching the shipped root plan):
+
+       authSessionUrl   GET  → the payload above. Called at boot when a session is expected.
+       authSignInUrl    POST { email, password } → the same payload.
+       authSignUpUrl    POST { email, password } → the same payload.
+       authSignOutUrl   POST → anything; the client drops its token either way.
+
+     Set `authSignInUrl` and the credential form below becomes the sign-in surface. Leave it
+     unset — this build's default — and the screen says so and offers the LOCAL provider
+     (`scripts/dev-session.mjs`, served at /dev-session.json by the dev origin) instead of
+     rendering a form that would accept any password. A control that promises something it
+     does not do is the one thing this template never ships.
+
+     WHY THE TOKEN IS NOT PERSISTED. Only the DECISION rides `dsx.cookie.sd_auth`
+     ('in' | 'guest'); the token itself lives in `global.auth` — memory — and is re-fetched
+     from the provider on every cold start. That is how a real IdP session works (the
+     provider holds its own session; the app asks it for a short-lived access token), and it
+     keeps a bearer JWT out of a JavaScript-readable cookie.
+
+     HOW A SCREEN CONSUMES IT — three spellings, no session block, no authHeaders copy:
+
+       <api as="wallet" url="/wallet/state" ssr="false"
+            auto="global.auth.ok == true" headers="global.auth.headers"/>
+
+     `auto=` is re-evaluated whenever its read set changes (kernel/src/api.ts —
+     "refetch when the MATERIALIZED request changes"), so a block declared before this seam
+     resolves simply waits, then fires the moment the token lands, and stops the moment it is
+     dropped. `== true` and not truthiness: an unset global is NSNull, whose truthiness is
+     not something to bet a money route on (AGENTS.md).
+
+     GUEST BROWSING IS THE DEFAULT, on purpose. App Store 5.1.1(v): "If your app doesn't
+     include significant account-based features, let people use it without a login." A drama
+     catalogue does not need one to browse, so a first run is a GUEST: home, discover,
+     browse, show pages and every free episode work with no account at all. Sign-in is asked
+     for exactly where identity is — the wallet, an unlock, VIP, My List, comments.
+
+     THE SURFACE IS REACHED FROM ANYWHERE by one push — `dsx.module.route.push({ path:
+     '/auth/signin' })` (or `/auth/signout`, `/auth/delete`). One statement, so it fits an
+     inline `on:tap`; no screen plumbs state into a child, and no screen has to own a modal.
+     `<SignInCard>` is the card that does it. See "WHY THE SURFACE IS A ROUTE" in the head. -->
+<vstack spacing="0" alignItems="stretch" on:appear="dsx.action.resolve()">
+  <head>
+    <!-- TWO MODES, ONE FILE. `boot` (the default) is the resolver: it publishes `global.auth`
+         and renders NOTHING, and every screen mounts one. `page` is the surface, mounted
+         exactly once by the /auth/:pane route (Components/Auth.dsx). Splitting them across
+         two files would have split `publishIn` with them, which is the nine-copies disease
+         in miniature — the whole point of this file. -->
+    <attribute as="mode" default="'boot'"/>       <!-- boot | page -->
+    <attribute as="pane" default="'signin'"/>     <!-- signin | signout | delete -->
+
+    <!-- raised when the pane has finished its job, so the route screen can go back -->
+    <event as="done" payload="what"/>
+
+    <!-- THE PROVIDER CALLS. All four are imperative (`auto="false"`): the seam decides when
+         identity is wanted, and a GET that fires on mount would re-authenticate on every
+         route change. -->
+    <api as="sessionCall" url="{{ dsx.variable.sessionUrl }}" auto="false" ssr="false"/>
+    <api as="signInCall"  url="{{ dsx.variable.signInUrl }}"  method="POST" auto="false"/>
+    <api as="signUpCall"  url="{{ dsx.variable.signUpUrl }}"  method="POST" auto="false"/>
+    <api as="signOutCall" url="{{ dsx.variable.signOutUrl }}" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="deleteCall"  url="{{ dsx.variable.deleteUrl }}"  method="POST" auto="false" headers="global.auth.headers"/>
+
+    <variable as="email">return ''</variable>
+    <variable as="password">return ''</variable>
+    <variable as="mode">return 'in'</variable>        <!-- in | up -->
+    <variable as="busy">return false</variable>
+    <variable as="notice">return ''</variable>
+    <variable as="confirmWord">return ''</variable>
+    <variable as="deleteState">return ''</variable>   <!-- '' | done | absent | refused -->
+    <variable as="deleteNote">return ''</variable>
+
+    <!-- THE CONFIG PLANE. `dsx.const.*` is App.json's `consts`, overlaid by dsx.config.json
+         `consts` — flat scalars, reactive, and typed-NULL when absent, which is exactly the
+         gate an honest degradation needs.
+
+         ONE MEASURED CAVEAT, and it needs a guard rather than a note. The SSR renderer does
+         NOT seed this plane — only the client bootloader does (`cli/src/build.ts` hands
+         `consts` to `bootDsx`; `server/src/page-render.ts` seeds nothing) — so on a
+         server-rendered first paint every key reads null. Unguarded, a cold load of
+         /auth/signin on a deployment that HAS a provider would render "this build has no
+         identity provider" and then flip. That is a wrong claim, which is worse than a late
+         one, so both lanes wait on `constsKnown`: the whole plane is absent server-side and
+         a dict on the client, which is a fact this component can actually test. Filed for
+         PLAN.md §6 as the SSR-consts ask. -->
+    <variable as="constsKnown" computed="true">return dsx.const != null</variable>
+    <variable as="sessionUrl" computed="true">
+      const u = dsx.const.authSessionUrl
+      if (u == null || u == '') { return '/dev-session.json' }
+      return u
+    </variable>
+    <variable as="signInUrl" computed="true">
+      const u = dsx.const.authSignInUrl
+      return u == null ? '' : u
+    </variable>
+    <variable as="signUpUrl" computed="true">
+      const u = dsx.const.authSignUpUrl
+      return u == null ? '' : u
+    </variable>
+    <variable as="signOutUrl" computed="true">
+      const u = dsx.const.authSignOutUrl
+      return u == null ? '' : u
+    </variable>
+    <variable as="deleteUrl" computed="true">
+      const u = dsx.const.accountDeleteUrl
+      return u == null ? '' : u
+    </variable>
+    <!-- ONE test decides whether the credential form is real. No provider → no form. -->
+    <variable as="hasProvider" computed="true">return dsx.variable.signInUrl != ''</variable>
+    <variable as="canSignUp" computed="true">return dsx.variable.signUpUrl != ''</variable>
+    <!-- ══ WHY THE SURFACE IS A ROUTE AND NOT A SHEET ═══════════════════════════════
+         It was a sheet first, raised from any screen by writing one global, and that shape
+         is broken in a way worth recording. A PUSHED route does not unmount the screen under
+         it — a covered frame keeps its whole DOM, which is what makes the back gesture
+         instant — and the router seeds a root frame under a DEEP-LINKED page so back works
+         there too. So a cold load of /profile has two live frames, each with its own seam,
+         each watching the same global, each portaling a sheet into the one app-wide overlay
+         layer. Measured: two identical panels stacked at the same coordinates, two
+         confirmation fields holding different text.
+
+         Every ownership rule I could write from inside the component is wrong for one of
+         those cases (a seeded under-frame mounts while the route ALREADY reads the deep
+         link, so "the route I was born under" is the same string for both), and asking each
+         caller to pass an owner id is the failure mode a template cannot afford.
+
+         A ROUTE is exactly-once by construction, which is the framework's own guarantee
+         rather than a protocol of mine. It costs nothing that mattered: a pushed frame keeps
+         the screen underneath alive and restores it on pop, so the player never loses its
+         place. And it buys something real — /auth/signin is a URL, so it survives a reload
+         and can be the redirect target an OAuth provider hands back.
+
+         (The template's other sheets are fine because they are driven by a LOCAL `open`
+         variable: only the instance whose own trigger was tapped opens.) -->
+    <variable as="isPage" computed="true">return dsx.attribute.mode == 'page'</variable>
+    <variable as="submitLabel" computed="true">
+      if (dsx.variable.busy) { return 'One moment…' }
+      return dsx.variable.mode == 'up' ? 'Create account' : 'Sign in'
+    </variable>
+    <variable as="canDelete" computed="true">
+      return dsx.variable.deleteUrl != '' && global.auth.ok == true
+    </variable>
+    <variable as="confirmed" computed="true">
+      return dsx.variable.confirmWord == 'DELETE' && dsx.variable.busy == false
+    </variable>
+
+    <!-- ── the identity lifecycle. Nothing else in the app writes `global.auth` or
+         `dsx.cookie.sd_auth`: every screen READS the published fact and pushes a route to
+         change it. ────────────────────────────────────────────────────────────────── -->
+
+    <!-- Runs on every mount and does its work exactly once per app load: `state` is only
+         absent before the first resolve, so a route change costs nothing. -->
+    <action as="resolve">
+      if (global.auth != null && global.auth.state != null) { return }
+      if (dsx.cookie.sd_auth != 'in') {
+        dsx.action.publishGuest()
+        return
+      }
+      const r = await sessionCall.send()
+      if (r.ok && r.data != null && r.data.viewer != null && r.data.viewer.token != null) {
+        dsx.action.publishIn({ payload: r.data })
+        return
+      }
+      // The provider will not confirm the session. That is SIGNED OUT, not a broken app:
+      // the catalogue is public and keeps working. The card that asks for identity says so.
+      dsx.cookie.sd_auth = 'guest'
+      dsx.action.publishGuest()
+    </action>
+
+    <!-- ARGUMENTS TO A DECLARED ACTION ARE A NAMED DICT, not positional values, and this
+         is worth the sentence because the failure is silent: `dsx.action.publishIn(r.data)`
+         passes a dict whose keys are not the declared input names, so `payload` falls back
+         to a caller-scope reading of the bare word (the ROW scope, which has no such key)
+         and resolves NULL. Measured here: the seam published `Bearer ` with an empty token
+         and every authenticated read answered 401 while `global.auth.ok` said true. The
+         runner is explicit about it — callAction does `Object.assign(scope, callArgs)`. -->
+    <action as="publishIn" inputs="payload">
+      const v = payload.viewer
+      const h = { authorization: 'Bearer ' + v.token }
+      // THE OPERATOR IS THE SAME SEAM. Locally the dev minter hands back a second identity
+      // carrying the service-role claim (the writes on the Manage surface need it). The
+      // literal spelling of that claim is deliberately not in this file: scripts/dist-guard.mjs
+      // refuses any build artefact containing it, and the guard is right to.
+      // In production there is no second token: the operator is whoever the IdP marks with
+      // that claim, so the viewer headers ARE the operator headers, and the gateway of the
+      // host (`reach=""`) decides. Either way the Manage screen reads one name.
+      const op = payload.operator == null ? h : { authorization: 'Bearer ' + payload.operator.token }
+      global.auth = {
+        state: 'in',
+        ok: true,
+        sub: v.sub == null ? '' : v.sub,
+        name: v.name == null ? '' : v.name,
+        email: v.email == null ? '' : v.email,
+        headers: h,
+        opHeaders: op
+      }
+      dsx.cookie.sd_auth = 'in'
+    </action>
+
+    <action as="publishGuest">
+      // headers is an EMPTY DICT, never null and never a null-valued key: a header whose
+      // value is null is a doc-11 "missing-value" hole that gates the block forever.
+      global.auth = { state: 'guest', ok: false, sub: '', name: '', email: '', headers: {}, opHeaders: {} }
+    </action>
+
+    <!-- THE VIEWER-SCOPED CACHES DIE WITH THE VIEWER. docs/auth.md names these five: they
+         are one person's coin balance, list, history, ledger and rewards state, kept
+         app-wide so a tab revisit paints stale-then-fresh instead of blank (PLAN.md §6.30).
+         Whatever drops the token must null them in the same breath or the next viewer sees
+         the previous one's money for a frame. The CONTENT keys (cacheHome, cacheDiscover,
+         cacheCatalog, cacheShow, cacheInbox) are public and stay. -->
+    <action as="clearViewerCaches">
+      global.cacheWallet = null
+      global.cacheFavs = null
+      global.cacheContinue = null
+      global.cacheLedger = null
+      global.cacheRewards = null
+    </action>
+
+    <!-- THE ORDER OF THESE FOUR LINES IS LOAD-BEARING, and it was wrong first: measured on
+         a signed-in Account screen, the wallet stash came BACK two seconds after sign-out.
+         A cookie write calls invalidateCookies(), which is part of every GET block's
+         materialized identity — so writing the cookie FIRST made every authenticated block
+         refetch WITH THE TOKEN STILL LIVE, and those responses landed after the caches were
+         cleared and re-published the previous viewer money into the app-wide store.
+         Drop the identity first (`auto` goes false, so nothing new can fire), then clear,
+         and only then touch the cookie. The `on:success` writes are guarded as well — one
+         request already in flight when the viewer taps Sign out cannot be reordered away. -->
+    <action as="signOut">
+      if (dsx.variable.signOutUrl != '') { await signOutCall.send({}) }
+      dsx.action.publishGuest()
+      dsx.action.clearViewerCaches()
+      dsx.cookie.sd_auth = 'guest'
+      dsx.action.finish({ what: 'signedout' })
+    </action>
+
+    <!-- the pane is finished: clear anything typed and tell the route screen to go back -->
+    <action as="finish" inputs="what">
+      dsx.variable.password = ''
+      dsx.variable.notice = ''
+      dsx.variable.confirmWord = ''
+      dsx.event('done', { what: what })
+    </action>
+
+    <action as="setMode" inputs="next">
+      dsx.variable.mode = next
+      dsx.variable.notice = ''
+    </action>
+
+    <!-- The credential lane. Only reachable when a provider is configured. -->
+    <action as="submit">
+      if (dsx.variable.busy) { return }
+      const em = dsx.variable.email
+      const pw = dsx.variable.password
+      if (em == '' || pw == '') {
+        dsx.variable.notice = 'Enter your email and your password.'
+        return
+      }
+      dsx.variable.busy = true
+      dsx.variable.notice = ''
+      // `await` is a STATEMENT, never a ternary branch — the ternary form returns something
+      // whose .ok is falsy, silently (AGENTS.md / PLAN.md §6.31).
+      let r = null
+      if (dsx.variable.mode == 'up') { r = await signUpCall.send({ email: em, password: pw }) }
+      else { r = await signInCall.send({ email: em, password: pw }) }
+      dsx.variable.busy = false
+      if (r.ok && r.data != null && r.data.viewer != null && r.data.viewer.token != null) {
+        dsx.action.publishIn({ payload: r.data })
+        dsx.action.finish({ what: 'signedin' })
+        return
+      }
+      // A declared rejection reaches `api` as { ok:false, status, data:{reason,message} };
+      // `r.error` is transport only (timeout/network/parse). Show the words the server chose.
+      if (r.data != null && r.data.message != null) { dsx.variable.notice = r.data.message }
+      else if (dsx.variable.mode == 'up') { dsx.variable.notice = 'That account could not be created.' }
+      else { dsx.variable.notice = 'That email and password did not match an account.' }
+    </action>
+
+    <!-- The LOCAL lane. `scripts/dev-session.mjs` mints one demo viewer and the dev origin
+         serves it to private-network hosts only. There are no credentials to check, which
+         is why this is a button and not a login form. -->
+    <action as="useLocal">
+      if (dsx.variable.busy) { return }
+      dsx.variable.busy = true
+      dsx.variable.notice = ''
+      const r = await sessionCall.send()
+      dsx.variable.busy = false
+      if (r.ok && r.data != null && r.data.viewer != null && r.data.viewer.token != null) {
+        dsx.action.publishIn({ payload: r.data })
+        dsx.action.finish({ what: 'signedin' })
+        return
+      }
+      dsx.variable.notice = 'The local session provider did not answer. Run `npm run session`, restart the origin, and try again.'
+    </action>
+
+    <!-- ACCOUNT DELETION — App Store 5.1.1(v): the app must offer to delete the entire
+         account record and its personal data, in-app, with no support ticket in the way.
+         The regulated-industry carve-out (5.1.1(ix)) covers banking, healthcare, gambling,
+         cannabis, air travel and crypto; a drama app is none of them.
+
+         This is the CLIENT half. The erase itself has to be one server action, because the
+         rows live behind owner-scoped RLS across ten entities and there is no client route
+         that can touch nine of them. `accountDeleteUrl` names it; when it is unset the pane
+         below says exactly what is missing instead of showing a button that cannot work. -->
+    <action as="deleteAccount">
+      if (dsx.variable.confirmed == false) { return }
+      dsx.variable.busy = true
+      dsx.variable.deleteNote = ''
+      // THE SWEEP LOOPS. A request gets 64 module calls, so /viewer/delete clears a bounded
+      // batch and answers `done: false` while rows remain — a single call would leave a large
+      // account HALF DELETED while reporting success, which is precisely the "deactivate"
+      // outcome 5.1.1(v) refuses. Bounded at 60 passes to match the ceiling on that route; if
+      // it is still not done by then the account is not empty and this must NOT claim it is.
+      // (No apostrophes in an action-body comment: the balance scanner counts them as quotes.)
+      let r = await deleteCall.send({ confirm: 'DELETE' })
+      let passes = 1
+      while (r.ok && r.data != null && r.data.done == false && passes < 60) {
+        r = await deleteCall.send({ confirm: 'DELETE' })
+        passes = passes + 1
+      }
+      dsx.variable.busy = false
+      if (r.ok && r.data != null && r.data.done == false) {
+        dsx.variable.deleteState = 'refused'
+        dsx.variable.deleteNote = 'Some of your data could not be removed. Nothing has been signed out — try again, and contact support if it repeats.'
+        return
+      }
+      if (r.ok) {
+        // same order as signOut, for the same measured reason
+        dsx.action.publishGuest()
+        dsx.action.clearViewerCaches()
+        dsx.cookie.sd_auth = 'guest'
+        dsx.variable.deleteState = 'done'
+        dsx.variable.confirmWord = ''
+        return
+      }
+      // 404 from the router of the host is `unknown_route` — the deployment has not declared the
+      // action. Name it; do not report it as "something went wrong".
+      const reason = r.data == null || r.data.reason == null ? '' : r.data.reason
+      if (r.status == 404 || reason == 'unknown_route') {
+        dsx.variable.deleteState = 'absent'
+        dsx.variable.deleteNote = ''
+        return
+      }
+      dsx.variable.deleteState = 'refused'
+      dsx.variable.deleteNote = r.data != null && r.data.message != null
+        ? r.data.message
+        : 'The deletion could not be completed. Nothing was removed.'
+    </action>
+
+    <style as="body" spacing="16" alignItems="stretch" paddingH="20" paddingTop="8" paddingBottom="26"/>
+    <style as="head" alignItems="center" spacing="12"/>
+    <style as="title" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
+    <style as="sub" fontSize="13" color="rgba(255,255,255,0.55)" lineSpacing="3"/>
+    <style as="closeBtn" width="32" height="32" radius="16" background="rgba(255,255,255,0.1)" alignItems="center"/>
+
+    <style as="field" background="#1C1C22" radius="12" paddingH="14" paddingV="12" spacing="10" alignItems="center"/>
+    <style as="fieldCap" fontSize="12" color="rgba(255,255,255,0.45)"/>
+    <style as="primary" background="#FF2C55" radius="22" paddingV="14" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="danger" background="#8E1637" radius="22" paddingV="14" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="ghost" background="rgba(255,255,255,0.08)" radius="22" paddingV="13" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="switcher" spacing="8" alignItems="center" paddingTop="2"/>
+    <style as="switchLink" fontSize="13" fontWeight="semibold" color="#FF6B8A"/>
+
+    <style as="noticeRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="flex-start"/>
+    <style as="noticeLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
+    <style as="bridge" background="#1C1C22" radius="12" paddingH="14" paddingV="14" spacing="8" alignItems="stretch"/>
+    <style as="bridgeTitle" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="bridgeBody" fontSize="13" color="rgba(255,255,255,0.6)" lineSpacing="4"/>
+    <style as="legal" fontSize="12" color="rgba(255,255,255,0.42)" lineSpacing="4"/>
+
+    <style as="dangerCard" background="rgba(142,22,55,0.18)" radius="12" paddingH="14" paddingV="14" spacing="8" alignItems="stretch"/>
+    <style as="killList" spacing="7" alignItems="stretch" paddingTop="2"/>
+    <style as="killRow" spacing="10" alignItems="flex-start"/>
+    <style as="killTxt" fontSize="13" color="rgba(255,255,255,0.75)" lineSpacing="3"/>
+    <style as="doneCard" background="#141419" radius="12" paddingH="14" paddingV="18" spacing="10" alignItems="center"/>
+  </head>
+
+  <!-- THE SURFACE. Nothing renders in `boot` mode: a screen mounting the resolver gets a
+       zero-height stack and no chrome. The /auth/:pane route mounts this once with
+       mode="page" and the pane it was asked for. -->
+  <vstack spacing="0" alignItems="stretch" visible-if="dsx.variable.isPage">
+
+    <!-- ══ PANE 1 — SIGN IN / CREATE ACCOUNT ═════════════════════════════════════════ -->
+    <vstack class="body" visible-if="dsx.attribute.pane != 'signout' &amp;&amp; dsx.attribute.pane != 'delete'">
+      <hstack class="head">
+        <vstack spacing="4" style="flex: 1; min-width: 0" alignItems="stretch">
+          <text value="{{ dsx.variable.mode == 'up' ? 'Create your account' : 'Sign in' }}" class="title"/>
+          <text class="sub" value="Coins, VIP, your list and your history belong to an account — so they follow you to any device. Browsing stays open either way."/>
+        </vstack>
+      </hstack>
+
+      <hstack class="noticeRow" visible-if="dsx.variable.notice != ''">
+        <image icon="exclamationmark.triangle.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+        <text value="{{ dsx.variable.notice }}" class="noticeLine" style="flex: 1; min-width: 0"/>
+      </hstack>
+
+      <!-- the credential form: rendered only when a provider is actually behind it -->
+      <vstack spacing="12" alignItems="stretch" visible-if="dsx.variable.constsKnown &amp;&amp; dsx.variable.hasProvider">
+        <vstack spacing="6" alignItems="stretch">
+          <text value="Email" class="fieldCap"/>
+          <hstack class="field">
+            <image icon="person.crop.circle" iconSize="16" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+            <textfield bind="dsx.variable.email" placeholder="you@example.com" color="#FFFFFF"
+                       style="flex: 1" a11yLabel="Email address"/>
+          </hstack>
+        </vstack>
+        <vstack spacing="6" alignItems="stretch">
+          <text value="Password" class="fieldCap"/>
+          <hstack class="field">
+            <image icon="lock.fill" iconSize="16" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+            <textfield bind="dsx.variable.password" placeholder="Your password" secure="true" color="#FFFFFF"
+                       style="flex: 1" a11yLabel="Password" on:submit="dsx.action.submit()"/>
+          </hstack>
+        </vstack>
+        <button label="{{ dsx.variable.submitLabel }}" class="primary" on:tap="dsx.action.submit()"/>
+        <hstack class="switcher" visible-if="dsx.variable.canSignUp">
+          <text value="{{ dsx.variable.mode == 'up' ? 'Already have an account?' : 'New here?' }}" class="legal"/>
+          <text class="switchLink" a11yTrait="button"
+                value="{{ dsx.variable.mode == 'up' ? 'Sign in' : 'Create an account' }}"
+                on:tap="dsx.action.setMode({ next: dsx.variable.mode == 'up' ? 'in' : 'up' })"/>
+        </hstack>
+      </vstack>
+
+      <!-- NO PROVIDER: the gap, named, with the local implementation offered in its place.
+           An email/password form in front of a minter that checks neither would be theatre
+           — and this template deletes controls that promise what they cannot do. -->
+      <vstack class="bridge" visible-if="dsx.variable.constsKnown &amp;&amp; dsx.variable.hasProvider == false">
+        <text value="This build has no identity provider" class="bridgeTitle"/>
+        <text class="bridgeBody" value="Locally the session comes from `scripts/dev-session.mjs` — one demo viewer, minted with the same HS256 token the server verifies in production. There are no credentials to check, so there is no login form here. Set `authSignInUrl` (and `authSignUpUrl`) in App.json `consts` and this screen becomes the real one: same payload, same token contract. docs/auth.md has the shape."/>
+        <button label="{{ dsx.variable.busy ? 'One moment…' : 'Continue as the demo viewer' }}"
+                class="primary" on:tap="dsx.action.useLocal()"/>
+      </vstack>
+
+      <button label="Keep browsing as a guest" class="ghost" on:tap="dsx.action.finish({ what: 'cancel' })"/>
+
+      <!-- Terms and Privacy belong on the surface where an account is created (App Store
+           3.1.2 / Play's policy centre want them reachable in-app). <LegalLinks> names the
+           gap when a deployment has not set them, rather than shipping a dead link. -->
+      <LegalLinks variant="line"/>
+    </vstack>
+
+    <!-- ══ PANE 2 — SIGN OUT ═════════════════════════════════════════════════════════
+         A confirm, because signing out on a shared device is destructive to the session and
+         a mis-tap on a settings row should not cost a viewer their place. It also states
+         what survives: nothing is deleted, and everything is waiting on the next sign-in. -->
+    <vstack class="body" visible-if="dsx.attribute.pane == 'signout'">
+      <hstack class="head">
+        <vstack spacing="4" style="flex: 1; min-width: 0" alignItems="stretch">
+          <text value="Sign out?" class="title"/>
+          <text class="sub"
+                value="Your coins, VIP pass, list and history stay on the account — they are all here again the moment you sign back in. The catalogue keeps working while you are out."/>
+        </vstack>
+      </hstack>
+      <button label="Sign out" class="primary" on:tap="dsx.action.signOut()"/>
+      <button label="Stay signed in" class="ghost" on:tap="dsx.action.finish({ what: 'cancel' })"/>
+    </vstack>
+
+    <!-- ══ PANE 3 — DELETE ACCOUNT ═══════════════════════════════════════════════════ -->
+    <vstack class="body" visible-if="dsx.attribute.pane == 'delete'">
+      <hstack class="head">
+        <vstack spacing="4" style="flex: 1; min-width: 0" alignItems="stretch">
+          <text value="Delete your account" class="title"/>
+          <text value="This cannot be undone." class="sub"/>
+        </vstack>
+      </hstack>
+
+      <!-- done -->
+      <vstack class="doneCard" visible-if="dsx.variable.deleteState == 'done'">
+        <image icon="checkmark.circle.fill" iconSize="30" color="#F6B63D" a11yHidden="true"/>
+        <text value="Your account is deleted" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+        <text class="bridgeBody" textAlign="center"
+              value="Everything held against it is gone and you are signed out. The catalogue stays open — you can keep browsing as a guest, or create a new account whenever you like."/>
+        <button label="Done" class="ghost" on:tap="dsx.action.finish({ what: 'deleted' })"/>
+      </vstack>
+
+      <vstack spacing="16" alignItems="stretch" visible-if="dsx.variable.deleteState != 'done'">
+        <vstack class="dangerCard">
+          <text value="What is deleted" class="bridgeTitle"/>
+          <vstack class="killList">
+            <hstack class="killRow">
+              <image icon="minus" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+              <text class="killTxt" style="flex: 1; min-width: 0"
+                    value="Your wallet: the coin balance, the bonus balance and your VIP pass."/>
+            </hstack>
+            <hstack class="killRow">
+              <image icon="minus" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+              <text class="killTxt" style="flex: 1; min-width: 0"
+                    value="Every episode you unlocked, your transaction history and your orders."/>
+            </hstack>
+            <hstack class="killRow">
+              <image icon="minus" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+              <text class="killTxt" style="flex: 1; min-width: 0"
+                    value="Watch progress, My List, check-ins, spins, task claims and ad views."/>
+            </hstack>
+            <hstack class="killRow">
+              <image icon="minus" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+              <text class="killTxt" style="flex: 1; min-width: 0"
+                    value="Every comment you posted, and the account record itself."/>
+            </hstack>
+          </vstack>
+        </vstack>
+
+        <!-- THE COIN BALANCE IS NAMED, and it is not a reason to refuse. Apple is explicit
+             that an unspent balance does not license keeping the account; the honest thing
+             is to say what happens to it BEFORE the tap. -->
+        <text class="bridgeBody"
+              value="Any unspent coins and any days left on a VIP pass are destroyed with the account. They cannot be transferred to another account and they are not refunded. A purchase is refunded only by whoever took the payment — the App Store, Google Play, or Stripe on the web — so ask for a refund there BEFORE you delete, because afterwards there is no order history left to point at."/>
+
+        <!-- not wired: the gap, named in place, with the exact thing that closes it -->
+        <vstack class="bridge" visible-if="dsx.variable.canDelete == false && global.auth.ok == true">
+          <text value="Deletion is not wired in this deployment" class="bridgeTitle"/>
+          <text class="bridgeBody" value="Erasing the account touches ten owner-scoped entities behind Postgres RLS, so it is one declared server action — there is no client route that can reach nine of them. Declare `deleteAccount` in `server/viewer.dsx`, route it at POST /viewer/delete, and set `accountDeleteUrl` in App.json `consts`. docs/auth.md has the exact shape. Nothing here pretends to delete in the meantime."/>
+        </vstack>
+
+        <vstack spacing="12" alignItems="stretch" visible-if="dsx.variable.canDelete">
+          <vstack spacing="6" alignItems="stretch">
+            <text value="Type DELETE to confirm" class="fieldCap"/>
+            <hstack class="field">
+              <image icon="trash" iconSize="16" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+              <textfield bind="dsx.variable.confirmWord" placeholder="DELETE" color="#FFFFFF"
+                         style="flex: 1" a11yLabel="Type the word DELETE to confirm"/>
+            </hstack>
+          </vstack>
+          <!-- The confirm gate is the BUTTON'S EXISTENCE, not a greyed-out one: there is no
+               `disabled` in the element grammar, and a button with no handler announces to a
+               screen reader as a control that does nothing. -->
+          <text class="legal" visible-if="dsx.variable.confirmed == false"
+                value="Type DELETE above and the button appears. Nothing is sent until you press it."/>
+          <button label="{{ dsx.variable.busy ? 'Deleting…' : 'Delete my account permanently' }}"
+                  class="danger" role="destructive" visible-if="dsx.variable.confirmed"
+                  on:tap="dsx.action.deleteAccount()"/>
+        </vstack>
+
+        <vstack class="bridge" visible-if="dsx.variable.deleteState == 'absent'">
+          <text value="This deployment answered 404" class="bridgeTitle"/>
+          <text class="bridgeBody" value="Nothing was deleted. The route named by `accountDeleteUrl` does not exist on this origin — declare `deleteAccount` in `server/viewer.dsx` and route it. docs/auth.md, 'Account deletion'."/>
+        </vstack>
+        <hstack class="noticeRow" visible-if="dsx.variable.deleteState == 'refused'">
+          <image icon="exclamationmark.triangle.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+          <text value="{{ dsx.variable.deleteNote }}" class="noticeLine" style="flex: 1; min-width: 0"/>
+        </hstack>
+
+        <button label="Keep my account" class="ghost" on:tap="dsx.action.finish({ what: 'cancel' })"/>
+      </vstack>
+    </vstack>
+  </vstack>
+</vstack>

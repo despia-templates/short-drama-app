@@ -1,0 +1,123 @@
+<!-- RestoreRow — "Restore purchases", wired to the real thing.
+
+     APPLE'S RULE (3.1.1): "you should make sure you have a restore mechanism for any
+     restorable in-app purchases", and a subscription sign-up surface must let a current
+     subscriber sign in OR restore. Both halves are now real: <AuthSeam> is the sign-in, and
+     this row is the restore.
+
+     WHAT IT ACTUALLY RESTORES, precisely — because most of the category ships a Restore
+     button whose job nobody can describe:
+
+       · VIP and every unlocked episode are SERVER-SIDE, account-scoped rows. A reinstall, a
+         new phone or a second device that signs back in already has them; there is nothing
+         to restore, which is why this row's resting line reports what the account holds
+         rather than pretending a transfer happened.
+       · The real gap it closes is the money that was TAKEN and never granted: an order the
+         payment provider confirmed while the app was closed, offline or killed between the
+         payment sheet's success and the settle call. `POST /store/restore` walks the
+         caller's own unsettled orders, asks Stripe about each, and grants the ones that
+         succeeded. It is exactly-once for the same reason settle is — the ledger's unique
+         index refuses a second grant.
+
+     WHAT IT DOES NOT COVER, named rather than implied: a purchase made through StoreKit or
+     Play Billing never creates one of these orders, so there is nothing here to restore for
+     it. That receiver is a hosted-lane integration this template does not have
+     (server/store.dsx's own header says so). An adopter shipping to the App Store wires it
+     before submitting, and until then this row says what it can and cannot do.
+
+     THIS ROW USED TO BE A LIE BY OMISSION. On /vip it called `wallet.refresh()` and told the
+     viewer that restoring "re-reads the account you are signed in to" and that there was no
+     sign-in anywhere. Both halves are fixed: the call is real and the sign-in exists. -->
+<vstack spacing="0" alignItems="stretch">
+  <head>
+    <attribute as="variant" default="'row'"/>   <!-- row | compact -->
+
+    <event as="restored" payload="coins"/>
+
+    <api as="restoreCall" url="/store/restore" method="POST" auto="false" headers="global.auth.headers"/>
+
+    <variable as="busy">return false</variable>
+    <variable as="result">return ''</variable>
+
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <variable as="line" computed="true">
+      if (dsx.variable.busy) { return 'Checking your purchases…' }
+      if (dsx.variable.result != '') { return dsx.variable.result }
+      if (dsx.variable.signedIn == false) {
+        return 'Sign in first — purchases belong to an account, so restoring means reaching the account that made them.'
+      }
+      return 'VIP and every unlocked episode are held on your account, so they are already here. This checks for a payment that was taken but never applied.'
+    </variable>
+    <variable as="btnLabel" computed="true">
+      if (dsx.variable.busy) { return 'Checking…' }
+      return dsx.variable.signedIn ? 'Restore' : 'Sign in'
+    </variable>
+
+    <!-- One tap, two destinations: with no account there is nothing to restore ONTO, so the
+         control does the thing that has to happen first rather than failing at it. -->
+    <action as="tapped">
+      if (dsx.variable.signedIn == false) {
+        dsx.module.route.push({ path: '/auth/signin' })
+        return
+      }
+      dsx.action.restore()
+    </action>
+
+    <action as="restore">
+      if (dsx.variable.busy) { return }
+      dsx.variable.busy = true
+      dsx.variable.result = ''
+      const r = await restoreCall.send({})
+      dsx.variable.busy = false
+      if (!r.ok) {
+        // A declared rejection carries the words the server chose at r.data.message; r.error is
+        // transport only. "Payments are not configured" is a real answer and reads better
+        // than any sentence written here.
+        dsx.variable.result = r.data != null && r.data.message != null
+          ? r.data.message
+          : 'Your purchases could not be checked right now. Nothing was charged and nothing was lost.'
+        return
+      }
+      const d = r.data
+      if (d.restored == 0) {
+        dsx.variable.result = d.checked == 0
+          ? 'Nothing to restore — every purchase on this account is already applied.'
+          : 'Checked ' + d.checked + ' pending order(s): none had completed payment, so nothing was applied.'
+        return
+      }
+      let got = ''
+      if (d.coins > 0) { got = d.coins + ' coins' }
+      if (d.bonus > 0) { got = got == '' ? d.bonus + ' bonus coins' : got + ' and ' + d.bonus + ' bonus coins' }
+      if (d.vipDays > 0) { got = got == '' ? d.vipDays + ' VIP days' : got + ' and ' + d.vipDays + ' VIP days' }
+      dsx.variable.result = 'Restored ' + d.restored + ' purchase(s): ' + got + ' are back on your account.'
+      dsx.event('restored', { coins: d.coins })
+    </action>
+
+    <style as="row" spacing="14" alignItems="flex-start" paddingV="12"/>
+    <style as="label" fontSize="16" color="#FFFFFF"/>
+    <style as="note" fontSize="13" color="rgba(255,255,255,0.45)" lineSpacing="3"/>
+    <style as="btn" background="#26262C" radius="18" paddingH="16" paddingV="12" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="compact" spacing="8" alignItems="stretch" paddingTop="4"/>
+    <style as="compactBtn" background="rgba(255,255,255,0.08)" radius="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+  </head>
+
+  <!-- ROW — the disclosure spelling, under a benefit list -->
+  <hstack class="row" visible-if="dsx.attribute.variant != 'compact'">
+    <image icon="arrow.clockwise" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
+    <vstack spacing="3" style="flex: 1; min-width: 0" alignItems="stretch">
+      <text value="Restore purchases" class="label"/>
+      <text value="{{ dsx.variable.line }}" class="note"/>
+      <text class="note"
+            value="A purchase made through the App Store or Google Play is restored by that store's own receipt, which this deployment does not receive yet — see server/store.dsx."/>
+    </vstack>
+    <button label="{{ dsx.variable.btnLabel }}" class="btn" on:tap="dsx.action.tapped()"
+            a11yLabel="Restore purchases made on this account"/>
+  </hstack>
+
+  <!-- COMPACT — the purchase-sheet spelling, where the price list is the point -->
+  <vstack class="compact" visible-if="dsx.attribute.variant == 'compact'">
+    <button label="{{ dsx.variable.signedIn ? 'Restore purchases' : 'Sign in to restore purchases' }}"
+            class="compactBtn" on:tap="dsx.action.tapped()"/>
+    <text value="{{ dsx.variable.line }}" class="note" visible-if="dsx.variable.result != '' || dsx.variable.busy"/>
+  </vstack>
+</vstack>

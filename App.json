@@ -9,5 +9,16 @@
     ]
   },
   "icons": "unified",
-  "design": "custom"
+  "design": "custom",
+  "_consts_note": "THE DEPLOYMENT PLANE. `consts` is App.json's flat-scalar block, read in markup as `dsx.const.<key>` (reactive, and typed-NULL when a key is absent — which is exactly the gate an honest degradation needs). A local build may override any of these in dsx.config.json `consts` without editing the file that ships. Everything below is EMPTY ON PURPOSE: a placeholder URL looks satisfied to an adopter and reads as a broken promise to a store reviewer. See docs/auth.md and Components/parts/AuthSeam.dsx.",
+  "consts": {
+    "authSessionUrl": "/dev-session.json",
+    "authSignInUrl": "",
+    "authSignUpUrl": "",
+    "authSignOutUrl": "",
+    "accountDeleteUrl": "/viewer/delete",
+    "termsUrl": "",
+    "privacyUrl": "",
+    "supportUrl": ""
+  }
 }

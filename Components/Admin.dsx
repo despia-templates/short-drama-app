@@ -8,14 +8,13 @@
   <head>
     <!-- the router publishes nav.canPop / nav.depth; back reads it -->
     <expects variable="nav"/>
-    <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="stats" url="/internal/admin/stats" method="POST" auto="true" body="dsx.variable.empty" ssr="false" needs="session" headers="dsx.variable.opHeaders"/>
-    <api as="shows" url="/internal/admin/listshows" method="POST" auto="true" body="dsx.variable.empty" ssr="false" needs="session" headers="dsx.variable.opHeaders"/>
-    <api as="upsertShow" url="/internal/admin/upsertshow" method="POST" auto="false" headers="dsx.variable.opHeaders"/>
-    <api as="upsertEp" url="/internal/admin/upsertepisode" method="POST" auto="false" headers="dsx.variable.opHeaders"/>
-    <api as="publishCall" url="/internal/admin/publish" method="POST" auto="false" headers="dsx.variable.opHeaders"/>
-    <api as="featureCall" url="/internal/admin/feature" method="POST" auto="false" headers="dsx.variable.opHeaders"/>
-    <api as="noticeCall" url="/internal/admin/notice" method="POST" auto="false" headers="dsx.variable.opHeaders"/>
+    <api as="stats" url="/internal/admin/stats" method="POST" body="dsx.variable.empty" ssr="false" auto="global.auth.ok == true" headers="global.auth.opHeaders"/>
+    <api as="shows" url="/internal/admin/listshows" method="POST" body="dsx.variable.empty" ssr="false" auto="global.auth.ok == true" headers="global.auth.opHeaders"/>
+    <api as="upsertShow" url="/internal/admin/upsertshow" method="POST" auto="false" headers="global.auth.opHeaders"/>
+    <api as="upsertEp" url="/internal/admin/upsertepisode" method="POST" auto="false" headers="global.auth.opHeaders"/>
+    <api as="publishCall" url="/internal/admin/publish" method="POST" auto="false" headers="global.auth.opHeaders"/>
+    <api as="featureCall" url="/internal/admin/feature" method="POST" auto="false" headers="global.auth.opHeaders"/>
+    <api as="noticeCall" url="/internal/admin/notice" method="POST" auto="false" headers="global.auth.opHeaders"/>
 
     <variable as="empty">return {}</variable>
     <variable as="toast">return ''</variable>
@@ -29,19 +28,26 @@
     <variable as="pMessage">return ''</variable>
     <variable as="pSegment">return 'all'</variable>
 
-    <variable as="opHeaders" computed="true">
-      if (session.data == null) { return {} }
-      return { authorization: 'Bearer ' + session.data.operator.token }
-    </variable>
 
     <!-- The stat cards fell back to an em dash and the table to nothing, for BOTH a pending
          read and a failed one — an operator could not tell "loading" from "the admin routes
          are refusing me", which on this surface is usually an authority problem worth naming.
          `stats.error`/`shows.error` were read nowhere in the file. -->
+    <!-- SIGNED OUT IS NOT "THE ROUTES ARE REFUSING YOU". With the seam gating the reads,
+         a guest never sends them at all, so the failure card would otherwise sit here
+         forever blaming authority for something that is just an absent session. Three
+         states, in order: no session · a session the routes refuse · loading. -->
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <variable as="authKnown" computed="true">return global.auth != null &amp;&amp; global.auth.state != null</variable>
+    <variable as="signedOut" computed="true">
+      return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
+    </variable>
     <variable as="opsFailed" computed="true">
+      if (dsx.variable.signedIn == false) { return false }
       return (stats.error != null || shows.error != null) && stats.data == null && shows.data == null
     </variable>
     <variable as="opsLoading" computed="true">
+      if (dsx.variable.signedIn == false) { return false }
       return dsx.variable.opsFailed == false && (stats.data == null || shows.data == null)
     </variable>
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
@@ -164,7 +170,7 @@
       <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
 
       <!-- stat cards -->
-      <hstack class="statRow">
+      <hstack class="statRow" visible-if="dsx.variable.signedIn">
         <vstack class="statCard" style="flex: 1">
           <text value="{{ stats.data == null ? '—' : stats.data.live }}" class="statNum"/>
           <text value="Live" class="statCap"/>
@@ -183,21 +189,26 @@
         </vstack>
       </hstack>
 
+      <SignInCard visible-if="dsx.variable.signedOut"
+                  icon="gearshape"
+                  title="The Manage surface needs an operator"
+                  note="These routes admit a service-role identity only. Sign in — locally the same provider mints the operator alongside the demo viewer; in production the operator is whoever your identity provider marks service-role (docs/auth.md)."/>
+
       <vstack class="card" visible-if="dsx.variable.opsFailed">
         <text value="The Manage routes are not answering." class="h2"/>
-        <text class="note" value="These routes require operator authority. If you are signed in as a viewer, this build's local session mints an operator token separately — see docs/auth.md."/>
+        <text class="note" value="You are signed in, so this is authority rather than identity: these routes admit only a service-role caller (or DSX_INTERNAL_KEY) and answer everyone else 404. Locally the provider mints the operator beside the viewer; in production the role claim comes from your identity provider — docs/auth.md."/>
         <hstack spacing="10" alignItems="center" paddingTop="6">
           <button label="Retry" class="miniBtn" on:tap="stats.refresh(); shows.refresh()"/>
         </hstack>
       </vstack>
 
-      <vstack class="card" visible-if="dsx.variable.opsFailed == false">
+      <vstack class="card" visible-if="dsx.variable.opsFailed == false && dsx.variable.signedIn">
         <text value="About the numbers on the storefront" class="h2"/>
         <text class="note" value="Every series carries a view count and a rating, shown in the home hero, on the detail screen and under each browse card. In this template they are DEMO VALUES seeded from scripts/catalogue.mjs — nothing increments them, and no telemetry is collected. A real deployment replaces that table with its own counter; the wire shape (show.views, show.rating) does not change."/>
       </vstack>
 
       <!-- shows table -->      <!-- shows table -->
-      <vstack class="card" visible-if="dsx.variable.opsFailed == false">
+      <vstack class="card" visible-if="dsx.variable.opsFailed == false && dsx.variable.signedIn">
         <text value="Shows" class="h2"/>
         <text class="empty" visible-if="dsx.variable.opsLoading" value="Loading the catalogue…"/>
         <text class="empty" visible-if="shows.data != null && shows.data.rows.length == 0" value="No shows yet — create the first one below."/>
@@ -219,7 +230,7 @@
       </vstack>
 
       <!-- create show -->
-      <vstack class="card">
+      <vstack class="card" visible-if="dsx.variable.signedIn">
         <text value="New show" class="h2"/>
         <textfield class="field" bind="dsx.variable.nTitle" placeholder="Title"/>
         <textfield class="field" bind="dsx.variable.nSynopsis" placeholder="Synopsis"/>
@@ -232,7 +243,7 @@
       </vstack>
 
       <!-- add episode -->
-      <vstack class="card">
+      <vstack class="card" visible-if="dsx.variable.signedIn">
         <text value="Add episode" class="h2"/>
         <text value="{{ dsx.variable.epShow == '' ? 'Tap “+ EP” on a show row to target it.' : 'Target set — EP ' + dsx.variable.epIdx }}" class="note"/>
         <textfield class="field" bind="dsx.variable.epUrl" placeholder="Video URL (MP4/HLS — Stream in the hosted lane)"/>
@@ -240,7 +251,7 @@
       </vstack>
 
       <!-- notice / push composer -->
-      <vstack class="card">
+      <vstack class="card" visible-if="dsx.variable.signedIn">
         <text value="Send a notice" class="h2"/>
         <textfield class="field" bind="dsx.variable.pTitle" placeholder="Title — e.g. EP 41–45 drop tonight 8PM"/>
         <textfield class="field" bind="dsx.variable.pMessage" placeholder="Message"/>
@@ -269,4 +280,7 @@
        agrees). The tab roots keep their bar and swap instantly, so it never moves there
        either. Wide viewports crossfade instead of pushing, so <TopNav> — painted identically
        by both frames over an opaque under-frame — composites STILL (PLAN.md §6.26). -->
+  <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of
+       the layout, so a zero-height child here cannot disturb any chrome. -->
+  <AuthSeam/>
 </vstack>

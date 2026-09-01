@@ -17,14 +17,15 @@
     <!-- the router publishes nav.canPop / nav.depth; back reads it -->
     <expects variable="nav"/>
     <api as="detail" url="/catalog/show/{{ vars.id }}" on:success="global.cacheShow = detail.data"/>
-    <api as="session" url="/dev-session.json" ssr="false"/>
-    <api as="wallet" url="/wallet/state" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheWallet = wallet.data"/>
-    <api as="favs" url="/viewer/list" ssr="false" needs="session" headers="dsx.variable.authHeaders" on:success="global.cacheFavs = favs.data"/>
-    <api as="fav" url="/viewer/favorite" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+    <!-- the seam owns the token (<AuthSeam/> at the foot of this file); every authenticated
+         read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
+    <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
+    <api as="favs" url="/viewer/list" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheFavs = global.auth.ok == true ? favs.data : null"/>
+    <api as="fav" url="/viewer/favorite" method="POST" auto="false" headers="global.auth.headers"/>
     <!-- the basket, priced by the server (one BULK_OFF, server-side) and re-quoted after a
          purchase so the offer can never advertise something already owned -->
-    <api as="offer" url="/wallet/series/{{ vars.id }}" ssr="false" needs="session" headers="dsx.variable.authHeaders"/>
-    <api as="buySeries" url="/wallet/unlockseries" method="POST" auto="false" headers="dsx.variable.authHeaders"/>
+    <api as="offer" url="/wallet/series/{{ vars.id }}" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers"/>
+    <api as="buySeries" url="/wallet/unlockseries" method="POST" auto="false" headers="global.auth.headers"/>
 
     <variable as="favTouched">return ''</variable>
     <variable as="buyingSeries">return false</variable>
@@ -48,17 +49,17 @@
       if (cached == null || cached.show == null) { return null }
       return cached.show.id == vars.id ? cached : null
     </variable>
+    <!-- signed in is the seam, and a viewer-scoped stash never survives the viewer -->
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
     <variable as="favsView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (favs.data != null) { return favs.data }
       return global.cacheFavs
     </variable>
     <variable as="walletView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
       if (wallet.data != null) { return wallet.data }
       return global.cacheWallet
-    </variable>
-    <variable as="authHeaders" computed="true">
-      if (session.data == null) { return {} }
-      return { authorization: 'Bearer ' + session.data.viewer.token }
     </variable>
     <variable as="show" computed="true">
       if (dsx.variable.detailView == null) { return null }
@@ -167,6 +168,12 @@
          stacks a second copy of where you came from. Back is never href — href pushes. -->
     <action as="buyWholeSeries">
       if (dsx.variable.buyingSeries) { return }
+      // the basket is owned by an account: raise the sign-in sheet rather than spending a
+      // round trip to be told 401, and the viewer lands back on this show (docs/auth.md)
+      if (dsx.variable.signedIn == false) {
+        dsx.module.route.push({ path: '/auth/signin' })
+        return
+      }
       dsx.variable.buyingSeries = true
       const r = await buySeries.send({ show: vars.id })
       dsx.variable.buyingSeries = false
@@ -184,6 +191,10 @@
       else { dsx.module.route.replace({ path: '/' }) }
     </action>
     <action as="toggleFav">
+      if (dsx.variable.signedIn == false) {
+        dsx.module.route.push({ path: '/auth/signin' })
+        return
+      }
       const r = await fav.send({ show: vars.id })
       if (r.ok) { dsx.variable.favTouched = r.data.favorite ? 'y' : 'n' }
     </action>
@@ -501,4 +512,7 @@
        agrees). The tab roots keep their bar and swap instantly, so it never moves there
        either. Wide viewports crossfade instead of pushing, so <TopNav> — painted identically
        by both frames over an opaque under-frame — composites STILL (PLAN.md §6.26). -->
+  <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of
+       the layout, so a zero-height child here cannot disturb any chrome. -->
+  <AuthSeam/>
 </vstack>
