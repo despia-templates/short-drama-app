@@ -344,12 +344,20 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   it back — WAS TRIED AND IS WRONG: it made the bar 104pt on that screen against 70
   everywhere else, so the captions stopped clipping and started SHIFTING as you changed tabs.
   Compensating in the shared component turns a clip into a drift.
-  The fix is that the screen conforms: no `ignoreSafeArea` on a pager whose sibling is chrome,
-  and stage height derived from the SAFE region (`screen.height - safeTop - safeBottom -
-  chromeH`). `ignoreSafeArea` belongs only to a screen that owns the WHOLE window and pays
-  every inset back itself — Watch does exactly that, and mounts no tab bar (§6.29). Any screen
-  deriving a height from `dsx.screen.height` while chrome shares its column is making this
-  mistake.
+  The fix is that the screen conforms, in three parts. (1) No `ignoreSafeArea` on a pager whose
+  sibling is chrome — that attribute belongs only to a screen owning the WHOLE window and
+  paying every inset back itself (Watch does exactly that, and mounts no tab bar, §6.29).
+  (2) Height comes from the SAFE REGION, and the engine publishes it: **`dsx.screen.safeHeight`
+  / `safeWidth`** are the window minus its insets, clamped at zero, identical on all three
+  renderers. Never rebuild it out of `screen.height` and four insets — never mind
+  `screen.height` alone. (3) **A screen that must know a shared bar's height ASKS it**
+  (`measure=` on the mount) rather than typing the number a second time. That last one is not
+  pedantry: `chromeH = 70` against a bar that measures 65 was the final 5pt of this drift, and
+  it survived a round of fixing precisely because 70 looks like a decision rather than a guess.
+  Measured on an iPhone 17 Pro, probe-free, VIP-badge fiducial across Home / For You / My List /
+  Profile: spread **4.67pt → 0.00pt**, bar bottom 839.7 against a safe edge of 840.
+  Any screen deriving a height from `dsx.screen.height` while chrome shares its column, or
+  hard-coding a shared component's size, is making one of these mistakes.
 - **Icons are UNIFIED here** (App.json `icons: "unified"`, dev@37e1c82c): native draws the
   web's own 24×24 Boxicons paths — same geometry, same em-box, so icon spacing is
   pixel-true. `position: absolute` + edge insets and `filter: blur(N)` are bridged now;

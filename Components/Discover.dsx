@@ -10,6 +10,8 @@
 
     <variable as="page">return 0</variable>
     <variable as="activeShow">return ''</variable>
+    <!-- the shared bar's MEASURED box (see chromeH below) -->
+    <variable as="barBox">return {}</variable>
     <!-- Does the RESTING clip have frames? The transport binding is the one instrument
          that cannot race: `buffering=` is ACTIVE-GUARDED by the renderer ("an inactive
          pager preload must never overwrite the shared active clip's bindings"), so
@@ -54,17 +56,32 @@
          inherited the stage's grid column, and while `dsx.screen.*` settles after a tab
          switch that column computed 362, so the bar shrank 375 → 362 → 375 in ~60ms.
          Chrome is a sibling of the stage now, exactly as on every other screen. -->
-    <variable as="chromeH" computed="true">return dsx.variable.wide ? 64 : 70</variable>
-    <!-- THE SAFE REGION, not the window. `dsx.screen.height` is the whole display; the frame
-         hands this screen height MINUS the insets, so subtracting only the bar overshot by
-         safeTop + safeBottom and the column ran past its box. Measured on an iPhone 17 Pro:
-         874 - 70 = 804 for the stage plus 70 for the bar is exactly 874, the full window,
-         inside a frame offering 781 — so the bar spilled into the 34pt indicator. Any screen
-         deriving a height from dsx.screen.height while chrome shares its column is making
-         this mistake (AGENTS.md, the safe-area law). -->
+    <!-- THE BAR'S OWN HEIGHT, MEASURED — never a number typed twice. The seed is what the
+         phone bar measures on an iPhone 17 Pro (9 + 22 icon + gap + caption + 9 = 65), so the
+         very first paint is already right; the measurement then keeps it right when Dynamic
+         Type grows the caption or a platform draws the icon a point taller. Guessing 70 here
+         was the last 5pt of the drift the founder saw: every OTHER tab root lets the frame
+         place the bar and lands its bottom edge exactly on the safe edge at 840, while this
+         screen predicted a bar 5pt taller than the one that renders and stopped 5pt short.
+         A screen that must know a shared bar's height ASKS it. -->
+    <variable as="chromeH" computed="true">
+      if (dsx.variable.wide) { return 64 }
+      const b = dsx.variable.barBox
+      if (b == null) { return 65 }
+      const h = b.height
+      if (h == null) { return 65 }
+      if (h < 1) { return 65 }
+      return h
+    </variable>
+    <!-- THE SAFE REGION, not the window. `dsx.screen.height` is the whole DISPLAY; the frame
+         hands this screen the display minus its insets, which the engine now publishes as one
+         fact rather than leaving every author to subtract it. Measured on an iPhone 17 Pro:
+         height 874, safeTop 62, safeBottom 34, safeHeight 778 — and 874 - 70 = 804 for the
+         stage plus the bar was the full window inside a 778 box, so the bar spilled into the
+         34pt home indicator. Any screen deriving a height from dsx.screen.height while chrome
+         shares its column is making that mistake (AGENTS.md, the safe-area law). -->
     <variable as="stageH" computed="true">
-      const inset = (dsx.screen.safeTop || 0) + (dsx.screen.safeBottom || 0)
-      return dsx.screen.height - inset - dsx.variable.chromeH
+      return dsx.screen.safeHeight - dsx.variable.chromeH
     </variable>
 
     <variable as="card" computed="true">
@@ -197,5 +214,5 @@
 
   </zstack>
 
-  <TabBar active="foryou" visible-if="dsx.variable.wide == false"/>
+  <TabBar active="foryou" measure="dsx.variable.barBox" visible-if="dsx.variable.wide == false"/>
 </vstack>
