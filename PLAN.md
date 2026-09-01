@@ -1948,3 +1948,74 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     what a template actually trips over, while the fidelity half (Stages 3–5, the card-stack
     look) is a want rather than a blocker: two nested drawers ship in this template today,
     on the plain flat presentation, and they are good.
+
+96. RESOLVED 2026-09-01 (`despia-framework dev@1870e4e4`) — **`nav` was a reserved plane on the
+    WEB runtime only, so the documented guarded-back idiom answered null on both native lanes.**
+
+    StackReference documents it on its own routing page:
+    `visible-if="{{ dsx.variable.nav.canPop }}"`. `dsx.variable.nav` normalizes to the bare
+    name `nav`; the web resolver has a reserved branch for it beside `route`, and NEITHER
+    NATIVE RESOLVER DID. So the read fell through to the SURFACE store while the router
+    publishes `nav` to the APP store, and returned nil.
+
+    Measured on an iPhone 17 Pro at depth 3 (`/` → `/browse/Comedy` → `/show/:id`): the back
+    chevron logged `replace — apply — depth 3 top /`. The guard took its else branch, the
+    viewer landed on Home, and the stack was left as `[/, /browse/Comedy, /]`. After:
+    `pop — apply — depth 2 top /browse`. The same markup had always popped correctly on web,
+    which is exactly what made it look like an iOS quirk rather than two lanes missing a
+    branch the third had.
+
+    A documented read that silently answers null is worse than one that errors: every guard
+    written against it inverts, and it inverts toward "there is no history" — the destructive
+    direction, every time.
+
+    Both native resolvers now carry the branch, reading the app store exactly as `route` does,
+    so it is reactive for the same reason. And the plane is READ-ONLY, now enforced: all four
+    write paths (web interpreter, web codegen, Swift, Kotlin) already refused surface-store
+    writes to `dsx`/`global`/`route`/`cookie`, and `nav` joins them — a plane an author can
+    now SEE is a plane an author can now try to write, and `nav.canPop = false` would
+    otherwise have quietly created a surface variable the reader deliberately ignores.
+
+    THE GATE: `Conformance/jse/reserved-planes.json` — 14 case groups over 23 spellings,
+    because all three appear in shipped markup (the bare name, the `dsx.` root, and the
+    surface-scope spelling that broke). Two properties beyond the values: a reserved plane
+    cannot be SHADOWED by a surface variable or a row field of the same name, and an
+    unpublished plane answers null rather than a stale value. Proven to fail — removing the
+    branch again turns 2 of 3 red on web and 2 of 3 on the JVM. The fixture needs a seeded app
+    store, which the generic triple runner cannot express, so it declares its own executors and
+    BOTH generic runners now honour that declaration loudly: they skip the rows but assert the
+    named executor is still on disk.
+
+97. RESOLVED 2026-09-01 (`despia-framework dev@daad3fa0`) — **A `reset` away from a pushed
+    screen could kill the process, and the cause was that DISPOSAL PUBLISHED.**
+
+    Reproduced 3× on the most ordinary gesture an app has — push a detail, tap a tab: thousands
+    of "Publishing changes from within view updates is not allowed" and then
+    `Fatal access conflict detected`. An earlier pass isolated it against a control build
+    (pre-existing) and measured one hypothesis FALSE: deferring `releaseNative` off the publish
+    turn does not fix it, because the disposals immediately before the fatal are a whole
+    surface's api blocks going down as SwiftUI unmounts the replaced root, not `onPop`. That
+    negative result was right and it points at the seam.
+
+    Two causes, both in teardown. (1) `ApiBlock.cancel()` settles the envelope flags — loading
+    false, refreshing false, status ready — and `dispose()` called it. Those writes are a state
+    transition for an OBSERVER, and a disposed block has none: its surface is being destroyed.
+    But `store.vars` is `@Published` with a `didSet`, so every block on the outgoing surface
+    published into an observed store from inside SwiftUI's update pass. (2) Disposal rides
+    `deinit`, and `deinit` runs on whichever queue drops the last reference — the same reason
+    `FrameSurface.deinit` already hops — while `apiHandles` and the api graph are
+    main-thread-only, so a mass release mutated main-thread state off-main.
+
+    `cancel(publishing:)` takes false from `dispose()` (the live-cancel path, where a refetch
+    supersedes a request and the flags DO matter, is unchanged), and both `MountedStackApi.deinit`
+    and `StackSurface.deinit` hop through `JSE.afterRender`. The hop is safe precisely because
+    the release it defers is IDENTITY-checked: if the replacing view identity has already
+    re-claimed the name, `handle.value` is the new block and the late release returns false —
+    which is the behaviour that check was written for.
+
+    Measured after: three cycles of push-a-tab-root-then-switch-tabs plus a depth-3 push and
+    pop — 0 publish-in-update warnings (was ~15,000), 0 access conflicts, process alive.
+
+    The general lesson, and it is the third time this ledger has written a version of it:
+    a write on a teardown path has no reader, and a framework that publishes it anyway is
+    paying a crash for a value nobody will ever read.
