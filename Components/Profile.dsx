@@ -135,7 +135,10 @@
         dsx.cookie.uiLocale = null
         return
       }
-      dsx.cookie.uiLocale = tag
+      // { value, days } is the durable spelling (dev@e213cbac, §6.100 resolved): the jar
+      // is the one plane every lane and the server share, and 365 days is a preference,
+      // not a session. A bare string would still be a session cookie on every lane.
+      dsx.cookie.uiLocale = { value: tag, days: 365 }
     </action>
 
     <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
@@ -469,7 +472,6 @@
               <picker bind="global.locale" optionsKey="dsx.variable.langRows"
                       maxWidth="320" style="max-width: 320px"
                       a11yLabel="App language" on:change="dsx.action.localePicked()"/>
-              <text value="Remembered until you quit the app — this build has no durable preference store." class="menuNote"/>
             </vstack>
             <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)" href="/admin"
                     a11yGroup="true" a11yLabel="Manage this app — operator surface">

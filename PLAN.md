@@ -2119,6 +2119,13 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     Secondary and cheaper: expose `localize(s)` in the JSE builtin table, which also gives
     the interpolated-composite tier a manual escape hatch until the Translate module lands.
 
+     **RESOLVED UPSTREAM 2026-09-02** (dev@d2927f31 web · 30831187 Kotlin · the Swift half in
+     91a108b0): option labels reach the table through one fold per lane (`DSXStrings.option`),
+     and `localize()` is a JSE verb in all three tables. This template's device row is now
+     `localize('Device language')` with one key in each Strings table; `deviceRowLabel()` and
+     its thirteen hand-kept copies are gone, and `scripts/strings.mjs` harvests `localize('…')`
+     literals so `--write` can never prune the key. Proof: `npm run verify` reads the tables.
+
 99. **THE STRING-TABLE LADDER TRIES [FULL TAG, BARE LANGUAGE] AND NOTHING BETWEEN, so a
     script- or region-qualified table is unreachable from the DEVICE step** (found
     2026-09-01 shipping `pt-br` and `zh-hant`; `kernel/src/strings.ts load()`, and the same
@@ -2179,6 +2186,13 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      better, close §6.33 with a real preferences plane and let cookies go back to being
      about credentials. A language choice is not a credential and should not have been
      riding the auth plane's storage in the first place.
+
+     **RESOLVED UPSTREAM 2026-09-02** (dev@e213cbac web · de9ca462 Swift · 50cd79f8 Kotlin):
+     a cookie write of `{ value, days }` is the durable spelling on every lane (RFC 6265bis
+     400-day cap; a bad `days` fails open to a session cookie; null/undefined/NSNull delete).
+     This template writes `dsx.cookie.uiLocale = { value: tag, days: 365 }` and the
+     "Remembered until you quit" note is gone. IdentityVault was argued and rejected upstream
+     as the home for a preference (it is the credential vault); §6.33 stays the long-term ask.
 
 101. **THE MESSAGE TEMPLATE TIER IS A CLIENT TIER: the SSR renderer emits the raw ICU
      group into the delivered HTML** (found 2026-09-01 shipping Arabic; measured on a live

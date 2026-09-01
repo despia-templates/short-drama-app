@@ -916,8 +916,6 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
     const pickerTags = [...tagsBody.matchAll(/'([a-z][a-z0-9-]*)'/g)].map((m) => m[1]);
     const rowsBody = /function languageRows\(\)\s*\{([\s\S]*?)\n      \}/.exec(themeSrc)?.[1] ?? "";
     const rowIds = [...rowsBody.matchAll(/\{ id: '([a-z0-9-]*)'/g)].map((m) => m[1]);
-    const deviceBody = /function deviceRowLabel\(\)\s*\{([\s\S]*?)\n      \}/.exec(themeSrc)?.[1] ?? "";
-    const deviceTags = [...deviceBody.matchAll(/l == '([a-z][a-z0-9-]*)'/g)].map((m) => m[1]);
 
     // `en` is the SOURCE language: it is a row in the picker and it never has a table,
     // because a table mapping English to English is 215 keys of nothing.
@@ -928,9 +926,12 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
     check("...and its rows and its tag list are the same list",
       rowIds.length === pickerTags.length + 1 && pickerTags.every((t) => rowIds.includes(t)) && rowIds[0] === "",
       `localeTags ${JSON.stringify(pickerTags)} · languageRows ${JSON.stringify(rowIds)} — the first row is the DEVICE row (empty tag) and every other row must be a declared tag`);
+    // The device row reaches the table through localize('Device language') (Theme.dsx) —
+    // so the proof is the TABLE carrying a translation, not a hand-kept map in the source.
+    const deviceRow = offered.map((t) => [t, shipped[t]?.["Device language"]]);
     check("...and every offered locale names the device row in its own language",
-      offered.every((t) => deviceTags.includes(t)),
-      `deviceRowLabel covers ${JSON.stringify(deviceTags)} — a locale missing from that map gets an English "Device language" row inside an otherwise translated menu (PLAN.md §6.98)`);
+      deviceRow.every(([, v]) => typeof v === "string" && v !== "" && v !== "Device language"),
+      `Device language → ${JSON.stringify(Object.fromEntries(deviceRow))} — a table without it renders an English "Device language" row inside an otherwise translated menu (PLAN.md §6.98)`);
 
     // ── A TABLE THAT COPIED ENGLISH THROUGH IS NOT A TRANSLATION ──────────────────────
     // Completeness is a count, and a count is satisfiable by pasting the key into the

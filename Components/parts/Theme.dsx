@@ -358,7 +358,7 @@
 
       function languageRows() {
         return [
-          { id: '', label: deviceRowLabel() },
+          { id: '', label: localize('Device language') },
           { id: 'en', label: 'English' },
           { id: 'es', label: 'Español' },
           { id: 'pt-br', label: 'Português (Brasil)' },
@@ -377,29 +377,12 @@
       }
 
       /* THE ONE ROW THAT IS A SENTENCE RATHER THAN A NAME, and therefore the one row the
-         endonym argument above does not cover. Option labels do not reach localize(), so
-         this map is a hand-kept second copy of thirteen table entries and it is exactly
-         what §6.98 asks the engine to delete. It reads the ACTIVE locale, which is empty
-         precisely when the device is deciding — so the row that says "the device decides"
-         is the row that cannot know which language to say it in, and it falls back to
-         English the same way every other miss in this app does (Article 7). */
-      function deviceRowLabel() {
-        const l = activeLocale()
-        if (l == 'es') { return 'Idioma del dispositivo' }
-        if (l == 'pt-br') { return 'Idioma do dispositivo' }
-        if (l == 'ja') { return '端末の言語' }
-        if (l == 'de') { return 'Gerätesprache' }
-        if (l == 'fr') { return 'Langue de l’appareil' }
-        if (l == 'ko') { return '기기 언어' }
-        if (l == 'zh-hant') { return '裝置語言' }
-        if (l == 'id') { return 'Bahasa perangkat' }
-        if (l == 'th') { return 'ภาษาของอุปกรณ์' }
-        if (l == 'it') { return 'Lingua del dispositivo' }
-        if (l == 'tr') { return 'Cihaz dili' }
-        if (l == 'vi') { return 'Ngôn ngữ thiết bị' }
-        if (l == 'ar') { return 'لغة الجهاز' }
-        return 'Device language'
-      }
+         endonym argument above does not cover. It reaches the table through localize() —
+         the kernel's own JSE verb since dev@d2927f31 (§6.98 resolved) — so the thirteen
+         hand-kept copies this function used to carry are one key in Strings.<tag>.json,
+         harvested by scripts/strings.mjs like any display attribute. The active locale is
+         empty exactly when the device is deciding, and a miss renders the English key, the
+         same fall-through as every other miss in this app (Article 7). */
     </functions>
   </head>
 </stack>

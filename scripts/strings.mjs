@@ -42,6 +42,15 @@ const DISPLAY_TAGS = {
   textfield: "placeholder", input: "placeholder", securefield: "placeholder", searchbar: "placeholder",
 };
 
+/** `localize('…')` calls in JSE bodies (functions, actions, computed variables): the
+ *  kernel looks the literal up in the table exactly as it looks up a display attribute
+ *  (dev@d2927f31 put `localize()` in all three JSE tables), so the literal IS a key — and a
+ *  key the extractor cannot see is a key `--write` prunes on the next refresh. One rule: a
+ *  single string literal as the whole argument. */
+function localizeCallKeys(src) {
+  return [...src.matchAll(/\blocalize\(\s*(['"])((?:(?!\1)[^\\]|\\.)*)\1\s*\)/g)].map((m) => m[2]);
+}
+
 /** attributes that carry copy the seam does NOT localize — the follow-up list */
 const UNREACHABLE_ATTRS = ["a11yLabel", "a11yValue", "a11yHint", "alt", "title", "toast"];
 
@@ -109,6 +118,10 @@ export function extract() {
         const v = a[k];
         if (typeof v === "string" && v.length > 0 && !v.includes("{{")) add(unreachable, `${k}: ${v}`, f);
       }
+    }
+    // JSE bodies: a literal handed to localize() is a key the kernel will look up.
+    for (const k of localizeCallKeys(body)) add(keys, k, f);
+    if (false) {
     }
     // <text>inner text</text> with no value= — the other half of the text display point
     for (const m of body.matchAll(/<text(?![\w])([^>]*)>([^<{}]+)<\/text>/g)) {
