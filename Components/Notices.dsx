@@ -73,7 +73,7 @@
 
       <vstack style="{{ dsx.variable.shell }}" spacing="16" alignItems="stretch" paddingTop="12">
         <hstack class="head">
-          <image icon="{{ chevBack() }}" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
+          <image icon="chevron.backward" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
                  a11yLabel="Back" a11yTrait="button"/>
           <text value="Notifications" class="h1"/>
           <spacer/>

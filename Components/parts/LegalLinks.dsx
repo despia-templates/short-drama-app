@@ -94,7 +94,7 @@
             a11yGroup="true" a11yTrait="link" a11yLabel="Terms of Use — opens in your browser">
       <image icon="note.text" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
       <text value="Terms of Use" class="label" style="flex: 1"/>
-      <image icon="{{ arrowFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+      <image icon="arrow.forward" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
     </hstack>
     <hstack class="row" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
             visible-if="dsx.variable.terms == ''"
@@ -111,7 +111,7 @@
             a11yGroup="true" a11yTrait="link" a11yLabel="Privacy Policy — opens in your browser">
       <image icon="lock.shield" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
       <text value="Privacy Policy" class="label" style="flex: 1"/>
-      <image icon="{{ arrowFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+      <image icon="arrow.forward" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
     </hstack>
     <hstack class="row" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
             visible-if="dsx.variable.privacy == ''"
@@ -127,7 +127,7 @@
             a11yGroup="true" a11yTrait="link" a11yLabel="Support and contact — opens in your browser">
       <image icon="info.circle.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
       <text value="Support &amp; contact" class="label" style="flex: 1"/>
-      <image icon="{{ arrowFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+      <image icon="arrow.forward" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
     </hstack>
     <hstack class="row" visible-if="dsx.variable.support == ''"
             a11yGroup="true" a11yLabel="Support and contact: no URL is set in this build. An adopter sets supportUrl in App.json consts. App Store guideline 1.2 requires published contact information for an app carrying user comments.">

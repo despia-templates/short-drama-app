@@ -469,7 +469,7 @@
               visible-if="dsx.variable.wide == false && dsx.variable.phase != 'error' && dsx.variable.phase != 'empty'">
         <!-- a deep-linked phone has no TopNav: the back bar is the only way out -->
         <hstack class="phoneBar">
-          <image icon="{{ chevBack() }}" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
+          <image icon="chevron.backward" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
                  a11yLabel="Back" a11yTrait="button"/>
           <text value="{{ show == null ? 'Details' : show.title }}" class="phoneBarTitle"
                 style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0"/>

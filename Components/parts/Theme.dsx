@@ -282,23 +282,21 @@
          this app. Named in the README, filed as PLAN.md §6.102, and deliberately not
          papered over with a boot-time write of the device tag into `global.locale` —
          that would delete the kernel ladder's device step for every locale at once. */
-      function rtlLangs() { return ['ar', 'he', 'iw', 'fa', 'ur', 'ps', 'prs', 'sd', 'ug', 'yi', 'ji', 'dv', 'ckb'] }
-
-      function isRtl() {
-        const l = activeLocale()
-        if (l == '') { return false }
-        const lower = String(l).toLowerCase()
-        const cut = lower.indexOf('-')
-        const bare = cut == -1 ? lower : lower.slice(0, cut)
-        return rtlLangs().indexOf(bare) != -1
-      }
-
-      /* BACK and FORWARD as READING directions, not as compass points. `chevBack` is the
-         one on a nav bar and a sheet header; `chevFwd` is the disclosure on a menu row;
-         `arrowFwd` is the "this opens something" glyph beside a link. */
-      function chevBack() { if (isRtl()) { return 'chevron.right' } return 'chevron.left' }
-      function chevFwd() { if (isRtl()) { return 'chevron.left' } return 'chevron.right' }
-      function arrowFwd() { if (isRtl()) { return 'arrow.backward' } return 'arrow.right' }
+      /* THE READING-DIRECTION GLYPHS ARE THE CATALOG'S JOB NOW, and five functions went
+         with them. This library used to carry `rtlLangs`, `isRtl`, `chevBack`, `chevFwd`
+         and `arrowFwd`, and 34 call sites interpolated them — 34 chances to forget, in one
+         app, with every app after it owing the same tax. The shared icon catalog gained a
+         logical vocabulary (`chevron.backward` / `chevron.forward` / `arrow.forward`, SF
+         Symbols' own spelling), each name carrying the physical twin whose glyph it copies
+         field for field, and each renderer turns it against the layout direction it already
+         holds. So the call sites are literals again and the direction is resolved where the
+         direction is known.
+         This also retires PLAN.md §6.102 FOR ICONS: `isRtl` read `global.locale`, which is
+         empty exactly when the DEVICE is deciding, so an Arabic device that never opened the
+         picker got a mirrored layout from the engine and unmirrored chevrons from this app.
+         Nothing in the app reads the direction now, so nothing can read it wrongly. §6.102
+         stays open for the transform and gesture cases, which still have no DSX-readable
+         direction. */
 
       /* a view count at glance width. The K/M suffixes stay Latin because the compact
          notation Intl would give us is NOT in the framework number formatter (its options

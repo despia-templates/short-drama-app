@@ -225,7 +225,7 @@
                   <text value="EP {{ item.episodes }}" class="pill" lineLimit="1" style="white-space: nowrap" visible-if="item.episodes > 0"/>
                 </hstack>
               </vstack>
-              <image icon="{{ chevFwd() }}" iconSize="13" color="rgba(255,255,255,0.3)" a11yHidden="true"/>
+              <image icon="chevron.forward" iconSize="13" color="rgba(255,255,255,0.3)" a11yHidden="true"/>
             </hstack>
           </grid>
         </vstack>

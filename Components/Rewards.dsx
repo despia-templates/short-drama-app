@@ -305,7 +305,7 @@
         <hstack class="head">
           <!-- pushed here from Store, Profile, the player — the way back exists on phone,
                where no TopNav carries the map -->
-          <image icon="{{ chevBack() }}" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
+          <image icon="chevron.backward" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
                  a11yLabel="Back" a11yTrait="button" visible-if="dsx.variable.wide == false"/>
           <text value="Rewards" class="h1"/>
           <spacer/>
@@ -355,7 +355,7 @@
               <text value="{{ dsx.variable.sellTitle }}" class="sellTitle"/>
               <text value="{{ dsx.variable.sellNote }}" class="sellNote"/>
             </vstack>
-            <image icon="{{ chevFwd() }}" iconSize="14" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
+            <image icon="chevron.forward" iconSize="14" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
           </hstack>
         </vstack>
       </vstack>

@@ -448,16 +448,19 @@
           </vstack>
           <!-- the thumb rail drives the pager (value= is two-way)
 
-               THE ONLY TWO DIRECTIONAL ICONS IN THIS APP THAT STAY PHYSICAL, and it is
-               not an oversight. Every other chevron reads through `chevBack`/`chevFwd`
-               so it turns with the locale — but these two point at a `<pager>`, and a
-               pager's PAGE ORDER does not turn: the engine pins its viewport `dir="ltr"`
-               on purpose ("one scroll-coordinate model in every engine", dom mount.ts),
-               so index 0 sits at the left in Arabic exactly as it does in English.
-               Measured: `.dsx-paged-viewport` carries `dir="ltr"` while every ancestor
-               computes `rtl`. An arrow that mirrored while the track did not would point
-               away from the slide it fetches. They agree with the control they drive,
-               and PLAN.md §6.103 is where the control itself is filed. -->
+               THE ONLY TWO DIRECTIONAL ICONS IN THIS APP THAT STAY PHYSICAL, and they
+               are no longer a local exception defended by prose — they are the catalog's
+               `physical` class, and `Conformance/icons/direction.json` carries a case
+               naming this pager as the reason. Every other chevron in the app now writes
+               a LOGICAL name (`chevron.backward` / `chevron.forward`) and each renderer
+               turns it against the layout direction it already holds. These two do not,
+               because they point at a `<pager>`, and a pager's PAGE ORDER does not turn:
+               the engine pins its viewport `dir="ltr"` on purpose ("one scroll-coordinate
+               model in every engine", dom mount.ts), so index 0 sits at the left in Arabic
+               exactly as it does in English. Measured: `.dsx-paged-viewport` carries
+               `dir="ltr"` while every ancestor computes `rtl`. An arrow that mirrored
+               while its track did not would point away from the slide it fetches.
+               PLAN.md §6.103 is where the control itself is filed. -->
 
           <vstack style="width: 100%; height: {{ dsx.variable.heroH }}px; justify-content: flex-end; pointer-events: none">
             <hstack style="{{ dsx.variable.thumbShellBox }}">
@@ -563,7 +566,7 @@
           <spacer/>
           <hstack class="viewAllRow" href="/browse" a11yGroup="true" a11yLabel="View all new releases">
             <text value="View all" class="viewAll"/>
-            <image icon="{{ chevFwd() }}" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
+            <image icon="chevron.forward" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
           </hstack>
         </hstack>
         <scroll axis="horizontal" indicators="false">
@@ -647,7 +650,7 @@
             <hstack class="shelfMore" href="/browse/{{ item.genre }}" a11yGroup="true" a11yTrait="button"
                     a11yLabel="View all {{ item.genre }} series">
               <text value="View all" class="shelfMoreLabel"/>
-              <image icon="{{ chevFwd() }}" iconSize="10" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
+              <image icon="chevron.forward" iconSize="10" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
             </hstack>
           </hstack>
           <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">

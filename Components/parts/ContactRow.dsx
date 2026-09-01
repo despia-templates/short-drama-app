@@ -55,7 +55,7 @@
         <text value="{{ dsx.attribute.label }}" class="label"/>
         <text value="{{ dsx.attribute.note }}" class="note"/>
       </vstack>
-      <image icon="{{ arrowFwd() }}" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+      <image icon="arrow.forward" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
     </hstack>
 
     <!-- NOT SET — the gap, named in place (Article 7). Not a hidden row and not a dead link. -->

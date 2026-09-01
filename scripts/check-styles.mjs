@@ -28,6 +28,17 @@ const ICONS = process.env.DSX_ICON_CATALOG
 // platforms nobody ran. Caught two on this template's own screens — `eye` beside every view
 // count and `rectangle.stack` in three empty states — both rendering fine on web.
 const iconNames = new Set(Object.keys(JSON.parse(readFileSync(ICONS, "utf8")).icons));
+// THE DIRECTION CLASSIFICATION, read from the same catalog the names come from. A back
+// affordance must name a MIRRORING glyph — `chevron.backward`, not `chevron.left` — or an
+// Arabic reader gets an arrow pointing away from where the control goes. The app used to
+// answer this itself with a `chevBack()` helper at 34 call sites; the catalog answers it
+// now, and this gate is what stops the 35th site forgetting.
+const DIRECTION = (() => {
+  try {
+    const d = JSON.parse(readFileSync(ICONS.replace(/sf-map\.json$/, "direction.json"), "utf8"));
+    return new Set(d.classification?.mirrors ?? []);
+  } catch { return null; }   // catalog without the axis yet: the arm is inert, never a false red
+})();
 
 const valid = new Set(["as", "class"]);
 for (const g of JSON.parse(readFileSync(CATALOG, "utf8")).groups) {
@@ -120,6 +131,30 @@ for (const f of files.sort()) {
       if (!themeFunctions.has(call[1])) {
         say(f, `icon="{{ ${m[1].trim()} }}" calls ${call[1]}(), which Theme.dsx does not declare — ` +
                "an icon chosen at runtime is only checkable through the function library that names it");
+      }
+    }
+  }
+
+  // A CONTROL THAT GOES BACK NAMES A GLYPH THAT TURNS. Scoped to the element carrying the
+  // pop — an `<image icon=…>` inside an hstack whose on:tap pops — because that is the only
+  // position where the reading direction is the meaning of the arrow.
+  if (DIRECTION !== null && DIRECTION.size > 0) {
+    // WHAT COUNTS AS "goes back", read off the markup rather than resolved through the
+    // action table: an inline pop, or a named action whose NAME is the intent, or the
+    // accessible name a screen reader would announce. The first spelling is the rare one
+    // here — every back control in this app routes through `dsx.action.back()`, which is
+    // exactly why matching only `route.pop()` made this gate unable to fail on its first run.
+    const GOES_BACK = /on:tap="[^"]*?(?:route\.pop\(\)|dsx\.action\.(?:back|goBack|dismiss)\(\)|goBack\(\))[^"]*"|a11yLabel="Back\b[^"]*"/;
+    for (const m of src.matchAll(/<(?:hstack|vstack|button)\b([^>]*)>([\s\S]{0,400}?)<\/(?:hstack|vstack|button)>/g)) {
+      if (!GOES_BACK.test(m[1])) continue;
+      for (const icon of m[2].matchAll(/icon="([a-z][a-z0-9.]*)"/g)) {
+        const name = icon[1];
+        if (!iconNames.has(name)) continue;                 // the unknown-name arm already said so
+        if (DIRECTION.has(name)) continue;
+        if (/^(xmark|multiply)/.test(name)) continue;       // a close control is not directional
+        say(f, `icon="${name}" sits on a control that pops, and the catalog does not class it as ` +
+               "mirroring — a back affordance needs a logical name (chevron.backward) so it turns " +
+               "for a right-to-left reader instead of pointing away from where it goes");
       }
     }
   }
