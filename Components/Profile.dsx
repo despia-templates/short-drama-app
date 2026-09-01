@@ -262,7 +262,16 @@
                   <text value="{{ dsx.variable.isVip ? 'VIP is active' : 'Go VIP' }}" class="vipTitle"/>
                   <text value="{{ dsx.variable.vipLine }}" class="vipSub"/>
                 </vstack>
-                <text value="{{ dsx.variable.isVip ? 'Manage' : 'See plans' }}" class="vipGo"/>
+                <!-- "Add days" rather than "Manage", for two reasons that happen to agree.
+                     (1) It is TRUE: nothing renews and there is nothing to cancel, so the
+                     only thing this chip can do for a viewer who already has VIP is buy
+                     more days onto the pass they hold — which is exactly what
+                     `vipTermLine()` tells them three lines further down. "Manage" promised
+                     a settings screen that does not exist. (2) `Manage` is also the Manage
+                     surface's own h1, and one literal is one key: translating the chip
+                     would have retitled an operator screen this README calls deliberately
+                     English, in twelve languages, from a Profile edit. -->
+                <text value="{{ dsx.variable.isVip ? 'Add days' : 'See plans' }}" class="vipGo"/>
               </hstack>
             </vstack>
           </PlansSheet>

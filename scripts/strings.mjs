@@ -76,8 +76,20 @@ export function extract() {
         const v = a[display];
         if (typeof v === "string" && v.length > 0) {
           if (v.includes("{{")) {
-            // an interpolated template resolves BEFORE the seam, so only its exact rendered
-            // form could ever match a table — static chrome is covered, composites are not
+            // AN INTERPOLATION RESOLVES BEFORE THE SEAM — AND THE SEAM READS WHAT COMES OUT.
+            // This branch used to file every interpolated value as unreachable, which is
+            // half true and cost real coverage. `bindDisplay` is
+            //     () => DSXStrings.localize(expr.includes("{{") ? interpolate(expr) : expr)
+            // so the RENDERED form is looked up. `EP 1–{{ n }} Free` renders "EP 1–5 Free"
+            // and will never match a table, correctly. But a ternary over string LITERALS
+            // renders one of those literals byte-for-byte, and the table hits.
+            //
+            // Measured before it was believed: `<text value="{{ favOn ? 'Saved' : 'My List' }}">`
+            // on /show renders "Liste" with `global.locale = 'de'`. Thirty-six literals sat in
+            // the follow-up list carrying the app's most-tapped words — Follow / Following,
+            // Claim / Claimed, See plans, Restore purchases, Sign in — so twelve otherwise
+            // complete locales all showed English on their VIP call to action.
+            for (const lit of ternaryLiterals(v)) add(keys, lit, f);
             add(unreachable, `${tag}.${display}: ${v}`, f);
           } else add(keys, v, f);
         }
@@ -96,6 +108,42 @@ export function extract() {
     }
   }
   return { keys, unreachable };
+}
+
+//  THE RENDERED FORMS OF A TERNARY, and the two conditions that make them exact.
+//
+//  (1) THE WHOLE ATTRIBUTE IS ONE HOLE. `value="{{ a ? 'X' : 'Y' }}"` renders exactly X or
+//      exactly Y. `value="{{ … }}{{ … }}"` or `value="EP {{ n }}"` renders a CONCATENATION,
+//      and no branch of it is ever a rendered form on its own — the ledger row that reads
+//      `{{ kind == 'bonus' ? 'Bonus coins' : 'Coins' }}{{ … ' · expires in 7 days' }}` is
+//      the live example, and taking its branches would have put two keys in every table
+//      that the runtime can never look up.
+//  (2) THE LITERAL IS A WHOLE BRANCH. It has to sit between a `?` or `:` and a `:` or the
+//      end of the hole. That excludes a comparison operand (`kind == 'bonus'`, which is
+//      never displayed) and a concatenation fragment (`'a' + x`, which never renders alone),
+//      while still reading every arm of a nested ternary.
+//
+//  Anything this misses stays in the unreachable list, which is the safe direction: a key
+//  nobody renders is dead weight in a table, and `--write` prunes it on the next refresh.
+const WHOLE_HOLE = /^\{\{([\s\S]*)\}\}$/;
+const BRANCH_LITERAL = /[?:]\s*'([^'\\]*)'\s*(?=:|$)/g;
+
+export function ternaryLiterals(value) {
+  const trimmed = value.trim();
+  // exactly ONE hole, and it is the whole attribute. Counting the openers is the check that
+  // matters: `^\{\{[\s\S]*\}\}$` is greedy and happily spans `}}{{`, which is how the first
+  // cut of this pulled " · expires in 7 days" — a concatenation fragment — into the corpus.
+  if ((trimmed.match(/\{\{/g) ?? []).length !== 1) return [];
+  const whole = WHOLE_HOLE.exec(trimmed);
+  if (whole === null) return [];
+  const hole = whole[1];
+  if (!hole.includes("?")) return [];
+  const out = [];
+  for (const m of hole.matchAll(BRANCH_LITERAL)) {
+    const lit = m[1];
+    if (lit.length > 0) out.push(lit);
+  }
+  return out;
 }
 
 function add(map, k, f) {
@@ -145,8 +193,21 @@ if (process.argv[1] !== undefined && process.argv[1].endsWith("strings.mjs")) {
     console.log("                               screen reader hears English on a Spanish device.");
     console.log("                               Upstream ask: run a11y copy through the same seam.");
     console.log("  an interpolated composite    resolves before the lookup, so only its exact");
-    console.log("                               rendered form could match. The Translate module");
-    console.log("                               (scheduled, not shipped) owns this tier.");
+    console.log("                               rendered form could match. A TERNARY over string");
+    console.log("                               literals IS extracted (ternaryLiterals above) —");
+    console.log("                               the seam localizes what interpolation renders.");
+    console.log("                               A CONCATENATION never can be; the Translate module");
+    console.log("                               (scheduled, not shipped) owns that tier.");
+    console.log("  a computed that returns      THE KNOWN NEXT TIER, not yet extracted. A display");
+    console.log("  literal sentences            bound to `{{ dsx.variable.vipLine }}` renders one of");
+    console.log("                               the literals that computed returns, so the seam");
+    console.log("                               WOULD hit them — measured, roughly 25 strings across");
+    console.log("                               Rewards, Store, AdGate, PlansSheet, RestoreRow and");
+    console.log("                               the Profile VIP card. Following a computed's returns");
+    console.log("                               needs a rule that cannot mistake an enum key or a CSS");
+    console.log("                               string for copy, and a half-safe rule puts junk in");
+    console.log("                               twelve tables — so it waits for the extractor the");
+    console.log("                               framework generator will need anyway.");
     console.log("  server copy                  prices, rejection messages and notice bodies are");
     console.log("                               the server's words; they localize server-side.\n");
     for (const [k, files] of [...unreachable].sort()) {
@@ -201,8 +262,12 @@ if (process.argv[1] !== undefined && process.argv[1].endsWith("strings.mjs")) {
     let table;
     try { table = JSON.parse(readFileSync(file, "utf8")); }
     catch { console.error(`  ${file}  INVALID JSON — the loader skips it and the app silently stays English`); bad++; continue; }
-    const filled = Object.entries(table).filter(([, v]) => typeof v === "string" && v !== "");
     const viewerSet = new Set(byClass.viewer);
+    // COUNT THE VIEWER KEYS, not the file's entries. Counting entries let a STALE key stand
+    // in for a MISSING one: the moment `Manage` became operator-only and `Add days` arrived,
+    // every table read "244/244 (100%)" while none of them carried the new string. The
+    // detail lines below were right and the headline was wrong, which is the worse way round.
+    const filled = byClass.viewer.filter((k) => typeof table[k] === "string" && table[k] !== "");
     const stale = Object.keys(table).filter((k) => !viewerSet.has(k));
     const missing = byClass.viewer.filter((k) => typeof table[k] !== "string" || table[k] === "");
     const pct = byClass.viewer.length === 0 ? 0 : Math.round((filled.length / byClass.viewer.length) * 100);

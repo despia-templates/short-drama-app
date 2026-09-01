@@ -66,7 +66,7 @@
          hidden: the web writer emits `name=value; path=/` with no max-age and no expires
          (dom/src/boot.ts wireCookies), so the choice survives reloads, deep links and tab
          restores and does NOT survive quitting the browser. Measured, not assumed. The
-         Language row says so in the UI. Filed as PLAN.md §6.99.
+         Language row says so in the UI. Filed as PLAN.md §6.100.
 
          Restoring here rather than in one screen is deliberate: a viewer can cold-land on
          any route, so the restore belongs to the component every screen already mounts
