@@ -1692,3 +1692,45 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     spelling shorter than the wrong one. Until then AGENTS.md's tab-root corollary carries the
     subtraction, and the web router's chrome-drift reporter (the navigation pass) catches the
     class at runtime rather than in a screenshot.
+
+90. RESOLVED 2026-09-01 — **The tab bar's last 4.67pt, and why the number 70 survived a round
+    of fixing.** Item 89 removed 34pt of drift and left 4.67. The residue had a different
+    cause, and it is the more instructive one.
+
+    Measured on device, probe-free, VIP-badge fiducial across the four tab roots:
+
+        BEFORE  Home 782.67  For You 778.00  My List 782.67  Profile 782.67   spread 4.67pt
+        AFTER   Home 782.67  For You 782.67  My List 782.67  Profile 782.67   spread 0.00pt
+                bar bottom 839.7pt against a safe edge of 840pt
+
+    For You was the screen out of step, and it was out of step by PREDICTING instead of
+    ASKING. It sized its stage `safeHeight - chromeH` with `chromeH = 70`; the bar it was
+    reserving space for measures 65. Every other tab root lets the frame place the bar and
+    lands its bottom edge on the safe edge, so a screen that reserves the wrong number stops
+    short. `70` survived the previous round because a hard-coded 70 reads as a decision, not
+    a guess — the same reason the earlier `inset` compensation read as a fix.
+
+    THE RULE: a screen that must know a shared component's size ASKS it. `measure=` on the
+    `<TabBar>` mount publishes the real box; the seed is the 65 the phone bar actually
+    measures, so the first paint is already right and Dynamic Type or a platform drawing the
+    icon a point taller corrects it from there rather than drifting.
+
+    THE FACTS, read off the device rather than derived. A temporary probe in the bar printed
+    `H874 T62 B34 SH778 bar65`. Two things fell out of that. **safeTop is 62 on an iPhone 17
+    Pro, not 59** — every device constant in this family would have been wrong. And
+    `dsx.screen.safeHeight`, the engine fact added the same day
+    (`despia-framework dev@40f214f7`), was live and correct on device, so the stage reads one
+    fact instead of subtracting three.
+
+    The framework half of the day, for the record: `safeWidth`/`safeHeight` published
+    identically on iOS, web and Android, and `mount.ts` importing `./element-motion.js` — a
+    spelling tsc resolves and node does not — had silently darkened EVERY test in the web dom
+    package since dev@6da4c7f7. 118 assertions in five files, including the router's own
+    corpus, had stopped running. Fixing the import surfaced five real failures, all from that
+    same commit, all now green: a byte-string pin describing a replaced zstack rule, a raw
+    `#000` and a hand-picked 180ms in the rail edge fade (now `black` and
+    `var(--dsx-dur-fast)`, which is 0ms under reduced motion — a preference the literal
+    ignored), a reduced-motion assertion that read only the first of two policy blocks, and
+    eight universal attributes with no web-support decision at all. The general lesson is the
+    one this ledger keeps relearning: a gate that cannot fail is worse than no gate, because
+    it is counted as coverage.
