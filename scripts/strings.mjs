@@ -75,7 +75,16 @@ export function extract() {
       if (display !== undefined && a["bind"] === undefined) {
         const v = a[display];
         if (typeof v === "string" && v.length > 0) {
-          if (v.includes("{{")) {
+          if (icuKey(v) !== null) {
+            // A MESSAGE TEMPLATE IS ITS OWN KEY, WITH THE HOLES INTACT. The framework's
+            // message tier (kernel message.ts, wired into the display point by dom
+            // mount.ts) normalizes `{n, plural, one {# x} other {# xs}}` to
+            // `{0, plural, one {# x} other {# xs}}` and looks THAT up, resolving the
+            // count after the hit — so one entry serves every value of n and each locale
+            // picks its own CLDR category. That is the only spelling in which Arabic can
+            // state six forms; a `== 1` ternary can state two.
+            add(keys, icuKey(v), f);
+          } else if (v.includes("{{")) {
             // AN INTERPOLATION RESOLVES BEFORE THE SEAM — AND THE SEAM READS WHAT COMES OUT.
             // This branch used to file every interpolated value as unreachable, which is
             // half true and cost real coverage. `bindDisplay` is
@@ -127,6 +136,56 @@ export function extract() {
 //  nobody renders is dead weight in a table, and `--write` prunes it on the next refresh.
 const WHOLE_HOLE = /^\{\{([\s\S]*)\}\}$/;
 const BRANCH_LITERAL = /[?:]\s*'([^'\\]*)'\s*(?=:|$)/g;
+
+//  ══ THE MESSAGE-TEMPLATE KEY ═══════════════════════════════════════════════════════
+//  A display value carrying an ICU GROUP (`{expr, plural, …}`) is looked up as its
+//  NORMALIZED template — the mirror of `DSXMessage.normalize` in the framework kernel,
+//  restricted to what this template actually writes. Walking left to right, every
+//  `{{ expr }}` hole and every `{expr, plural, …}` HEAD contributes one argument,
+//  deduplicated by its trimmed expression text and rewritten to `{N}` in source order.
+//
+//  ONLY A VALUE WITH A GROUP QUALIFIES, and that is deliberate rather than shy. A plain
+//  composite (`EP 1–{{ n }} Free`) normalizes to a perfectly good key too, and the
+//  runtime would resolve it — but the SSR renderer does not run the message tier at all
+//  (PLAN.md §6.101), so adopting those wholesale would ship raw templates in the served
+//  HTML. A group is the OPT-IN: an author writes one only where the tier is complete,
+//  and `npm run verify` asserts no server-rendered route carries one.
+const ICU_HEAD = /^\{\s*([^{},]+?)\s*,\s*(plural|select|selectordinal|number|currency|percent|compact|date|time)\b/;
+
+export function icuKey(value) {
+  if (!value.includes("{")) return null;
+  let hasGroup = false, out = "", i = 0;
+  const exprs = [];
+  const intern = (e) => {
+    const at = exprs.indexOf(e);
+    if (at >= 0) return at;
+    exprs.push(e);
+    return exprs.length - 1;
+  };
+  while (i < value.length) {
+    if (value[i] === "{" && value[i + 1] === "{") {
+      const close = value.indexOf("}}", i + 2);
+      if (close < 0) { out += value.substring(i); break; }
+      out += `{${intern(value.substring(i + 2, close).trim())}}`;
+      i = close + 2;
+      continue;
+    }
+    if (value[i] === "{") {
+      const head = ICU_HEAD.exec(value.substring(i));
+      if (head !== null) {
+        hasGroup = true;
+        out += `{${intern(head[1])}`;
+        // resume AT THE COMMA, exactly as the kernel does: the group body is then copied
+        // by this same loop, so a hole inside a branch numbers in true source order
+        i += head[0].indexOf(",");
+        continue;
+      }
+    }
+    out += value[i];
+    i += 1;
+  }
+  return hasGroup ? out : null;
+}
 
 export function ternaryLiterals(value) {
   const trimmed = value.trim();

@@ -831,6 +831,65 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
       check(`the ${tag} locale is a translation and not a copy (${pct}% identical to English)`, pct < 30,
         `${identical.length}/${rows.length} values are byte-identical to their English key — e.g. ${identical.slice(0, 5).map(([k]) => JSON.stringify(k.slice(0, 24))).join(" · ")}`);
     }
+
+    // ── THE PLURAL PLANE IS EXERCISED, AND ARABIC IS WHY ──────────────────────────────
+    // A locale is not measured only by how many keys it fills. A `{n, plural, …}` entry
+    // that answers one form for a language with six is a table that PASSES the coverage
+    // gate and renders the wrong word at every count but one — the exact defect a hand-
+    // rolled `== 1` ternary already had, carried into the table. So the CATEGORIES are
+    // asserted against the shared CLDR corpus (Conformance/strings/plurals.json), through
+    // the SAME kernel the app runs, at counts that discriminate the rules.
+    const { DSXMessage, DSXPlural } = await import("@despia-native/kernel");
+    const asText = (v) => String(v);
+    const asNum = (v) => (typeof v === "number" ? v : null);
+    const pluralKeys = viewer.filter((k) => k.includes(", plural,"));
+    check(`the corpus carries message templates with plural groups (${pluralKeys.length})`, pluralKeys.length > 0,
+      "no `{n, plural, …}` display string in Components/** — the plural tier is declared and unexercised, " +
+      "and a `== 1` ternary is a two-category language hard-coded into the markup");
+    // The counts CLDR needs to tell Arabic's six apart, one per category.
+    const ARABIC_PROBE = { 0: "zero", 1: "one", 2: "two", 3: "few", 11: "many", 100: "other" };
+    for (const tag of Object.keys(shipped)) {
+      const lang = tag.split("-")[0];
+      // every category this language's rule can actually SELECT, discovered rather than
+      // typed: sweep the probe counts and collect what the kernel returns
+      const wanted = new Set([...Array(130).keys()].map((n) => DSXPlural.category(lang, n)));
+      const missing = [];
+      for (const key of pluralKeys) {
+        // the branch names a group actually declares: every bare word that OPENS a brace.
+        // (`plural` in the head is followed by a comma, never a brace, so it never matches.)
+        const declared = new Set([...shipped[tag][key].matchAll(/(?:^|[^A-Za-z])([a-z]+)\s*\{/g)].map((m) => m[1]));
+        for (const cat of wanted) if (!declared.has(cat)) missing.push(`${cat} in ${JSON.stringify(key.slice(12, 34))}… (has ${[...declared].join("/")})`);
+      }
+      check(`the ${tag} plural entries carry every category CLDR can select (${[...wanted].sort().join("/")})`,
+        missing.length === 0,
+        `missing: ${missing.slice(0, 4).join(" · ")} — a table short a category falls back to \`other\`, which is a grammatical error in that language, not a miss`);
+    }
+    // ...and Arabic's six are SIX DISTINCT RENDERINGS, not one string repeated to satisfy
+    // the count above. This is the assertion that makes the six real.
+    for (const key of pluralKeys) {
+      const rendered = Object.entries(ARABIC_PROBE).map(([n, cat]) =>
+        [cat, DSXMessage.render(shipped.ar[key], [Number(n)], asText, asNum, "ar", "ar", true)]);
+      check(`ar renders six distinct forms for ${JSON.stringify(key.slice(12, 40))}…`,
+        rendered.every(([, v]) => typeof v === "string" && v.length > 0)
+        && new Set(rendered.map(([, v]) => v)).size === 6,
+        rendered.map(([c, v]) => `${c}=${JSON.stringify(v)}`).join(" · "));
+    }
+  }
+
+  // ── A PLURAL GROUP AT A SERVER-RENDERED DISPLAY POINT SHIPS RAW ICU ──────────────────
+  // The message tier lives in the CLIENT mount (dom/src/mount.ts localizeTemplate); the
+  // SSR renderer does not run it. Measured before this gate existed: a `{n, plural, …}`
+  // caption on /show served the template VERBATIM into the html and only hydration
+  // replaced it (PLAN.md §6.101). So the three groups this app writes are confined to
+  // sheets that mount on a tap, and this asserts that confinement from the OUTSIDE —
+  // over the delivered bytes, which is the only place the mistake is visible.
+  console.log("\nthe message tier is where SSR can carry it");
+  for (const path of ["/", "/browse", "/vip", "/store", "/profile", `/show/${card.id}`, `/watch/${card.id}/1`]) {
+    const html = await fetch(`${base}${path}`).then((r) => r.text());
+    const raw = bodyText(html).match(/\{[^{}]*,\s*(?:plural|select|selectordinal)\s*,/);
+    check(`${path} server-renders no raw message template`, raw === null,
+      `the delivered body carries ${JSON.stringify(raw?.[0])} — a plural group at a server-rendered display point ` +
+      "is visible ICU markup until hydration. Move it behind a tap-mounted sheet, or wait for §6.101");
   }
 
   // 1.2(d) — PUBLISHED CONTACT INFORMATION needs somewhere to be published FROM. The value

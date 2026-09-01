@@ -1916,8 +1916,16 @@ Please unlock to watch." class="lockHead"/>
                   <text class="cAuthor"
                         value="{{ item.owner == global.auth.sub &amp;&amp; global.auth.sub != '' ? 'You' : item.author }}"/>
                   <text value="{{ item.body }}" class="cBody"/>
+                  <!-- A HAND-ROLLED `== 1` TERNARY IS A TWO-CATEGORY LANGUAGE HARD-CODED
+                       INTO THE MARKUP, and this one was worse than that: the extractor
+                       could only lift the singular arm as a key (a concatenation fragment
+                       is never a rendered form), so twelve locales translated "Flagged by
+                       1 reader" and every plural count stayed English. One plural group is
+                       the whole string in every language, and Arabic gets its six. Safe
+                       here for the same reason as the composer counter below: this sheet
+                       is never server-rendered. -->
                   <text class="cFlagged" visible-if="item.flags &gt; 0"
-                        value="{{ item.flags == 1 ? 'Flagged by 1 reader' : 'Flagged by ' + item.flags + ' readers' }}"/>
+                        value="{item.flags, plural, one {Flagged by # reader} other {Flagged by # readers}}"/>
                 </vstack>
                 <!-- 1.2(b) and 1.2(c), one tap from every comment. 44pt, per the tap-target
                      floor, because this is a hand-rolled hit area with no system hit-slop. -->
@@ -1947,11 +1955,29 @@ Please unlock to watch." class="lockHead"/>
             </hstack>
           </hstack>
           <!-- the 500-character rule, shown BEFORE the tap rather than as a server rejection
-               after it (audit G16). It appears only once it is about to matter. -->
+               after it (audit G16). It appears only once it is about to matter.
+
+               ══ THE TWO STRINGS THAT CARRY THE PLURAL PLANE, AND WHY THEY ARE THESE TWO ══
+               `{n, plural, …}` is the framework's MESSAGE tier: the template is the table
+               key with its holes intact, so ONE entry serves every value of n and each
+               locale picks its own CLDR category. Arabic has SIX (zero/one/two/few/many/
+               other) and a `== 1` ternary can express two, which is why the plane exists.
+               A 500-character budget reaches ALL SIX by typing: 0 zero · 1 one · 2 two ·
+               3-10 few · 11-99 many · 100+ other. Nothing else in this app does that.
+
+               AND THIS COMPOSER IS THE ONE PLACE THE TIER IS SAFE TODAY. `localizeTemplate`
+               lives in the CLIENT mount (dom/src/mount.ts); the SSR renderer does not run
+               it, so a plural group at a server-rendered display point ships the RAW ICU
+               text in the HTML — measured on /show, the grid caption served
+               `{dsx.variable.freeCount, plural, one {# free} other {# free}}` verbatim
+               until hydration replaced it (PLAN.md §6.101). This sheet is mounted by a tap
+               and appears NOWHERE in the SSR body (asserted in scripts/verify.mjs, both
+               directions), so the tier is complete by the time these render. Six further
+               counted strings are named in the ledger and are waiting on that gap. -->
           <text class="cCounter" textAlign="right" visible-if="dsx.variable.draftLeft &lt; 80 &amp;&amp; dsx.variable.draftLeft &gt;= 0"
-                value="{{ dsx.variable.draftLeft }} characters left"/>
+                value="{dsx.variable.draftLeft, plural, one {# character left} other {# characters left}}"/>
           <text class="cCounterHot" textAlign="right" visible-if="dsx.variable.draftLeft &lt; 0"
-                value="{{ 0 - dsx.variable.draftLeft }} characters over the 500 limit"/>
+                value="{0 - dsx.variable.draftLeft, plural, one {# character over the 500 limit} other {# characters over the 500 limit}}"/>
           <!-- The EULA acknowledgement Apple wants beside a UGC composer, from the same
                config plane the account screen reads. It names its own gap when unset. -->
           <LegalLinks variant="line"/>
