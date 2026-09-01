@@ -1575,3 +1575,29 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     ACTION, not the intent: `rate="3/h"` looked right for a once-in-a-lifetime decision and
     rate-limited the viewer out of finishing their own deletion on pass two.
 
+88. RESOLVED 2026-09-01 (`despia-framework dev@45264667`) — **Every `href` on iOS
+    navigated to the entry route, silently, in every DSX app.** `href=` on a non-control
+    element runs `followHref()`, which interpolates the path and calls
+    `env.run("dsx.module.route.push({ path: __href })", args: ["__href": path])`. The body
+    contains a brace, so `run(_:item:args:)` routes it to `runActionBody` — and BOTH body
+    paths seed their scope with `var locals = item ?? [:]`, never merging `args`. The
+    parameter was threaded through the whole call chain and used only for `replyToken`. So
+    `__href` resolved to nothing, `route.push({ path: <nothing> })` fell back to the entry,
+    and the tap landed on Home.
+
+    It was invisible for exactly the reason it was worst: the entry route IS "/", so a broken
+    link looks like "the tap did nothing" rather than like a navigation bug, and the one
+    spelling that works — `on:tap="dsx.module.route.push({ path: '/x' })"` — is common enough
+    in this template that whole screens navigated correctly while their neighbours did not.
+    Measured on device: Profile's Account row (`href="/account"`) logged `push /`; the same
+    row after the fix logs `push /account` and the screen opens with a native back chevron.
+
+    AGENTS.md documents `href` as the idiom for cards and links ("CTAs are `<button on:tap>`
+    when they need a background; `href` containers are for cards/links whose text stays
+    plain"), so the documented, preferred spelling was the broken one. Web resolves args here
+    and so does Kotlin — the comment at the call site even says "the web + Kotlin runners
+    resolve the same way" — so this was iOS drifting from the other two lanes, not a design.
+
+    Args now merge into the locals seed and shadow the row scope, because an explicit payload
+    is more specific than the ambient item.
+
