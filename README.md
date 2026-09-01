@@ -380,9 +380,9 @@ something:
 | | |
 |---|---|
 | **244 viewer** | product copy — what a locale is measured against, and all twelve are at 100% |
-| **43 operator** | rendered only by the Manage surface: an internal tool, deliberately English |
+| **44 operator** | rendered only by the Manage surface: an internal tool, deliberately English |
 | **17 developer** | copy that cites a source path, a config key or a ledger entry. Translating "set `authSignInUrl` in App.json `consts`" makes the instruction *wrong* in the target language |
-| **258 unreachable** | the seam's real boundary, listed by `--unreachable` rather than guessed |
+| **256 unreachable** | the seam's real boundary, listed by `--unreachable` rather than guessed |
 
 That last row is the honest part. Three things the seam does not reach, each needing a
 different answer: **a11y labels** (the kernel localizes display points only, so a screen reader
