@@ -123,9 +123,30 @@
            · passing the table object into a lambda — `const n = await count(dsx.module.data
              .favorite)` — returns ok with ZERO rows, because the object loses the caller's
              RLS scope when it travels as a value. Measured: literal 5, via-lambda 0.
-         So every table below is named literally. Verbose beats a deletion that lies. -->
+         So every table below is named literally. Verbose beats a deletion that lies.
 
-    <action as="deleteAccount" inputs="confirm">
+         ══ THE TWO ALL-READ TABLES NEED A FILTER, AND THAT IS NOT A DETAIL ═══════════════
+         `comment` and `report` are ownership="public-read" (server/social.dsx says why), so
+         an unfiltered `list` here returns EVERY viewer rows, not the caller. The sweep then
+         (a) burns its whole delete budget attempting rows RLS will not give it, and (b) never
+         reaches `done`, because the page it re-reads next pass is identical. Worse, a delete
+         that RLS filtered away comes back `ok` — the statement is `delete … returning id`, so
+         a hidden row simply matches nothing — and the old code counted every one of those as
+         a row removed. MEASURED on this origin before the fix: a viewer who owned NOTHING
+         looped /viewer/delete eight times, reported "removed 2" every pass and never
+         finished, because two other people had left comments. In-app account deletion was
+         broken for any deployment that had ever been commented on, which is 5.1.1(v).
+         Both tables now carry a DECLARED owner column (`author_id` / `reporter_id`, filled by
+         Postgres from the verified subject — server/policies.local.sql), so the sweep can
+         name the caller rows in a query instead of scanning. `sub` is what it filters on, and
+         `sub` comes from the CLIENT — deliberately, and safely: it is used ONLY as a list
+         filter, and every delete underneath still runs as the caller identity, so a forged
+         subject enumerates rows it cannot delete and removes nothing. It cannot delete
+         another account data; it can only fail to delete its own. When it is absent the two
+         passes are skipped and `done` says so rather than claiming an empty account. -->
+
+
+    <action as="deleteAccount" inputs="confirm, sub">
       if (confirm !== 'DELETE') { throw { reason: 'invalid', message: 'confirmation required' } }
       // BOUNDED AND RESUMABLE. A request gets 64 module calls (ACTION_CALL_CAP, and a spec can
       // only lower it) — twelve list calls plus one delete per row blows that on any real
@@ -307,13 +328,32 @@
       } else { done = false }
 
       if (budget > 0) {
-        const pg_comment = await dsx.module.data.comment.list({ limit: 100 })
+        const pg_block = await dsx.module.data.block.list({ limit: 100 })
+        if (pg_block.ok && pg_block.data.length > 0) {
+          done = false
+          let i_block = 0
+          while (i_block < pg_block.data.length && budget > 0) {
+            const g_block = await dsx.module.data.block.delete({ id: pg_block.data[i_block].id })
+            if (g_block.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['block']); i_block = pg_block.data.length }
+            budget = budget - 1
+            i_block = i_block + 1
+          }
+        }
+      } else { done = false }
+
+      // ── the two ALL-READ tables. Same shape, one difference that decides whether this
+      //    works at all: the list is FILTERED to the caller declared owner column, and the
+      //    delete is judged on its returned DATA rather than on `ok` (see the header).
+      const me = sub == null ? '' : String(sub)
+      if (budget > 0 && me !== '') {
+        const pg_comment = await dsx.module.data.comment.list({ filters: { author_id: me }, limit: 100 })
         if (pg_comment.ok && pg_comment.data.length > 0) {
           done = false
           let i_comment = 0
           while (i_comment < pg_comment.data.length && budget > 0) {
             const g_comment = await dsx.module.data.comment.delete({ id: pg_comment.data[i_comment].id })
-            if (g_comment.ok) { removed = removed + 1 }
+            if (g_comment.ok && g_comment.data != null) { removed = removed + 1 }
             else { stuck = stuck.concat(['comment']); i_comment = pg_comment.data.length }
             budget = budget - 1
             i_comment = i_comment + 1
@@ -321,7 +361,24 @@
         }
       } else { done = false }
 
-      return { deleted: done, done: done, removed: removed, stuck: stuck }
+      if (budget > 0 && me !== '') {
+        const pg_report = await dsx.module.data.report.list({ filters: { reporter_id: me }, limit: 100 })
+        if (pg_report.ok && pg_report.data.length > 0) {
+          done = false
+          let i_report = 0
+          while (i_report < pg_report.data.length && budget > 0) {
+            const g_report = await dsx.module.data.report.delete({ id: pg_report.data[i_report].id })
+            if (g_report.ok && g_report.data != null) { removed = removed + 1 }
+            else { stuck = stuck.concat(['report']); i_report = pg_report.data.length }
+            budget = budget - 1
+            i_report = i_report + 1
+          }
+        }
+      } else { done = false }
+
+      // `scoped` is the honest half of the answer: with no subject to filter on, the two
+      // all-read tables were not swept and this account is NOT provably empty.
+      return { deleted: done, done: done, removed: removed, stuck: stuck, scoped: me !== '' }
     </action>
 
     <action as="myList">

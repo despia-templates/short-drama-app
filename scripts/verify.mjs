@@ -626,8 +626,164 @@ console.log("\nlocal session seam");
     "an RFC1918 host was refused — that breaks testing a phone against this origin, which is the reason the check is a network test and not a loopback test");
 }
 
+// ── 12 · UGC SAFETY (App Store 1.2) — FILTER · REPORT · BLOCK ──────────────────────────
+// Every claim in this section is a RUNTIME agreement between two callers, which is precisely
+// the class no source-reading gate can see. Two of them were already false when this section
+// was first written: a delete that RLS filtered away answered `{deleted: true}` (the statement
+// is `delete … returning id`, so a hidden row simply matches nothing and the call is still
+// `ok`), and every comment was authored by the literal string "You". Both are pinned below.
+console.log("\nUGC safety: filter, report, block");
+const otherSub = randomUUID();
+const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-type": "application/json" };
+{
+  const anyShow = home.latest[0];
+  const anyEp = (await GET(`/catalog/show/${anyShow.id}`, anon).then(asJson)).body.episodes[0];
+
+  // 1.2 — POSTING NEEDS AN IDENTITY. Reading does not; the thread is public by design.
+  const asGuest = await POST("/social/comment", anon, { show: anyShow.id, episode: anyEp.id, body: "hello" });
+  check("an anonymous caller cannot post a comment", asGuest.status === 401,
+    `answered ${asGuest.status} — /social/comment must refuse a caller with no verified subject`);
+
+  // 1.2(a) — THE FILTER REFUSES, AND SAYS WHAT IT REFUSED. A rejection whose message is
+  // "something went wrong" is a filter the viewer cannot comply with.
+  const spam = await POST("/social/comment", viewer, { show: anyShow.id, episode: anyEp.id, body: "watch this https://spam.example instead" }).then(asJson);
+  check("the filter refuses a link, with a reason the viewer can act on",
+    spam.status === 400 && typeof spam.body?.message === "string" && /link/i.test(spam.body.message),
+    `${spam.status} ${JSON.stringify(spam.body)}`);
+  const phone = await POST("/social/comment", viewer, { show: anyShow.id, episode: anyEp.id, body: "call me on +1 (555) 123-4567 tonight" }).then(asJson);
+  check("the filter refuses a phone number", phone.status === 400 && /phone/i.test(phone.body?.message ?? ""),
+    `${phone.status} ${JSON.stringify(phone.body)}`);
+  const mash = await POST("/social/comment", viewer, { show: anyShow.id, episode: anyEp.id, body: "aaaaaaaaaaaaaa" }).then(asJson);
+  check("the filter refuses keyboard mashing", mash.status === 400, `${mash.status} ${JSON.stringify(mash.body)}`);
+  // …AND LETS AN ORDINARY COMMENT THROUGH. The negative above is worthless without this:
+  // "the filter refuses X" would pass just as well if it refused everything.
+  const mine = await POST("/social/comment", viewer, { show: anyShow.id, episode: anyEp.id, body: "The twist in this one actually landed" }).then(asJson);
+  check("an ordinary comment posts", mine.status === 200 && typeof mine.body?.id === "string", JSON.stringify(mine.body));
+
+  // M1 — THE AUTHOR IS THE VERIFIED SUBJECT, not a client string and not the literal "You".
+  const theirs = await POST("/social/comment", other, { show: anyShow.id, episode: anyEp.id, body: "Agreed, the pacing is the whole trick" }).then(asJson);
+  const thread = async (headers, level) =>
+    (await GET(`/social/comments/${anyEp.id}${level ? `?level=${level}` : ""}`, headers).then(asJson)).body;
+  const seen = await thread(viewer);
+  const rowOfMine = seen.rows.find((r) => r.id === mine.body.id);
+  const rowOfTheirs = seen.rows.find((r) => r.id === theirs.body.id);
+  check("a comment is attributed to its verified author, not to \"You\"",
+    rowOfMine?.author !== "You" && rowOfMine?.author === `Viewer ${viewerSub.slice(0, 6).toUpperCase()}`,
+    `author was ${JSON.stringify(rowOfMine?.author)} — the display name must be derived from the row owner_id`);
+  check("two viewers are two different people in the thread",
+    rowOfMine?.author !== rowOfTheirs?.author && rowOfMine?.owner !== rowOfTheirs?.owner,
+    "both comments carried the same author — the thread reads as one person talking to themselves");
+
+  // 1.2(b) — REPORT, and IDEMPOTENT per (reporter, target). The unique index is the lock;
+  // without it one account could hide any comment for everyone by tapping three times.
+  const filed = await POST("/social/report", viewer, { target: theirs.body.id, reason: "harassment" }).then(asJson);
+  check("a report is filed", filed.status === 200 && filed.body?.filed === true, JSON.stringify(filed.body));
+  const again = await POST("/social/report", viewer, { target: theirs.body.id, reason: "harassment" }).then(asJson);
+  check("reporting the same comment twice is idempotent, and says so",
+    again.status === 200 && again.body?.filed === true && again.body?.duplicate === true, JSON.stringify(again.body));
+  if (pool !== null) {
+    const rows = await sql("select count(*)::int as n from dsx_report where owner_id = $1 and target = $2", [viewerSub, theirs.body.id]);
+    check("...and exactly one report row exists",
+      rows?.rows[0].n === 1,
+      `${rows?.rows[0].n} rows — dsx_report_owner_target_uniq in server/policies.local.sql is what makes the flag threshold count PEOPLE rather than taps`);
+  }
+  const flaggedRow = (await thread(anon)).rows.find((r) => r.id === theirs.body.id);
+  check("the flag count is public and real", flaggedRow?.flags === 1, `flags was ${flaggedRow?.flags}`);
+
+  // 1.2(a) as a VIEWER CONTROL: strict withholds a flagged comment, standard does not, and
+  // both decisions are made on the server — the row is absent from the payload, not hidden
+  // in markup, which is the same rule the paywall had to learn (G1).
+  const strict = await thread(viewer, "strict");
+  check("strict filtering withholds a flagged comment from the PAYLOAD",
+    strict.rows.every((r) => r.id !== theirs.body.id) && strict.hidden >= 1,
+    `${JSON.stringify(strict.rows.map((r) => r.id))} hidden=${strict.hidden}`);
+  check("...and standard filtering still shows it", (await thread(viewer)).rows.some((r) => r.id === theirs.body.id),
+    "one report hid a comment for everyone — a single account must not be a censor button");
+
+  // 1.2(c) — BLOCK, enforced server-side and scoped to the blocker alone.
+  const blocked = await POST("/social/block", viewer, { comment: theirs.body.id }).then(asJson);
+  check("a viewer can block the author of a comment", blocked.status === 200 && blocked.body?.blocked === true, JSON.stringify(blocked.body));
+  const afterBlock = await thread(viewer);
+  check("a blocked author is absent from the blocker's payload",
+    afterBlock.rows.every((r) => r.owner !== otherSub) && afterBlock.blocked >= 1,
+    "the blocked author's comment was still in the JSON — a block filtered in markup is not a block");
+  check("...and is still there for everyone else",
+    (await thread(other)).rows.some((r) => r.id === theirs.body.id) && (await thread(anon)).rows.some((r) => r.id === theirs.body.id),
+    "blocking one person removed their comment for the whole app");
+  check("the block list is the blocker's own",
+    (await GET("/social/blocks", viewer).then(asJson)).body?.count === 1 &&
+    (await GET("/social/blocks", other).then(asJson)).body?.count === 0,
+    "one viewer could see another's block list");
+  const unblocked = await POST("/social/unblock", viewer, { subject: otherSub }).then(asJson);
+  check("unblocking restores the thread", unblocked.status === 200 &&
+    (await thread(viewer)).rows.some((r) => r.id === theirs.body.id), JSON.stringify(unblocked.body));
+
+  // DELETE-OWN IS OWN. This is the one that was already broken: `ok` survives a row RLS
+  // filtered away, so only the returned DATA can say a row went.
+  const notMine = await POST("/social/comment/delete", viewer, { comment: theirs.body.id }).then(asJson);
+  check("a viewer cannot delete somebody else's comment", notMine.status === 403, `${notMine.status} ${JSON.stringify(notMine.body)}`);
+  check("...and the comment is still in the thread", (await thread(other)).rows.some((r) => r.id === theirs.body.id),
+    "the refusal was reported but the row went anyway");
+  const deleted = await POST("/social/comment/delete", viewer, { comment: mine.body.id }).then(asJson);
+  check("a viewer can delete their own comment", deleted.status === 200 &&
+    (await thread(anon)).rows.every((r) => r.id !== mine.body.id), `${deleted.status} ${JSON.stringify(deleted.body)}`);
+
+  // THE OPERATOR QUEUE IS BEHIND THE GATEWAY, and a prober gets the 404 an absent route gets.
+  const asViewer = await POST("/social/reports", viewer, {}).then(asJson);
+  check("the moderation queue is invisible to a viewer", asViewer.status === 404,
+    `answered ${asViewer.status} — reach="" must answer 404, never 403, which would confirm the endpoint exists`);
+  const asOperator = await POST("/social/reports", operator, {}).then(asJson);
+  check("...and the operator can read it, with the reported text preserved",
+    asOperator.status === 200 && asOperator.body.rows.some((r) => r.target === theirs.body.id && typeof r.snapshot === "string" && r.snapshot.length > 0),
+    `${asOperator.status} ${JSON.stringify(asOperator.body).slice(0, 200)}`);
+
+  // 1.2(d) — PUBLISHED CONTACT INFORMATION needs somewhere to be published FROM. The value
+  // ships empty on purpose (a placeholder URL reads as a broken promise to a reviewer); the
+  // KEY has to exist, or an adopter has nowhere to put it and the UI names a gap forever.
+  const consts = JSON.parse(readFileSync(resolve(root, "App.json"), "utf8")).consts ?? {};
+  check("the deployment plane declares a contact key", Object.prototype.hasOwnProperty.call(consts, "supportUrl"),
+    "App.json consts has no `supportUrl` — guideline 1.2 requires published contact information for an app carrying comments");
+
+  // ── AND THE SAFETY ROWS LEAVE WITH THE ACCOUNT (5.1.1(v)) ────────────────────────────
+  // The comment and report tables are ownership="public-read", so an unfiltered sweep sees
+  // every viewer's rows and can neither delete them nor stop asking for them. That is not a
+  // hypothetical: before the declared owner columns existed, a viewer who owned NOTHING
+  // looped /viewer/delete eight times and never reached `done`, because two other people had
+  // left comments. `otherSub` still has a live comment throughout this block — that is the
+  // fixture, and without it the assertion would pass on an empty table.
+  const survivor = (await thread(anon)).rows.some((r) => r.owner === otherSub);
+  check("another viewer's comment is present while we delete", survivor,
+    "no foreign comment in the thread — this deletion assertion would pass vacuously");
+  await POST("/social/report", viewer, { target: theirs.body.id, reason: "spam" });
+  await POST("/social/block", viewer, { comment: theirs.body.id });
+  let wipe = await POST("/viewer/delete", viewer, { confirm: "DELETE", sub: viewerSub }).then(asJson);
+  let passes = 1;
+  while (wipe.status === 200 && wipe.body?.done === false && passes < 60) {
+    wipe = await POST("/viewer/delete", viewer, { confirm: "DELETE", sub: viewerSub }).then(asJson);
+    passes += 1;
+  }
+  check("account deletion completes with other people's comments in the table",
+    wipe.status === 200 && wipe.body?.done === true && wipe.body?.scoped === true,
+    `${passes} passes, last answer ${JSON.stringify(wipe.body)} — an unfiltered sweep of an all-read table can never finish`);
+  if (pool !== null) {
+    const left = await sql(
+      "select (select count(*) from dsx_report where owner_id = $1)::int as reports," +
+      " (select count(*) from dsx_block where owner_id = $1)::int as blocks," +
+      " (select count(*) from dsx_comment where owner_id = $1)::int as comments", [viewerSub]);
+    check("...and takes the reports, the blocks and the comments with it",
+      left?.rows[0].reports === 0 && left?.rows[0].blocks === 0 && left?.rows[0].comments === 0,
+      JSON.stringify(left?.rows[0]));
+  }
+  check("...and the other viewer's comment survived it",
+    (await thread(anon)).rows.some((r) => r.owner === otherSub),
+    "one account's deletion removed another account's data");
+}
+
 if (pool !== null) {
   // leave nothing behind: this run's throwaway identity, and nothing else
+  await sql("delete from dsx_report where owner_id = $1 or owner_id = $2", [viewerSub, otherSub]);
+  await sql("delete from dsx_block where owner_id = $1 or owner_id = $2", [viewerSub, otherSub]);
+  await sql("delete from dsx_comment where owner_id = $1 or owner_id = $2", [viewerSub, otherSub]);
   await sql("delete from dsx_ledger where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_unlock where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_playticket where owner_id = $1", [viewerSub]);

@@ -370,6 +370,15 @@
       const p = dsx.variable.pick
       return p == null ? '' : p.body
     </variable>
+    <!-- ONE COMMENT GETS ONE DECISION. Once a report, a block or a delete has landed, the
+         row is in `hiddenIds` — so the choices that produced it are no longer offered, and
+         the pane shows what happened instead. A failed write puts the id back, which brings
+         the choices back with it: the pane can never sit on an outcome that did not occur. -->
+    <variable as="pickHandled" computed="true">
+      const p = dsx.variable.pick
+      if (p == null) { return false }
+      return dsx.variable.hiddenIds.includes(p.id)
+    </variable>
     <variable as="blockedRows" computed="true">
       if (blocks.data == null) { return [] }
       return blocks.data.rows
@@ -584,13 +593,12 @@
     <action as="unlockNow">
       const ep = dsx.variable.episode
       if (ep == null || dsx.variable.unlocking) { return }
-      // AN UNLOCK IS OWNED BY AN ACCOUNT. A guest tap raises the sign-in sheet rather than
-      // spending a round trip to be told 401 — the paywall stays exactly where it is, so
-      // the viewer lands back on this episode the moment they are in (docs/auth.md).
-      if (dsx.variable.signedIn == false) {
-        dsx.module.route.push({ path: '/auth/signin' })
-        return
-      }
+      // NO SIGN-IN GATE ON MONEY. Most revenue in this category never signs in, so a gate
+      // here is a revenue bug wearing a safety costume. `auth="required"` verifies a TOKEN,
+      // it does not ask who holds it — an anonymous session satisfies it unchanged, and the
+      // subject Postgres derives from that token owns the purchase exactly as a named one
+      // would. Sign-in is the UPSELL AFTER the purchase ("keep what you bought on another
+      // device"), never the toll in front of it.
       dsx.variable.unlocking = true
       const r = await unlockCall.send({ episode: ep.id })
       dsx.variable.unlocking = false
@@ -1662,7 +1670,7 @@ Please unlock to watch." class="lockHead"/>
         <hstack class="cHead">
           <vstack class="cBack" style="justify-content: center" on:tap="dsx.action.setPane({ next: 'thread' })"
                   a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
-            <image icon="arrow.left" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
+            <image icon="chevron.left" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
           </vstack>
           <text value="Report or block" class="cTitle" grow="width" style="flex: 1"/>
         </hstack>
@@ -1680,7 +1688,8 @@ Please unlock to watch." class="lockHead"/>
               <text value="{{ dsx.variable.modNote }}" class="cNoteTxt" grow="width" style="flex: 1"/>
             </hstack>
 
-            <vstack spacing="8" alignItems="stretch" visible-if="dsx.variable.pickIsMine == false">
+            <vstack spacing="8" alignItems="stretch"
+                    visible-if="dsx.variable.pickIsMine == false &amp;&amp; dsx.variable.pickHandled == false">
               <text value="WHY ARE YOU REPORTING THIS?" class="cGroupCap"/>
               <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'spam' })"
                       a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment as spam or a scam">
@@ -1723,7 +1732,8 @@ Please unlock to watch." class="lockHead"/>
 
             <!-- YOUR OWN COMMENT. The row is offered on a subject match; the SERVER still
                  decides, because RLS is what refuses a delete of anyone else row. -->
-            <vstack spacing="8" alignItems="stretch" visible-if="dsx.variable.pickIsMine">
+            <vstack spacing="8" alignItems="stretch"
+                    visible-if="dsx.variable.pickIsMine &amp;&amp; dsx.variable.pickHandled == false">
               <text value="YOUR COMMENT" class="cGroupCap"/>
               <hstack class="cOptRow" on:tap="dsx.action.deletePick()"
                       a11yGroup="true" a11yTrait="button" a11yLabel="Delete your comment permanently">
@@ -1732,6 +1742,15 @@ Please unlock to watch." class="lockHead"/>
               </hstack>
               <text class="cSmall" value="This removes it for everyone, and it cannot be undone."/>
             </vstack>
+
+            <!-- HANDLED. The decision is made; offering the same choices again would only
+                 earn a "you already reported this". -->
+            <hstack class="cOptRow" visible-if="dsx.variable.pickHandled"
+                    on:tap="dsx.action.setPane({ next: 'thread' })"
+                    a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
+              <image icon="chevron.left" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+              <text value="Back to the comments" class="cOptTxt" grow="width" style="flex: 1"/>
+            </hstack>
 
             <!-- 1.2(d), at the point of need: if this needs a person, here is the person. -->
             <ContactRow label="Contact us about this comment"
@@ -1746,7 +1765,7 @@ Please unlock to watch." class="lockHead"/>
         <hstack class="cHead">
           <vstack class="cBack" style="justify-content: center" on:tap="dsx.action.setPane({ next: 'thread' })"
                   a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
-            <image icon="arrow.left" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
+            <image icon="chevron.left" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
           </vstack>
           <text value="Safety &amp; filters" class="cTitle" grow="width" style="flex: 1"/>
         </hstack>

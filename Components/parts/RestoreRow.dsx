@@ -53,13 +53,14 @@
       return dsx.variable.signedIn ? 'Restore' : 'Sign in'
     </variable>
 
-    <!-- One tap, two destinations: with no account there is nothing to restore ONTO, so the
-         control does the thing that has to happen first rather than failing at it. -->
+    <!-- RESTORE IS ANONYMOUS. The old shape read "with no account there is nothing to restore
+         ONTO" — which is only true if an account means a signed-in human. It does not: an
+         anonymous session is a real subject, it is the subject that paid, and it is the one a
+         restore has to reach. Gating restore behind sign-in strands exactly the buyer this
+         app makes most of its money from, at the moment they are trying to get back what
+         they already paid for. Restore now just restores; the sign-in offer sits beside it as
+         the way to carry those purchases to a second device. -->
     <action as="tapped">
-      if (dsx.variable.signedIn == false) {
-        dsx.module.route.push({ path: '/auth/signin' })
-        return
-      }
       dsx.action.restore()
     </action>
 

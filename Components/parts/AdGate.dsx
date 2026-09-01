@@ -227,7 +227,7 @@
     <!-- Article 7, named where the viewer reads it: the half that works and the half that
          does not, in that order, with the seam pointed at. -->
     <variable as="optedOutNote" computed="true">
-      return 'Thanks — this creative will not play again for the rest of this session on this device. It is not sent anywhere yet: no moderation route is declared on this backend, so an adopter wires the report POST to the `reported` event this card emits.'
+      return 'Thanks — this creative will not play again for the rest of this session on this device, and it goes to the moderation queue. The consumer decides: this card raises a `reported` event carrying the lane and creative, and the screen that mounts it files the report.'
     </variable>
 
     <!-- ── the lanes ───────────────────────────────────────────────────────────────── -->

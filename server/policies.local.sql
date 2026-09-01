@@ -20,6 +20,16 @@
 -- so a user-scope insert would land owner_id NULL and fail the check below
 alter table dsx_comment alter column owner_id set default auth.uid();
 
+-- AND THE DECLARED TWIN. `author_id` is the same subject as owner_id, filled the same way and
+-- by the same authority — Postgres, from the verified JWT — but DECLARED on the entity, which
+-- owner_id can never be. That is what makes `list({ filters: { author_id } })` a query instead
+-- of a silently-dropped filter, and it is the only way an account deletion can enumerate one
+-- viewer rows in an all-read table. Nothing in the app writes it, and nothing can: postComment
+-- builds its own values object, so the column is never reachable from a request body.
+alter table dsx_comment alter column author_id set default auth.uid();
+-- and converge a database that predates the column: the value is owner_id, always
+update dsx_comment set author_id = owner_id where author_id is null and owner_id is not null;
+
 drop policy if exists dsx_comment_owner_write on dsx_comment;
 create policy dsx_comment_owner_write on dsx_comment
   for insert with check (owner_id = auth.uid());
@@ -139,6 +149,9 @@ create unique index if not exists dsx_block_owner_subject_uniq on dsx_block (own
 -- tally the thread read computes. `server/social.dsx` names this trade in full. The gateway
 -- (`reach=""` on /social/reports) is what keeps a viewer out of the queue.
 alter table dsx_report alter column owner_id set default auth.uid();
+-- the declared twin, exactly as on dsx_comment above and for the same reason
+alter table dsx_report alter column reporter_id set default auth.uid();
+update dsx_report set reporter_id = owner_id where reporter_id is null and owner_id is not null;
 
 drop policy if exists dsx_report_owner_write on dsx_report;
 create policy dsx_report_owner_write on dsx_report

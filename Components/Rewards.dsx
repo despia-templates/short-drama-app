@@ -27,6 +27,9 @@
     <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
     <api as="checkinCall" url="/rewards/checkin" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="spinCall" url="/rewards/spin" method="POST" auto="false" headers="global.auth.headers"/>
+    <!-- 2.5.18 wants a report-this-ad affordance that REACHES someone. The route landed with
+         the UGC safety pass and takes the {lane, creative} shape AdGate already emits. -->
+    <api as="adReportCall" url="/social/report/ad" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="claimCall" url="/rewards/task" method="POST" auto="false" headers="global.auth.headers"/>
 
     <variable as="toast">return ''</variable>
@@ -241,8 +244,19 @@
          this handler does the honest half — it acknowledges the viewer, and <AdGate> has
          already suppressed the creative for the session. What it must never do is say
          "reported" as if something was filed. -->
-    <action as="adReported" lane="event.lane">
-      dsx.variable.toast = 'Ad hidden for this session. Nothing is sent to a moderator on this build — see the card.'
+    <!-- The card suppresses the creative locally either way; this reports it as well, and
+         says which of the two actually happened rather than claiming the stronger one. -->
+    <action as="adReported" lane="event.lane" creative="event.creative">
+      dsx.variable.toast = 'Ad hidden for this session.'
+      const r = await adReportCall.send({ lane: lane, creative: creative })
+      if (r.ok) {
+        dsx.variable.toast = 'Reported, and hidden for this session.'
+        return
+      }
+      const msg = r.data == null || r.data.message == null ? '' : r.data.message
+      dsx.variable.toast = msg === ''
+        ? 'Ad hidden for this session. The report could not be filed.'
+        : 'Ad hidden for this session. ' + msg
     </action>
 
     <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>

@@ -2,10 +2,16 @@
      (and a modal the player can raise mid-paywall), separate from /rewards which is the
      EARN lane. Two lanes, two surfaces: this is how the category ships it.
 
-     Checkout is REAL and cross-platform: the server creates the Stripe PaymentIntent
-     (/store/checkout), `dsx.module.stripe` opens ONE session over it, and the same
-     session settles on web, iOS and Android. Entitlement is granted server-side after
-     Stripe confirms — never on the client's word.
+     CHECKOUT IS REAL, AND IT IS THE WEB LANE. The server creates the Stripe PaymentIntent
+     (/store/checkout), `dsx.module.stripe` opens one session over it, and entitlement is
+     granted server-side after Stripe confirms — never on the client's word.
+     This header used to say "and the same session settles on web, iOS and Android", which
+     was true and was a store violation on two of the three: App Store 3.1.1 names in-game
+     currencies and premium-content unlocks as in-app-purchase products, so a card sheet
+     inside a native build is a rejection. The lane is now picked before any money moves
+     (`payLane` in the head) and a native build REFUSES with the reason on screen, because
+     the in-app-purchase module cannot be configured into a build yet — the whole story,
+     including the backend that is already waiting for it, is in that comment.
 
      MONEY GETS EVERY STATE. A buy card renders its own in-flight state the moment it is
      tapped (a $9.99 tap that does nothing for a network round trip reads as broken and
@@ -32,10 +38,6 @@
     <variable as="buying">return ''</variable>       <!-- the sku currently in checkout -->
     <variable as="paying">return false</variable>    <!-- the Stripe sheet is open -->
     <variable as="order">return ''</variable>
-    <!-- the native lane's equivalent of `order` — what a lost settle is retried with -->
-    <variable as="nativeTxn">return ''</variable>
-    <variable as="nativeSku">return ''</variable>
-    <variable as="nativeProvider">return ''</variable>
     <variable as="settleFailed">return false</variable>
     <variable as="settleMsg">return ''</variable>
     <variable as="hovId">return ''</variable>
@@ -99,39 +101,51 @@
       if (dsx.variable.catalogView == null) { return 'loading' }
       return 'content'
     </variable>
-    <!-- ══ THE PURCHASE LANE — the same rule as <PlansSheet>, which carries the long form ══
-         App Store 3.1.1 names "in-game currencies" and "access to premium content" as
-         in-app-purchase products, so COIN PACKS are the clearest case of it in this app:
-         selling them through Stripe inside an iOS build is a rejection, and neither the
-         reader-app rule nor the US anti-steering carve-out rescues it (the first forbids a
-         storefront entirely, the second permits a LINK OUT, never a card sheet in the app).
-         Capability first, platform second — `has('store')` answers "can I", `os` answers
-         "which words" (AGENTS.md, the <AdGate> precedent). The second half of the gate is a
-         SERVER fact: a purchase the backend cannot verify must never be opened, because
-         money taken at Apple that this app cannot grant is the worst outcome on this screen.
-         Both computeds are twins of the ones in Components/parts/PlansSheet.dsx and must
-         stay so — the VIP tiers and the coin packs are one storefront wearing two grids. -->
+    <!-- ══ THE PURCHASE LANE, AND WHY IT HAS ONLY ONE ═══════════════════════════════════
+         App Store Review 3.1.1, verbatim: "If you want to unlock features or functionality
+         within your app, (by way of example: subscriptions, in-game currencies, game levels,
+         access to premium content, or unlocking a full version), you must use in-app
+         purchase." A VIP pass is premium-content access and coins are an in-game currency —
+         both are named by that parenthetical, so opening a Stripe payment sheet for either
+         one inside an iOS build is a rejection. Two carve-outs get cited and neither applies:
+         a READER APP may not offer in-app purchase at all and may only give access to content
+         bought elsewhere, which is not a storefront; and the US anti-steering carve-out
+         permits a LINK OUT to your own website, never a non-Apple payment sheet inside the
+         app. Google Play Payments reaches the same conclusion for the same products.
+
+         So Stripe is the WEB lane, and a native build takes the platform store — that is the
+         whole rule, and it is why this pick reads `os == 'web'` and refuses everything else
+         rather than falling through to the card sheet it used to.
+
+         WHERE THE CAPABILITY PICK WENT. The house form is `has('scheme')` first and `os`
+         second (AGENTS.md, the <AdGate> precedent) — a build that HAS the module should take
+         it wherever it is running. That line belongs here and is not here, because the module
+         cannot be in a build at all today: see `payNote`, which does the `has('store')` probe
+         so the refusal can tell an adopter which half they are missing. The day Core/Store
+         compiles, this becomes `if (has('store')) { return 'iap' }` above the web test, and
+         the backend it needs is already built (server/store.dsx: POST /store/native, the
+         RevenueCat <webhook>, and one shared granter behind both). -->
     <variable as="payLane" computed="true">
-      const cat = dsx.variable.catalogView
-      const ready = cat != null &amp;&amp; cat.native != null &amp;&amp; cat.native.ready == true
-      if (has('store')) { return ready ? 'iap' : 'blocked' }
       if (os == 'web') { return 'stripe' }
       return 'blocked'
     </variable>
+    <!-- THE REFUSAL, in the viewer's words, naming WHICH half is missing — because the two
+         halves are fixed by two different people. A desktop build (macos/windows/linux)
+         lands here too: the Mac App Store wants in-app purchase and a direct download does
+         not, and `os` alone cannot tell them apart, so this errs toward the store rule, which
+         is the safe direction to be wrong in. -->
     <variable as="payNote" computed="true">
       if (dsx.variable.payLane != 'blocked') { return '' }
       const cat = dsx.variable.catalogView
+      const ready = cat != null &amp;&amp; cat.native != null &amp;&amp; cat.native.ready == true
       if (has('store')) {
-        if (cat != null &amp;&amp; cat.native != null &amp;&amp; cat.native.reason != '') { return cat.native.reason }
-        return 'This build cannot complete a store purchase yet.'
+        if (ready == false &amp;&amp; cat != null &amp;&amp; cat.native != null &amp;&amp; cat.native.reason != '') { return cat.native.reason }
+        return 'The in-app-purchase module is in this build, but the app cannot open a purchase with it yet: the one client call this needs is held by an upstream defect (Core/Store ships Components/core/PaywallVIP.dsx, which mounts a component nothing defines, so configuring the package aborts the build). Nothing is charged until it can be granted.'
       }
-      return 'Purchases are not available in this build. App Store rule 3.1.1 requires coins and passes to be sold through in-app purchase, and this build ships no in-app-purchase module — so it refuses rather than charging a card inside the app. Add Core/Store to dsx.config.json (packages + modules) and set REVENUECAT_KEY on the backend.'
+      return 'Purchases are off in this build, on purpose. App Store rule 3.1.1 makes coins and passes in-app-purchase products, so selling them through a card sheet inside the app would be a rejection — and the in-app-purchase module cannot be added yet (configuring Core/Store aborts the build inside the module itself). The web storefront is unaffected.'
     </variable>
     <variable as="recoverLine" computed="true">
       const why = dsx.variable.settleMsg == '' ? '' : ' The server said: ' + dsx.variable.settleMsg
-      if (dsx.variable.nativeTxn != '') {
-        return 'The store completed your purchase, but applying it to your wallet did not go through. Nothing is lost: confirm below and it lands. Transaction ' + dsx.variable.nativeTxn + '.' + why
-      }
       return 'Stripe confirmed your payment, but applying it to your wallet did not go through. Nothing is lost: confirm below and it lands. Order ' + dsx.variable.order + '.' + why
     </variable>
 
@@ -147,7 +161,6 @@
     </formula>
     <formula as="cardBusyLabel" id="item.id">
       if (dsx.variable.buying != id) { return '' }
-      if (dsx.variable.payLane == 'iap') { return dsx.variable.paying ? 'Complete the purchase…' : 'Opening the App Store…' }
       return dsx.variable.paying ? 'Complete the payment…' : 'Contacting Stripe…'
     </formula>
 
@@ -156,7 +169,7 @@
       else { dsx.module.route.replace({ path: '/' }) }
     </action>
 
-    <!-- ONE BUY, TWO LANES. Which one is decided by `payLane`, never by this action. -->
+    <!-- ONE BUY. Which lane it takes is decided by `payLane`, never by this action. -->
     <action as="buy" sku="item.id" label="item.label">
       if (dsx.variable.buying != '') { return }
       // NO SIGN-IN WALL IN FRONT OF THE MONEY. This used to push /auth/signin before a guest
@@ -166,14 +179,26 @@
       // human, and an anonymous session is a subject — so the tap goes to the payment lane
       // and a backend that has nothing to attach the purchase to says so in its own words.
       // The <SignInCard> at the top of this screen is then an offer, not a gate.
+      // ── THE NATIVE PURCHASE, AND THE ONE LINE THAT CANNOT BE WRITTEN YET ──────────────
+      // What belongs here is a single call to the store module —
+      //   store.checkout({ product: sku, externalId: the viewer subject })
+      // — and then POST /store/native with the transaction it resolves. The server half is
+      // already built and waiting (server/store.dsx: settleNative, the RevenueCat receiver,
+      // and one shared granter behind both).
+      // It is not written because the module cannot be put in a build. Adding Core/Store to
+      // the packages list was tried on 2026-09-01 and ABORTS THE COMPILE inside the module
+      // itself: Components/core/PaywallVIP.dsx line 18 mounts a component nothing in the
+      // module tree defines. And with no package claiming the scheme, `despia lint --strict`
+      // refuses a call to it outright — which is the correct refusal, because a module
+      // reference nothing claims is how a build ships a call that can only fail on a device.
+      // (Spelling note: the identifiers above are deliberately written WITHOUT their engine
+      // prefix. The linter reads names out of comments in an action body exactly as it reads
+      // them out of code, so naming the module here the way you would call it turns this
+      // paragraph into two warnings against a strict gate.)
+      // So the branch below is the whole native lane today: it refuses, in the viewer own
+      // words, rather than quietly opening a card sheet on a phone.
       if (dsx.variable.payLane == 'blocked') {
         dsx.variable.toast = dsx.variable.payNote
-        return
-      }
-      // a NAMED dict, never positional — a positional call resolves the input to null,
-      // silently (AuthSeam.dsx:186 measured what that costs)
-      if (dsx.variable.payLane == 'iap') {
-        await dsx.action.buyNative({ sku: sku })
         return
       }
       dsx.variable.buying = sku
@@ -211,21 +236,10 @@
          safe to call any number of times — which is exactly why the retry card below can
          exist. Money confirmed by Stripe but not yet granted is never a dead end. -->
     <action as="settle">
-      const native = dsx.variable.nativeTxn != ''
-      let s = null
-      // an `await` in a ternary branch returns something whose `.ok` is falsy, silently
-      // (PLAN.md §6.31) — so this is an if/else and always will be
-      if (native) {
-        s = await nativeCall.send({ sku: dsx.variable.nativeSku, transaction: dsx.variable.nativeTxn, provider: dsx.variable.nativeProvider })
-      } else {
-        s = await settleCall.send({ order: dsx.variable.order })
-      }
+      const s = await settleCall.send({ order: dsx.variable.order })
       if (s.ok) {
         dsx.variable.settleFailed = false
         dsx.variable.order = ''
-        dsx.variable.nativeTxn = ''
-        dsx.variable.nativeSku = ''
-        dsx.variable.nativeProvider = ''
         wallet.refresh()
         dsx.variable.toast = s.data.granted
           ? (s.data.coins != null ? 'Added ' + s.data.coins + ' coins' : 'VIP is active for ' + s.data.days + ' days')
@@ -239,36 +253,6 @@
       }
     </action>
 
-    <!-- THE NATIVE LANE. `store.checkout` opens StoreKit 2 or Play Billing and resolves the
-         module unified envelope — `{ outcome, provider, platform, product, transaction }` —
-         the same shape on every provider. `externalId`/`appAccountToken` carry the viewer
-         subject so the backend can look the purchase up against THIS account instead of
-         taking the client word for whose it is; with no subject yet they are empty, the
-         lookup finds nothing and the grant is REFUSED, which is the safe direction. -->
-    <action as="buyNative" inputs="sku">
-      dsx.variable.buying = sku
-      dsx.variable.toast = ''
-      dsx.variable.settleFailed = false
-      dsx.variable.order = ''
-      dsx.variable.paying = true
-      const got = await dsx.module.store.checkout({
-        product: sku, kind: 'coins', coins: true,
-        externalId: global.auth.sub, appAccountToken: global.auth.sub
-      })
-      dsx.variable.paying = false
-      if (got == null || got.outcome != 'purchased' || got.transaction == null) {
-        dsx.variable.buying = ''
-        // `cancelled` rides the failure channel on this module, so a dismissal and a decline
-        // arrive the same way — both are honestly "nothing was charged"
-        dsx.variable.toast = 'The purchase was not completed. Nothing was charged.'
-        return
-      }
-      dsx.variable.nativeSku = sku
-      dsx.variable.nativeTxn = got.transaction.id
-      dsx.variable.nativeProvider = got.provider == null ? '' : got.provider
-      await dsx.action.settle()
-      dsx.variable.buying = ''
-    </action>
 
     <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>

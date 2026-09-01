@@ -48,11 +48,25 @@
        · a word list pretending to be moderation. See `postComment`. -->
 <server>
   <head>
+    <!-- `author_id` IS `owner_id`, DECLARED, and it exists for exactly one reason: a viewer
+         must be able to delete their account and take their comments with them.
+         `list` filters accept DECLARED FIELDS ONLY — repo.ts drops anything else in silence,
+         so `filters: { owner_id: … }` is not a query, it is a full table scan wearing a filter.
+         On an OWNER table that does not matter (RLS has already narrowed the rows to yours);
+         on a public-read table it is the whole problem, and it is why account deletion could
+         not empty this one. MEASURED before this field existed: a viewer who owned nothing at
+         all looped /viewer/delete eight times, "removed" two rows a pass and never finished,
+         because the sweep was listing EVERY comment in the deployment and deleting none.
+         Nothing writes this column. `server/policies.local.sql` gives it `default auth.uid()`,
+         the same way owner_id is filled, so it is assigned by Postgres from the verified
+         subject and a client cannot set it (postComment builds its own values object). -->
     <entity as="comment" ownership="public-read">
       <field as="show" type="uuid"/>
       <field as="episode" type="uuid"/>
       <field as="body" type="text"/>
+      <field as="author_id" type="uuid"/>
       <index on="episode"/>
+      <index on="author_id"/>
     </entity>
 
     <!-- THE REPORT. One row per (reporter, target), enforced by a unique index in
@@ -72,8 +86,11 @@
       <field as="reason" type="text"/>      <!-- spam | harassment | sexual | violence | other -->
       <field as="note" type="text"/>
       <field as="snapshot" type="text"/>    <!-- the reported text, so the queue survives a delete -->
+      <!-- the same declared-owner column, for the same reason: see `comment.author_id` -->
+      <field as="reporter_id" type="uuid"/>
       <index on="target"/>
       <index on="episode"/>
+      <index on="reporter_id"/>
     </entity>
 
     <!-- THE BLOCK. `subject` is the blocked author owner_id — the RLS subject, which is what

@@ -7,7 +7,7 @@
       "path": "/",
       "component": "shortdrama.App",
       "meta": {
-        "title": "Short Drama \u2014 binge-worthy vertical series"
+        "title": "Short Drama — binge-worthy vertical series"
       },
       "motion": {
         "mobile": "none",
@@ -18,7 +18,7 @@
       "path": "/discover",
       "component": "shortdrama.Discover",
       "meta": {
-        "title": "Discover \u2014 Short Drama"
+        "title": "Discover — Short Drama"
       },
       "motion": {
         "mobile": "none",
@@ -29,7 +29,7 @@
       "path": "/vip",
       "component": "shortdrama.Vip",
       "meta": {
-        "title": "VIP \u2014 Short Drama"
+        "title": "VIP — Short Drama"
       },
       "motion": {
         "mobile": "none",
@@ -40,25 +40,22 @@
       "path": "/store",
       "component": "shortdrama.Store",
       "meta": {
-        "title": "Store \u2014 Short Drama"
+        "title": "Store — Short Drama"
       }
     },
     {
       "path": "/rewards",
       "component": "shortdrama.Rewards",
       "meta": {
-        "title": "Rewards \u2014 Short Drama"
+        "title": "Rewards — Short Drama"
       },
-      "motion": {
-        "mobile": "none",
-        "wide": "dsx"
-      }
+      "_motion_note": "NO `motion` HERE, and that is the fix rather than an omission. `motion: {mobile: none}` is the TAB-ROOT declaration: it exists so a screen reached by `route.reset` does not slide on a phone, because a tab switch is not a push and the tab bar would ride the transition. Rewards is reached by PUSH from Profile, Store and the player — never by a tab — so wearing the tab-root motion made it the one pushed screen in the app that teleported in on the phone while every other pushed screen slid. Measured 2026-09-01 on both lanes: web hard-cut at 390px, iOS slid anyway (the key was dropped in resolution before this pass), so the same tap produced two different products. With the key gone the phone lane slides on both lanes and the wide lane crossfades, which is what every other pushed route already did."
     },
     {
       "path": "/list",
       "component": "shortdrama.MyList",
       "meta": {
-        "title": "My List \u2014 Short Drama"
+        "title": "My List — Short Drama"
       },
       "motion": {
         "mobile": "none",
@@ -69,7 +66,7 @@
       "path": "/profile",
       "component": "shortdrama.Profile",
       "meta": {
-        "title": "Profile \u2014 Short Drama"
+        "title": "Profile — Short Drama"
       },
       "motion": {
         "mobile": "none",
@@ -80,56 +77,61 @@
       "path": "/notices",
       "component": "shortdrama.Notices",
       "meta": {
-        "title": "Notifications \u2014 Short Drama"
+        "title": "Notifications — Short Drama"
       }
     },
     {
       "path": "/account",
       "component": "shortdrama.Account",
       "meta": {
-        "title": "Account \u2014 Short Drama"
+        "title": "Account — Short Drama"
       }
     },
     {
       "path": "/auth/:pane",
       "component": "shortdrama.Auth",
       "meta": {
-        "title": "Account \u2014 Short Drama"
+        "title": "Account — Short Drama"
       }
     },
     {
       "path": "/browse/:genre",
       "component": "shortdrama.Browse",
       "meta": {
-        "title": "Browse \u2014 Short Drama"
+        "title": "Browse — Short Drama"
       }
     },
     {
       "path": "/browse",
       "component": "shortdrama.Browse",
       "meta": {
-        "title": "Browse \u2014 Short Drama"
+        "title": "Browse — Short Drama"
       }
     },
     {
       "path": "/show/:id",
       "component": "shortdrama.Show",
       "meta": {
-        "title": "Show \u2014 Short Drama"
-      }
+        "title": "Show — Short Drama"
+      },
+      "motion": {
+        "mobile": "none",
+        "wide": "dsx"
+      },
+      "_PROBE": "temporary — suppression probe, removed after measurement"
     },
     {
       "path": "/watch/:show/:idx",
       "component": "shortdrama.Watch",
       "meta": {
-        "title": "Watch \u2014 Short Drama"
+        "title": "Watch — Short Drama"
       }
     },
     {
       "path": "/admin",
       "component": "shortdrama.Admin",
       "meta": {
-        "title": "Manage \u2014 Short Drama"
+        "title": "Manage — Short Drama"
       }
     }
   ],
@@ -139,6 +141,7 @@
     "motionBreakpoint": 768,
     "wide": "dsx"
   },
+  "_packages_note": "THE IN-APP-PURCHASE LANE IS MISSING FROM THIS LIST AND THAT IS NOT A CHOICE. App Store 3.1.1 names in-game currencies and premium-content unlocks as in-app-purchase products, so coins and the VIP pass may not be sold through Stripe inside an iOS or Android build; Stripe is legal on the WEB storefront only. The module that would fix it is Core/Store (scheme 'store', shelf premium like Stripe, so no licensing tier changes) at ClosedSource/DSX/Modules/Core/Store. Adding it here was TRIED on 2026-09-01 and ABORTS THE BUILD: the package ships 20 Paywall* components and one of them, Components/core/PaywallVIP.dsx line 18, mounts <shared.VipCard>, which no component in the module tree defines — 'despia build: refused - no global component VipCard'. Until that is fixed upstream, no app can configure the module, `has('store')` is false on every lane, and the purchase surfaces (Components/Store.dsx, Components/parts/PlansSheet.dsx) REFUSE on native rather than falling back to a card sheet. The backend half is already built and waiting: POST /store/native plus the RevenueCat <webhook> in server/store.dsx. Re-add the path below and 'store' to modules the day the module compiles.",
   "packages": [
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Payments/Stripe",
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/SocialShare"

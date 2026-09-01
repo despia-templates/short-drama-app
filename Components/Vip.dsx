@@ -142,18 +142,18 @@
       return 'VIP active through ' + dsx.variable.vipUntil
     </variable>
     <!-- WHAT A PLAN ACTUALLY IS ON THIS BACKEND, derived from the same table the tiers are
-         priced from rather than typed in here. `createCheckout` opens a ONE-OFF Stripe
-         PaymentIntent (server/store.dsx:88-95) and `settleOrder` stamps
-         `vip_until = now + days` (server/store.dsx:150-151). There is no Stripe Subscription
-         object, no renewal, no cancel path — so a pass runs its term and stops.
+         priced from rather than typed in here. Every lane opens a ONE-OFF charge — a Stripe
+         PaymentIntent on the web, a consumable store product on a native build — and the
+         grant stamps `vip_until = (current expiry or now) + days`. There is no subscription
+         object, no renewal, no cancel path: a pass runs its term and stops.
 
-         THIS CONTRADICTS THE TIER CARDS BELOW, ON PURPOSE. `storeCatalog` ships
-         `note: 'Auto-renew. Cancel anytime.'` on two tiers and 'then $14.99/week' on the
-         third (server/store.dsx:34-36), and <PlansSheet> renders those strings verbatim.
-         Those notes are false and they live in a document this pass does not own; the fix
-         is filed as a handoff. Until it lands, the screen whose stated job is trust states
-         what the build does rather than repeating a claim it cannot back — the contradiction
-         being visible is the point of a loud bridge (Article 7). -->
+         THE LOUD BRIDGE THAT USED TO STAND HERE IS GONE, and its removal is the point.
+         `storeCatalog` shipped `note: 'Auto-renew. Cancel anytime.'` on two tiers and
+         'then $14.99/week' on the third while this line said the opposite — a screen arguing
+         with its own server, which Article 7 tolerates only as long as it takes to fix the
+         side that is wrong. The server now says "One charge for N days. No auto-renewal." in
+         the tier notes themselves, so this line and the cards below it agree, and this
+         paragraph is the derivation rather than a contradiction. -->
     <variable as="termLine" computed="true">
       const c = dsx.variable.catalogView
       const tail = ' When the date passes VIP simply stops — your coins are not affected.'
@@ -162,7 +162,7 @@
       }
       let days = ''
       for (const t of c.vip) { days = days == '' ? String(t.days) : days + ', ' + String(t.days) }
-      return 'Every plan is a one-time charge for a dated pass — ' + days + ' days. This build has no auto-renewal.' + tail
+      return 'Every plan is a one-time charge for a dated pass — ' + days + ' days. Nothing renews and there is nothing to cancel; buying again adds days to the pass you hold.' + tail
     </variable>
     <variable as="posterW" computed="true">return dsx.variable.bp == 'phone' ? 150 : 186</variable>
     <variable as="phase" computed="true">

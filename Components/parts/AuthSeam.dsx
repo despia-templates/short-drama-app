@@ -328,10 +328,18 @@
       // outcome 5.1.1(v) refuses. Bounded at 60 passes to match the ceiling on that route; if
       // it is still not done by then the account is not empty and this must NOT claim it is.
       // (No apostrophes in an action-body comment: the balance scanner counts them as quotes.)
-      let r = await deleteCall.send({ confirm: 'DELETE' })
+      // THE SUBJECT TRAVELS WITH THE REQUEST, and only as a LIST FILTER. Two of the tables a
+      // deletion has to empty are ownership="public-read" (comment, report), so RLS does not
+      // narrow a read there and the sweep has to name the caller rows itself — through the
+      // declared owner columns, which a filter can address and `owner_id` cannot. Sending it
+      // grants nothing: every delete underneath still runs as this token, so a forged subject
+      // enumerates rows it cannot remove. The server answers `scoped: false` if it arrives
+      // empty, and this loop treats that as not-done rather than as success.
+      const who = global.auth.sub
+      let r = await deleteCall.send({ confirm: 'DELETE', sub: who })
       let passes = 1
       while (r.ok && r.data != null && r.data.done == false && passes < 60) {
-        r = await deleteCall.send({ confirm: 'DELETE' })
+        r = await deleteCall.send({ confirm: 'DELETE', sub: who })
         passes = passes + 1
       }
       dsx.variable.busy = false
@@ -511,7 +519,7 @@
             <hstack class="killRow">
               <image icon="minus" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
               <text class="killTxt" style="flex: 1; min-width: 0"
-                    value="Every comment you posted, and the account record itself."/>
+                    value="Every comment you posted, everyone you blocked, every report you filed, and the account record itself."/>
             </hstack>
           </vstack>
         </vstack>

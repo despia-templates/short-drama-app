@@ -168,12 +168,12 @@
          stacks a second copy of where you came from. Back is never href — href pushes. -->
     <action as="buyWholeSeries">
       if (dsx.variable.buyingSeries) { return }
-      // the basket is owned by an account: raise the sign-in sheet rather than spending a
-      // round trip to be told 401, and the viewer lands back on this show (docs/auth.md)
-      if (dsx.variable.signedIn == false) {
-        dsx.module.route.push({ path: '/auth/signin' })
-        return
-      }
+      // NO SIGN-IN GATE ON MONEY. Most revenue in this category never signs in, so a gate
+      // here is a revenue bug wearing a safety costume. `auth="required"` verifies a TOKEN,
+      // it does not ask who holds it — an anonymous session satisfies it unchanged, and the
+      // subject Postgres derives from that token owns the purchase exactly as a named one
+      // would. Sign-in is the UPSELL AFTER the purchase ("keep what you bought on another
+      // device"), never the toll in front of it.
       dsx.variable.buyingSeries = true
       const r = await buySeries.send({ show: vars.id })
       dsx.variable.buyingSeries = false
