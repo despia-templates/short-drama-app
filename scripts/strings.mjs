@@ -22,8 +22,10 @@
 //                                             keep every translation already in it
 //    node scripts/strings.mjs --unreachable   the strings the SEAM CANNOT REACH, which is
 //                                             the mechanical follow-up list rather than a
-//                                             guess: a11y labels, alt text, interpolated
-//                                             composites, and copy the server sends
+//                                             guess: a11y labels, alt text and interpolated
+//                                             composites
+//    node scripts/strings.mjs --server        just the SERVER tier — the copy a declared
+//                                             action sends to a display point (SERVER_COPY)
 //
 //  The extractor mirrors the framework's own (`cli/src/edit.ts collectDisplayStrings`,
 //  which serves the Studio's strings table) so a key produced here is a key the runtime
@@ -116,6 +118,11 @@ export function extract() {
       if (t.length > 0) add(keys, t, "inner");
     }
   }
+  // ONE CORPUS, NOT TWO. The server tier folds in here rather than beside, so `--write`,
+  // the coverage gate and the identical-to-English ratio all measure a locale against every
+  // string a reader sees — wherever it was authored. A caller that wants the tier alone
+  // asks `extractServer()`; nothing in this repo needs to.
+  for (const [k, files] of extractServer()) for (const f of files) add(keys, k, f);
   return { keys, unreachable };
 }
 
@@ -232,6 +239,136 @@ export function classify(key, files) {
   return "viewer";
 }
 
+//  ══ THE SERVER TIER, AND WHY IT IS THE SAME PLANE RATHER THAN A SECOND ONE ═══════════
+//  The Store's price list is not authored in markup. Plan names ("7-day pass"), the term
+//  note ("One charge for 7 days. No auto-renewal.") and the badge ("BEST VALUE") are
+//  fields on the rows `server/store.dsx storeCatalog` returns, and that is deliberate:
+//  they are the ONE copy of the price table (its header argues the case — three copies had
+//  already drifted, and the audit filed it as a blocker, because the price a screen
+//  DISPLAYS and the price a card is CHARGED must not be two literals). So they never
+//  passed through this extractor, thirteen tables reported 248/248, and a Japanese reader
+//  still bought in English off the app's most valuable screen.
+//
+//  THE FIX IS NOT A MECHANISM. It is noticing that the server is ALREADY returning keys.
+//  Under gettext the English source string IS the key, so "the backend sends English" and
+//  "the backend sends a translation key" are the same sentence — the key just happens to
+//  be readable. And the display point does not care where its template came from: the
+//  kernel's `localizeTemplate` normalizes `{{ item.note }}` to `{0}`, misses, renders the
+//  hole, and then looks up THE RENDERED FORM — the seam's "legacy door". So the string the
+//  server sent hits the table the same way `Save` does.
+//
+//  HOW EACH LANE GETS THE RIGHT STRING, since parity is the standing goal and a plane that
+//  only works in a browser would be no answer at all. There is one implementation of this
+//  per renderer and they are the same algorithm, read side by side rather than assumed:
+//    web      kernel/src/strings.ts        localizeTemplate  → "THE LEGACY DOOR"
+//    iOS      Engine/iOS/DSXStrings.swift  localizeTemplate  → the same comment, same order
+//    Android  .../engine/Strings.kt        localizeTemplate  → likewise
+//  All three read `Strings.<tag>.json` out of the same build registry down the same ladder
+//  (`global.locale` → device → en). The client resolves; the server never learns a locale.
+//  SSR is the same story and needs no special case: server/src/render.ts holds no reference
+//  to DSXStrings on purpose ("the server is rendering for MANY locales at once and knows
+//  exactly one of them: the one the app is AUTHORED in"), so a route SSRs English and
+//  `bindDisplay` swaps the translation in at mount — for a markup key and a server-sent key
+//  identically. Nothing about the price list behaves differently from `Sign in`.
+//
+//  WHAT WAS REJECTED, and why the code decided it rather than taste:
+//   · PER-REQUEST RESOLUTION ON THE SERVER (Accept-Language, or a locale argument on the
+//     call). It is the right answer for anything a CRAWLER or an EMAIL must read, and this
+//     app sends neither. Against it: `Accept-Language` is a browser header — the native
+//     lanes would have to pass an explicit argument, so the "one plane" would immediately
+//     be two, which is exactly the parity failure to avoid. It would also put a second
+//     table corpus on the backend, and render.ts already refuses the idea for a structural
+//     reason that has nothing to do with effort: `exportStatic` writes ONE document per
+//     route to disk and every reader is served it.
+//   · MOVING THE COPY INTO MARKUP and returning only prices and identifiers. Tempting, and
+//     wrong here for two reasons the source states. It re-creates the drift store.dsx's
+//     header exists to prevent (display copy in one file, the charged price in another),
+//     and the TIER SET IS OPERATOR DATA — markup would hard-code three passes, so a
+//     deployment adding a 90-day tier would render a card with no name. The one thing that
+//     argument was buying — translatability — is exactly what the plane above already gives
+//     the server for free, so the trade has nothing left on its side.
+//
+//  THE COST THAT COMES WITH KEEPING IT SERVER-SIDE, named rather than discovered later: the
+//  KEY SET GROWS WITH THE OPERATOR'S ROWS. Three tiers are three names and three notes; a
+//  fourth tier is two more keys in thirteen tables. The honest form of that would be one
+//  ICU template (`{days, plural, other {#-day pass}}`) covering every tier at one key, and
+//  it is not available: the Store is a server-rendered route, and `npm run verify` asserts
+//  no server-rendered route carries a raw message template (PLAN.md §6.101). So the cost is
+//  paid, and `npm run verify` makes it LOUD — the live-payload gate there fails the build
+//  when the running server sends a word no table carries.
+//
+//  WHICH FIELDS ARE COPY IS DECLARED, because nothing can infer it. A row is
+//  `{ id: 'vip_pass_7', label: '7-day pass', price: '$11.99', cents: 1199 }` and no rule
+//  distinguishes the name from the sku without being told which field a screen prints.
+//  `price` and `bonus` are deliberately absent: `$11.99` and `+5%` are formatted NUMBERS,
+//  which localise by `Intl` at the point of formatting and never by a string table.
+//  `reason` IS here and still comes out English — it cites `REVENUECAT_KEY` and a source
+//  path, so `classify()` files it DEVELOPER by the same rule it applies to markup. That is
+//  the tier working, not an omission.
+//
+//  AND THIS EXTRACTOR IS A CONVENIENCE, NOT THE AUTHORITY. It reads source, so it sees a
+//  field whose value is a literal (a ternary included) and cannot see one a body computes.
+//  That is fine, and it is why the real assertion lives in `npm run verify`, over the bytes
+//  a BOOTED origin actually answers with: source-reading is what fills the tables, and the
+//  running server is what proves them.
+const SERVER_COPY = {
+  "store.dsx": { storeCatalog: ["label", "note", "badge", "reason"] },
+};
+
+/** the body of one `<action as="NAME">`, whole-line `//` comments dropped. Only whole-line,
+ *  because a trailing strip would eat the `//` in a `'https://api.stripe.com/…'` literal. */
+function actionBody(src, name) {
+  const m = new RegExp(`<action\\s[^>]*as="${name}"[^>]*>([\\s\\S]*?)</action>`).exec(src);
+  if (m === null) return null;
+  return m[1].split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+}
+
+/** every quoted literal inside the VALUE of `field:` — the value's extent is walked rather
+ *  than regexed so a ternary (`reason: ok ? '' : 'This build …'`) yields both of its arms
+ *  and a comma inside a nested call never ends the value early. */
+function fieldLiterals(body, field) {
+  const out = [];
+  for (const head of body.matchAll(new RegExp(`(?:^|[{,\\s])${field}\\s*:`, "g"))) {
+    let i = head.index + head[0].length;
+    let depth = 0;
+    while (i < body.length) {
+      const ch = body[i];
+      if (ch === "'" || ch === '"') {
+        let j = i + 1, lit = "";
+        while (j < body.length && body[j] !== ch) {
+          if (body[j] === "\\") { lit += body[j + 1] ?? ""; j += 2; continue; }
+          lit += body[j]; j += 1;
+        }
+        if (lit.length > 0) out.push(lit);
+        i = j + 1;
+        continue;
+      }
+      if (ch === "(" || ch === "[" || ch === "{") depth += 1;
+      else if (ch === ")" || ch === "]") depth -= 1;
+      else if (ch === "}") { if (depth === 0) break; depth -= 1; }
+      else if (ch === "," && depth === 0) break;
+      i += 1;
+    }
+  }
+  return out;
+}
+
+/** the declared copy an action sends, keyed exactly as a markup literal is */
+export function extractServer(dir = "server") {
+  const keys = new Map();
+  for (const [file, actions] of Object.entries(SERVER_COPY)) {
+    const path = `${dir}/${file}`;
+    if (!existsSync(path)) continue;
+    const src = readFileSync(path, "utf8").replace(/<!--[\s\S]*?-->/g, "");
+    for (const [action, fields] of Object.entries(actions)) {
+      const body = actionBody(src, action);
+      if (body === null) continue;
+      for (const field of fields) for (const lit of fieldLiterals(body, field)) add(keys, lit, path);
+    }
+  }
+  return keys;
+}
+
 export function tableFiles(root = ".") {
   return readdirSync(root)
     .map((e) => /^Strings\.([a-z][a-z0-9-]*)\.json$/.exec(e))
@@ -267,12 +404,32 @@ if (process.argv[1] !== undefined && process.argv[1].endsWith("strings.mjs")) {
     console.log("                               string for copy, and a half-safe rule puts junk in");
     console.log("                               twelve tables — so it waits for the extractor the");
     console.log("                               framework generator will need anyway.");
-    console.log("  server copy                  prices, rejection messages and notice bodies are");
-    console.log("                               the server's words; they localize server-side.\n");
+    console.log("  server copy                  NO LONGER LISTED HERE, and the old note that said");
+    console.log("                               it 'localizes server-side' was wrong twice over: it");
+    console.log("                               does not, and it does not need to. A declared action");
+    console.log("                               field is extracted like any literal and resolves at");
+    console.log("                               the client display point — see SERVER_COPY above and");
+    console.log("                               --server. What is genuinely still English is the copy");
+    console.log("                               no action DECLARES: rejection messages and notice");
+    console.log("                               bodies, which are the same one-line extension.\n");
     for (const [k, files] of [...unreachable].sort()) {
       console.log(`  ${k}`);
       console.log(`      ${[...files].join(" ")}`);
     }
+    process.exit(0);
+  }
+
+  if (arg === "--server") {
+    const server = extractServer();
+    console.log(`${server.size} string(s) the DECLARED SERVER TIER contributes (SERVER_COPY):\n`);
+    for (const [k, files] of [...server].sort()) {
+      console.log(`  ${classify(k, files).padEnd(9)} ${JSON.stringify(k)}`);
+      console.log(`      ${[...files].join(" ")}`);
+    }
+    console.log("\nThese are keys exactly as a markup literal is: the English the action sends IS");
+    console.log("the table key, and the client display point resolves it on all three renderers.");
+    console.log("`npm run verify` asserts the same words over a BOOTED origin's payload, so a");
+    console.log("price list cannot go back to English without a gate going red.");
     process.exit(0);
   }
 
