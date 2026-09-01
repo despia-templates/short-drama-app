@@ -326,9 +326,10 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   `grow="true"` AND `style="flex: 1; min-height: 0"` on the root scroller, web still measures
   1440×900 and native finally gets a box. Removing the CSS in favour of the attribute alone
   REGRESSED the web (the page hugged its content instead of filling the window), so a port
-  that swaps is a port that breaks the shipped lane; a port that adds is free. The two
-  exceptions with no attribute twin today: main-axis centring (`justify-content` — upstream
-  #238) and `position: absolute` overlays, which need a `zstack` + `align` fallback beneath
+  that swaps is a port that breaks the shipped lane; a port that adds is free. The one
+  exception with no attribute twin today is `position: absolute` overlays (main-axis
+  alignment landed 2026-09-02, dev@6c5f185a: `justify-content: flex-start|center|flex-end`
+  reaches the Compose stack and a column's fixed frame — the old upstream #238), which need a `zstack` + `align` fallback beneath
   the web enhancement. `lineLimit` already works natively, so the nowrap/ellipsis trio and the
   `-webkit-line-clamp` box are correct as they stand — they are the web twins of an attribute
   that is already there. PLAN.md §6.43 counts what remains: 252 structural declarations.

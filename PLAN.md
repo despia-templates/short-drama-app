@@ -2634,9 +2634,11 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      shorthands, so every 1px hairline in this template (`TabBar.dsx:15`, `App.dsx:743`,
      `Show.dsx:446/506`, the Profile rows) is web-only and Android logs `border-top … inert` on every
      Home render. Landing it is a catalog key on four renderers plus three gates, both native stroke
-     paths, both bridges with `css-bridge.json` rows, and the web `borderDecls` emitter. Both are in
-     flight upstream as this is written; the template changes nothing for either — the markup is
-     already the right markup.
+     paths, both bridges with `css-bridge.json` rows, and the web `borderDecls` emitter. (a) LANDED upstream the same night (dev@6c5f185a): Android's fixed frames anchor per axis and
+     the three words reach the Compose arrangement — Play pill at 71.0% of screen height vs iOS 73.1%
+     (the residual is the two lanes' status/home bars). One iOS follow-up filed with it: a fixed-WIDTH
+     `hstack` under `justify-content: center` still sits leading on iOS. (b) is in flight; the
+     template changes nothing for either — the markup is already the right markup.
 
 119. **ANDROID'S ROUTE CHROME, INBOUND LINKS, BOOT SPLASH AND SYSTEM BARS NOW MATCH iOS** (found
      2026-09-02; fixed upstream dev@bbb14a66 · 10c3b381 · adec03fe). Four findings. (1) `Router.kt

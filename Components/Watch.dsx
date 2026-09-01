@@ -630,7 +630,8 @@
          level 1 with its key still true), so the drawer never closes except through here.
          TOP-DOWN, like the engine will do it: the child first, then the parent. -->
     <action as="closeDrawer">
-      dsx.variable.genreOpen = false
+      // The engine cascades the nested genre sheet when its parent closes (§6.114), so one
+      // write is the whole close; the child key is cleared by the ledger, on every lane.
       dsx.variable.drawer = false
     </action>
     <!-- and the one way IN, so the invariant "the drawer only ever moves through an action
@@ -645,14 +646,14 @@
          is a whole page — hero, episode grid, related rail — and it SHOULD take over the
          frame. Both sheets close first, because the router will not do it for us. -->
     <action as="goShow" inputs="id">
-      dsx.action.closeDrawer()
+      // No closeDrawer() first: the router closes the declared overlays before the swap on
+      // every lane now (§6.114, dev@d21d5eb7 · 19bd4afc · f1c22794), children included.
       dsx.module.route.push({ path: '/show/' + id })
     </action>
     <!-- and the door back out to the full, shareable, deep-linkable page. A sheet has no
          URL; this row is what keeps that affordance reachable from inside one. -->
     <action as="seeAllGenre">
       const g = dsx.variable.genre
-      dsx.action.closeDrawer()
       dsx.module.route.push({ path: '/browse/' + g })
     </action>
     <action as="saveNow" epid="dsx.variable.epId" epidx="dsx.variable.cur" locked="dsx.variable.epLocked">

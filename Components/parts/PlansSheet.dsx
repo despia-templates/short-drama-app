@@ -201,7 +201,7 @@
     </action>
     <action as="closeDetail">dsx.variable.detail = false</action>
     <action as="closePlans">
-      dsx.variable.detail = false
+      // One write: the engine cascades the nested detail sheet with its parent (§6.114).
       dsx.variable.open = false
     </action>
     <!-- the full page is a DESTINATION — rails, wallet, the whole benefit story — so this
@@ -209,7 +209,7 @@
          consult the overlay ledger, so a push from inside a sheet leaves it painted over
          the screen it just mounted (measured on the player's drawer, PLAN.md 6.95). -->
     <action as="openVipPage">
-      dsx.action.closePlans()
+      // No closePlans() first: reset closes the declared overlays before the swap (§6.114).
       // RESET, not push: /vip mounts the tab bar, and a push slides the whole frame with
       // the bar riding along — the founder's rule, and PLAN.md 6.29's reasoning from the
       // product side. A screen with a menu bar is entered laterally, never pushed.

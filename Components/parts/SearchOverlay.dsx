@@ -117,7 +117,8 @@
          result is a viewer who has finished searching. Nothing about the overlay is worth
          preserving behind it, so there is nothing for a level to keep. -->
     <action as="openShow" inputs="id">
-      dsx.action.closeSearch()
+      // The router closes the overlay before the swap (§6.114); clearing the query is a
+      // product choice and stays with closeSearch for the explicit close control.
       dsx.module.route.push({ path: '/show/' + id })
     </action>
 
