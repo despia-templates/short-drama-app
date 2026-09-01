@@ -302,6 +302,38 @@ in each market rather than the words a dictionary offers), they were checked in 
 clipping and wrapping at 390px, and they are good enough to demonstrate the plane and to start
 from. They are not a substitute for a linguist.
 
+### What had to be shortened, and for which control
+
+The tab bar is the tightest thing in the app: `Components/parts/TabBar.dsx` gives each slot
+`width="66" paddingH="4"` at `fontSize="11"` with no `lineLimit`, so the caption box is
+**58px** and an over-long caption *wraps* rather than clipping. Measured live at 390px, the
+widest caption any locale produces is ja `マイページ` at 55.0. These are the strings that had
+to give, with the faithful longer form each one displaced:
+
+| locale | key | shipped | rejected |
+|---|---|---|---|
+| de | `Home` | Start | Startseite (10, tab bar) |
+| de | `My List` | Liste | Meine Liste (11, tab bar — the full form survives on the `My list` sibling) |
+| de | `Save` / `Saved` | Merken / Gemerkt | Speichern / Gespeichert (the *state* arm is 11 against a 9-char rail) |
+| de | `Speed` · `Playback Speed` | Tempo · Wiedergabetempo | Geschwindigkeit · Wiedergabegeschwindigkeit |
+| de | `Show less` | Weniger lesen | Weniger anzeigen (16) |
+| fr | `Save` / `Saved` | Garder / Gardé | Enregistrer / Enregistré (11/12) |
+| fr | `Add days` | Prolonger | Ajouter des jours (a 129px pill against English's 84) |
+| fr | `Earn free` · `Get coins` | Gagner · Recharger | Pièces gratuites · Obtenir des pièces (a nowrap 2-up pill row) |
+| fr | `See plans` | Nos offres | Voir les offres (15) |
+| ja | `My List` | リスト | マイリスト (5 glyphs, tab bar) |
+| ja | `Get Coins` | チャージ | コインをチャージ (kept for `Top up coins`) |
+| ko | `Profile` | 내 정보 | 마이페이지 (kept for `Personal Center`) |
+| pt-br, it | `My List` | Lista | Minha lista · La mia lista |
+| tr | `Home` | Anasayfa | Ana Sayfa (the space is a wrap point) |
+| tr | `Saved` · `Following` | Kayıtlı · Takipte | Kaydedildi · Takip ediliyor |
+| tr | `Restore purchases` | Alımları geri yükle | Satın Alınanları Geri Yükle (Apple TR's own, 27) |
+| vi | `For You` · `My List` | Cho bạn · Danh sách | Dành cho bạn · Danh sách của tôi |
+
+Two that were left over budget on purpose, because the control has the room: fr
+`Supprimer mon commentaire` (25 against a 23.8 guideline, in a full-width sheet row) and
+id `Baru di sini?` (13 against 12.6 — every shorter option meant something else).
+
 Where we are least confident, in order:
 
 1. **`th` Thai** — the most distant from the rest and the hardest to self-check: word breaking
