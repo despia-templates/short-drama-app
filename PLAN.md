@@ -3400,3 +3400,42 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      lane. What stays different on Android and is named already: the paywall's
      `backdrop-filter: blur(22px)` is the material ladder's degradation (§6.64b), so the chrome
      under the wall shows faintly through the 45% scrim there where iOS blurs it away.
+
+168. **A `<sheet title=>` IS VISIBLE COPY AT A DISPLAY POINT THE SEAM DOES NOT REACH**
+     (found 2026-09-02 extracting the component tier; measured on the web lane).
+
+     The sheet's own chrome renders `title=` as the panel's heading and points
+     `aria-labelledby` at it, so it is both the accessible name AND a sentence the reader
+     sees. Measured at 390px on a PRESENTED sheet, because the CSS alone would only have
+     been an inference: `.dsx-sheet-chrome` lays out 390x53 with a bottom hairline and the
+     `<h2 class="dsx-sheet-title">` paints 60x19 at headline weight in grid-column 2. It is
+     visible copy, not an `sr-only` name.
+
+     And the seam is simply not wired there. `overlay-controls.ts sheet()` calls
+     `bindLabel(api, node.attrs["title"], heading)`, and `bindLabel` is
+     `api.bindText(expr, (v) => { target.textContent = boundedText(v) })` — no
+     `DSXStrings.localize`, where `mount.ts bindDisplay` has one. The same file localizes its
+     OWN chrome strings two lines above (`aria-label` on the grabber and the close control),
+     which is what makes this an oversight rather than a policy: the framework's words go
+     through the seam and the author's do not. Exactly as `native-controls.ts` never calls it
+     for a choice control's options (§6.98). `<sheet title="What VIP includes">` in
+     `Components/parts/PlansSheet.dsx` therefore renders four English words at the top of an
+     otherwise complete Japanese panel, with a 100% coverage report beside it.
+
+     **WHY IT IS FILED HERE RATHER THAN FIXED IN PLACE.** The template has no reachable
+     spelling for it. Interpolating the attribute changes nothing — the seam is not wired at
+     that point at all, so `title="{{ … }}"` resolves and is then rendered raw — and JSE
+     still has no `localize()` (§6.98), so a computed cannot translate the string before
+     handing it over. Moving the words into the body would give up the accessible name,
+     which a level-2 dialog must have. So the string stays English and
+     `node scripts/strings.mjs --unreachable` lists it under its own heading rather than
+     letting it hide inside the `title:` rows, which is where it sat until the component
+     tier separated the two meanings of that attribute name.
+
+     **THE ASK.** Run `title=` through `DSXStrings.localize` where the sheet chrome builds
+     its heading, on all three renderers — it is display copy by construction, and the same
+     one-line change §6.98 asks for at the option builders. `action=` is the sibling case in
+     the same function — the author's action label reaches `actionLabel.textContent` through
+     `api.bindText` and never the seam, while `close=`'s own aria-label already goes through
+     it. Corpus-pinnable in `Conformance/strings/cases.json`: one sheet, one translated
+     title, one absent, asserting the miss is identity.

@@ -1072,7 +1072,7 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
   // is skipped silently by the loader (fail-open, Article 7), and an app that silently
   // stayed English is precisely what this catches.
   {
-    const { extract, classify, tableFiles, extractServer, SERVER_COPY } =
+    const { extract, classify, tableFiles, extractServer, SERVER_COPY, DISPLAY_TAGS } =
       await import(pathToFileURL(resolve(root, "scripts/strings.mjs")).href);
     const { keys } = extract();
     const viewer = [...keys.keys()].filter((k) => classify(k, keys.get(k)) === "viewer");
@@ -1201,6 +1201,107 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
       `${JSON.stringify(unseen.slice(0, 3))} reached the wire but no SERVER_COPY field yields it from source, ` +
       "so `--write` will never offer it to a translator and the coverage gate will never miss it. " +
       "Either the field is undeclared, or its value is computed where scripts/strings.mjs reads literals");
+
+    // ── AND THE MOUNT COPY A BOOTED ORIGIN ACTUALLY SERVES ────────────────────────────
+    // The THIRD tier, and it went missing for the same reason the price list did: the copy
+    // is authored at one point and DISPLAYED at another. `<SignInCard title="Purchases land
+    // on an account">` is a literal in Store.dsx that reaches `<text value="{{ dsx.attribute
+    // .title }}">` inside the child, so the kernel localizes it — but `title` sat in the
+    // extractor's UNREACHABLE list, nothing ever read a caller's attribute, and thirteen
+    // tables reported 255/255 while /store rendered two English sentences in Japanese.
+    //
+    // WHY NO EXISTING GATE COULD HAVE FOUND IT, which is the whole reason this one reads
+    // what it reads. Measured on this origin before the gate was written: not one of these
+    // fifteen strings appears in the SSR html of ANY of the fifteen routes. Every mount is
+    // behind a signed-out condition or a sheet's `present=`, and render.ts drops a node
+    // whose `visible-if` is falsy — correctly, because a server that has not asked who you
+    // are must not paint a signed-out card. So the tier is invisible to an html-reading
+    // assertion by construction, and only appears in a hydrated client with a session.
+    //
+    // WHAT THE ORIGIN DOES SERVE is `/registry.json` — the artefact the browser boots from,
+    // carrying every component's compiled tree. So this walks THAT, over HTTP, from the
+    // running server: the same shape as asking /store/catalog what words it sends, one door
+    // along. It catches what source-reading structurally cannot, and the first item is the
+    // hazard AGENTS.md opens with: a STALE dist behind a running origin (PLAN.md §6.39) —
+    // the source says one thing, the bytes the client receives say another, and every static
+    // gate is green. It also catches a compiler that stops preserving the attribute, and any
+    // string that reaches a client without the extractor being able to see it.
+    //
+    // THE READ IS THE ARTEFACT'S OWN, not a re-derivation: DISPLAY_TAGS comes from
+    // scripts/strings.mjs (one copy of the mirror of the dom layer's bindDisplay sites), and
+    // a mount tag is resolved through the registry's OWN `globalPool` — the same bare-name
+    // table the client uses to resolve `<SignInCard>` — rather than by guessing at
+    // capitalisation.
+    const served = await fetch(`${base}/registry.json`).then((r) => r.json());
+    const servedComponents = served.components ?? {};
+    const bare = (tag) => servedComponents[served.globalPool?.[tag] ?? ""] ?? null;
+    const eachNode = (node, fn) => {
+      if (node === null || node === undefined || typeof node !== "object") return;
+      if (Array.isArray(node)) { for (const n of node) eachNode(n, fn); return; }
+      fn(node);
+      eachNode(node.children, fn);
+    };
+    // which attributes land at a display point, read out of the BUILT tree. Same rule the
+    // extractor applies to source: the whole attribute, one hole, a bare read.
+    const BARE_READ = /^\{\{\s*dsx\.attribute\.([A-Za-z_]\w*)\s*\}\}$/;
+    const servedDisplays = new Map();
+    for (const [id, comp] of Object.entries(servedComponents)) {
+      const lands = new Map();
+      eachNode(comp.root, (n) => {
+        const display = DISPLAY_TAGS[n.tag];
+        if (display === undefined || n.attrs?.bind !== undefined) return;
+        const read = BARE_READ.exec(String(n.attrs?.[display] ?? "").trim());
+        if (read !== null) lands.set(read[1], "");
+      });
+      if (lands.size === 0) continue;
+      for (const decl of comp.head?.attributes ?? []) {
+        if (!lands.has(decl.as)) continue;
+        const lit = /^'([^']*)'$/.exec(String(decl.default ?? "").trim());
+        if (lit !== null) lands.set(decl.as, lit[1]);
+      }
+      servedDisplays.set(id, lands);
+    }
+    // every string a mount hands one of them, with the component that supplies it — because
+    // provenance is what classify() reads, and the same card is viewer copy on Store and
+    // operator copy on Admin.
+    const mountCopy = new Map();
+    for (const comp of Object.values(servedComponents)) {
+      eachNode(comp.root, (n) => {
+        const child = bare(n.tag);
+        const lands = child === null ? undefined : servedDisplays.get(`${child.scheme}.${child.name}`);
+        if (lands === undefined) return;
+        for (const [attr, fallback] of lands) {
+          const v = n.attrs?.[attr];
+          const word = v === undefined ? fallback : String(v);
+          if (word === "" || word.includes("{{")) continue;
+          if (!mountCopy.has(word)) mountCopy.set(word, new Set());
+          mountCopy.get(word).add(`${comp.name}.dsx`);
+        }
+      });
+    }
+    // THE PAIRED POSITIVE. Every negative below passes beautifully on a registry where no
+    // component displays an attribute at all — which is exactly what a compiler regression
+    // or a wrong `globalPool` read would look like from here.
+    check(`the served registry hands mounts copy to translate (${servedDisplays.size} component(s), ${mountCopy.size} strings)`,
+      servedDisplays.size > 0 && mountCopy.size > 0,
+      `/registry.json declared ${Object.keys(servedComponents).length} component(s) and ${servedDisplays.size} with an attribute at a ` +
+      "display point — if that is zero the walk found nothing and every assertion below is vacuous");
+    const mountViewer = [...mountCopy].filter(([w, files]) => classify(w, files) === "viewer").map(([w]) => w);
+    for (const tag of Object.keys(shipped)) {
+      const english = mountViewer.filter((w) => typeof shipped[tag][w] !== "string" || shipped[tag][w] === "");
+      check(`the ${tag} locale translates the copy mounts pass to components (${mountViewer.length})`,
+        english.length === 0,
+        `${english.length} of the strings this origin hands a <text value="{{ dsx.attribute.… }}"> have no ${tag} entry ` +
+        `in the built registry — e.g. ${english.slice(0, 3).map((w) => JSON.stringify(w.slice(0, 40))).join(" · ")}. ` +
+        `That is an English sentence inside a ${tag} screen: run node scripts/strings.mjs --write ${tag}, translate, rebuild`);
+    }
+    const fromMarkup = new Set(keys.keys());
+    const unseenMounts = [...mountCopy.keys()].filter((w) => !fromMarkup.has(w));
+    check(`the extractor can see every string the origin hands a mount (${mountCopy.size})`, unseenMounts.length === 0,
+      `${JSON.stringify(unseenMounts.slice(0, 3))} is in the component tree this origin serves but ` +
+      "scripts/strings.mjs does not yield it from Components/**. Either dist/ is stale (rebuild, then restart " +
+      "`npm run serve` — PLAN.md §6.39), or componentDisplayAttrs and the compiler no longer agree about " +
+      "which attributes reach a display point");
 
     // ── THE PLURAL PLANE IS EXERCISED, AND ARABIC IS WHY ──────────────────────────────
     // A locale is not measured only by how many keys it fills. A `{n, plural, …}` entry

@@ -26,6 +26,9 @@
 //                                             composites
 //    node scripts/strings.mjs --server        just the SERVER tier — the copy a declared
 //                                             action sends to a display point (SERVER_COPY)
+//    node scripts/strings.mjs --components    just the COMPONENT tier — which attributes a
+//                                             caller may fill with copy, DERIVED from the
+//                                             children rather than declared
 //
 //  The extractor mirrors the framework's own (`cli/src/edit.ts collectDisplayStrings`,
 //  which serves the Studio's strings table) so a key produced here is a key the runtime
@@ -33,10 +36,14 @@
 //  re-check.
 //
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
+import { basename } from "node:path";
 import { componentFiles } from "./theme.mjs";
 
-/** display attribute per tag — the mirror of the dom layer's bindDisplay call sites */
-const DISPLAY_TAGS = {
+/** display attribute per tag — the mirror of the dom layer's bindDisplay call sites.
+ *  EXPORTED because `npm run verify` walks the BUILT component trees a booted origin serves
+ *  and has to ask the same question of them; a second copy of this table over there is a
+ *  place for the source read and the artefact read to disagree. */
+export const DISPLAY_TAGS = {
   text: "value", label: "value",
   button: "label", pressable: "label", glassButton: "label", transport: "label", row: "label",
   textfield: "placeholder", input: "placeholder", securefield: "placeholder", searchbar: "placeholder",
@@ -57,6 +64,91 @@ const UNREACHABLE_ATTRS = ["a11yLabel", "a11yValue", "a11yHint", "alt", "title",
 const TAG = /<([A-Za-z][\w.]*)\s([^>]*?)\/?>/gs;
 const ATTR = /([\w:.-]+)="([^"]*)"/g;
 
+//  ══ THE COMPONENT TIER: COPY THE CALLER WRITES AND THE CHILD DISPLAYS ════════════════
+//  A third tier missed the tables for the same reason the price list did, and it is worth
+//  saying plainly because the two look alike and the FIX is not alike at all.
+//
+//  `<SignInCard title="Purchases land on an account">` is a markup literal in Store.dsx.
+//  It is not at a display point: `SignInCard` is a file component, and the string reaches
+//  `<text value="{{ dsx.attribute.title }}">` one hop away, inside the child. The kernel
+//  does not care — an interpolation resolves and `bindDisplay` looks up WHAT IT RENDERED
+//  (the seam's legacy door, the same one the server tier walks through), so the table would
+//  hit. Only this extractor cared: `title` sat in UNREACHABLE_ATTRS, no rule ever read a
+//  caller's attribute, and thirteen complete tables reported 100% while a Japanese reader saw
+//  two English sentences on the money screen. Measured at 390px on /store with `uiLocale=ja`
+//  before this existed, and it was never one card: fifteen viewer strings across the guest
+//  cards and the device link prompts on Home, My List, VIP, Rewards, My Page, Profile,
+//  Account and Store.
+//
+//  THE RULE IS DERIVED, NOT DECLARED, and that is the whole difference from SERVER_COPY.
+//  A store row is `{ id, label, price, cents }` and NOTHING in the source says which field a
+//  screen prints, so that tier needs a manifest and pays for it (a new copy field is a line
+//  nobody remembers to add — which is exactly why the verify gate reads a booted origin).
+//  A component is not data. The child ALREADY declares where each attribute lands, in the
+//  markup it needs for its own sake:
+//
+//      <attribute as="title" default="'Sign in to continue'"/>   ← the name
+//      <text value="{{ dsx.attribute.title }}" class="title"/>   ← the display point
+//
+//  so `componentDisplayAttrs()` reads that pair out of every file in Components/** and the
+//  manifest writes itself. Delete the `<text>` and the attribute stops being copy on the
+//  next run; add one and every caller's string joins the corpus with nothing to update.
+//  There is no second list to drift, which is the property SERVER_COPY cannot have.
+//
+//  AND IT CANNOT CONFLATE `title` WITH `title`, because the map is keyed by COMPONENT and
+//  the difference between the two was never the attribute name — it is the tag:
+//    · `<sheet title="What VIP includes">`  the panel's ACCESSIBLE NAME, rendered by the
+//      kernel's own sheet chrome. There is no template of ours behind it, `sheet` is not a
+//      file in Components/**, so it is absent from the map and stays in UNREACHABLE_ATTRS
+//      where it belongs — a real gap, filed, and not one a caller can close.
+//    · `<SignInCard title="…">`  a mount of a component that declares that attribute at a
+//      display point. One hop, and the seam reaches it.
+//  Same six letters, two mechanisms, and the code tells them apart by reading the child
+//  rather than by being told. `Skeleton` is the control case: capitalised, mounted 25 times,
+//  a framework global with no file here — so it is not in the map and never will be.
+//
+//  THE READ IS DELIBERATELY TIGHT. An attribute counts only when the display value is the
+//  WHOLE attribute and a BARE read (`value="{{ dsx.attribute.note }}"`). That excludes the
+//  two shapes in this repo that would otherwise look like copy and are not: AdGate's
+//  `"{{ dsx.attribute.today }}/{{ dsx.attribute.cap }} today"` is a concatenation, so no
+//  caller value is ever a rendered form on its own; PersonalNav's
+//  `"{{ dsx.attribute.uid == '' ? 'Signed out' : … }}"` renders its own literals, which the
+//  ternary rule below already extracts at the child. Loosening this rule would put a UID and
+//  two counters into thirteen tables.
+const MOUNT = /<([A-Za-z][\w.]*)(\s[^>]*?)?\/?>/gs;
+const ATTRIBUTE_DECL = /<attribute\s([^>]*?)\/?>/gs;
+const BARE_ATTRIBUTE_READ = /^\{\{\s*dsx\.attribute\.([A-Za-z_]\w*)\s*\}\}$/;
+const DEFAULT_LITERAL = /^'([^']*)'$/;
+
+/** component name -> Map(attribute that lands at a display point -> its `default=` literal,
+ *  or "" when the default is absent or is not a bare string). Read out of the components
+ *  themselves; nothing here is hand-maintained. */
+export function componentDisplayAttrs(files = componentFiles()) {
+  const out = new Map();
+  for (const f of files) {
+    const body = markup(readFileSync(f, "utf8"));
+    const lands = new Set();
+    for (const m of body.matchAll(TAG)) {
+      const display = DISPLAY_TAGS[m[1]];
+      if (display === undefined) continue;
+      const a = attrs(m[2]);
+      if (a["bind"] !== undefined) continue;
+      const read = BARE_ATTRIBUTE_READ.exec((a[display] ?? "").trim());
+      if (read !== null) lands.add(read[1]);
+    }
+    if (lands.size === 0) continue;
+    const fallbacks = new Map([...lands].map((k) => [k, ""]));
+    for (const m of body.matchAll(ATTRIBUTE_DECL)) {
+      const a = attrs(m[1]);
+      if (!lands.has(a["as"])) continue;
+      const lit = DEFAULT_LITERAL.exec((a["default"] ?? "").trim());
+      if (lit !== null) fallbacks.set(a["as"], lit[1]);
+    }
+    out.set(basename(f, ".dsx"), fallbacks);
+  }
+  return out;
+}
+
 //  XML ENTITIES ARE DECODED BEFORE THE STRING BECOMES A KEY, and getting this wrong is
 //  invisible until you look at the running app. The kernel localizes the RENDERED text, so
 //  the key it looks up for `value="My List &amp;amp; History"` is `My List & History`. Keyed
@@ -71,57 +163,111 @@ function attrs(blob) {
   return out;
 }
 
+//  THE MARKUP OF A COMPONENT, WITH BOTH KINDS OF COMMENT GONE. `<!-- -->` was always
+//  stripped — a code sample in documentation is not copy. The second kind bit as soon as
+//  the mount sweep below started reading tags a caller wrote: `<action>` and `<variable>`
+//  bodies are JSE, and Store.dsx line 180 says
+//      // The <SignInCard> at the top of this screen is then an offer, not a gate.
+//  which is a sentence about a mount, not a mount. Read as one it has no attributes, so
+//  every attribute falls back and the sweep filed SignInCard's `default=` ("Sign in to
+//  continue") as a string the Store renders. It does not, and thirteen translators would
+//  have been asked for it.
+//  WHOLE-LINE ONLY, for the reason `actionBody` states further down: a trailing strip eats
+//  the `//` in a `'https://…'` literal, and here it would also eat the tail of any markup
+//  attribute holding a URL.
+function markup(src) {
+  return src.replace(/<!--[\s\S]*?-->/g, "").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+}
+
 /** every static display string in Components/**, with the files that render it */
 export function extract() {
   const keys = new Map();       // source string -> Set(file)
   const unreachable = new Map();
+  const displayAttrs = componentDisplayAttrs();
+
+  //  ONE ANSWER TO "WHAT DOES THIS VALUE RENDER AS", shared by the two display points that
+  //  ask it: a `<text value=>` in a component, and the attribute a caller hands a mount of
+  //  one. They are the same seam one hop apart, so a second copy of this rule here would be
+  //  a place for them to disagree — and disagreeing silently is the whole family of defect
+  //  this file exists to close.
+  const rendered = (v, where, f) => {
+    const icu = icuKey(v);
+    if (icu !== null) {
+      // A MESSAGE TEMPLATE IS ITS OWN KEY, WITH THE HOLES INTACT. The framework's
+      // message tier (kernel message.ts, wired into the display point by dom
+      // mount.ts) normalizes `{n, plural, one {# x} other {# xs}}` to
+      // `{0, plural, one {# x} other {# xs}}` and looks THAT up, resolving the
+      // count after the hit — so one entry serves every value of n and each locale
+      // picks its own CLDR category. That is the only spelling in which Arabic can
+      // state six forms; a `== 1` ternary can state two.
+      add(keys, icu, f);
+      return;
+    }
+    if (v.includes("{{")) {
+      // AN INTERPOLATION RESOLVES BEFORE THE SEAM — AND THE SEAM READS WHAT COMES OUT.
+      // This branch used to file every interpolated value as unreachable, which is
+      // half true and cost real coverage. `bindDisplay` is
+      //     () => DSXStrings.localize(expr.includes("{{") ? interpolate(expr) : expr)
+      // so the RENDERED form is looked up. `EP 1–{{ n }} Free` renders "EP 1–5 Free"
+      // and will never match a table, correctly. But a ternary over string LITERALS
+      // renders one of those literals byte-for-byte, and the table hits.
+      //
+      // Measured before it was believed: `<text value="{{ favOn ? 'Saved' : 'My List' }}">`
+      // on /show renders "Liste" with `global.locale = 'de'`. Thirty-six literals sat in
+      // the follow-up list carrying the app's most-tapped words — Follow / Following,
+      // Claim / Claimed, See plans, Restore purchases, Sign in — so twelve otherwise
+      // complete locales all showed English on their VIP call to action.
+      for (const lit of ternaryLiterals(v)) add(keys, lit, f);
+      add(unreachable, `${where}: ${v}`, f);
+      return;
+    }
+    add(keys, v, f);
+  };
+
   for (const f of componentFiles()) {
-    const src = readFileSync(f, "utf8");
-    // strip comments: a code sample inside one is documentation, not copy
-    const body = src.replace(/<!--[\s\S]*?-->/g, "");
+    const body = markup(readFileSync(f, "utf8"));
     for (const m of body.matchAll(TAG)) {
       const tag = m[1];
       const a = attrs(m[2]);
       const display = DISPLAY_TAGS[tag];
       if (display !== undefined && a["bind"] === undefined) {
         const v = a[display];
-        if (typeof v === "string" && v.length > 0) {
-          if (icuKey(v) !== null) {
-            // A MESSAGE TEMPLATE IS ITS OWN KEY, WITH THE HOLES INTACT. The framework's
-            // message tier (kernel message.ts, wired into the display point by dom
-            // mount.ts) normalizes `{n, plural, one {# x} other {# xs}}` to
-            // `{0, plural, one {# x} other {# xs}}` and looks THAT up, resolving the
-            // count after the hit — so one entry serves every value of n and each locale
-            // picks its own CLDR category. That is the only spelling in which Arabic can
-            // state six forms; a `== 1` ternary can state two.
-            add(keys, icuKey(v), f);
-          } else if (v.includes("{{")) {
-            // AN INTERPOLATION RESOLVES BEFORE THE SEAM — AND THE SEAM READS WHAT COMES OUT.
-            // This branch used to file every interpolated value as unreachable, which is
-            // half true and cost real coverage. `bindDisplay` is
-            //     () => DSXStrings.localize(expr.includes("{{") ? interpolate(expr) : expr)
-            // so the RENDERED form is looked up. `EP 1–{{ n }} Free` renders "EP 1–5 Free"
-            // and will never match a table, correctly. But a ternary over string LITERALS
-            // renders one of those literals byte-for-byte, and the table hits.
-            //
-            // Measured before it was believed: `<text value="{{ favOn ? 'Saved' : 'My List' }}">`
-            // on /show renders "Liste" with `global.locale = 'de'`. Thirty-six literals sat in
-            // the follow-up list carrying the app's most-tapped words — Follow / Following,
-            // Claim / Claimed, See plans, Restore purchases, Sign in — so twelve otherwise
-            // complete locales all showed English on their VIP call to action.
-            for (const lit of ternaryLiterals(v)) add(keys, lit, f);
-            add(unreachable, `${tag}.${display}: ${v}`, f);
-          } else add(keys, v, f);
-        }
+        if (typeof v === "string" && v.length > 0) rendered(v, `${tag}.${display}`, f);
       }
+      const lands = displayAttrs.get(tag.split(".").pop());
       for (const k of UNREACHABLE_ATTRS) {
+        // ...UNLESS THIS TAG IS A MOUNT THAT DISPLAYS THAT ATTRIBUTE. `title` on a `<sheet>`
+        // is the panel's accessible name and genuinely out of reach; `title` on a mount of a
+        // component that declares it at a display point is one hop from a `<text value=>`,
+        // and the loop below keys it. Listing it in both places would report the same string
+        // as covered and as unreachable, which is worse than either alone.
+        if (lands !== undefined && lands.has(k)) continue;
         const v = a[k];
         if (typeof v === "string" && v.length > 0 && !v.includes("{{")) add(unreachable, `${k}: ${v}`, f);
       }
     }
-    // JSE bodies: a literal handed to localize() is a key the kernel will look up.
+    // JSE bodies: a literal handed to localize() is a key the kernel will look up. It reads
+    // the same comment-stripped body the sweeps below do, which is right for it too: a
+    // `localize('x')` inside a `//` line is a sentence about a call, not a call.
     for (const k of localizeCallKeys(body)) add(keys, k, f);
-    if (false) {
+    // A MOUNT'S ATTRIBUTES, keyed at the MOUNT SITE rather than at the child. Provenance is
+    // what `classify()` reads, and the same card is viewer copy on Store and operator copy
+    // on Admin — the string is rendered by the screen that supplies it, so that is the file
+    // recorded. (Hence a separate pass with its own regex: TAG requires an attribute, and
+    // `<ContactRow/>` — every attribute defaulted — is a legal mount that must still count.)
+    for (const m of body.matchAll(MOUNT)) {
+      const lands = displayAttrs.get(m[1].split(".").pop());
+      if (lands === undefined) continue;
+      const a = attrs(m[2] ?? "");
+      for (const [name, fallback] of lands) {
+        const v = a[name];
+        // AN OMITTED ATTRIBUTE RENDERS THE CHILD'S `default=`, so that literal is a key at
+        // this mount and nowhere else. Written defensively and load-bearing within the week:
+        // `<SearchOverlay>` in TopNav.dsx omits `placeholder`, so "Search dramas" is a string
+        // the nav renders and no `<textfield placeholder=>` anywhere states.
+        if (v === undefined) { if (fallback !== "") add(keys, fallback, f); continue; }
+        if (v.length > 0) rendered(v, `${m[1]}.${name}`, f);
+      }
     }
     // <text>inner text</text> with no value= — the other half of the text display point
     for (const m of body.matchAll(/<text(?![\w])([^>]*)>([^<{}]+)<\/text>/g)) {
@@ -426,11 +572,47 @@ if (process.argv[1] !== undefined && process.argv[1].endsWith("strings.mjs")) {
     console.log("                               the client display point — see SERVER_COPY above and");
     console.log("                               --server. What is genuinely still English is the copy");
     console.log("                               no action DECLARES: rejection messages and notice");
-    console.log("                               bodies, which are the same one-line extension.\n");
+    console.log("                               bodies, which are the same one-line extension.");
+    console.log("  a mount's attribute          ALSO NO LONGER LISTED, and this one was hiding under");
+    console.log("                               `title:`. Copy a caller hands a file component reaches");
+    console.log("                               a <text value=> inside the child, so the seam resolves");
+    console.log("                               it — see componentDisplayAttrs above and --components.");
+    console.log("                               `title` on a <sheet> stays here, and the two are told");
+    console.log("                               apart by the TAG rather than by the name.");
+    console.log("  <sheet title=>               the panel's ACCESSIBLE NAME, rendered by the kernel's");
+    console.log("                               own sheet chrome — measured 390x53 with the heading");
+    console.log("                               painted, so it is VISIBLE copy at a display point this");
+    console.log("                               app does not own (`bindLabel`, not `bindDisplay`).");
+    console.log("                               Filed as PLAN.md §6.168; the same upstream ask as the");
+    console.log("                               a11y row above: run chrome copy through the seam.\n");
     for (const [k, files] of [...unreachable].sort()) {
       console.log(`  ${k}`);
       console.log(`      ${[...files].join(" ")}`);
     }
+    process.exit(0);
+  }
+
+  if (arg === "--components") {
+    const map = componentDisplayAttrs();
+    const total = [...map.values()].reduce((n, m) => n + m.size, 0);
+    console.log(`${total} attribute(s) on ${map.size} component(s) land at a display point.\n`);
+    console.log("NOTHING BELOW IS DECLARED. Each row is read out of the component itself — an");
+    console.log("`<attribute as=>` whose name appears as the WHOLE value of a display attribute");
+    console.log("(`value=\"{{ dsx.attribute.note }}\"`). So a caller's string is copy because the");
+    console.log("child says where it lands, and there is no manifest here to fall out of date.\n");
+    for (const [name, lands] of [...map].sort()) {
+      console.log(`  <${name}>`);
+      for (const [attr, fallback] of [...lands].sort()) {
+        console.log(`      ${attr.padEnd(10)} default ${fallback === "" ? "— (none, or not a bare string)" : JSON.stringify(fallback)}`);
+      }
+    }
+    console.log("\nEvery value a mount supplies for one of these is keyed AT THE MOUNT, so the same");
+    console.log("card is viewer copy on Store and operator copy on Admin. An attribute a mount omits");
+    console.log("renders the default above, which is then the key that mount contributes.");
+    console.log("`npm run verify` asserts the same thing over the artefact a BOOTED origin serves —");
+    console.log("/registry.json, the compiled trees the browser boots from. NOT the SSR html: not one");
+    console.log("of these strings appears in the served body of any route, because every mount sits");
+    console.log("behind a signed-out condition or a sheet and render.ts drops a falsy visible-if.");
     process.exit(0);
   }
 

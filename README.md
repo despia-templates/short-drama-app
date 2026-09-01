@@ -103,6 +103,7 @@ node scripts/strings.mjs                  # locale coverage per language
 node scripts/strings.mjs --write pt-br    # refresh a locale table against the current source
 node scripts/strings.mjs --unreachable    # the strings the localisation seam cannot reach
 node scripts/strings.mjs --server         # the copy the BACKEND sends to a display point
+node scripts/strings.mjs --components     # which component attributes a caller may fill with copy
 ```
 
 **A UI or backend change means rebuild, then restart `npm run serve`** — the site registry is
@@ -491,16 +492,17 @@ something:
 
 | | |
 |---|---|
-| **255 viewer** | product copy — what a locale is measured against, and all thirteen are at 100%. Seven of them are the SERVER's words (below) |
-| **44 operator** | rendered only by the Manage surface: an internal tool, deliberately English |
+| **304 viewer** | product copy — what a locale is measured against, and all thirteen are at 100%. Seven of them are the SERVER's words, and fifteen are copy a screen hands a component (both below) |
+| **45 operator** | rendered only by the Manage surface: an internal tool, deliberately English |
 | **17 developer** | copy that cites a source path — the server's `reason` field is one of them, a config key or a ledger entry. Translating "set `authSignInUrl` in App.json `consts`" makes the instruction *wrong* in the target language |
-| **253 unreachable** | the seam's real boundary, listed by `--unreachable` rather than guessed |
+| **273 unreachable** | the seam's real boundary, listed by `--unreachable` rather than guessed |
 
 That last row is the honest part. Two things the seam does not reach, each needing a
-different answer: **a11y labels** (the kernel localizes display points only, so a screen reader
-hears English on a Spanish device — an upstream ask) and **interpolated composites**
-(`EP 1–{{ n }} Free` renders `EP 1–5 Free`, which no table can hold; the scheduled Translate
-module owns that tier).
+different answer: **a11y labels and sheet chrome titles** (the kernel localizes display points
+only, so a screen reader hears English on a Spanish device — and `<sheet title=>` is *visible*
+copy at a display point this app does not own, measured and filed as PLAN.md §6.168), and
+**interpolated composites** (`EP 1–{{ n }} Free` renders `EP 1–5 Free`, which no table can hold;
+the scheduled Translate module owns that tier).
 
 ### The price list is the server's words, and it is the same plane
 
@@ -556,6 +558,51 @@ extractor can *see* every word the wire sends, which is the door source-reading 
 cannot close (a key that leaves the corpus leaves the tables merely *stale*, and stale has never
 been a failure). Both were proved by making them fail. PLAN.md §6.107.
 
+### And the copy a screen hands a component, which is the same plane again
+
+**A third tier missed the tables for the same reason, and the fix is not the same at all.**
+`<SignInCard title="Purchases land on an account">` is a markup literal on the screen that
+mounts it; it renders at `<text value="{{ dsx.attribute.title }}">` inside the child, one hop
+away, so the kernel resolves it through the very same legacy door. Only the extractor cared:
+`title` sat in the unreachable list, no rule ever read a caller's attribute, and thirteen tables
+reported 100% while `/store` showed two English sentences at 390px under `uiLocale=ja`.
+
+**This one is DERIVED, not declared, and that is the difference from `SERVER_COPY`.** A store
+row is data — nothing in it says which field a screen prints, so that tier needs a manifest and
+pays for it. A component is *source*, and the child already declares where each attribute lands,
+in the markup it needs for its own sake:
+
+```
+<attribute as="title" default="'Sign in to continue'"/>   ← the name
+<text value="{{ dsx.attribute.title }}" class="title"/>   ← the display point
+```
+
+`componentDisplayAttrs()` reads that pair out of every file in `Components/**`, so the manifest
+writes itself and there is no second list to drift: delete the `<text>` and the attribute stops
+being copy on the next run; add one and every caller's string joins the corpus. The redesign
+proved it without an edit — the rule found **15 attributes on 7 components** (`SignInCard`,
+`LinkPrompt`, `ContactRow`, `PlanCard`, `CoverCard`, `BuyButton`, `SearchOverlay`) where the
+pass that wrote it had seen 4 on 2.
+
+It cannot confuse `<sheet title=>` with a mount's `title=`, because the map is keyed by
+**component**: `sheet` is a kernel tag with no template here, so it stays unreachable (§6.168),
+and `Skeleton` — capitalised, mounted 25 times, a framework global with no file — is the control
+case. The read is deliberately tight, the *whole* display value and a *bare* attribute read,
+which is what keeps `{{ today }}/{{ cap }} today` and a bound show title out of thirteen tables:
+a mount that passes `{{ item.title }}` is an interpolation and files as unreachable, a mount that
+passes a literal is copy. `node scripts/strings.mjs --components` prints what it derived.
+
+**The gate had to read the artefact rather than the html, and the measurement is why.** Not one
+of these strings appears in the SSR body of *any* route: every mount sits behind a signed-out
+condition or a sheet, and `render.ts` correctly drops a node whose `visible-if` is falsy. So
+`npm run verify` fetches `/registry.json` off the booted origin — what the browser actually boots
+from — walks the compiled component trees, resolves each mount tag through the registry's own
+`globalPool`, and requires every locale to answer the copy a mount hands a child; a second
+assertion requires the extractor to *see* every such string the origin ships, which is what a
+stale `dist/` breaks (§6.39). Proved by injection: blanking the display points fails the paired
+positive while every negative passes vacuously at zero, and swapping one served mount string
+leaves all thirteen source-reading coverage gates green while both live assertions go red.
+
 **A ternary is not a composite, and getting that wrong cost 29 strings.** `bindDisplay`
 localizes the string it *renders*, so `<text value="{{ favOn ? 'Saved' : 'Save' }}">` looks up
 `Saved` or `Save` and hits the table — measured, that control reads `Liste` in German today.
@@ -563,6 +610,39 @@ The extractor used to file every interpolated value as unreachable, so twelve co
 all showed English on `Follow`, `Claim`, `See plans` and `Restore purchases`. It now pulls the
 literal arms of a ternary when the attribute is exactly one hole and each arm is a whole
 literal; a concatenation fragment still is not a rendered form and stays out.
+
+**The server already sends keys, and nobody was reading them.** Plan names, term notes and
+`BEST VALUE` are fields on the rows `server/store.dsx storeCatalog` returns — deliberately, so
+the price a screen *displays* and the price a card is *charged* are one literal. Under gettext
+the English source string *is* the key, so "the backend sends English" and "the backend sends a
+translation key" are the same sentence; the client display point resolves it exactly as it
+resolves `Sign in`. `SERVER_COPY` in `scripts/strings.mjs` declares which fields are copy,
+because a row is `{ id, label, price, cents }` and no rule can tell a name from a sku without
+being told.
+
+**And copy a caller hands a component reaches a display point one hop away.**
+`<SignInCard title="Purchases land on an account">` is a literal in `Store.dsx`; it renders at
+`<text value="{{ dsx.attribute.title }}">` inside the child, so the table hits. `title` sat in
+the unreachable list, no rule read a caller's attribute, and thirteen tables reported 100%
+while `/store` showed two English sentences in Japanese — fifteen strings across seven
+`<SignInCard>` mounts and two `<ContactRow>` mounts.
+
+This one is **derived, not declared**, and that is the difference from `SERVER_COPY`. A store
+row is data; a component is source, and the child already says where each attribute lands:
+
+```
+<attribute as="title" default="'Sign in to continue'"/>   ← the name
+<text value="{{ dsx.attribute.title }}" class="title"/>   ← the display point
+```
+
+`componentDisplayAttrs()` reads that pair out of every file in `Components/**`, so the manifest
+writes itself and there is no second list to drift — delete the `<text>` and the attribute stops
+being copy on the next run. It also cannot confuse `<sheet title=>` with `<SignInCard title=>`,
+because the map is keyed by **component**: `sheet` is a kernel tag with no template here, so it
+stays unreachable, and `Skeleton` — capitalised, mounted 25 times, a framework global — is never
+in the map either. The read is tight on purpose: the attribute must be the *whole* display value
+and a *bare* read, which keeps AdGate's `{{ today }}/{{ cap }} today` and PersonalNav's UID out
+of thirteen tables. `node scripts/strings.mjs --components` prints what it derived.
 
 ### The plural plane, and why Arabic is the reason it exists
 
@@ -623,10 +703,24 @@ registry and fails if a shipped locale is missing one viewer string, if the pick
 language whose table nobody wrote (or ships a table nobody can select), if a locale is missing
 from the device-row map, or if more than 30% of a table's values are byte-identical to their
 English key — because completeness is a count, and a count is satisfiable by pasting the key
-into the value 247 times. It also fails if a plural entry is short a category its language can
+into the value 270 times. It also fails if a plural entry is short a category its language can
 select, or if Arabic's six forms are not six distinct strings, or if any server-rendered route
 carries a raw message template. Adding a language is: write the table, add the row and the tag
 in `Theme.dsx`, add the device-row label, run the gates.
+
+**Everything above reads source — which is exactly the gate the last two tiers walked past — so
+two more assertions ask a BOOTED origin what words it actually puts in front of a reader.** One
+reads `/store/catalog` and requires every locale to answer the price list on the wire. The other
+reads `/registry.json`, the artefact the browser boots from, walks the compiled component trees
+and requires every locale to answer the copy a mount hands a child. That second one had to read
+the artefact rather than the html: measured, not one of the fifteen mount strings appears in the
+SSR body of *any* of the fifteen routes, because every mount sits behind a signed-out condition
+or a sheet, and `render.ts` correctly drops a node whose `visible-if` is falsy. Both are paired
+with an `unseen` check in the other direction — a word the origin ships that the extractor
+cannot see from source never reaches a translator, and a stale `dist/` is precisely that
+(PLAN.md §6.39). Proved by injection: blanking the display points fails the paired positive
+while every negative passes vacuously at zero, and swapping one served mount string leaves all
+thirteen source-reading coverage gates green at 270/270 while both live assertions go red.
 
 Numbers and dates are locale **formatting**, not translation: `compactCount()` and
 `shortDate()` in `Components/parts/Theme.dsx` run through `Intl` and read the same

@@ -88,6 +88,23 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   hold. Treating the two the same left 29 strings untranslated in twelve complete locales,
   including `Follow`, `Claim` and the VIP card's `See plans`. `scripts/strings.mjs`
   `ternaryLiterals()` is the rule: one hole, whole attribute, each arm a bare literal.
+- **COPY YOU HAND A COMPONENT IS TRANSLATABLE, and where it is AUTHORED is not where it is
+  DISPLAYED.** `<SignInCard title="Purchases land on an account">` is a literal in Store.dsx
+  that renders at `<text value="{{ dsx.attribute.title }}">` inside the child, so the kernel
+  resolves it through the same legacy door the server tier uses — one hop changes nothing.
+  `scripts/strings.mjs componentDisplayAttrs()` DERIVES which attributes those are by reading
+  every component for an `<attribute as=>` whose name is the WHOLE value of a display attribute,
+  so there is no manifest to maintain: add a `<text value="{{ dsx.attribute.x }}">` and every
+  caller's `x=` joins the corpus on the next run. Two riders. (1) The same six letters mean two
+  different things: `title` on a `<sheet>` is the panel's accessible name, which the seam does
+  NOT reach, and the rule tells them apart by the TAG rather than the name — never "fix" that by
+  adding `title` to a list. (2) A mount that OMITS the attribute renders the child's `default=`,
+  so that literal is the key at that mount. Fifteen strings shipped English inside thirteen
+  complete locales because no rule read a caller's attribute, and the rule scales without an
+  edit: it reads 15 attributes on 7 components today (`SignInCard`, `LinkPrompt`, `ContactRow`,
+  `PlanCard`, `CoverCard`, `BuyButton`, `SearchOverlay`) where the pass that wrote it saw 4 on 2.
+  `npm run verify` asks a booted origin's `/registry.json` — the SSR html cannot answer, since
+  every one of those mounts is behind a signed-out condition or a sheet.
 - **AN EVENT PAYLOAD ARRIVES FLAT, so a declared action input names the key BARE.**
   `<action as="failed" message="message">` reads the payload's `message`;
   `message="event.message"` reads NOTHING — there is no `event` plane, the miss resolves to
