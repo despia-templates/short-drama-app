@@ -226,6 +226,60 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     authority for declared actions) and their refusal is invisible per (a), so the Manage
     screen and README say exactly that rather than promising a working write path.
 
+16. **CORRECTED 2026-09-01 — `Core/Store` CAN be built; the blocker was the CLI's component
+    pool, and it is fixed (`despia-framework dev@15b93a53`).** The original entry here
+    read "no DSX app can ship in-app purchase today" on the strength of
+
+        Core/Store/Components/core/PaywallVIP.dsx:18:
+          error: <shared.VipCard>: no global component 'VipCard'
+
+    and concluded the file was missing from the package. It is not missing.
+    `VipCard.dsx` is at `Mandatory/Foundation/Components/Core/VipCard.dsx`, along with the
+    whole `shared.*` family (Avatar, Banner, Callout, Card, Chip, EmptyState, FAB, VipCard).
+    Two CLI facts explain the error, and both are about the POOL, not the module:
+
+      · Foundation declares NO scheme, so its components belong to the global (null) scope —
+        exactly what `<shared.X>` requires. But `dsx lint` folds only the roots listed in
+        `dsx.config.json` `packages`, and Foundation is not one of them. It is `mandatory:
+        true`, so it always ships in the EXPORT while never entering the LINT pool. Adding it
+        to `packages` resolves VipCard immediately.
+      · That then exposed the real bug. `foldPackage`, which folds a CONFIGURED root, read
+        only the package's `.dsx` files; the Swift scan that publishes a Swift-defined global
+        (`override class var tag: String { "SystemFAB" }`) lived exclusively in
+        `foldPackageTree`. So configuring Foundation reported `<SystemFAB>` and
+        `<SystemSettingsRow>` unresolved even though both are declared in Swift beside the
+        markup mounting them. `lint_dsx.rb`, which walks the whole tree, always resolved them
+        — so the two linters disagreed and the TypeScript one refused documents the real one
+        accepts. `foldPackage` now walks its root for Swift globals too.
+
+    Measured after the fix, with `Mandatory/Foundation` and `Core/Store` both configured:
+    **109 files, 0 errors.** The module is sound.
+
+    WHAT REMAINS BEFORE THE TEMPLATE TURNS IAP ON, and it is a scoping question rather than a
+    blocker: configuring a package makes `dsx lint` lint that package's own files, so
+    Foundation's three pre-existing warnings (`dsx.module.haptic` and `dsx.module.dom`
+    unconfigured, an `aria-pressed` census notice) enter an app gate that allows zero
+    warnings. Either those get configured/fixed, or lint scopes findings to app files and uses
+    packages for resolution only. Until that is settled the template keeps Stripe on web and
+    names the native gap on the purchase surface — which is what it does today.
+
+17. **The linter reads identifiers out of `//` comments inside an action body (2026-09-01).**
+    Same family as the apostrophe rule already in AGENTS.md, and it costs the same way. A
+    comment explaining what a seam WILL call —
+
+    ```
+    // What belongs here is: dsx.module.store.checkout({ product: sku })
+    // ...configure Core/Store in dsx.config.json
+    ```
+
+    — produces `unknown namespace 'dsx.config'` and `dsx.module.store — no CONFIGURED package
+    claims scheme 'store'`, i.e. two warnings against a zero-warning gate, for two lines of
+    prose. Measured here; the workaround is to write the identifier without its engine prefix
+    (`store.checkout(…)`, "the packages list"), or to move the paragraph into the `<!-- -->`
+    comment above the action, which is not scanned. Worth fixing upstream because the
+    incentive it creates is exactly backwards: it prices documenting an unavailable module
+    higher than silently leaving the gap unexplained.
+
 ## 7 · Decision log
 
 - **2026-08-29 · Custom UI everywhere, no native chrome.** ReelShort/DramaBox/NetShort all use
