@@ -61,14 +61,16 @@
 
          THREE ROWS, NOT FOUR. The list is shorter than the design that preceded it because
          the backend grants two things and the client adds one. Padding it back to four would
-         re-create the defect this pass removed. -->
-    <variable as="benefits">
-      return [
-        { id: 'b1', icon: 'lock.open.fill',        label: 'Every episode unlocked', note: 'Paid episodes open at 0 coins, on every series in the catalogue — including the ones added while your pass runs' },
-        { id: 'b2', icon: 'dollarsign.circle.fill', label: 'Your coins stay yours',  note: 'A VIP unlock debits nothing, so the balance you bought is still there when the pass ends' },
-        { id: 'b3', icon: 'bolt.fill',             label: 'No ads',                 note: 'The one rewarded ad this app shows is switched off while your pass is active' }
-      ]
-    </variable>
+         re-create the defect this pass removed.
+
+         AND IT IS NO LONGER WRITTEN HERE. The plans sheet now opens a "What VIP includes"
+         level over itself (Components/parts/PlansSheet.dsx), which renders the same three
+         rows — and a paid promise with two copies is a promise an adopter will edit half
+         of. The list moved to `vipBenefits()` in the global function library
+         (Components/parts/Theme.dsx), where every argument above is repeated beside it.
+         COMPUTED, not a plain variable: a plain initializer runs at mount and the library
+         registers when <Theme/> instantiates, so a computed is the read that cannot race. -->
+    <variable as="benefits" computed="true">return vipBenefits()</variable>
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
          last good payload lives in the app-wide store and is the FIRST PAINT while the
          refetch runs. Read homeView, never home.data, or the blank frame returns. -->
@@ -137,15 +139,13 @@
          side that is wrong. The server now says "One charge for N days. No auto-renewal." in
          the tier notes themselves, so this line and the cards below it agree, and this
          paragraph is the derivation rather than a contradiction. -->
+    <!-- the same sentence the plans sheet's detail level prints, and for the same reason
+         the benefit list moved: one paid promise, one source (vipTermLine, Theme.dsx). It
+         is DERIVED from the tiers the server shipped, so a deployment that changes its pass
+         lengths changes this line with them. -->
     <variable as="termLine" computed="true">
       const c = dsx.variable.catalogView
-      const tail = ' When the date passes VIP simply stops — your coins are not affected.'
-      if (c == null || c.vip == null || c.vip.length == 0) {
-        return 'Every plan is a one-time charge for a pass that runs a fixed number of days.' + tail
-      }
-      let days = ''
-      for (const t of c.vip) { days = days == '' ? String(t.days) : days + ', ' + String(t.days) }
-      return 'Every plan is a one-time charge for a dated pass — ' + days + ' days. Nothing renews and there is nothing to cancel; buying again adds days to the pass you hold.' + tail
+      return vipTermLine(c == null ? null : c.vip)
     </variable>
     <variable as="posterW" computed="true">return dsx.variable.bp == 'phone' ? 150 : 186</variable>
     <variable as="phase" computed="true">

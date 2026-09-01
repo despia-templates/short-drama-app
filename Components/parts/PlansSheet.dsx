@@ -54,6 +54,25 @@
     <variable as="settleMsg">return ''</variable>
     <variable as="toast">return ''</variable>
     <variable as="hovId">return ''</variable>
+    <!-- ── THE DETAIL LEVEL: A SHEET OVER THE PLANS SHEET ──────────────────────────────
+         "See everything VIP includes" used to be `open = false` followed by a push to
+         /vip, which answers the question by destroying the thing that asked it: the sheet
+         closes, a whole marketing page takes the frame, and a viewer who was two seconds
+         from choosing the 30-day pass has to find their way back and re-open it. The
+         answer to "what am I buying" belongs OVER the price list, not instead of it.
+
+         It is also the founder's own rule about push motion: /vip mounts <TopNav> on a wide
+         viewport, and pushing a screen that carries a bar over a paywall reads wrong. A
+         sheet is the right instrument precisely when the destination must not take the
+         frame.
+
+         The full page stays reachable from inside the level (`openVipPage`), because /vip
+         has the rails, the wallet and the tiers and a sheet has no URL.
+
+         SAME CASCADE BRIDGE AS THE PLAYER'S DRAWER (PLAN.md 6.95): the engine does not
+         close a declared child when its parent goes down, so the plans sheet only ever
+         closes through `closePlans`. -->
+    <variable as="detail">return false</variable>
 
     <variable as="isInline" computed="true">return dsx.attribute.mode == 'inline'</variable>
     <variable as="phase" computed="true">
@@ -120,6 +139,17 @@
       if (dsx.attribute.vipUntil == '') { return 'VIP is active — buying again adds days to it.' }
       return 'VIP is active until ' + dsx.attribute.vipUntil + ' — buying again adds days to it.'
     </variable>
+    <!-- WHAT THE LEVEL SHOWS, and neither half is authored here. The benefit rows and the
+         term sentence are the SAME two the /vip page prints, read out of the global
+         function library (Components/parts/Theme.dsx) rather than copied — a paid promise
+         with two copies is a promise an adopter edits half of. The term is derived from
+         the tiers the server actually shipped, so it cannot describe a plan that is not
+         for sale. -->
+    <variable as="benefits" computed="true">return vipBenefits()</variable>
+    <variable as="termLine" computed="true">
+      const c = catalog.data
+      return vipTermLine(c == null ? null : c.vip)
+    </variable>
 
     <formula as="tierFx" id="item.id" best="item.best">
       const lift = dsx.variable.hovId == id ? 'translateY(-2px)' : 'none'
@@ -153,6 +183,28 @@
     </action>
     <action as="load">
       if (catalog.data == null) { catalog.refresh() }
+    </action>
+
+    <!-- ── the detail level's three verbs, so no caller carries the cascade ────────────
+         `closePlans` is the ONLY way the plans sheet closes. The engine leaves a declared
+         child open when its parent goes down (PLAN.md 6.95, measured), so a bare
+         `open = false` anywhere would strand the detail level over an empty screen. -->
+    <action as="openDetail">
+      dsx.variable.detail = true
+      dsx.action.track({ name: 'vip_detail_opened', props: { surface: 'plans' } })
+    </action>
+    <action as="closeDetail">dsx.variable.detail = false</action>
+    <action as="closePlans">
+      dsx.variable.detail = false
+      dsx.variable.open = false
+    </action>
+    <!-- the full page is a DESTINATION — rails, wallet, the whole benefit story — so this
+         one is a route and not a third level. Both sheets close first: the router does not
+         consult the overlay ledger, so a push from inside a sheet leaves it painted over
+         the screen it just mounted (measured on the player's drawer, PLAN.md 6.95). -->
+    <action as="openVipPage">
+      dsx.action.closePlans()
+      dsx.module.route.push({ path: '/vip' })
     </action>
 
     <action as="buy" sku="item.id">
@@ -282,6 +334,23 @@
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
     <style as="benefitsLink" fontSize="13" fontWeight="semibold" color="#F6B63D" textAlign="center" paddingV="6"/>
     <style as="errCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="20" alignItems="center"/>
+
+    <!-- ── the detail level ── the same 16pt gutter as the sheet it sits over, so the two
+         depths read as one surface rather than two unrelated cards -->
+    <style as="detailBody" spacing="14" alignItems="stretch" paddingH="16" paddingTop="4" paddingBottom="26"/>
+    <!-- the BACK affordance: the system close control dismisses the top card but cannot
+         say where it lands, and a viewer two levels into a purchase needs telling. 44 tall
+         is the tap floor. -->
+    <style as="detailBack" spacing="4" alignItems="center" minHeight="44"/>
+    <style as="detailBackTxt" fontSize="15" fontWeight="semibold" color="rgba(255,255,255,0.7)"/>
+    <style as="detailRow" spacing="13" alignItems="flex-start" paddingV="11"/>
+    <style as="detailIcon" width="30" height="30" radius="15" background="rgba(246,182,61,0.14)" alignItems="center"/>
+    <style as="detailLabel" fontSize="16" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="detailNote" fontSize="13" color="rgba(255,255,255,0.5)" lineSpacing="3"/>
+    <style as="detailTerm" background="rgba(255,255,255,0.05)" radius="12" paddingH="14" paddingV="13" spacing="8" alignItems="flex-start"/>
+    <style as="detailTermCap" fontSize="12" fontWeight="semibold" color="rgba(255,255,255,0.45)" tracking="0.4"/>
+    <style as="detailPage" background="rgba(255,255,255,0.06)" radius="12" paddingH="14" paddingV="14" spacing="10" alignItems="center" minHeight="44"/>
+    <style as="detailPageTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
   <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
@@ -353,16 +422,19 @@
     </grid>
   </vstack>
 
-  <!-- SHEET: content-height, so the plans sit over the screen that asked for them -->
+  <!-- SHEET: content-height, so the plans sit over the screen that asked for them.
+       `on:dismiss` runs the CASCADE rather than a bare `open = false` — a swipe-dismiss of
+       the price list has to take the detail level with it, and today only the author can
+       do that (PLAN.md 6.95). -->
   <sheet present="dsx.variable.open" detents="content" background="#141414"
-         on:dismiss="dsx.variable.open = false">
+         on:dismiss="dsx.action.closePlans()">
     <vstack class="sheetBody">
       <hstack class="head">
         <vstack spacing="4" style="flex: 1; min-width: 0" alignItems="stretch">
           <text value="Go VIP" class="title"/>
           <text value="{{ dsx.variable.statusLine }}" class="status"/>
         </vstack>
-        <vstack class="closeBtn" style="justify-content: center" on:tap="dsx.variable.open = false"
+        <vstack class="closeBtn" style="justify-content: center" on:tap="dsx.action.closePlans()"
                 a11yTrait="button" a11yLabel="Close plans">
           <image icon="xmark" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
         </vstack>
@@ -425,10 +497,72 @@
       <!-- Terms + Privacy beside the price, which is where Apple requires them. -->
       <LegalLinks variant="line" visible-if="dsx.variable.phase == 'content'"/>
 
-      <!-- the full page still exists for the benefit story; the sheet just isn't it -->
+      <!-- the answer to "what am I buying" opens OVER the prices now, instead of replacing
+           them with a page (see the `detail` note in the head) -->
       <text value="See everything VIP includes" class="benefitsLink"
             visible-if="dsx.variable.phase == 'content'" a11yTrait="button"
-            on:tap="dsx.variable.open = false; dsx.module.route.push({ path: '/vip' })"/>
+            a11yLabel="See everything VIP includes, opens over the plans"
+            on:tap="dsx.action.openDetail()"/>
+
+      <!-- ══════ LEVEL 2 — what a VIP pass is ═══════════════════════════════════════════
+           DECLARED INSIDE ITS PARENT'S SLOT, which is what makes it a stack: on iOS the
+           sheet slot is an escaping closure, so this anchor exists only while the plans
+           sheet is presented and UIKit presents the second card from the first one's view
+           controller. Two `<sheet>` tags as siblings are NOT a stack — a view controller
+           presents one thing at a time, so the second would silently do nothing.
+
+           IT IS THE LAST CHILD ON PURPOSE. The anchor is zero-size and invisible on web
+           (`display: contents`) but a real 0x0 child of a stack on iOS, where a zero-size
+           child still pays the column's gaps; at the foot of the column that costs nothing
+           a reader can see.
+
+           `mode="inline"` (the Store screen) never renders the trigger above, so this level
+           has no reachable path there — which is correct: from a page, a page is the right
+           destination and /vip is one tap away in the nav. -->
+      <sheet present="dsx.variable.detail" detents="content" background="#141414"
+             title="What VIP includes" close="trailing"
+             on:dismiss="dsx.variable.detail = false">
+        <vstack class="detailBody">
+
+          <hstack class="detailBack" on:tap="dsx.action.closeDetail()"
+                  a11yGroup="true" a11yTrait="button" a11yLabel="Back to the plans">
+            <image icon="chevron.left" iconSize="14" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
+            <text value="Back to plans" class="detailBackTxt"/>
+          </hstack>
+
+          <list bind="dsx.variable.benefits" key="id" scroll="false" spacing="0">
+            <hstack class="detailRow">
+              <vstack class="detailIcon" style="justify-content: center">
+                <image icon="{{ item.icon }}" iconSize="15" color="{{ gold() }}" a11yHidden="true"/>
+              </vstack>
+              <vstack spacing="3" style="flex: 1; min-width: 0" alignItems="stretch">
+                <text value="{{ item.label }}" class="detailLabel"/>
+                <text value="{{ item.note }}" class="detailNote"/>
+              </vstack>
+            </hstack>
+          </list>
+
+          <!-- THE TERM IS A DISCLOSURE, not a fourth perk, so it wears the quiet card
+               rather than a gold icon. It is derived from the tiers the server shipped —
+               while the catalogue is still in flight it says the true general thing rather
+               than a specific number it does not have yet, which is why there is no
+               skeleton here: this block is never empty and never wrong. -->
+          <vstack class="detailTerm">
+            <text value="WHAT A PASS IS" class="detailTermCap"/>
+            <text value="{{ dsx.variable.termLine }}" class="detailNote"/>
+          </vstack>
+
+          <!-- and out to the page, for the viewer who wants the rails and the wallet.
+               It leaves the purchase, which is why it is last and says so. -->
+          <hstack class="detailPage" on:tap="dsx.action.openVipPage()"
+                  a11yGroup="true" a11yTrait="button"
+                  a11yLabel="Open the full VIP page — closes the plans">
+            <text value="Open the full VIP page" class="detailPageTxt" grow="width" style="flex: 1"/>
+            <image icon="arrow.right" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
+          </hstack>
+
+        </vstack>
+      </sheet>
     </vstack>
   </sheet>
 </vstack>

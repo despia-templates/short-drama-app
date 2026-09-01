@@ -169,6 +169,47 @@
       function gemLift() { return '#FF7BAA' }         /* the VIP gem gradient, top stop */
       function gemDeep() { return '#B3103A' }         /* ... and its end stop */
 
+      /* ── THE VIP PROMISE, SAID ONCE ───────────────────────────────────────────────
+         Product copy in the presentation library needs a reason, and this is it: a PAID
+         PROMISE is the one string an app must never hold two copies of. The benefit list
+         and the term sentence are rendered on two surfaces that a viewer can reach within
+         one tap of each other — the /vip page and the plans sheet that a nested level now
+         opens over — and an adopter who edits one is an adopter who has shipped an app
+         that advertises two different products at two different prices.
+
+         Every row below is a thing `server/*.dsx` ACTUALLY GRANTS, and can be checked:
+           unlocked  `unlockEpisode` prices at 0 while `vip_until` is in the future
+                     (server/wallet.dsx) — no catalogue exceptions, so it covers shows
+                     added after the pass was bought
+           coins     because that price is 0 the spend path never runs: no ledger row, no
+                     wallet debit, so the balance survives the pass
+           no ads    <AdGate> takes `vip=` and refuses in its own action
+         Three rows and not four. "1080p" and "Offline downloads" were deleted in an
+         earlier pass because nothing in this app delivers either; padding the list back
+         to four would re-create the defect that removal fixed. */
+      function vipBenefits() {
+        return [
+          { id: 'b1', icon: 'lock.open.fill',         label: 'Every episode unlocked',
+            note: 'Paid episodes open at 0 coins, on every series in the catalogue — including the ones added while your pass runs' },
+          { id: 'b2', icon: 'dollarsign.circle.fill', label: 'Your coins stay yours',
+            note: 'A VIP unlock debits nothing, so the balance you bought is still there when the pass ends' },
+          { id: 'b3', icon: 'bolt.fill',              label: 'No ads',
+            note: 'The one rewarded ad this app shows is switched off while your pass is active' }
+        ]
+      }
+
+      /* THE TERM, derived from the tiers the SERVER shipped rather than authored — so the
+         day a deployment changes its pass lengths this sentence changes with them. Pass
+         `catalog.vip` (or null while it is still loading). */
+      function vipTermLine(tiers) {
+        const tail = ' When the date passes VIP simply stops — your coins are not affected.'
+        if (tiers == null) { return 'Every plan is a one-time charge for a pass that runs a fixed number of days.' + tail }
+        if (tiers.length == 0) { return 'Every plan is a one-time charge for a pass that runs a fixed number of days.' + tail }
+        let days = ''
+        for (const t of tiers) { days = days == '' ? String(t.days) : days + ', ' + String(t.days) }
+        return 'Every plan is a one-time charge for a dated pass — ' + days + ' days. Nothing renews and there is nothing to cancel; buying again adds days to the pass you hold.' + tail
+      }
+
       /* ── LOCALE-AWARE FORMATTING ──────────────────────────────────────────────────
          Numbers and dates are locale FORMATTING, not translation, and the string table
          cannot help with either: `1.2M` and `2026-09-01` are composed at render time and
