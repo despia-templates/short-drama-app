@@ -76,22 +76,10 @@
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
-    <variable as="bp" computed="true">
-      const w = dsx.screen.width
-      if (w >= 1120) { return 'desktop' }
-      if (w >= 768) { return 'tablet' }
-      return 'phone'
-    </variable>
-    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
-    <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 86 }
-      if (dsx.variable.bp == 'tablet') { return 40 }
-      return 16
-    </variable>
-    <variable as="shell" computed="true">
-      const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 720px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
-    </variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
+    <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 720)</variable>
 
     <action as="back">
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
@@ -133,6 +121,10 @@
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
   </head>
 
+  <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
+       FIRST CHILD, always: the block registers on instantiate, and this screen reads its
+       own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
+  <Theme/>
   <TopNav active="profile" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page" style="{{ dsx.variable.shell }}">
@@ -209,7 +201,7 @@
         <hstack class="menuRow" on:tap="dsx.module.route.push({ path: '/auth/delete' })"
                 a11yGroup="true" a11yTrait="button"
                 a11yLabel="Delete account — permanently erases this account and everything held against it">
-          <image icon="trash" iconSize="15" color="#FF6B8A" a11yHidden="true"/>
+          <image icon="trash" iconSize="15" color="{{ brandTint() }}" a11yHidden="true"/>
           <vstack spacing="2" style="flex: 1" alignItems="stretch">
             <text value="Delete account" class="dangerLabel"/>
             <text value="Erases the account record and everything on it — wallet, coins, unlocks, history, list and comments. Permanent." class="menuNote"/>
@@ -223,7 +215,7 @@
   <!-- the toast lives OUTSIDE the scroll so an answer reaches the person who caused it -->
   <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
     <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
-    <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+    <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
            a11yLabel="Dismiss message" a11yTrait="button"/>
   </hstack>
   <!-- NO <TabBar> HERE, and that is the rule rather than an omission: a PUSHED route mounts

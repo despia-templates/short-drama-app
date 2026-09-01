@@ -15,22 +15,10 @@
       if (inbox.data != null) { return inbox.data }
       return global.cacheInbox
     </variable>
-    <variable as="bp" computed="true">
-      const w = dsx.screen.width
-      if (w >= 1120) { return 'desktop' }
-      if (w >= 768) { return 'tablet' }
-      return 'phone'
-    </variable>
-    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
-    <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 86 }
-      if (dsx.variable.bp == 'tablet') { return 40 }
-      return 16
-    </variable>
-    <variable as="shell" computed="true">
-      const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 760px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
-    </variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
+    <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 760)</variable>
     <variable as="phase" computed="true">
       if (inbox.error != null) { return 'error' }
       if (dsx.variable.inboxView == null) { return 'loading' }
@@ -72,6 +60,10 @@
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
+       FIRST CHILD, always: the block registers on instantiate, and this screen reads its
+       own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
+  <Theme/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
       <TopNav active="" visible-if="dsx.variable.wide"/>
@@ -105,7 +97,7 @@
           <list bind="dsx.variable.inboxView.rows" key="id" scroll="false" spacing="0">
             <hstack class="row" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
               <vstack class="rowBadge" style="justify-content: center">
-                <image icon="{{ rowIcon }}" iconSize="15" color="#FF2C55" a11yHidden="true"/>
+                <image icon="{{ rowIcon }}" iconSize="15" color="{{ brand() }}" a11yHidden="true"/>
               </vstack>
               <vstack spacing="4" alignItems="stretch" style="flex: 1; min-width: 0">
                 <text value="{{ item.title }}" class="rowTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>

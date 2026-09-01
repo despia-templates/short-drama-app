@@ -43,7 +43,7 @@
     <attribute as="overArt" default="false"/>
 
     <variable as="hov">return ''</variable>
-    <variable as="on" computed="true">'#FF2C55'</variable>
+    <variable as="on" computed="true">brand()</variable>
     <!-- the bar owns its own breakpoint: measured at 1440 (gutter 86 · gaps 30), and at
          768 the same numbers put the wordmark under "Home" and the tools under "My List"
          — tablet drops the wordmark (the logo square carries the brand) and tightens -->
@@ -88,7 +88,7 @@
     <!-- one formula answers every link's color: active wins, then hover, then rest -->
     <formula as="linkTint" key="item.key">
       if (dsx.attribute.active == key) { return dsx.variable.on }
-      if (dsx.variable.hov == key) { return '#FF8FA8' }
+      if (dsx.variable.hov == key) { return brandSoft() }
       return dsx.variable.off
     </formula>
 
@@ -103,6 +103,10 @@
     <style as="cta" background="#FF2C55" radius="20" paddingH="22" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
+       Theme.dsx), and a caller must not have to remember to register it first. The
+       block is app-wide and last-write-wins, so a second mount costs a 0x0 stack. -->
+  <Theme/>
   <hstack class="inner" style="{{ dsx.variable.innerBox }}">
     <hstack class="brand" on:tap="dsx.module.route.reset({ path: '/' })" a11yGroup="true" a11yTrait="button" a11yLabel="Short Drama — home">
       <vstack class="logoBox" style="justify-content: center">

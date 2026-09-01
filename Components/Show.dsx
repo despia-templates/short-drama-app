@@ -85,18 +85,9 @@
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
-    <variable as="bp" computed="true">
-      const w = dsx.screen.width
-      if (w >= 1120) { return 'desktop' }
-      if (w >= 768) { return 'tablet' }
-      return 'phone'
-    </variable>
-    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
-    <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 86 }
-      if (dsx.variable.bp == 'tablet') { return 40 }
-      return 16
-    </variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
+    <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
     <!-- the stage is a real 9:16 portrait, capped by the viewport height (the reference
          runs 461×820 in a 900pt window) -->
     <variable as="stageW" computed="true">
@@ -146,10 +137,7 @@
       if (dsx.variable.bp == 'tablet') { return 4 }
       return 3
     </variable>
-    <variable as="shell" computed="true">
-      const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
-    </variable>
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 1440)</variable>
     <variable as="stageBox" computed="true">
       return 'width: ' + dsx.variable.stageW + 'px; height: ' + dsx.variable.stageH + 'px; border-radius: 12px; object-fit: cover'
     </variable>
@@ -259,6 +247,10 @@
     <style as="phoneMeta" spacing="10" alignItems="flex-start"/>
   </head>
 
+  <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
+       FIRST CHILD, always: the block registers on instantiate, and this screen reads its
+       own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
+  <Theme/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
 
@@ -360,7 +352,7 @@
             <text value="{{ dsx.variable.showViews }}" class="metaTxt"
                   a11yLabel="{{ dsx.variable.showViews }} views"/>
             <text value="·" class="metaTxt" a11yHidden="true"/>
-            <image icon="star.fill" iconSize="12" color="#F6B63D" a11yHidden="true"/>
+            <image icon="star.fill" iconSize="12" color="{{ gold() }}" a11yHidden="true"/>
             <text value="{{ show == null ? '' : show.rating }}" class="metaTxt"
                   a11yLabel="rated {{ show == null ? '' : show.rating }} out of 10"/>
           </hstack>
@@ -373,7 +365,7 @@
                server actually charged. -->
           <vstack class="bulkCard" visible-if="dsx.variable.bulkOn">
             <hstack spacing="10" alignItems="center">
-              <image icon="lock.open.fill" iconSize="16" color="#F6B63D" a11yHidden="true"/>
+              <image icon="lock.open.fill" iconSize="16" color="{{ gold() }}" a11yHidden="true"/>
               <vstack spacing="2" style="flex: 1; min-width: 0">
                 <text value="Unlock all {{ offer.data == null ? '' : offer.data.remaining }} remaining episodes" class="bulkTitle"/>
                 <text value="{{ offer.data == null ? '' : offer.data.listPrice }} coins  ·  save {{ offer.data == null ? '' : offer.data.off }}%" class="bulkWas"/>
@@ -390,18 +382,18 @@
                down (nothing left to sell), and a confirmation nested inside it would vanish
                in the same frame — the viewer would see 448 coins leave and be told nothing -->
           <hstack class="bulkReceipt" visible-if="dsx.variable.seriesToast != ''">
-            <image icon="checkmark" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+            <image icon="checkmark" iconSize="14" color="{{ gold() }}" a11yHidden="true"/>
             <text value="{{ dsx.variable.seriesToast }}" class="bulkNote"/>
           </hstack>
           <hstack class="ctaRow">
             <hstack class="favBtn" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button" a11yLabel="Toggle My List">
               <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="17"
-                     color="{{ dsx.variable.favOn ? '#FF2C55' : '#FFFFFF' }}" a11yHidden="true"/>
+                     color="{{ dsx.variable.favOn ? brand() : '#FFFFFF' }}" a11yHidden="true"/>
               <text value="{{ dsx.variable.favOn ? 'Saved' : 'My List' }}" class="favLabel"/>
             </hstack>
             <hstack class="favBtn" on:tap="dsx.module.route.push({ path: '/store' })"
                     a11yGroup="true" a11yTrait="button" a11yLabel="Your coins — get more in the store">
-              <image icon="dollarsign.circle.fill" iconSize="17" color="#F6B63D" a11yHidden="true"/>
+              <image icon="dollarsign.circle.fill" iconSize="17" color="{{ gold() }}" a11yHidden="true"/>
               <text value="{{ dsx.variable.walletView == null ? 0 : dsx.variable.walletView.coins + dsx.variable.walletView.bonus }}" class="favLabel"/>
             </hstack>
           </hstack>

@@ -165,13 +165,8 @@
       if (sec < 10) { out = out + '0' }
       return out + sec
     </variable>
-    <variable as="bp" computed="true">
-      const s = dsx.screen.width
-      if (s >= 1120) { return 'desktop' }
-      if (s >= 768) { return 'tablet' }
-      return 'phone'
-    </variable>
-    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
     <!-- THE EPISODE PANEL LANE. Every reference player on desktop — ReelShort, Shortical,
          Stardust, FlickReels — puts the episode grid in a PERSISTENT right-hand panel beside
          the clip, with the breadcrumb, title, tags, plot and counts above it. Only when the
@@ -181,7 +176,7 @@
          416 is the measured reference width (PLAN.md's category read: "detail panel 416 with
          a 6-col episode grid"); 1120 is this app's own desktop breakpoint, and below it the
          clip plus the panel no longer fit, so the drawer takes over unchanged. -->
-    <variable as="panel" computed="true">return dsx.screen.width >= 1120</variable>
+    <variable as="panel" computed="true">return panelAt(dsx.screen.width)</variable>
     <!-- the pill printed `{{ speed }}.0x`, which reads "0.5.0x" and "1.25.0x" for four of the
          seven rungs. The option rows always used `item.label`; the pill now does too. -->
     <!-- THE PLAYER HAD NO FAILURE SURFACE AT ALL. The word "error" did not appear in this
@@ -940,6 +935,10 @@
     <style as="cUndo" background="rgba(255,255,255,0.12)" radius="16" paddingH="14" paddingV="9" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
+       FIRST CHILD, always: the block registers on instantiate, and this screen reads its
+       own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
+  <Theme/>
   <TopNav active="" visible-if="dsx.variable.wide"/>
   <hstack alignItems="stretch" style="flex: 1; min-height: 0; width: 100%">
     <!-- the stage centers its CAPPED pager: web spells it margin:auto on the pager; the
@@ -962,7 +961,7 @@
           <image icon="chevron.left" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()"
                  a11yLabel="Back" a11yTrait="button" style="align-self: flex-start"/>
           <spacer/>
-          <spinner color="#FF2C55" visible-if="dsx.variable.phase == 'loading'"/>
+          <spinner color="{{ brand() }}" visible-if="dsx.variable.phase == 'loading'"/>
           <text value="Loading the episode…" class="stateBody" visible-if="dsx.variable.phase == 'loading'"/>
 
           <image icon="play.rectangle.fill" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"
@@ -1069,7 +1068,7 @@
             <vstack class="rail" style="pointer-events: auto">
               <vstack class="railItem" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button" a11yLabel="Save to My List">
                 <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="27"
-                       color="{{ dsx.variable.favOn ? '#FF2C55' : '#FFFFFF' }}" a11yHidden="true"/>
+                       color="{{ dsx.variable.favOn ? brand() : '#FFFFFF' }}" a11yHidden="true"/>
                 <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="railCap"/>
               </vstack>
               <!-- the shared catalog has no speech-bubble glyph (upstream #235); note.text
@@ -1209,8 +1208,8 @@ Please unlock to watch." class="lockHead"/>
               <!-- the control ANIMATES rather than snapping: the box springs on toggle and
                    the tick scales in behind it (web enhancement; native gets the platform
                    control's own animation) -->
-              <vstack class="checkBox" background="{{ dsx.variable.autoUnlock ? '#FF2C55' : 'rgba(255,255,255,0.08)' }}"
-                      style="justify-content: center; border: 1.5px solid {{ dsx.variable.autoUnlock ? '#FF2C55' : 'rgba(255,255,255,0.32)' }}; transition: background 0.18s ease, border-color 0.18s ease, transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1); transform: scale({{ dsx.variable.autoUnlock ? 1.08 : 1 }})">
+              <vstack class="checkBox" background="{{ dsx.variable.autoUnlock ? brand() : 'rgba(255,255,255,0.08)' }}"
+                      style="justify-content: center; border: 1.5px solid {{ dsx.variable.autoUnlock ? brand() : 'rgba(255,255,255,0.32)' }}; transition: background 0.18s ease, border-color 0.18s ease, transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1); transform: scale({{ dsx.variable.autoUnlock ? 1.08 : 1 }})">
                 <image icon="checkmark" iconSize="12" color="#FFFFFF" a11yHidden="true"
                        style="transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.16s ease; transform: scale({{ dsx.variable.autoUnlock ? 1 : 0.3 }}); opacity: {{ dsx.variable.autoUnlock ? 1 : 0 }}"/>
               </vstack>
@@ -1264,14 +1263,14 @@ Please unlock to watch." class="lockHead"/>
           <image icon="play.fill" iconSize="14" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
           <text value="{{ dsx.variable.panelViews }}" class="panelStat"
                 a11yLabel="{{ dsx.variable.panelViews }} views"/>
-          <image icon="star.fill" iconSize="13" color="#F6B63D" a11yHidden="true"/>
+          <image icon="star.fill" iconSize="13" color="{{ gold() }}" a11yHidden="true"/>
           <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.rating }}" class="panelStat"
                 a11yLabel="rated {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.rating }} out of 10"/>
           <spacer/>
           <hstack class="panelAct" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button"
                   a11yLabel="{{ dsx.variable.favOn ? 'Remove from My List' : 'Save to My List' }}">
             <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="15"
-                   color="{{ dsx.variable.favOn ? '#FF2C55' : '#FFFFFF' }}" a11yHidden="true"/>
+                   color="{{ dsx.variable.favOn ? brand() : '#FFFFFF' }}" a11yHidden="true"/>
             <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="panelStat"/>
           </hstack>
           <hstack class="panelAct" on:tap="dsx.action.doShare()" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
@@ -1283,7 +1282,7 @@ Please unlock to watch." class="lockHead"/>
         <hstack class="panelRanges">
           <list bind="dsx.variable.ranges" key="id" axis="horizontal" scroll="false" spacing="16">
             <text value="{{ item.label }}" class="rangeTxt"
-                  color="{{ item.from - 1 == Number(dsx.variable.range) * 30 ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}"
+                  color="{{ item.from - 1 == Number(dsx.variable.range) * 30 ? brand() : 'rgba(255,255,255,0.6)' }}"
                   on:tap="dsx.variable.range = (item.from - 1) / 30" a11yTrait="button"/>
           </list>
           <spacer/>
@@ -1294,7 +1293,7 @@ Please unlock to watch." class="lockHead"/>
         <grid bind="dsx.variable.visibleEps" key="id" columns="6" spacing="8" scroll="false">
           <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center; overflow: hidden"
                   on:tap="dsx.action.go({ target: item.idx })"
-                  background="{{ item.idx == Number(dsx.variable.cur) ? '#FF2C55' : '#2C2C2E' }}"
+                  background="{{ item.idx == Number(dsx.variable.cur) ? brand() : '#2C2C2E' }}"
                   a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', VIP' : '' }}" a11yTrait="button" a11yGroup="true">
             <text value="{{ item.idx }}" class="epNum" color="#FFFFFF"/>
             <text value="VIP" class="cellTag" visible-if="gridLocked"
@@ -1322,7 +1321,7 @@ Please unlock to watch." class="lockHead"/>
             <text value="All {{ dsx.variable.total }} Episodes" class="drawerSub"/>
           </vstack>
           <button label="{{ dsx.variable.favOn ? 'Following' : 'Follow' }}" class="followBtn"
-                  background="{{ dsx.variable.favOn ? '#8E1637' : '#FF2C55' }}" on:tap="dsx.action.toggleFav()"/>
+                  background="{{ dsx.variable.favOn ? brandPressed() : brand() }}" on:tap="dsx.action.toggleFav()"/>
         </hstack>
 
         <!-- THE TABS ARE A TAB BAR, so the rule TRAVELS. Each label used to own a rule
@@ -1341,12 +1340,12 @@ Please unlock to watch." class="lockHead"/>
             <vstack class="tabHit" on:tap="dsx.variable.drawerTab = 'synopsis'" a11yTrait="button"
                     a11yLabel="Synopsis{{ dsx.variable.drawerTab == 'synopsis' ? ', selected' : '' }}">
               <text value="Synopsis" class="tabTxt" measure="dsx.variable.tabSynBox"
-                    color="{{ dsx.variable.drawerTab == 'synopsis' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
+                    color="{{ dsx.variable.drawerTab == 'synopsis' ? brand() : 'rgba(255,255,255,0.75)' }}"/>
             </vstack>
             <vstack class="tabHit" on:tap="dsx.variable.drawerTab = 'episodes'" a11yTrait="button"
                     a11yLabel="Episodes{{ dsx.variable.drawerTab == 'episodes' ? ', selected' : '' }}">
               <text value="Episodes" class="tabTxt" measure="dsx.variable.tabEpBox"
-                    color="{{ dsx.variable.drawerTab == 'episodes' ? '#FF2C55' : 'rgba(255,255,255,0.75)' }}"/>
+                    color="{{ dsx.variable.drawerTab == 'episodes' ? brand() : 'rgba(255,255,255,0.75)' }}"/>
             </vstack>
           </hstack>
           <zstack class="tabRail" grow="width" align="leading" style="width: 100%">
@@ -1440,7 +1439,7 @@ Please unlock to watch." class="lockHead"/>
               <hstack class="rangeRow">
                 <list bind="dsx.variable.ranges" key="id" axis="horizontal" scroll="false" spacing="18">
                   <text value="{{ item.label }}" class="rangeTxt"
-                        color="{{ item.from - 1 == Number(dsx.variable.range) * 30 ? '#FF2C55' : 'rgba(255,255,255,0.6)' }}"
+                        color="{{ item.from - 1 == Number(dsx.variable.range) * 30 ? brand() : 'rgba(255,255,255,0.6)' }}"
                         on:tap="dsx.variable.range = (item.from - 1) / 30" a11yTrait="button"/>
                 </list>
                 <spacer/>
@@ -1451,7 +1450,7 @@ Please unlock to watch." class="lockHead"/>
                 <grid bind="dsx.variable.visibleEps" key="id" columns="6" spacing="8" scroll="false">
                   <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center; overflow: hidden"
                           on:tap="dsx.action.go({ target: item.idx })"
-                          background="{{ item.idx == Number(dsx.variable.cur) ? '#FF2C55' : '#2C2C2E' }}"
+                          background="{{ item.idx == Number(dsx.variable.cur) ? brand() : '#2C2C2E' }}"
                           a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', VIP' : '' }}" a11yTrait="button" a11yGroup="true">
                     <text value="{{ item.idx }}" class="epNum" color="#FFFFFF"/>
                     <!-- the corner tab: flush to the cell's own corner, never over the numeral -->
@@ -1486,7 +1485,7 @@ Please unlock to watch." class="lockHead"/>
           <hstack class="menuRow" a11yGroup="true" a11yLabel="Subtitles">
             <image icon="globe" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
             <text value="Subtitles" class="menuLabel" style="flex: 1"/>
-            <toggle bind="dsx.variable.captions" color="#FF2C55" a11yLabel="Subtitles"/>
+            <toggle bind="dsx.variable.captions" color="{{ brand() }}" a11yLabel="Subtitles"/>
           </hstack>
           <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
           <!-- QUALITY IS NAMED, NOT FAKED (Article 7, the AdGate precedent). `<video>` has no
@@ -1544,7 +1543,7 @@ Please unlock to watch." class="lockHead"/>
           <hstack class="menuRow" a11yGroup="true" a11yLabel="Picture in picture">
             <image icon="rectangle.stack.fill" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
             <text value="Picture in Picture" class="menuLabel" style="flex: 1"/>
-            <toggle bind="dsx.variable.pip" color="#FF2C55" a11yLabel="Picture in picture"/>
+            <toggle bind="dsx.variable.pip" color="{{ brand() }}" a11yLabel="Picture in picture"/>
           </hstack>
         </vstack>
       </vstack>
@@ -1558,7 +1557,7 @@ Please unlock to watch." class="lockHead"/>
         <list bind="dsx.variable.speedOptions" key="id" scroll="false" spacing="2">
           <hstack class="optRow" on:tap="dsx.variable.speed = item.v" a11yTrait="button" a11yLabel="{{ item.label }}"
                   background="{{ item.v == dsx.variable.speed ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0)' }}">
-            <image icon="checkmark" iconSize="15" color="#FF2C55" visible-if="item.v == dsx.variable.speed" a11yHidden="true"/>
+            <image icon="checkmark" iconSize="15" color="{{ brand() }}" visible-if="item.v == dsx.variable.speed" a11yHidden="true"/>
             <text value="{{ item.label }}" class="optLabel" color="#FFFFFF"/>
           </hstack>
         </list>
@@ -1684,7 +1683,7 @@ Please unlock to watch." class="lockHead"/>
             </vstack>
 
             <hstack class="cNote" visible-if="dsx.variable.modNote != ''">
-              <image icon="exclamationmark.triangle" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+              <image icon="exclamationmark.triangle" iconSize="14" color="{{ gold() }}" a11yHidden="true"/>
               <text value="{{ dsx.variable.modNote }}" class="cNoteTxt" grow="width" style="flex: 1"/>
             </hstack>
 
@@ -1721,7 +1720,7 @@ Please unlock to watch." class="lockHead"/>
               <hstack class="cOptRow" on:tap="dsx.action.blockPick()"
                       a11yGroup="true" a11yTrait="button"
                       a11yLabel="Block {{ dsx.variable.pickAuthor }}. Their comments disappear for you everywhere in the app.">
-                <image icon="person.slash" iconSize="16" color="#FF6B8A" a11yHidden="true"/>
+                <image icon="person.slash" iconSize="16" color="{{ brandTint() }}" a11yHidden="true"/>
                 <vstack spacing="3" grow="width" style="flex: 1; min-width: 0">
                   <text value="Block {{ dsx.variable.pickAuthor }}" class="cOptTxtBad"/>
                   <text class="cOptNote"
@@ -1737,7 +1736,7 @@ Please unlock to watch." class="lockHead"/>
               <text value="YOUR COMMENT" class="cGroupCap"/>
               <hstack class="cOptRow" on:tap="dsx.action.deletePick()"
                       a11yGroup="true" a11yTrait="button" a11yLabel="Delete your comment permanently">
-                <image icon="trash" iconSize="16" color="#FF6B8A" a11yHidden="true"/>
+                <image icon="trash" iconSize="16" color="{{ brandTint() }}" a11yHidden="true"/>
                 <text value="{{ dsx.variable.modBusy ? 'Deleting…' : 'Delete my comment' }}" class="cOptTxtBad" grow="width" style="flex: 1"/>
               </hstack>
               <text class="cSmall" value="This removes it for everyone, and it cannot be undone."/>
@@ -1773,7 +1772,7 @@ Please unlock to watch." class="lockHead"/>
         <scroll grow="true" style="flex: 1; min-height: 0">
           <vstack class="cPaneBody">
             <hstack class="cNote" visible-if="dsx.variable.modNote != ''">
-              <image icon="exclamationmark.triangle" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+              <image icon="exclamationmark.triangle" iconSize="14" color="{{ gold() }}" a11yHidden="true"/>
               <text value="{{ dsx.variable.modNote }}" class="cNoteTxt" grow="width" style="flex: 1"/>
             </hstack>
 
@@ -1781,7 +1780,7 @@ Please unlock to watch." class="lockHead"/>
             <hstack class="cOptRow" on:tap="dsx.action.setFilter({ level: 'standard' })"
                     a11yGroup="true" a11yTrait="button"
                     a11yLabel="Standard filtering. Hides people you blocked and comments three or more readers have flagged.">
-              <image icon="checkmark" iconSize="16" color="#FF2C55" visible-if="dsx.variable.filterLevel == 'standard'" a11yHidden="true"/>
+              <image icon="checkmark" iconSize="16" color="{{ brand() }}" visible-if="dsx.variable.filterLevel == 'standard'" a11yHidden="true"/>
               <image icon="circle" iconSize="16" color="rgba(255,255,255,0.25)" visible-if="dsx.variable.filterLevel != 'standard'" a11yHidden="true"/>
               <vstack spacing="3" grow="width" style="flex: 1; min-width: 0">
                 <text value="Standard" class="cOptTxt"/>
@@ -1791,7 +1790,7 @@ Please unlock to watch." class="lockHead"/>
             <hstack class="cOptRow" on:tap="dsx.action.setFilter({ level: 'strict' })"
                     a11yGroup="true" a11yTrait="button"
                     a11yLabel="Strict filtering. Also hides every comment carrying any flag at all.">
-              <image icon="checkmark" iconSize="16" color="#FF2C55" visible-if="dsx.variable.filterLevel == 'strict'" a11yHidden="true"/>
+              <image icon="checkmark" iconSize="16" color="{{ brand() }}" visible-if="dsx.variable.filterLevel == 'strict'" a11yHidden="true"/>
               <image icon="circle" iconSize="16" color="rgba(255,255,255,0.25)" visible-if="dsx.variable.filterLevel != 'strict'" a11yHidden="true"/>
               <vstack spacing="3" grow="width" style="flex: 1; min-width: 0">
                 <text value="Strict" class="cOptTxt"/>

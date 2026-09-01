@@ -9,6 +9,7 @@
 //
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { themeTones } from "./theme.mjs";
 
 // the sibling convention (scripts/preflight.mjs) or DSX_FRAMEWORK_DIR; DSX_STYLE_CATALOG
 // still overrides the exact file for unusual layouts
@@ -45,8 +46,30 @@ const files = [];
 let problems = 0;
 const say = (f, msg) => { problems++; console.error(`${f}: ${msg}`); };
 
+// THE PALETTE HAS ONE DEFINITION and it is Components/parts/Theme.dsx, where every colour
+// carries a name that says its job. Markup CALLS those names; a `<style as="…">` cannot,
+// because a style attribute drops an interpolation silently (measured — PLAN.md §6.91), so
+// the hexes inside style blocks are MIRRORS of the table. This is the check that stops a
+// mirror drifting: an unnamed hex fails, so a re-skin cannot half-land.
+const TONES = themeTones();
+let unnamed = 0;
+
 for (const f of files.sort()) {
   const src = readFileSync(f, "utf8");
+
+  // every hex must be a NAMED tone (Theme.dsx itself is the definition, so it is exempt)
+  if (!f.endsWith("Theme.dsx")) {
+    const off = new Set();
+    for (const m of src.matchAll(/#[0-9A-Fa-f]{6}\b/g)) {
+      if (!TONES.has(m[0].toLowerCase())) off.add(m[0].toUpperCase());
+    }
+    for (const hex of off) {
+      unnamed++;
+      say(f, `${hex} is not a named tone — add it to Components/parts/Theme.dsx with a name ` +
+             "that says its job, then use that name (a hex nobody named is a hex nobody can re-skin)");
+    }
+  }
+
   const names = [...src.matchAll(/<style\s+as="([^"]+)"/g)].map((m) => m[1]);
   const declared = new Set(names);
   // A DUPLICATE <style as="x"> is silent: the Set above collapses it, the linter allows it,
@@ -81,6 +104,6 @@ for (const f of files.sort()) {
 }
 
 console.log(problems === 0
-  ? `check:styles — ${files.length} files, 0 problems`
-  : `check:styles — ${problems} problem(s)`);
+  ? `check:styles — ${files.length} files, 0 problems (${TONES.size} named tones, 0 unnamed hexes)`
+  : `check:styles — ${problems} problem(s)${unnamed > 0 ? `, ${unnamed} unnamed colour(s)` : ""}`);
 process.exit(problems === 0 ? 0 : 1);

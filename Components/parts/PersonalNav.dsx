@@ -39,10 +39,10 @@
       return 'rgba(0,0,0,0)'
     </formula>
     <formula as="rowTint" key="item.key">
-      return dsx.attribute.active == key ? '#FF2C55' : 'rgba(255,255,255,0.6)'
+      return dsx.attribute.active == key ? brand() : 'rgba(255,255,255,0.6)'
     </formula>
     <formula as="rowInk" key="item.key">
-      return dsx.attribute.active == key ? '#FF2C55' : '#FFFFFF'
+      return dsx.attribute.active == key ? brand() : '#FFFFFF'
     </formula>
 
     <style as="side" spacing="14" alignItems="stretch"/>
@@ -67,6 +67,10 @@
     <style as="menuLabel" fontSize="15" fontWeight="medium"/>
   </head>
 
+  <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
+       Theme.dsx), and a caller must not have to remember to register it first. The
+       block is app-wide and last-write-wins, so a second mount costs a 0x0 stack. -->
+  <Theme/>
   <!-- identity -->
   <vstack class="card">
     <hstack class="idRow">
@@ -87,7 +91,7 @@
     <hstack class="balRow" style="justify-content: space-evenly">
       <vstack class="balCol">
         <hstack spacing="6" alignItems="center">
-          <image icon="dollarsign.circle.fill" iconSize="16" color="#F7C948" a11yHidden="true"/>
+          <image icon="dollarsign.circle.fill" iconSize="16" color="{{ coin() }}" a11yHidden="true"/>
           <text value="{{ dsx.attribute.coins == null ? '—' : dsx.attribute.coins }}" class="balNum"/>
         </hstack>
         <text value="Coins" class="balSub"/>
@@ -95,7 +99,7 @@
       <stack class="balDiv"/>
       <vstack class="balCol">
         <hstack spacing="6" alignItems="center">
-          <image icon="dollarsign.circle.fill" iconSize="16" color="#F7C948" a11yHidden="true"/>
+          <image icon="dollarsign.circle.fill" iconSize="16" color="{{ coin() }}" a11yHidden="true"/>
           <text value="{{ dsx.attribute.bonus == null ? '—' : dsx.attribute.bonus }}" class="balNum"/>
         </hstack>
         <text value="Bonus" class="balSub"/>

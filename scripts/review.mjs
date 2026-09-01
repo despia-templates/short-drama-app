@@ -20,21 +20,14 @@
 //  protection stays fully armed.
 //
 import { execSync } from "node:child_process";
+import { themeTones } from "./theme.mjs";
 
-const PALETTE = new Set([
-  // the VIP gold ramp (masthead gradients, the one gold surface per screen) and the
-  // settle-recovery card's violet — deliberate brand moments, declared as such
-  "#f7e3ae", "#e8c77a", "#ddb35e", "#1e1830",
-  "#000000", "#111111",                                     // stage · ink-on-white
-  "#0a0a0e", "#141419", "#17171c", "#1c1c22", "#1e1e24",    // the dark surface ramp
-  "#232329", "#26262c", "#3a3a42", "#43434d",
-  "#141414", "#1a1a1c", "#1c1c1e", "#242426", "#2a2a2e",    // the DramaWave sheet ramp
-  "#ffe9a8", "#8e1637", "#2c2c2e",                                     // gold highlight · pressed follow
-  "#ff2c55", "#ff6b8a", "#e5225a",                          // DramaWave pink-red + tint + pressed
-  "#f7c948", "#f6b63d", "#b9c5d8", "#ce8b5c",               // coin gold · rank metals
-  "#3a2a08", "#2a1d04",                                     // VIP-card ink (dark on gold)
-  "#ffffff",
-]);
+//  THE PALETTE IS NOT DECLARED HERE ANY MORE. It is read from the one place that defines
+//  it — Components/parts/Theme.dsx, where every colour has a name that says its job — so
+//  this gate cannot disagree with what ships. It used to hold its own copy and had already
+//  fallen six colours behind the app (#5FD08A #3A3547 #FF7BAA #B3103A #FF8FA8 #1F1F26 were
+//  all shipping and all absent here), which is the exact failure a second copy always has.
+const PALETTE = new Set(themeTones().keys());
 
 // the measured ramp: the iOS scale plus the category-reference sizes this app is built to
 const TYPE_RAMP = new Set([11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32, 34]);

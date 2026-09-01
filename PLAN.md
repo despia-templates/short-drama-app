@@ -1734,3 +1734,75 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
     eight universal attributes with no web-support decision at all. The general lesson is the
     one this ledger keeps relearning: a gate that cannot fail is worse than no gate, because
     it is counted as coverage.
+
+91. **A `<style as="…">` attribute cannot carry an interpolation, and the declaration is
+    dropped SILENTLY.** Probed in a throwaway one-element component (AGENTS.md's rule) while
+    factoring this template's brand palette into one definition:
+
+    ```xml
+    <variable as="brand" computed="true">return '#FF2C55'</variable>
+    <style as="a" color="{{ dsx.variable.brand }}" fontSize="15"/>
+    <style as="b" background="{{ dsx.variable.brand }}" padding="8"/>
+    ```
+
+    compiles to
+
+    ```css
+    [data-dsx~="a562"] { font-size: 15px; }
+    [data-dsx~="a563"] { padding: 8px; }
+    ```
+
+    — the interpolated declaration is not wrong, it is ABSENT. `despia lint --strict`,
+    `check:styles` and `despia review` all pass; the registry even preserves the hole
+    verbatim in `head.styles` (`{"as":"a","attrs":{"color":"{{ dsx.variable.brand }}"}}`),
+    so the loss happens in the CSS emitter, not the parser. The same hole works everywhere
+    else: an inline element attribute (`color="{{ brand() }}"`) and a `style=""` hole both
+    render, and the element node is marked reactive.
+
+    WHY IT MATTERS FOR A TEMPLATE. A named style class is the documented way to express a
+    repeated look, and a design token is the documented way to express a repeated value —
+    and the two cannot meet. `#FF2C55` is written 86 times across 20 files here; 82 of
+    those are markup and now call `brand()` (Components/parts/Theme.dsx), and the rest are
+    inside `<style>` blocks where nothing can be called. An adopter re-skinning the app
+    therefore still edits more than one file.
+
+    THE BRIDGE, named in place rather than silent: Theme.dsx is the single definition and
+    `npm run check:styles` refuses any hex in `Components/**` that it does not name, so the
+    `<style>` copies are checked mirrors rather than independent truths. `scripts/review.mjs`
+    reads the same table instead of the second copy it used to carry — a copy that had
+    already fallen six shipping colours behind the app (`#5FD08A #3A3547 #FF7BAA #B3103A
+    #FF8FA8 #1F1F26`), which is the ordinary fate of a second copy and the reason this entry
+    exists.
+
+    THE ASK: let a `<style>` attribute take a computed value, or give the style layer a
+    token plane of its own. Either one turns a re-skin into a one-line edit.
+
+92. **`Core/PostHog`, `Core/Consent` and `Core/Telemetry` each ship a complete web facet
+    that no build can reach, because their manifests declare no `web.entry`.** Found while
+    wiring this template's analytics plane. All three have `web/index.js` on disk —
+    PostHog's is a full SDK-free implementation that POSTs `/i/v0/e/` and `/flags?v=2`,
+    Consent's is a complete localStorage store publishing `granted`/`stored` — and
+    `grep '"web"' dsx.json` returns nothing for any of them. `cli/src/build.ts` is explicit:
+
+    ```ts
+    for (const pkg of registry.packageWeb ?? []) {
+      if (pkg.entry === undefined) continue;
+    ```
+
+    so no chunk is emitted, `has('posthog')` and `has('consent')` are false on every web
+    build, and every call answers not-ok. This is not a new class of defect: it is exactly
+    what `Core/SocialShare/dsx.json` records about itself — *"every web build silently had
+    `has('share') === false` and no chunk on disk, while the implementation sat there
+    complete. Declaring the entry is the whole fix."* SocialShare was fixed; these three
+    were not.
+
+    THE ASK: add `"web": { "boot": true, "entry": "web/index.js" }` to the three manifests.
+    Three lines each, no new code — the implementations are already written and already
+    conformance-pinned.
+
+    Template side, meanwhile: `Components/parts/Analytics.dsx` declares the funnel and calls
+    `dsx.module.posthog.capture` behind `has('posthog')` with the consent gate in front of
+    it, exactly as `Components/parts/AdGate.dsx` handles the rewarded-ad lane — capability
+    first, platform second. With no sink reachable the plane keeps a bounded in-memory ring
+    instead, and the Manage screen SAYS the deployment has no sink rather than implying the
+    funnel is being recorded.

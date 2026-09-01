@@ -93,22 +93,10 @@
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
-    <variable as="bp" computed="true">
-      const w = dsx.screen.width
-      if (w >= 1120) { return 'desktop' }
-      if (w >= 768) { return 'tablet' }
-      return 'phone'
-    </variable>
-    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
-    <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 86 }
-      if (dsx.variable.bp == 'tablet') { return 40 }
-      return 16
-    </variable>
-    <variable as="shell" computed="true">
-      const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
-    </variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
+    <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 1440)</variable>
 
     <formula as="rowSign" amt="item.amount">
       if (amt > 0) { return '+' + amt }
@@ -190,6 +178,10 @@
     <style as="menuValue" fontSize="12" color="rgba(255,255,255,0.42)"/>
   </head>
 
+  <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
+       FIRST CHILD, always: the block registers on instantiate, and this screen reads its
+       own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
+  <Theme/>
   <TopNav active="profile" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page" style="{{ dsx.variable.shell }}">
@@ -265,7 +257,7 @@
           <vstack class="card" visible-if="dsx.variable.wide == false && dsx.variable.signedOut == false">
             <hstack class="stats">
               <vstack class="stat" style="flex: 1">
-                <text value="{{ dsx.variable.coins == null ? '—' : dsx.variable.coins }}" class="statNum" color="#F7C948"/>
+                <text value="{{ dsx.variable.coins == null ? '—' : dsx.variable.coins }}" class="statNum" color="{{ coin() }}"/>
                 <text value="Coins" class="statCap"/>
               </vstack>
               <vstack class="stat" style="flex: 1">
@@ -289,13 +281,13 @@
             <hstack class="stripRow">
               <hstack spacing="7" alignItems="center">
                 <text value="Coins:" class="stripCap"/>
-                <image icon="dollarsign.circle.fill" iconSize="15" color="#F7C948" a11yHidden="true"/>
+                <image icon="dollarsign.circle.fill" iconSize="15" color="{{ coin() }}" a11yHidden="true"/>
                 <text value="{{ dsx.variable.coins == null ? '—' : dsx.variable.coins }}" class="stripNum"/>
               </hstack>
               <text value="|" class="stripCap"/>
               <hstack spacing="7" alignItems="center">
                 <text value="Bonus:" class="stripCap"/>
-                <image icon="dollarsign.circle.fill" iconSize="15" color="#F7C948" a11yHidden="true"/>
+                <image icon="dollarsign.circle.fill" iconSize="15" color="{{ coin() }}" a11yHidden="true"/>
                 <text value="{{ dsx.variable.bonus == null ? '—' : dsx.variable.bonus }}" class="stripNum"/>
               </hstack>
               <spacer/>
@@ -327,7 +319,7 @@
                   <text value="{{ rowLabel }}" class="ledgerTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
                   <text value="{{ item.kind == 'bonus' ? 'Bonus coins' : 'Coins' }}{{ item.expires == null ? '' : ' · expires in 7 days' }}" class="ledgerMeta"/>
                 </vstack>
-                <text value="{{ rowSign }}" class="amount" color="{{ item.amount > 0 ? '#F7C948' : '#FF2C55' }}"/>
+                <text value="{{ rowSign }}" class="amount" color="{{ item.amount > 0 ? coin() : brand() }}"/>
               </hstack>
             </list>
           </vstack>
@@ -389,7 +381,7 @@
                     a11yGroup="true" a11yLabel="Manage this app — operator surface">
               <image icon="gearshape" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
               <text value="Manage this app" class="menuLabel" style="flex: 1"/>
-              <text value="operator" class="menuValue" color="#F7C948"/>
+              <text value="operator" class="menuValue" color="{{ coin() }}"/>
               <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
             <!-- ACCOUNT IS THE LAST ROW, and it is the one a store reviewer looks for: sign
@@ -424,7 +416,7 @@
        to degrade. -->
   <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
     <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
-    <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+    <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
            a11yLabel="Dismiss message" a11yTrait="button"/>
   </hstack>
   <TabBar active="profile" visible-if="dsx.variable.wide == false"/>

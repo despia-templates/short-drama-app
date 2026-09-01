@@ -25,14 +25,9 @@
     <variable as="results">return null</variable>
     <variable as="busy">return false</variable>
 
-    <variable as="bp" computed="true">
-      const w = dsx.screen.width
-      if (w >= 1120) { return 'desktop' }
-      if (w >= 768) { return 'tablet' }
-      return 'phone'
-    </variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
     <variable as="hotCols" computed="true">return dsx.variable.bp == 'phone' ? 1 : 2</variable>
-    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
     <variable as="resCols" computed="true">
       if (dsx.variable.bp == 'desktop') { return 5 }
       if (dsx.variable.bp == 'tablet') { return 4 }
@@ -45,11 +40,7 @@
       return ''
     </variable>
 
-    <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 86 }
-      if (dsx.variable.bp == 'tablet') { return 40 }
-      return 16
-    </variable>
+    <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
     <!-- compound lists are ONE computed value used as the whole attribute (AGENTS.md) -->
     <variable as="shellBox" computed="true">
       const g = dsx.variable.gutter
@@ -57,7 +48,7 @@
     </variable>
 
     <formula as="rankTint" r="item.rank">
-      if (r == 1 || r == 2) { return '#F6B63D' }
+      if (r == 1 || r == 2) { return gold() }
       return 'rgba(255,255,255,0.4)'
     </formula>
 
@@ -132,6 +123,10 @@
     <style as="pillHint" fontSize="14" color="rgba(255,255,255,0.45)"/>
   </head>
 
+  <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
+       Theme.dsx), and a caller must not have to remember to register it first. The
+       block is app-wide and last-write-wins, so a second mount costs a 0x0 stack. -->
+  <Theme/>
   <image icon="magnifyingglass" iconSize="{{ dsx.attribute.size }}" color="{{ dsx.attribute.color }}"
          visible-if="dsx.attribute.pill == false"
          on:tap="dsx.action.openSearch()" a11yLabel="Search" a11yTrait="button"/>

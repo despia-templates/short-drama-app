@@ -1,0 +1,172 @@
+<!-- Theme — THE app's design vocabulary, once. Breakpoints, gutters, page shells and the
+     brand palette, as APP-WIDE FUNCTIONS every surface calls instead of re-deriving.
+
+     WHAT THIS REPLACES. Thirteen screens each carried a byte-identical copy of `bp`,
+     `wide`, `gutter` and `shell` — AGENTS.md says "responsive is one vocabulary per
+     screen", and it was one vocabulary fifteen times. Changing a breakpoint or the
+     desktop gutter was a fifteen-file edit an adopter would get half of. Twenty distinct
+     brand hexes were written out 529 times across 24 files, so a re-skin was a find-and-
+     replace nobody could verify.
+
+     THE MECHANISM is `<functions global="true">` — the framework's GLOBAL FUNCTION
+     LIBRARY (OpenSource/Skills/js-core.md "Shared logic", corpus Conformance/functions).
+     The block registers into the app-wide JSE table, last write wins, and a surface-local
+     name shadows it. Wired on all three renderers, and — measured, which is the part that
+     matters — on the SSR path too (`server/src/render.ts` renderInstance, same call as
+     the dom layer`s mount.ts).
+
+     ══ THE ONE RULE FOR A CALLER: MOUNT THIS FIRST ═══════════════════════════════════
+     Registration happens when this component INSTANTIATES, not at app boot, so the mount
+     has to come before the first read. Measured on a cold origin, first request:
+
+       <Theme/> absent            /notices SSR rendered  BP[]        (a silent null)
+       <Theme/> as first child    /notices SSR rendered  BP[phone]   (correct)
+
+     A screen root reads its own computeds as soon as it evaluates a `visible-if` on its
+     first child — `<TopNav visible-if="dsx.variable.wide"/>` is the usual one — so
+     `<Theme/>` goes ABOVE that, as the literal first child of the screen root. It renders
+     a 0×0 stack (the DemoSeed idiom) and paints nothing.
+
+     ══ WHY THE PALETTE IS HALF-ROUTED, AND WHY THAT IS NOT A SHORTCUT ════════════════
+     Every colour that a screen writes in MARKUP — an inline `color=`, a `background=`,
+     a ternary in a computed, a hole in a `style=` string — calls a function here.
+
+     Every colour inside a `<style as="…">` DECLARATION is still a literal, because a
+     `<style>` attribute CANNOT carry an interpolation: the compiler drops the whole
+     declaration, silently. Measured 2026-09-01 —
+
+       <style as="a" color="{{ dsx.variable.brand }}" fontSize="15"/>
+         → [data-dsx~="a562"] { font-size: 15px; }        (no `color` at all)
+
+     — no error, no lint warning, no CSS. Filed as PLAN.md §6.91. Until it lands, the
+     literals inside `<style>` blocks are CHECKED MIRRORS rather than sources: this file
+     is the single definition and `npm run check:styles` refuses any hex in Components/**
+     that is not one of the named tones below, so a mirror cannot drift silently and a
+     re-skin cannot half-land. `npm run review` reads the same table, so the brand-palette
+     waiver (§6.16) is derived from this file rather than from a second copy of it.
+
+     Two of the tones below are unreachable from this file today and are named anyway:
+     `railShellOf` is called with the 1440 CONTENT cap even on screens whose own shell is
+     1100, because the rail is a full-bleed track and the page column is not — that is a
+     real difference, not a copy that drifted. -->
+<stack width="0" height="0">
+  <head>
+    <!-- BODY CAVEAT (js-core.md): the NATIVE parsers do not lift a `<functions>` body as
+         raw JS yet, so a bare `<` in here breaks them and lint mirrors that by law. Every
+         comparison below is therefore spelled with `>=` or `!=`, never `<`, and there is
+         no `&&` — an XML body would need it escaped and the escape is easy to lose. -->
+    <functions global="true">
+      /* ── THE RESPONSIVE VOCABULARY ────────────────────────────────────────────────
+         phone 0-767 · tablet 768-1119 · desktop 1120+. The same three names the router
+         uses for its motion breakpoint (dsx.config.json router.motionBreakpoint 768) and
+         the same the native export puts iPad portrait and iPad Pro landscape on. */
+      function bpOf(w) {
+        if (w >= 1120) { return 'desktop' }
+        if (w >= 768) { return 'tablet' }
+        return 'phone'
+      }
+
+      /* every screen asked the same question of bp, so it is one name now */
+      function isWide(bp) { return bp != 'phone' }
+
+      /* the two-column player collapses at 1120 — ShortMax collapses at 1024 and
+         ReelShort keeps a 416 panel; 1120 is this app's measured choice (AGENTS.md) */
+      function panelAt(w) { return w >= 1120 }
+
+      /* MEASURED, not chosen: 86 is the category reference gutter on desktop. */
+      function gutterOf(bp) {
+        if (bp == 'desktop') { return 86 }
+        if (bp == 'tablet') { return 40 }
+        return 16
+      }
+
+      /* the OPERATOR gutter is deliberately tighter — Manage is a dense table surface,
+         not a storefront, and 86px of air on a data grid is wasted column */
+      function opsGutterOf(bp) {
+        if (bp == 'desktop') { return 32 }
+        if (bp == 'tablet') { return 24 }
+        return 16
+      }
+
+      /* THE PAGE SHELL: a centred column capped at maxW with the gutter as its padding.
+         maxW is the caller`s, because it is a CONTENT decision — 1440 for a storefront
+         grid, 1100 for a purchase column, 760 for an inbox, 520 for a credential form. */
+      function shellOf(bp, maxW) {
+        const g = gutterOf(bp)
+        return 'width: 100%; max-width: ' + maxW + 'px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+      }
+
+      function opsShellOf(bp, maxW) {
+        const g = opsGutterOf(bp)
+        return 'width: 100%; max-width: ' + maxW + 'px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
+      }
+
+      /* A HORIZONTAL RAIL`S TRACK IS `max-content`, never the page shell`s `width: 100%`
+         (AGENTS.md): the shell recipe caps the track at the scroller and the rows eat the
+         difference — measured, 150px posters rendered at 72.25px. The lead padding keeps
+         the first card flush with the page column on a viewport wider than the cap. */
+      function railShellOf(bp, w, maxW) {
+        const g = gutterOf(bp)
+        const over = w - maxW
+        const lead = g + (over > 0 ? Math.round(over / 2) : 0)
+        return 'width: max-content; padding-left: ' + lead + 'px; padding-right: ' + lead + 'px'
+      }
+
+      /* ── THE BRAND PALETTE ────────────────────────────────────────────────────────
+         Named by JOB, not by hue, so a re-skin is a value change and never a rename.
+         Callers: markup only (see the header — a `<style>` cannot hold an interpolation).
+         `npm run check:styles` proves no hex in Components/** is outside this table. */
+
+      /* the accent. One job: the thing you tap, the thing that is on. */
+      function brand() { return '#FF2C55' }
+      function brandTint() { return '#FF6B8A' }      /* accent on a dark card, links */
+      function brandPressed() { return '#8E1637' }   /* the followed/pressed state */
+      function brandSoft() { return '#FF8FA8' }      /* accent ink on a coloured wash */
+
+      /* money. gold is VIP, coin is a balance — two different promises, two tones. */
+      function gold() { return '#F6B63D' }
+      function coin() { return '#F7C948' }
+      function goldHi() { return '#FFE9A8' }
+      function vipGoldTop() { return '#F7E3AE' }
+      function vipGoldMid() { return '#E8C77A' }
+      function vipGoldEnd() { return '#DDB35E' }
+      function onGold() { return '#3A2A08' }         /* ink on a gold card */
+      function onGoldSoft() { return '#2A1D04' }
+
+      /* the stage and the ink */
+      function stage() { return '#000000' }
+      function ink() { return '#FFFFFF' }
+      function inkOnLight() { return '#111111' }
+
+      /* the dark surface ramp, deepest first */
+      function surfaceDeep() { return '#0A0A0E' }
+      function surface() { return '#141419' }
+      function surfaceRaised() { return '#17171C' }
+      function surfaceCard() { return '#1C1C22' }
+      function surfaceInput() { return '#1E1E24' }
+      function surfaceEdge() { return '#1F1F26' }
+      function surfaceChip() { return '#232329' }
+      function surfaceChipOn() { return '#26262C' }
+      function surfaceHair() { return '#3A3A42' }
+      function surfaceHairLift() { return '#43434D' }
+
+      /* the sheet ramp (the DramaWave drawer set — a sheet sits ABOVE the page, so it
+         gets its own neutrals rather than borrowing the page`s) */
+      function sheet() { return '#141414' }
+      function sheetRaised() { return '#1A1A1C' }
+      function sheetCard() { return '#1C1C1E' }
+      function sheetChip() { return '#242426' }
+      function sheetEdge() { return '#2A2A2E' }
+      function sheetCell() { return '#2C2C2E' }
+
+      /* one-off brand moments, each earned */
+      function recoveryViolet() { return '#1E1830' }  /* the Stripe settle-recovery card */
+      function violetEdge() { return '#3A3547' }
+      function positive() { return '#5FD08A' }        /* a grant landed */
+      function rankSilver() { return '#B9C5D8' }
+      function rankBronze() { return '#CE8B5C' }
+      function gemLift() { return '#FF7BAA' }         /* the VIP gem gradient, top stop */
+      function gemDeep() { return '#B3103A' }         /* ... and its end stop */
+    </functions>
+  </head>
+</stack>

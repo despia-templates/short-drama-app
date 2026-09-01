@@ -126,7 +126,7 @@
       // a card that cannot be bought must not look buyable: the blocked lane dims the whole
       // grid, and the notice above it says why (payNote)
       const dim = dsx.variable.payLane == 'blocked' ? 0.45 : (dsx.variable.buying == id ? 0.55 : 1)
-      const ring = best ? '#FF2C55' : 'rgba(0,0,0,0)'
+      const ring = best ? brand() : 'rgba(0,0,0,0)'
       const glow = dsx.variable.hovId == id ? '0 10px 30px rgba(230,190,110,0.25)' : 'none'
       return 'background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid ' + ring + '; opacity: ' + dim + '; transform: ' + lift + '; box-shadow: ' + glow + '; transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease'
     </formula>
@@ -269,6 +269,10 @@
     <style as="errCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="20" alignItems="center"/>
   </head>
 
+  <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
+       Theme.dsx), and a caller must not have to remember to register it first. The
+       block is app-wide and last-write-wins, so a second mount costs a 0x0 stack. -->
+  <Theme/>
   <!-- the host's own trigger markup, wrapped in the tap that raises the sheet -->
   <vstack class="trigger" visible-if="dsx.variable.isInline == false"
           on:tap="dsx.action.openPlans()" a11yTrait="button" a11yLabel="See VIP plans">
@@ -287,7 +291,7 @@
     </vstack>
     <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
       <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
-      <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+      <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
              a11yLabel="Dismiss message" a11yTrait="button"/>
     </hstack>
     <!-- THE REFUSAL, WHERE THE PRICE IS. App Store 3.1.1 makes coins and passes in-app-
@@ -351,7 +355,7 @@
 
       <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
         <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
-        <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+        <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
                a11yLabel="Dismiss message" a11yTrait="button"/>
       </hstack>
 

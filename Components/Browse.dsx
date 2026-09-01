@@ -64,27 +64,15 @@
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
-    <variable as="bp" computed="true">
-      const w = dsx.screen.width
-      if (w >= 1120) { return 'desktop' }
-      if (w >= 768) { return 'tablet' }
-      return 'phone'
-    </variable>
-    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
     <variable as="cols" computed="true">
       if (dsx.variable.bp == 'desktop') { return 5 }
       if (dsx.variable.bp == 'tablet') { return 4 }
       return 3
     </variable>
-    <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 86 }
-      if (dsx.variable.bp == 'tablet') { return 40 }
-      return 16
-    </variable>
-    <variable as="shell" computed="true">
-      const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
-    </variable>
+    <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 1440)</variable>
     <variable as="heading" computed="true">
       const a = dsx.variable.active
       return a == 'all' ? 'All series' : a
@@ -96,7 +84,7 @@
     <!-- ONE computed value used as the WHOLE style attribute: `style="{{ chunk }}; extras"`
          splits on `;` first and silently DROPS the colon-less fragment (AGENTS.md) -->
     <variable as="allChipFx" computed="true">
-      const bg = dsx.variable.active == 'all' ? '#FF2C55' : 'rgba(255,255,255,0.08)'
+      const bg = dsx.variable.active == 'all' ? brand() : 'rgba(255,255,255,0.08)'
       return 'background: ' + bg + '; border-radius: 18px; padding: 8px 16px; white-space: nowrap; transition: background-color 0.18s ease'
     </variable>
     <variable as="countLabel" computed="true">
@@ -107,12 +95,12 @@
 
     <formula as="chipFx" name="item.name">
       const on = dsx.variable.active == name
-      const bg = on ? '#FF2C55' : 'rgba(255,255,255,0.08)'
+      const bg = on ? brand() : 'rgba(255,255,255,0.08)'
       return 'background: ' + bg + '; border-radius: 18px; padding: 8px 16px; white-space: nowrap; transition: background-color 0.18s ease'
     </formula>
     <formula as="tagChipFx" name="item.name">
       const on = dsx.variable.active == name
-      const bg = on ? '#FF2C55' : 'rgba(255,255,255,0.05)'
+      const bg = on ? brand() : 'rgba(255,255,255,0.05)'
       const fg = on ? '#FFFFFF' : 'rgba(255,255,255,0.72)'
       return 'background: ' + bg + '; color: ' + fg + '; border-radius: 18px; padding: 8px 16px; white-space: nowrap; transition: background-color 0.18s ease'
     </formula>
@@ -159,6 +147,10 @@
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="11" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
+       FIRST CHILD, always: the block registers on instantiate, and this screen reads its
+       own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
+  <Theme/>
   <TopNav active="browse" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page" style="{{ dsx.variable.shell }}" paddingTop="16">

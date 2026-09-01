@@ -399,6 +399,10 @@
     <style as="doneCard" background="#141419" radius="12" paddingH="14" paddingV="18" spacing="10" alignItems="center"/>
   </head>
 
+  <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
+       Theme.dsx), and a caller must not have to remember to register it first. The
+       block is app-wide and last-write-wins, so a second mount costs a 0x0 stack. -->
+  <Theme/>
   <!-- THE SURFACE. Nothing renders in `boot` mode: a screen mounting the resolver gets a
        zero-height stack and no chrome. The /auth/:pane route mounts this once with
        mode="page" and the pane it was asked for. -->
@@ -414,7 +418,7 @@
       </hstack>
 
       <hstack class="noticeRow" visible-if="dsx.variable.notice != ''">
-        <image icon="exclamationmark.triangle.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+        <image icon="exclamationmark.triangle.fill" iconSize="14" color="{{ gold() }}" a11yHidden="true"/>
         <text value="{{ dsx.variable.notice }}" class="noticeLine" style="flex: 1; min-width: 0"/>
       </hstack>
 
@@ -490,7 +494,7 @@
 
       <!-- done -->
       <vstack class="doneCard" visible-if="dsx.variable.deleteState == 'done'">
-        <image icon="checkmark.circle.fill" iconSize="30" color="#F6B63D" a11yHidden="true"/>
+        <image icon="checkmark.circle.fill" iconSize="30" color="{{ gold() }}" a11yHidden="true"/>
         <text value="Your account is deleted" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
         <text class="bridgeBody" textAlign="center"
               value="Everything held against it is gone and you are signed out. The catalogue stays open — you can keep browsing as a guest, or create a new account whenever you like."/>
@@ -560,7 +564,7 @@
           <text class="bridgeBody" value="Nothing was deleted. The route named by `accountDeleteUrl` does not exist on this origin — declare `deleteAccount` in `server/viewer.dsx` and route it. docs/auth.md, 'Account deletion'."/>
         </vstack>
         <hstack class="noticeRow" visible-if="dsx.variable.deleteState == 'refused'">
-          <image icon="exclamationmark.triangle.fill" iconSize="14" color="#F6B63D" a11yHidden="true"/>
+          <image icon="exclamationmark.triangle.fill" iconSize="14" color="{{ gold() }}" a11yHidden="true"/>
           <text value="{{ dsx.variable.deleteNote }}" class="noticeLine" style="flex: 1; min-width: 0"/>
         </hstack>
 

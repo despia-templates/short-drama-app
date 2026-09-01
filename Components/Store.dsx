@@ -65,28 +65,16 @@
       if (catalog.data != null) { return catalog.data }
       return global.cacheCatalog
     </variable>
-    <variable as="bp" computed="true">
-      const w = dsx.screen.width
-      if (w >= 1120) { return 'desktop' }
-      if (w >= 768) { return 'tablet' }
-      return 'phone'
-    </variable>
-    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
-    <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 86 }
-      if (dsx.variable.bp == 'tablet') { return 40 }
-      return 16
-    </variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
+    <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
     <variable as="vipCols" computed="true">return dsx.variable.bp == 'phone' ? 1 : 3</variable>
     <variable as="packCols" computed="true">
       if (dsx.variable.bp == 'desktop') { return 3 }
       if (dsx.variable.bp == 'tablet') { return 3 }
       return 2
     </variable>
-    <variable as="shell" computed="true">
-      const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1100px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
-    </variable>
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 1100)</variable>
     <variable as="balance" computed="true">
       if (dsx.variable.walletView == null) { return 0 }
       return dsx.variable.walletView.coins + dsx.variable.walletView.bonus
@@ -299,6 +287,10 @@
     <style as="earnCta" background="rgba(255,255,255,0.1)" radius="24" paddingV="14" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
+       FIRST CHILD, always: the block registers on instantiate, and this screen reads its
+       own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
+  <Theme/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
       <TopNav active="store" visible-if="dsx.variable.wide"/>
@@ -314,7 +306,7 @@
           <text value="VIP" class="vipChip" visible-if="dsx.variable.isVip"/>
           <spacer/>
           <hstack class="balancePill" visible-if="dsx.variable.walletView != null">
-            <image icon="dollarsign.circle.fill" iconSize="15" color="#F6B63D" a11yHidden="true"/>
+            <image icon="dollarsign.circle.fill" iconSize="15" color="{{ gold() }}" a11yHidden="true"/>
             <text value="{{ dsx.variable.balance }}" class="balanceNum"/>
           </hstack>
         </hstack>
@@ -405,7 +397,7 @@
                     style="{{ packCardFx }}">
               <hstack spacing="8" alignItems="center" style="width: 100%">
                 <hstack class="coinRow">
-                  <image icon="dollarsign.circle.fill" iconSize="17" color="#F6B63D" a11yHidden="true"/>
+                  <image icon="dollarsign.circle.fill" iconSize="17" color="{{ gold() }}" a11yHidden="true"/>
                   <text value="{{ item.coins + item.free }}" class="packCoins"/>
                 </hstack>
                 <spacer/>
@@ -466,7 +458,7 @@
        to degrade. -->
   <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
     <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
-    <image icon="xmark" iconSize="12" color="#F6B63D" on:tap="dsx.variable.toast = ''"
+    <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
            a11yLabel="Dismiss message" a11yTrait="button"/>
   </hstack>
   <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of

@@ -74,35 +74,18 @@
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
-    <variable as="bp" computed="true">
-      const w = dsx.screen.width
-      if (w >= 1120) { return 'desktop' }
-      if (w >= 768) { return 'tablet' }
-      return 'phone'
-    </variable>
-    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
     <variable as="cols" computed="true">
       if (dsx.variable.bp == 'desktop') { return 5 }
       if (dsx.variable.bp == 'tablet') { return 4 }
       return 3
     </variable>
-    <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 86 }
-      if (dsx.variable.bp == 'tablet') { return 40 }
-      return 16
-    </variable>
-    <variable as="shell" computed="true">
-      const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
-    </variable>
+    <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 1440)</variable>
     <!-- a rail track is `max-content` with the gutter as its padding: `width: 100%` (the
          page-shell recipe) caps the track at the scroller and the cards eat the difference. -->
-    <variable as="railShell" computed="true">
-      const g = dsx.variable.gutter
-      const over = dsx.screen.width - 1440
-      const lead = g + (over > 0 ? Math.round(over / 2) : 0)
-      return 'width: max-content; padding-left: ' + lead + 'px; padding-right: ' + lead + 'px'
-    </variable>
+    <variable as="railShell" computed="true">return railShellOf(dsx.variable.bp, dsx.screen.width, 1440)</variable>
 
     <formula as="histFx" ep="item.episode">
       const on = dsx.variable.hovId == ('h-' + ep)
@@ -140,6 +123,10 @@
     <style as="signBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
+       FIRST CHILD, always: the block registers on instantiate, and this screen reads its
+       own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
+  <Theme/>
   <TopNav active="list" visible-if="dsx.variable.wide"/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page" style="{{ dsx.variable.shell }}">

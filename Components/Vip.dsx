@@ -97,30 +97,13 @@
       if (home.data != null) { return home.data }
       return global.cacheHome
     </variable>
-    <variable as="bp" computed="true">
-      const w = dsx.screen.width
-      if (w >= 1120) { return 'desktop' }
-      if (w >= 768) { return 'tablet' }
-      return 'phone'
-    </variable>
-    <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
-    <variable as="gutter" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 86 }
-      if (dsx.variable.bp == 'tablet') { return 40 }
-      return 16
-    </variable>
-    <variable as="shell" computed="true">
-      const g = dsx.variable.gutter
-      return 'width: 100%; max-width: 1100px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
-    </variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
+    <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 1100)</variable>
     <!-- a rail track is `max-content` with the gutter as its padding: `width: 100%` (the
          page-shell recipe) caps the track at the scroller and the cards eat the difference. -->
-    <variable as="railShell" computed="true">
-      const g = dsx.variable.gutter
-      const over = dsx.screen.width - 1440
-      const lead = g + (over > 0 ? Math.round(over / 2) : 0)
-      return 'width: max-content; padding-left: ' + lead + 'px; padding-right: ' + lead + 'px'
-    </variable>
+    <variable as="railShell" computed="true">return railShellOf(dsx.variable.bp, dsx.screen.width, 1440)</variable>
     <variable as="mastheadBox" computed="true">
       return dsx.variable.shell + '; background: linear-gradient(180deg, rgba(246,182,61,0.16) 0%, rgba(0,0,0,0) 100%)'
     </variable>
@@ -218,6 +201,10 @@
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
+       FIRST CHILD, always: the block registers on instantiate, and this screen reads its
+       own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
+  <Theme/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
       <TopNav active="vip" visible-if="dsx.variable.wide"/>
@@ -226,7 +213,7 @@
         <image src="/assets/coin.svg" a11yHidden="true" style="width: 54px; height: 54px"/>
         <text value="Enjoy Your VIP Access and Privileges" class="mastheadTitle"/>
         <hstack class="statusPill" visible-if="dsx.variable.isVip">
-          <image icon="crown.fill" iconSize="13" color="#F6B63D" a11yHidden="true"/>
+          <image icon="crown.fill" iconSize="13" color="{{ gold() }}" a11yHidden="true"/>
           <text value="{{ dsx.variable.statusLine }}" class="statusTxt"/>
         </hstack>
       </vstack>
@@ -251,7 +238,7 @@
           <hstack spacing="4" alignItems="center" on:tap="dsx.module.route.reset({ path: '/profile' })"
                   a11yGroup="true" a11yTrait="button" a11yLabel="View your wallet">
             <text value="View wallet" class="watchLink"/>
-            <image icon="chevron.right" iconSize="12" color="#F6B63D" a11yHidden="true"/>
+            <image icon="chevron.right" iconSize="12" color="{{ gold() }}" a11yHidden="true"/>
           </hstack>
         </hstack>
       </vstack>
@@ -318,7 +305,7 @@
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <list bind="dsx.variable.benefits" key="id" scroll="false" spacing="0">
             <hstack class="benefitRow">
-              <image icon="{{ item.icon }}" iconSize="20" color="#F6B63D" a11yHidden="true"/>
+              <image icon="{{ item.icon }}" iconSize="20" color="{{ gold() }}" a11yHidden="true"/>
               <vstack spacing="3" style="flex: 1; min-width: 0">
                 <text value="{{ item.label }}" class="benefitLabel"/>
                 <text value="{{ item.note }}" class="benefitNote"/>

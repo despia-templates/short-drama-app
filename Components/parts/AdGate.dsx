@@ -354,6 +354,10 @@
     <style as="waitBtn" background="rgba(255,255,255,0.14)" radius="24" paddingH="32" paddingV="13" fontSize="15" fontWeight="semibold" color="rgba(255,255,255,0.55)"/>
   </head>
 
+  <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
+       Theme.dsx), and a caller must not have to remember to register it first. The
+       block is app-wide and last-write-wins, so a second mount costs a 0x0 stack. -->
+  <Theme/>
   <vstack class="card">
     <hstack class="cardHead">
       <text value="{{ dsx.variable.cardTitle }}" class="h2"/>
@@ -363,7 +367,7 @@
       <text value="{{ dsx.attribute.today }}/{{ dsx.attribute.cap }} today" class="meta"
             visible-if="dsx.variable.isVip == false"/>
       <hstack class="vipPill" visible-if="dsx.variable.isVip" a11yGroup="true" a11yLabel="Included with VIP">
-        <image icon="crown.fill" iconSize="11" color="#F6B63D" a11yHidden="true"/>
+        <image icon="crown.fill" iconSize="11" color="{{ gold() }}" a11yHidden="true"/>
         <text value="VIP" class="vipPillTxt"/>
       </hstack>
     </hstack>
@@ -382,7 +386,7 @@
     </hstack>
 
     <button label="{{ dsx.variable.btnLabel }}" class="cta"
-            background="{{ dsx.variable.canPlay ? '#FF2C55' : '#26262C' }}"
+            background="{{ dsx.variable.canPlay ? brand() : '#26262C' }}"
             on:tap="dsx.action.play()"
             visible-if="dsx.variable.isVip == false"/>
 
