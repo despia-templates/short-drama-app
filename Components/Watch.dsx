@@ -1085,8 +1085,22 @@ Please unlock to watch." class="lockHead"/>
                       a11yTrait="button"
                       a11yLabel="Browse {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre }}"
                       href="/browse/{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre }}"/>
-                <text value="Series" class="tag"/>
+                <text value="EP 1–{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.free_until }} Free" class="tag"
+                      visible-if="dsx.variable.detailView != null"/>
               </hstack>
+              <!-- THE SHOW'S OWN TAGS, the same flow the wide panel draws (and the same
+                   /browse/:tag destination — browseCatalog matches genre OR tag, so a tag
+                   chip lands on a real result set). They were rendered in the panel lane
+                   ONLY, so a phone viewer never saw a single tag: the drawer and the panel
+                   are one component in two layouts and the house law is that both lanes
+                   render the SAME pieces, or they drift. "Series" is gone with them — it was
+                   a FORMAT label wearing a chip's clothes, and the one chip here that could
+                   not be tapped. -->
+              <flow class="tagFlow" bind="dsx.variable.showTags" key="name" spacing="6" lineSpacing="6"
+                    visible-if="dsx.variable.showTags.length > 0">
+                <text value="{{ item.name }}" class="tagSoft" a11yTrait="button"
+                      a11yLabel="Browse {{ item.name }}" href="/browse/{{ item.name }}"/>
+              </flow>
               <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.synopsis }}" class="synopsisTxt"/>
             </vstack>
           </vstack>
