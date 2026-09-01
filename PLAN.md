@@ -2665,3 +2665,25 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      the canvas luminance. Both bands measure (0,0,0) on both device themes; `dsx.screen.safeTop/
      safeBottom` were already the real insets. STILL OPEN after this pass, in flight: the player
      never leaves `phase == 'loading'` on Android and the For You stage paints no video frame.
+
+120. **A PARAM-ONLY `route.replace` KEPT THE FRAME BUT RESEEDED ONLY THE SURFACE STORE ON iOS, so
+     the player replayed episode 1 forever and closed its drawer every 10.7 seconds** (found
+     2026-09-02 while chasing "the Synopsis tab dismisses the drawer"; fixed upstream dev@fe142974 +
+     458e2c02 · 7de3de60). The report was wrong and the log stream said so: with the clip paused, a
+     tap inside the presented drawer logged `[dsx.tap] vstack dsx.variable.drawerTab = 'synopsis'`
+     and switched the tab — the overlay ledger, the anchors and SwiftUI hit-testing were never
+     involved. What closed the drawer was this template's own `onEnded → go → closeDrawer()` at the
+     demo clip's end, every 10.7s, and the reason it fired FOREVER was the engine: an in-place
+     `route.replace` (the URL sync after an episode advance, which must keep the frame so the drawer
+     survives) wrote the new `vars` to the surface store only, while the route-mounted screen and
+     every nested part had COPIED `vars` at birth. `boot()` on the next page read the stale `idx`,
+     the pager bounced to page 0, and the loop restarted — a ~10s HID tap timeout lined up with it.
+     Web never loops because `router.ts` re-mints the frame on replace. The fix is a frame-params
+     plane (`RouteVars.swift`: inherit at birth AND join the inheritance ledger; `reseed` walks every
+     live store once), the Router traces `N store(s) take the new params`, and
+     `Conformance/router/params.json` (10 rows) runs on the Swift lane — red before: "the instance
+     born from the surface reads the new params — `screen` reads idx 1, expected 2". Re-measured:
+     EP.1→2→3→4→5 with zero replace-to-/1, and the Synopsis tap leaves the drawer up. TEMPLATE RULE:
+     pause the clip before measuring anything inside the drawer, and a `present -> 0` with
+     `reason=programmatic` and no `[dsx.tap]` beside it is author code — grep the router's
+     `replace … in place` line next to it before blaming the sheet.
