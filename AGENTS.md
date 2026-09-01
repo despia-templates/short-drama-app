@@ -337,8 +337,10 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   `min-height: {{ dsx.screen.height }}px` is the WEB body-height mechanism; on native it
   forces window height into the safe region and the spill carries the tab bar into the
   home-indicator zone (measured 34pt). A native route frame already proposes the safe
-  region — `grow="true"` fills it. And the vstack default spacing (8, both lanes) plus a
-  zero-size seed child is a 14pt phantom above the scroller: roots zero their spacing.
+  region — `grow="true"` fills it. The vstack default spacing (8, both lanes) plus a
+  zero-size seed child used to be a 14pt phantom above the scroller; the engine no longer
+  gives a registration-only mount a stack slot, so `spacing="0"` on a root is now a design
+  decision rather than a workaround (keep it — a screen root has no gap to declare).
   Safe-area clearance itself belongs to the INSET PLANE on every lane (the native frame,
   the web `.dsx-frame` env() padding) — never to a screen's own padding.
 - **A progress fill is COMPUTED PX or a MEASURED track — never `width: N%`.** The native
@@ -408,9 +410,22 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   (custom-ux.md PlayerScrubber): track/fill/thumb off one `measure=` box, drag = seek.
 - **`flex: 1` fills natively now** (dev@bff4c16d) — a DIRECT stack child's raw inline
   `flex: 1`/`flex-grow: n` re-renders with a synthetic grow on the parent's axis, own
-  fills expanding with the box. Two riders: only raw literals (a computed flex hugs —
-  spell `grow=` there), and a component boundary hides the inner flex from the row — put
-  `grow="width"` ON THE MOUNT TAG (the zIndex-on-mount sibling rule).
+  fills expanding with the box. One rider left: only raw literals (a computed flex hugs —
+  spell `grow=` there).
+- **THE COMPONENT BOUNDARY CARRIES THE FILL NOW, and a registration is not a flex item.**
+  The old note here said a boundary hides the inner flex from the row, so put `grow="width"`
+  on the mount tag. That was a workaround for an engine gap and the gap is closed: a mount's
+  resolved grow reaches the template ROOT as a synthetic default, so the component's own
+  background widens with the box (measured on an iPhone 17 Pro: `<SignInCard/>` painted
+  16.00–361.67 inside a correct 16.00–385.67 frame; it now paints 16.00–385.67, the same as
+  the plain card beside it, and the same as web). A `grow=` still on a mount tag is harmless
+  and now redundant. Two siblings landed with it: a component's `<head>` registers at
+  INSTANCE BIRTH, so a route change no longer paints one classless frame (the tab bar's
+  captions used to sit 9.33pt low for exactly one frame after every navigation — its own
+  `paddingTop`, missing), and a mount that renders nothing (`<Theme/>`, `<Analytics/>`, the
+  `width="0" height="0"` idiom) takes no stack slot, so a spaced column stops paying a gap on
+  both sides of nothing (measured 40.00 in a column declaring 20.00; now 20.00 on both lanes).
+  `zIndex` ON THE MOUNT TAG is unaffected and still the rule.
 - **Probe before you generalise.** If a property "doesn't work", reproduce it in a throwaway
   one-element component first. Three framework defects were once filed from one bad
   measurement; all three were false.
