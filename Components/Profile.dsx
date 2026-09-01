@@ -93,16 +93,10 @@
     </variable>
 
     <!-- the shared breakpoint vocabulary (see Components/App.dsx for the rationale) -->
-    <!-- THE ACTIVE UI LOCALE. `global.locale` is the kernel's own override key (the ladder
-         is global.locale -> device language -> en), so this reads the switch rather than
-         keeping a second copy of it. Unset means the device is deciding, and the row shows
-         English because that is this app's source language and its only certain fallback. -->
-    <variable as="uiLocale" computed="true">
-      const l = global.locale
-      if (l == null) { return 'en' }
-      if (l == '') { return 'en' }
-      return String(l).slice(0, 2)
-    </variable>
+    <!-- THE LANGUAGE PICKER'S ROWS, from the one list that also gates the build
+         (Theme.dsx `languageRows()`). Computed rather than plain because the first row's
+         label follows the active locale, so it re-derives with every switch. -->
+    <variable as="langRows" computed="true">return languageRows()</variable>
     <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
     <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
     <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
@@ -127,8 +121,21 @@
       wallet.refresh()
       ledger.refresh()
     </action>
-    <action as="planFailed" message="event.message">
+    <action as="planFailed" message="message">
       dsx.variable.toast = message
+    </action>
+    <!-- THE PICKER ALREADY WROTE `global.locale` through its own bind seam by the time
+         this fires; the job left is to REMEMBER it. The device row carries the empty tag
+         and DELETES the cookie rather than storing an empty one, because "no choice" and
+         "chose nothing" have to read the same on the next launch — a stored empty string
+         would pin the ladder to a decision the viewer never made. -->
+    <action as="localePicked" tag="value">
+      if (tag == null) { return }
+      if (tag == '') {
+        dsx.cookie.uiLocale = null
+        return
+      }
+      dsx.cookie.uiLocale = tag
     </action>
 
     <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
@@ -183,7 +190,6 @@
     <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
     <style as="menuRow" alignItems="center" paddingV="12" spacing="11"/>
-    <style as="langChip" radius="14" paddingH="14" paddingV="7" fontSize="13" fontWeight="semibold"/>
     <style as="menuLabel" fontSize="13" color="#FFFFFF"/>
     <style as="menuNote" fontSize="12" color="rgba(255,255,255,0.42)"/>
     <style as="menuValue" fontSize="12" color="rgba(255,255,255,0.42)"/>
@@ -400,28 +406,35 @@
                  as the priced quality ladder Phase 1 deleted." That objection is answered by
                  coverage, not by argument — `npm run verify` fails the build if any viewer
                  string is missing from a shipped table, so a half-locale cannot reach a
-                 release. Add a language by adding a file; add the chip here beside it. -->
+                 release. Add a language by adding the file and its row in Theme.dsx
+                 `languageRows()`; verify refuses a row whose table the build did not fold.
+
+                 WHY A `<picker>` AND NOT THIRTEEN CHIPS. Two languages fit in a chip row;
+                 thirteen do not, and a hand-built list of stacks would be a menu that is
+                 not a menu — no keyboard model, no VoiceOver rotor, no platform sheet. The
+                 framework ships the real control, so this is one: `<picker>` is a genuine
+                 `<select>` on web and the system menu on iOS and Android. Its rows are DATA
+                 (Theme.dsx `languageRows()`), which is also why the endonyms never enter the
+                 string corpus — nothing here needs translating, and nothing here can be
+                 translated (§6.98).
+
+                 THE FIRST ROW IS THE DEVICE, and it is the app's real default. The kernel
+                 ladder is `global.locale` → device language → en, so an app that has never
+                 been switched is already following the device; writing a language at boot to
+                 make the control look decided would DESTROY that step. Picking the device row
+                 clears the choice and hands the ladder back. -->
             <vstack class="menuRow" spacing="9" alignItems="stretch"
                     style="border-bottom: 1px solid rgba(255,255,255,0.05)">
               <hstack spacing="11" alignItems="center">
                 <image icon="globe" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
-                <vstack spacing="2" style="flex: 1" alignItems="stretch">
+                <vstack spacing="2" style="flex: 1" grow="width" alignItems="stretch">
                   <text value="Language" class="menuLabel"/>
                   <text value="The app's own words. Audio and subtitle tracks are a separate control the renderer cannot offer yet." class="menuNote"/>
                 </vstack>
               </hstack>
-              <hstack spacing="8" alignItems="center">
-                <text value="English" class="langChip" a11yTrait="button"
-                      a11yLabel="Show the app in English"
-                      color="{{ dsx.variable.uiLocale == 'en' ? onGold() : ink() }}"
-                      background="{{ dsx.variable.uiLocale == 'en' ? coin() : surfaceChipOn() }}"
-                      on:tap="global.locale = 'en'"/>
-                <text value="Español" class="langChip" a11yTrait="button"
-                      a11yLabel="Mostrar la aplicación en español"
-                      color="{{ dsx.variable.uiLocale == 'es' ? onGold() : ink() }}"
-                      background="{{ dsx.variable.uiLocale == 'es' ? coin() : surfaceChipOn() }}"
-                      on:tap="global.locale = 'es'"/>
-              </hstack>
+              <picker bind="global.locale" optionsKey="dsx.variable.langRows"
+                      a11yLabel="App language" on:change="dsx.action.localePicked()"/>
+              <text value="Remembered until you quit the app — this build has no durable preference store." class="menuNote"/>
             </vstack>
             <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)" href="/admin"
                     a11yGroup="true" a11yLabel="Manage this app — operator surface">

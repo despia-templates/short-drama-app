@@ -221,12 +221,12 @@
     </action>
 
     <!-- the ad lane lives in <AdGate>; this screen only reacts to its outcome -->
-    <action as="adGranted" reward="event.reward" left="event.left">
+    <action as="adGranted" reward="reward" left="left">
       dsx.variable.toast = '+' + reward + ' bonus coins · ' + left + ' left today'
       state.refresh()
       wallet.refresh()
     </action>
-    <action as="adFailed" message="event.message">
+    <action as="adFailed" message="message">
       dsx.variable.toast = message
     </action>
     <!-- THE REPORT SEAM (App Store 2.5.18 requires the affordance; <AdGate> presents it).
@@ -238,7 +238,7 @@
          "reported" as if something was filed. -->
     <!-- The card suppresses the creative locally either way; this reports it as well, and
          says which of the two actually happened rather than claiming the stronger one. -->
-    <action as="adReported" lane="event.lane" creative="event.creative">
+    <action as="adReported" lane="lane" creative="creative">
       dsx.variable.toast = 'Ad hidden for this session.'
       const r = await adReportCall.send({ lane: lane, creative: creative })
       if (r.ok) {

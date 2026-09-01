@@ -1,6 +1,9 @@
 <!-- Theme — THE app's presentation vocabulary, once. Breakpoints, gutters, page shells,
-     the brand palette and the locale-aware formatters, as APP-WIDE FUNCTIONS every surface
-     calls instead of re-deriving.
+     the brand palette, the locale-aware formatters and the shipped locale SET, as APP-WIDE
+     FUNCTIONS every surface calls instead of re-deriving. It also carries the one piece of
+     presentation that is state rather than vocabulary — restoring the viewer's saved UI
+     language — because it is the component every screen already mounts first, and a cold
+     link can land on any route.
 
      WHAT THIS REPLACES. Thirteen screens each carried a byte-identical copy of `bp`,
      `wide`, `gutter` and `shell` — AGENTS.md says "responsive is one vocabulary per
@@ -50,8 +53,37 @@
      `railShellOf` is called with the 1440 CONTENT cap even on screens whose own shell is
      1100, because the rail is a full-bleed track and the page column is not — that is a
      real difference, not a copy that drifted. -->
-<stack width="0" height="0">
+<stack width="0" height="0" on:appear="dsx.action.restoreLocale()">
   <head>
+    <!-- ══ THE PERSISTED CHOICE ════════════════════════════════════════════════════
+         `global.locale` is in-memory and dies with the page, so without this the picker
+         is undone by every reload and every cold link. THE ONLY DECLARED CROSS-PLATFORM
+         PLACE TO PUT IT IS THE COOKIE JAR — `dsx.cookie.*` is one grammar over
+         document.cookie on web and DSXCookies on both native lanes — because there is
+         still no key-value plane (PLAN.md §6.33, filed 2026-08-30, open).
+
+         AND IT IS A SESSION COOKIE, which is a limitation and is named here rather than
+         hidden: the web writer emits `name=value; path=/` with no max-age and no expires
+         (dom/src/boot.ts wireCookies), so the choice survives reloads, deep links and tab
+         restores and does NOT survive quitting the browser. Measured, not assumed. The
+         Language row says so in the UI. Filed as PLAN.md §6.99.
+
+         Restoring here rather than in one screen is deliberate: a viewer can cold-land on
+         any route, so the restore belongs to the component every screen already mounts
+         first. It is idempotent and it never invents a choice — an absent cookie leaves
+         `global.locale` alone, which leaves the kernel ladder on its device step. -->
+    <action as="restoreLocale">
+      const saved = dsx.cookie.uiLocale
+      if (saved == null) { return }
+      if (saved == '') { return }
+      if (global.locale == saved) { return }
+      // A COOKIE IS UNTRUSTED INPUT even when this app wrote it: a tag from an older build,
+      // a hand-edited jar or a shared domain would otherwise pin the app to a language it
+      // cannot render, and the failure is invisible (every lookup misses, so it reads as
+      // plain English with a picker insisting otherwise).
+      if (localeTags().indexOf(saved) == -1) { return }
+      global.locale = saved
+    </action>
     <!-- BODY CAVEAT (js-core.md): the NATIVE parsers do not lift a `<functions>` body as
          raw JS yet, so a bare `<` in here breaks them and lint mirrors that by law. Every
          comparison below is therefore spelled with `>=` or `!=`, never `<`, and there is
@@ -254,6 +286,72 @@
         const loc = activeLocale()
         if (loc == '') { return new Date(iso).toLocaleDateString() }
         return new Date(iso).toLocaleDateString(loc)
+      }
+
+      /* ── THE SHIPPED LOCALE SET ───────────────────────────────────────────────────
+         ONE list, because two would drift: the language picker renders it, and
+         `npm run verify` reads the SAME rows out of this file and asserts that every
+         tag names a table the build actually folded into the registry. So a row here
+         with no `Strings.<tag>.json` beside it fails the build rather than offering a
+         viewer a language that silently answers English.
+
+         EVERY LABEL IS AN ENDONYM and none of them is ever translated. That is not a
+         shortcut around the string seam — it is the correct answer: a Japanese reader
+         hunting for German is looking for `Deutsch`, not for `ドイツ語`. It also happens
+         to be the only answer available, because a choice control`s option labels never
+         reach the localization seam at all (PLAN.md §6.98).
+
+         THE TAG IS THE FILENAME, lowercase, and the kernel ladder tries the full tag
+         then the bare language — so `de` also catches de-AT and de-CH, while `pt-br`
+         and `zh-hant` are reachable from this picker and NOT from a device whose system
+         language is pt-PT or zh-TW (also §6.98). Arabic is deliberately absent: it needs
+         the RTL layout plane, and a mirrored-layout locale shipped onto an LTR-only build
+         is a broken app, not a partial one. */
+      function localeTags() {
+        return ['en', 'es', 'pt-br', 'ja', 'de', 'fr', 'ko', 'zh-hant', 'id', 'th', 'it', 'tr', 'vi']
+      }
+
+      function languageRows() {
+        return [
+          { id: '', label: deviceRowLabel() },
+          { id: 'en', label: 'English' },
+          { id: 'es', label: 'Español' },
+          { id: 'pt-br', label: 'Português (Brasil)' },
+          { id: 'ja', label: '日本語' },
+          { id: 'de', label: 'Deutsch' },
+          { id: 'fr', label: 'Français' },
+          { id: 'ko', label: '한국어' },
+          { id: 'zh-hant', label: '繁體中文' },
+          { id: 'id', label: 'Bahasa Indonesia' },
+          { id: 'th', label: 'ไทย' },
+          { id: 'it', label: 'Italiano' },
+          { id: 'tr', label: 'Türkçe' },
+          { id: 'vi', label: 'Tiếng Việt' }
+        ]
+      }
+
+      /* THE ONE ROW THAT IS A SENTENCE RATHER THAN A NAME, and therefore the one row the
+         endonym argument above does not cover. Option labels do not reach localize(), so
+         this map is a hand-kept second copy of thirteen table entries and it is exactly
+         what §6.98 asks the engine to delete. It reads the ACTIVE locale, which is empty
+         precisely when the device is deciding — so the row that says "the device decides"
+         is the row that cannot know which language to say it in, and it falls back to
+         English the same way every other miss in this app does (Article 7). */
+      function deviceRowLabel() {
+        const l = activeLocale()
+        if (l == 'es') { return 'Idioma del dispositivo' }
+        if (l == 'pt-br') { return 'Idioma do dispositivo' }
+        if (l == 'ja') { return '端末の言語' }
+        if (l == 'de') { return 'Gerätesprache' }
+        if (l == 'fr') { return 'Langue de l’appareil' }
+        if (l == 'ko') { return '기기 언어' }
+        if (l == 'zh-hant') { return '裝置語言' }
+        if (l == 'id') { return 'Bahasa perangkat' }
+        if (l == 'th') { return 'ภาษาของอุปกรณ์' }
+        if (l == 'it') { return 'Lingua del dispositivo' }
+        if (l == 'tr') { return 'Cihaz dili' }
+        if (l == 'vi') { return 'Ngôn ngữ thiết bị' }
+        return 'Device language'
       }
     </functions>
   </head>

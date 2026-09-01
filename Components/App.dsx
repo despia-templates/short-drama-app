@@ -311,6 +311,12 @@
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- THE PRESENTATION PLANE, FIRST. This screen derives its own breakpoints (it predates
+       the shared vocabulary), so it used to reach Theme only through whichever of TopNav or
+       TabBar the viewport happened to mount — and both are `visible-if`. That was survivable
+       while Theme only registered functions; it is not, now that Theme also restores the
+       viewer's saved UI language, because the entry route is the one a cold link lands on. -->
+  <Theme/>
   <!-- OFFLINE DEMO SEED (native test lanes only — the component gates itself; Article 7:
        `global.demoSeeded` lights the pill in the phone bar below) -->
   <DemoSeed/>
@@ -718,11 +724,17 @@
             <text value="© 2026 Short Drama — the Despia DSX flagship template.
 One source. Native on iOS, Android, web and desktop." class="footCopy"/>
           </vstack>
+          <!-- A TAB ROOT IS ENTERED LATERALLY, EVEN FROM A FOOTER. These four used to be
+               `href=`, which is a PUSH: the frame slides and a tab bar rides in with it
+               (`hidesBottomBarWhenPushed`, AGENTS.md). The footer only renders on the wide
+               lane where no bar mounts, so nothing was visibly wrong — but the rule is about
+               the destination, not the origin, and the linter is right to read it statically.
+               `route.reset` is also the honest verb: going Home from a footer is not deeper. -->
           <vstack class="footCol">
             <text value="BROWSE" class="footHead"/>
-            <text value="Home" class="footLink" href="/"/>
-            <text value="Discover" class="footLink" href="/discover"/>
-            <text value="My List" class="footLink" href="/list"/>
+            <text value="Home" class="footLink" on:tap="dsx.module.route.reset({ path: '/' })" a11yTrait="link" a11yLabel="Home"/>
+            <text value="Discover" class="footLink" on:tap="dsx.module.route.reset({ path: '/discover' })" a11yTrait="link" a11yLabel="Discover"/>
+            <text value="My List" class="footLink" on:tap="dsx.module.route.reset({ path: '/list' })" a11yTrait="link" a11yLabel="My List"/>
           </vstack>
           <vstack class="footCol">
             <text value="EARN" class="footHead"/>
@@ -732,7 +744,7 @@ One source. Native on iOS, Android, web and desktop." class="footCopy"/>
           </vstack>
           <vstack class="footCol">
             <text value="ACCOUNT" class="footHead"/>
-            <text value="Wallet" class="footLink" href="/profile"/>
+            <text value="Wallet" class="footLink" on:tap="dsx.module.route.reset({ path: '/profile' })" a11yTrait="link" a11yLabel="Wallet"/>
             <text value="Manage this app" class="footLink" href="/admin"/>
           </vstack>
         </hstack>

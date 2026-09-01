@@ -117,6 +117,10 @@
     <style as="retryBtn" background="#FF2C55" radius="22" paddingH="20" paddingV="11" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- Theme first, and for the same reason App.dsx now mounts it: this screen derives its
+       own breakpoints, so it reached the presentation plane only through a `visible-if`
+       chrome mount — and the plane now carries the saved UI language. -->
+  <Theme/>
   <TopNav active="discover" visible-if="dsx.variable.wide"/>
 
   <zstack>
