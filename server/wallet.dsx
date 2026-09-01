@@ -21,9 +21,14 @@
      The two balances stay separate because spend ORDER is a real product rule (granted
      first, so a viewer's purchased coins outlive their free ones) and because keeping the
      purchased balance nameable is what makes 3.1.1 provable. Neither expires.
-     THE COPY STILL PROMISES EXPIRY on three lines this document does not own —
-     Components/Profile.dsx:255, :281, :303 — and they must be changed with this. See the
-     handover note in PLAN.md §6.85.
+     AND THE COPY AGREES NOW. This paragraph used to hand three Profile lines forward as a
+     handover (PLAN.md §6.85); all three are gone. The last of them was the dangerous one
+     precisely because it was already unreachable — a second interpolation appended to the
+     ledger row's kind, `{{ item.expires == null ? '' : ' · expires in 7 days' }}`, which
+     `ledgerRows` had stopped feeding. An unreachable promise is one payload change from a
+     live one, so it was deleted rather than left. `npm run verify` now asserts the copy
+     beside the behaviour: no display string in Components/** claims an expiry unless it
+     NEGATES one, read through the app's own display-point extractor.
 
      ── RESTORE IS PART OF THE SAME GUIDELINE ────────────────────────────────────────────
      3.1.1 also requires a restore mechanism for restorable purchases. Entitlement here is

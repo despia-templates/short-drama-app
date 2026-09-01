@@ -535,6 +535,39 @@ console.log("\ncurrency does not expire");
       console.log("  note  dsx_ledger.expires still exists in THIS database (the migration is additive and never drops); nothing reads or writes it");
     }
   }
+
+  // ── AND THE COPY, which is the half that actually reaches a REVIEWER ─────────────────
+  // The three assertions above prove the BEHAVIOUR: nothing expires. They say nothing about
+  // what the app TELLS the customer, and a store rejection reads the screen, not the schema.
+  // Three lines here promised a 7-day expiry after the server had stopped applying one, and
+  // the last of them survived two passes precisely because it was already unreachable — a
+  // second interpolation, `{{ item.expires == null ? '' : ' · expires in 7 days' }}`,
+  // appended to the ledger row's kind. `ledgerRows` stopped naming that field, so it could
+  // not fire; it was still one payload change from firing, and no gate could see it.
+  //
+  // The corpus is the app's OWN display-point extractor (scripts/strings.mjs `extract`),
+  // which is the same set of attributes the localisation seam resolves — so this cannot
+  // drift from what a viewer actually reads, and it covers BOTH halves: `keys` holds plain
+  // literals and whole-attribute ternary branches, `unreachable` holds every interpolated
+  // display attribute VERBATIM, which is where a concatenated fragment like the one above
+  // hides. A mention is allowed only when it NEGATES: "Coins never expire" is the true
+  // sentence and the only shape that passes.
+  {
+    const { extract } = await import(pathToFileURL(resolve(root, "scripts/strings.mjs")).href);
+    const { keys, unreachable } = extract();
+    const shown = [...keys.keys(), ...unreachable.keys()];
+    const mentions = shown.filter((s) => /expir/i.test(s));
+    const promises = mentions.filter((s) => !/\b(?:never|not|no|cannot|don't|doesn't)\s+expir/i.test(s));
+    check("no display string promises the viewer that coins expire", promises.length === 0,
+      `${promises.length} of ${shown.length} display strings claim an expiry, e.g. ` +
+      `${promises.slice(0, 3).map((s) => JSON.stringify(s.slice(0, 90))).join(" · ")} — App Store 3.1.1 forbids ` +
+      "expiring purchased currency and this backend expires nothing, so the copy is a promise the server does not keep");
+    // the negative above is worthless if the corpus is empty or the phrase is unsayable:
+    // prove the app DOES talk about expiry, and that the extractor reaches that sentence
+    check("...and the app says so out loud somewhere", mentions.length > 0,
+      "no display string mentions expiry at all — the assertion above would pass vacuously; " +
+      "Profile's balance strip is where \"Coins never expire\" lives");
+  }
 }
 
 // ── 9 · THE DECLARED CEILINGS ARE REAL ─────────────────────────────────────────────────

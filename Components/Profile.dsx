@@ -346,7 +346,27 @@
               <hstack class="ledgerRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)">
                 <vstack class="ledgerCol" style="flex: 1; min-width: 0">
                   <text value="{{ rowLabel }}" class="ledgerTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
-                  <text value="{{ item.kind == 'bonus' ? 'Bonus coins' : 'Coins' }}{{ item.expires == null ? '' : ' · expires in 7 days' }}" class="ledgerMeta"/>
+                  <!-- THE LAST EXPIRY PROMISE IN THE APP, AND IT WAS THE LIVE ONE. This read
+                       `…{{ item.expires == null ? '' : ' · expires in 7 days' }}` — a second
+                       hole appended to the first — so every ledger row whose payload carried
+                       an `expires` key rendered "Bonus coins · expires in 7 days". App Store
+                       3.1.1, verbatim: "Any credits or in-game currencies purchased via in-app
+                       purchase may not expire", and `bonus` is NOT a purely-granted bucket (a
+                       coin pack's "+5% free" is credited there by settleOrder), so the line
+                       was promising an expiry on money someone paid for.
+                       Nothing on the server expires any more — the field is off the entity,
+                       off all three grants, and `ledgerRows` names the payload's fields so a
+                       legacy column in an already-deployed database cannot reach the screen
+                       (migration.sql is additive and never drops). This clause was therefore
+                       already unreachable, and deleting it rather than leaving it is the
+                       point: an unreachable promise is one payload change from being a live
+                       one, and no gate would have caught it.
+                       AND IT WAS UNTRANSLATABLE. Two holes is a CONCATENATION, so neither
+                       branch was ever a rendered form the seam could look up (scripts/
+                       strings.mjs ternaryLiterals names this very line as its worked
+                       example). One hole over two bare literals IS translatable, so "Coins"
+                       and "Bonus coins" now hit the table in all thirteen locales. -->
+                  <text value="{{ item.kind == 'bonus' ? 'Bonus coins' : 'Coins' }}" class="ledgerMeta"/>
                 </vstack>
                 <text value="{{ rowSign }}" class="amount" color="{{ item.amount > 0 ? coin() : brand() }}"/>
               </hstack>
