@@ -311,7 +311,7 @@ export function classify(key, files) {
 //  That is fine, and it is why the real assertion lives in `npm run verify`, over the bytes
 //  a BOOTED origin actually answers with: source-reading is what fills the tables, and the
 //  running server is what proves them.
-const SERVER_COPY = {
+export const SERVER_COPY = {
   "store.dsx": { storeCatalog: ["label", "note", "badge", "reason"] },
 };
 
