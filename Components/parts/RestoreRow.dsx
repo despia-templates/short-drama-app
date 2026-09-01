@@ -1,33 +1,66 @@
-<!-- RestoreRow — "Restore purchases", wired to the real thing.
+<!-- RestoreRow — "Restore purchases", wired to the real thing on both lanes, and honest
+     about the one it cannot reach.
 
      APPLE'S RULE (3.1.1): "you should make sure you have a restore mechanism for any
      restorable in-app purchases", and a subscription sign-up surface must let a current
-     subscriber sign in OR restore. Both halves are now real: <AuthSeam> is the sign-in, and
-     this row is the restore.
+     subscriber sign in OR restore. Both halves are real: <AuthSeam> is the sign-in, and this
+     row is the restore.
 
-     WHAT IT ACTUALLY RESTORES, precisely — because most of the category ships a Restore
-     button whose job nobody can describe:
+     ══ RESTORE IS ONE VERB OVER TWO MECHANISMS, AND THE SPLIT IS ARCHITECTURAL ═══════════
+     There is no browser twin for an app store — the store module's own manifest says so in
+     as many words, and the reason is that StoreKit 2 and Play Billing are device-side OS
+     services with no JS binding. So the verb "restore" resolves to a different question per
+     lane, and this row runs whichever ones its build can ask:
 
-       · VIP and every unlocked episode are SERVER-SIDE, account-scoped rows. A reinstall, a
-         new phone or a second device that signs back in already has them; there is nothing
-         to restore, which is why this row's resting line reports what the account holds
-         rather than pretending a transfer happened.
-       · The real gap it closes is the money that was TAKEN and never granted: an order the
-         payment provider confirmed while the app was closed, offline or killed between the
-         payment sheet's success and the settle call. `POST /store/restore` walks the
-         caller's own unsettled orders, asks Stripe about each, and grants the ones that
-         succeeded. It is exactly-once for the same reason settle is — the ledger's unique
-         index refuses a second grant.
+       WEB      POST /store/restore         — ask Stripe about orders this backend opened
+                                              for this subject and never granted.
+       NATIVE   POST /store/restore/native  — ask RevenueCat what the store says this
+                                              subject owns, and grant what is ungranted.
+                PLUS the Stripe sweep, because a viewer who bought on the web storefront and
+                came back on their phone has an unsettled order on the same account, and the
+                phone is where they are asking.
 
-     WHAT IT DOES NOT COVER, named rather than implied: a purchase made through StoreKit or
-     Play Billing never creates one of these orders, so there is nothing here to restore for
-     it. That receiver is a hosted-lane integration this template does not have
-     (server/store.dsx's own header says so). An adopter shipping to the App Store wires it
-     before submitting, and until then this row says what it can and cannot do.
+     Neither route takes an argument naming the purchase, and that is deliberate: the client
+     is never the authority on what was bought. `auth="required"` verifies a TOKEN — it does
+     not ask for a human behind it — so the caller id is read server-side off a row the
+     caller owns, and an anonymous session satisfies it exactly as a signed-in one does.
 
-     THIS ROW USED TO BE A LIE BY OMISSION. On /vip it called `wallet.refresh()` and told the
-     viewer that restoring "re-reads the account you are signed in to" and that there was no
-     sign-in anywhere. Both halves are fixed: the call is real and the sign-in exists. -->
+     ══ WHAT IT RECOVERS, AND WHAT NO IMPLEMENTATION COULD ════════════════════════════════
+     RECOVERS, on either lane: money that was TAKEN and never granted — the app was killed,
+     offline, or the settle call was lost between the provider confirming and the coins
+     landing. That is the failure a restore button is actually for, and it is otherwise
+     unreachable by the person it happened to.
+
+     ALREADY TRUE WITHOUT IT: VIP and every unlocked episode are server-side, account-scoped
+     rows. A reinstall or a second device that reaches the same subject has them, with
+     nothing to restore. The resting line says so rather than implying a transfer happened.
+
+     CANNOT, and this is a product truth rather than a gap: a purchase made under a DIFFERENT
+     subject. Apple keys a receipt to an Apple ID and Google keys a purchase token to a
+     Google account — per-account, never per-device — so the platform really can recognise a
+     returning buyer with no app login. But every product here is a CONSUMABLE (coin packs by
+     nature; the VIP pass by design), the platforms do not restore consumables, and replaying
+     one would be wrong even where RevenueCat still remembers it: a consumable was already
+     DELIVERED. Someone who bought 1,000 coins and spent 400 holds a balance of 600, not a
+     1,000-coin receipt, so re-granting mints fresh coins on every reinstall.
+     `unique (intent)` refuses that by design. A reinstall is therefore an IDENTITY problem —
+     the coins are safe on the subject that bought them and the job is to reach that subject
+     — which is why the sign-in offer sits beside this control instead of in front of it.
+
+     ══ THE ONE THING THIS BUILD CANNOT DO, NAMED (Article 7) ═════════════════════════════
+     The founder's requirement is that restore work with no login, because most of this
+     product's revenue comes from viewers who never make an account. The SERVER half is built
+     for exactly that: both routes need a subject, not a human. The CLIENT half is missing —
+     <AuthSeam> `publishGuest` publishes `{ ok: false, headers: {} }`, so a guest carries no
+     token at all and both routes would 401. Rather than fire a call that cannot succeed,
+     this row says which half is missing and offers the sign-in that works today. The seam is
+     one action in <AuthSeam> (mint a durable anonymous subject and publish it as a session);
+     it is named here, in the README deploy checklist, and in PLAN.md §6.86.
+
+     THIS ROW USED TO BE A LIE BY OMISSION, twice over. On /vip it called `wallet.refresh()`
+     and claimed restoring "re-reads the account you are signed in to". Then it grew a real
+     call and a header comment declaring restore anonymous — while its button still read
+     "Sign in" and performed a restore anyway, so the label and the action disagreed. -->
 <vstack spacing="0" alignItems="stretch">
   <head>
     <attribute as="variant" default="'row'"/>   <!-- row | compact -->
@@ -35,31 +68,53 @@
     <event as="restored" payload="coins"/>
 
     <api as="restoreCall" url="/store/restore" method="POST" auto="false" headers="global.auth.headers"/>
+    <!-- the NATIVE sweep. Same trust shape, different question — server/store.dsx
+         restoreNative asks RevenueCat rather than Stripe. -->
+    <api as="nativeRestoreCall" url="/store/restore/native" method="POST" auto="false" headers="global.auth.headers"/>
 
     <variable as="busy">return false</variable>
     <variable as="result">return ''</variable>
 
     <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <!-- CAPABILITY BEFORE PLATFORM (AGENTS.md, the <AdGate> precedent): a build that HAS the
+         store module takes it wherever it runs, and only then does `os` decide. `blocked` is
+         a native build with no store module — which is every native build today, because
+         configuring Core/Store aborts the compile inside the module itself. -->
+    <variable as="lane" computed="true">
+      if (has('store')) { return 'native' }
+      if (os == 'web') { return 'stripe' }
+      return 'blocked'
+    </variable>
     <variable as="line" computed="true">
       if (dsx.variable.busy) { return 'Checking your purchases…' }
       if (dsx.variable.result != '') { return dsx.variable.result }
       if (dsx.variable.signedIn == false) {
-        return 'Sign in first — purchases belong to an account, so restoring means reaching the account that made them.'
+        return 'Restoring needs a session this build does not mint for guests yet, so sign in to reach the purchases on your account. The routes behind this button never ask who you are — see RestoreRow.dsx.'
+      }
+      if (dsx.variable.lane == 'native') {
+        return 'VIP and every unlocked episode are held on your account, so they are already here. This asks the store what you have bought and applies anything that was paid for and never landed.'
+      }
+      if (dsx.variable.lane == 'blocked') {
+        return 'This build cannot ask the App Store or Google Play anything — it ships without the in-app-purchase module. What it can still check is a payment taken on the web storefront and never applied to your account.'
       }
       return 'VIP and every unlocked episode are held on your account, so they are already here. This checks for a payment that was taken but never applied.'
+    </variable>
+    <!-- THE SECOND LINE IS THE CEILING, per lane, and it is always shown — a limit a viewer
+         only discovers after tapping is a limit the UI hid from them. -->
+    <variable as="ceiling" computed="true">
+      if (dsx.variable.lane == 'stripe') {
+        return 'A purchase made inside the iOS or Android app is restored in that app, by the store that took the payment — a browser cannot read an App Store or Play receipt.'
+      }
+      if (dsx.variable.lane == 'blocked') {
+        return 'Coin packs and passes are in-app-purchase products, so this build does not sell them here at all — see the note on the Store screen.'
+      }
+      return 'Coins you have already spent are not granted again: a coin pack is a consumable, so its value is delivered once. If you reinstalled, your balance is on the account that bought it — signing in is what reaches it.'
     </variable>
     <variable as="btnLabel" computed="true">
       if (dsx.variable.busy) { return 'Checking…' }
       return dsx.variable.signedIn ? 'Restore' : 'Sign in'
     </variable>
 
-    <!-- RESTORE IS ANONYMOUS. The old shape read "with no account there is nothing to restore
-         ONTO" — which is only true if an account means a signed-in human. It does not: an
-         anonymous session is a real subject, it is the subject that paid, and it is the one a
-         restore has to reach. Gating restore behind sign-in strands exactly the buyer this
-         app makes most of its money from, at the moment they are trying to get back what
-         they already paid for. Restore now just restores; the sign-in offer sits beside it as
-         the way to carry those purchases to a second device. -->
     <!-- THE EMIT SHELL (Components/parts/Analytics.dsx). Four lines, and they are copied
          rather than shared because a `<functions global="true">` body is the EXPRESSION
          tier: dsx.log, dsx.module.* and a global write are all silent no-ops there, measured
@@ -72,6 +127,14 @@
     </action>
 
     <action as="tapped">
+      // NOT A GATE, A NAMED GAP. The server would take an anonymous caller happily; this
+      // build has no anonymous session to be one (see the header). Firing a call that can
+      // only 401 would be a control that promises something it does not do, so the row says
+      // which half is missing and sends the viewer at the sign-in that works today.
+      if (dsx.variable.signedIn == false) {
+        dsx.module.route.push({ path: '/auth/signin' })
+        return
+      }
       dsx.action.restore()
     </action>
 
@@ -79,32 +142,79 @@
       if (dsx.variable.busy) { return }
       dsx.variable.busy = true
       dsx.variable.result = ''
-      dsx.action.track({ name: 'restore', props: { phase: 'started' } })
+      dsx.action.track({ name: 'restore', props: { phase: 'started', lane: dsx.variable.lane } })
+
+      // ── THE NATIVE SWEEP FIRST, where the build can ask ──────────────────────────────
+      // Two calls rather than one, because they ask different providers about different
+      // purchases and a viewer can legitimately have both: a coin pack bought in the app,
+      // and an order opened on the web storefront that never settled. `await` is a STATEMENT
+      // and never a ternary branch (AGENTS.md, PLAN.md 6.31), so this is spelled long.
+      let checked = 0
+      let restored = 0
+      let coins = 0
+      let bonus = 0
+      let vipDays = 0
+      let more = false
+      let failure = ''
+      if (dsx.variable.lane == 'native') {
+        const n = await nativeRestoreCall.send({})
+        if (n.ok) {
+          checked = checked + n.data.checked
+          restored = restored + n.data.restored
+          coins = coins + n.data.coins
+          bonus = bonus + n.data.bonus
+          vipDays = vipDays + n.data.vipDays
+          if (n.data.done == false) { more = true }
+        } else {
+          // a declared rejection carries the words the server chose at r.data.message;
+          // r.error is transport only
+          failure = n.data != null && n.data.message != null ? n.data.message : ''
+        }
+      }
+
       const r = await restoreCall.send({})
+      if (r.ok) {
+        checked = checked + r.data.checked
+        restored = restored + r.data.restored
+        coins = coins + r.data.coins
+        bonus = bonus + r.data.bonus
+        vipDays = vipDays + r.data.vipDays
+        // BOTH sweeps are bounded (twenty Stripe reads, five native grants), so both can
+        // come back unfinished and either one unfinished means tap again
+        if (r.data.done == false) { more = true }
+      } else {
+        const why = r.data != null && r.data.message != null ? r.data.message : ''
+        if (failure == '') { failure = why }
+      }
       dsx.variable.busy = false
-      if (!r.ok) {
-        // A declared rejection carries the words the server chose at r.data.message; r.error is
-        // transport only. "Payments are not configured" is a real answer and reads better
-        // than any sentence written here.
-        dsx.variable.result = r.data != null && r.data.message != null
-          ? r.data.message
-          : 'Your purchases could not be checked right now. Nothing was charged and nothing was lost.'
+
+      // A FAILURE ON ONE LANE DOES NOT ERASE A SUCCESS ON THE OTHER. Report what landed
+      // first, then say what could not be checked — the opposite order loses the money.
+      if (restored == 0 && failure != '') {
+        dsx.variable.result = failure
         return
       }
-      const d = r.data
-      dsx.action.track({ name: 'restore', props: { phase: 'done', checked: d.checked, restored: d.restored } })
-      if (d.restored == 0) {
-        dsx.variable.result = d.checked == 0
-          ? 'Nothing to restore — every purchase on this account is already applied.'
-          : 'Checked ' + d.checked + ' pending order(s): none had completed payment, so nothing was applied.'
+      dsx.action.track({ name: 'restore', props: { phase: 'done', lane: dsx.variable.lane, checked: checked, restored: restored } })
+      if (restored == 0) {
+        if (checked == 0) {
+          dsx.variable.result = 'Nothing to restore — every purchase on this account is already applied.'
+        } else {
+          dsx.variable.result = 'Checked ' + checked + ' pending purchase(s): none had completed payment, so nothing was applied.'
+        }
         return
       }
       let got = ''
-      if (d.coins > 0) { got = d.coins + ' coins' }
-      if (d.bonus > 0) { got = got == '' ? d.bonus + ' bonus coins' : got + ' and ' + d.bonus + ' bonus coins' }
-      if (d.vipDays > 0) { got = got == '' ? d.vipDays + ' VIP days' : got + ' and ' + d.vipDays + ' VIP days' }
-      dsx.variable.result = 'Restored ' + d.restored + ' purchase(s): ' + got + ' are back on your account.'
-      dsx.event('restored', { coins: d.coins })
+      if (coins > 0) { got = coins + ' coins' }
+      if (bonus > 0) { got = got == '' ? bonus + ' bonus coins' : got + ' and ' + bonus + ' bonus coins' }
+      if (vipDays > 0) { got = got == '' ? vipDays + ' VIP days' : got + ' and ' + vipDays + ' VIP days' }
+      let said = 'Restored ' + restored + ' purchase(s): ' + got + ' are back on your account.'
+      // RESUMABLE, AND THE VIEWER IS TOLD. restoreNative grants at most five per call
+      // (ACTION_CALL_CAP); a half-finished restore that reports itself as finished is how
+      // someone stops asking for money they are still owed.
+      if (more) { said = said + ' More are still waiting — tap Restore again to finish.' }
+      if (failure != '') { said = said + ' One lane could not be checked: ' + failure }
+      dsx.variable.result = said
+      dsx.event('restored', { coins: coins })
     </action>
 
     <style as="row" spacing="14" alignItems="flex-start" paddingV="12"/>
@@ -121,8 +231,7 @@
     <vstack spacing="3" style="flex: 1; min-width: 0" alignItems="stretch">
       <text value="Restore purchases" class="label"/>
       <text value="{{ dsx.variable.line }}" class="note"/>
-      <text class="note"
-            value="A purchase made through the App Store or Google Play is restored by that store's own receipt, which this deployment does not receive yet — see server/store.dsx."/>
+      <text value="{{ dsx.variable.ceiling }}" class="note"/>
     </vstack>
     <button label="{{ dsx.variable.btnLabel }}" class="btn" on:tap="dsx.action.tapped()"
             a11yLabel="Restore purchases made on this account"/>

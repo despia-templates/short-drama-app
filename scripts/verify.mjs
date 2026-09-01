@@ -506,6 +506,88 @@ if (pool === null) {
     "kind must be part of the unique key — a coin pack legitimately writes two rows for one order");
 }
 
+// ── 7b · RESTORE EXISTS ON BOTH LANES, AND NEITHER ASKS WHO YOU ARE ────────────────────
+// App Store 3.1.1 wants a restore mechanism for restorable purchases, and the founder's
+// constraint is sharper than the guideline: it must work with no login, because most of
+// this product's revenue comes from viewers who never make an account. `auth="required"`
+// verifies a TOKEN and never asks for a human, so an anonymous session reaches both routes
+// exactly as a signed-in one does — what is asserted here is that neither route can be
+// talked into a grant, and that the lane this deployment cannot ask REFUSES OUT LOUD
+// instead of answering "nothing to restore", which is the one wrong answer to give someone
+// who has paid.
+console.log("\nrestore, both lanes");
+{
+  for (const path of ["/store/restore", "/store/restore/native"]) {
+    const asAnon = await POST(path, anon);
+    check(`${path} refuses a caller with no token`, asAnon.status === 401,
+      `answered ${asAnon.status} — restore grants money, so it needs a verified subject even though it needs no login`);
+  }
+
+  // THE STRIPE LANE ANSWERS. A fresh viewer has no unsettled order, so the honest answer is
+  // "nothing", 200 — and it must come with the resumability contract the sweep now carries.
+  const web = await asJson(await POST("/store/restore", viewer));
+  check("the Stripe lane answers a signed-in caller with nothing to restore",
+    web.status === 200 && web.body?.restored === 0 && web.body?.checked === 0,
+    `${web.status} ${JSON.stringify(web.body)}`);
+  check("...and reports whether the sweep finished", web.body?.done === true,
+    `done was ${JSON.stringify(web.body?.done)} — a bounded sweep that cannot say it finished is one a caller can never resume`);
+
+  // THE NATIVE LANE CANNOT ASK, AND SAYS SO. `REVENUECAT_KEY` is deliberately unset in this
+  // template (a placeholder would read as a wired integration), so this deployment has no
+  // way to learn what a store sold. The failure mode that matters is the QUIET one: a 200
+  // saying "nothing to restore" to a viewer whose coins are sitting unredeemed at Apple.
+  // The refusal must name the missing half, because the person who can fix it is the
+  // operator reading the deploy checklist, not the viewer.
+  const nativeRestore = await asJson(await POST("/store/restore/native", viewer));
+  const hasRcKey = typeof process.env.REVENUECAT_KEY === "string" && process.env.REVENUECAT_KEY !== "";
+  if (hasRcKey) {
+    check("the native lane answers a signed-in caller", nativeRestore.status === 200 && typeof nativeRestore.body?.done === "boolean",
+      `${nativeRestore.status} ${JSON.stringify(nativeRestore.body)} — REVENUECAT_KEY is set, so this should reach RevenueCat`);
+  } else {
+    check("the native lane REFUSES rather than reporting nothing to restore",
+      nativeRestore.status >= 400 && /REVENUECAT_KEY/.test(nativeRestore.body?.message ?? ""),
+      `${nativeRestore.status} ${JSON.stringify(nativeRestore.body)} — with no way to ask the store, a 200 "nothing to restore" ` +
+      "tells a viewer their purchase does not exist; the refusal has to name the secret the deployment is missing");
+  }
+
+  // ── NO GRANT ORIGINATES FROM THE CLIENT, AND RESTORE IS THE EASIEST DOOR TO FORGET ────
+  // `restoreNative` deliberately takes NO input: the caller id comes off a row the caller
+  // owns and the purchase list comes from RevenueCat. This posts a body that names a sku, a
+  // transaction, an owner and an amount — everything a grant needs — and asserts none of it
+  // is read. The assertion is the BALANCE and the ROWS, not the status code, because the
+  // defect this guards against (an input added later "for convenience") would answer 200.
+  const beforeCoins = (await asJson(await GET("/wallet/state", viewer))).body;
+  const forgedTxn = `verify_forged_${randomUUID().slice(0, 8)}`;
+  await POST("/store/restore/native", viewer, {
+    sku: "coins_10000", transaction: forgedTxn, provider: "revenuecat",
+    owner: randomUUID(), coins: 99999, bonus: 99999, days: 3650,
+  });
+  await POST("/store/restore", viewer, { order: randomUUID(), coins: 99999 });
+  const afterCoins = (await asJson(await GET("/wallet/state", viewer))).body;
+  check("a crafted restore body grants nothing",
+    beforeCoins?.coins === afterCoins?.coins && beforeCoins?.bonus === afterCoins?.bonus
+    && beforeCoins?.vip === afterCoins?.vip,
+    `${JSON.stringify(beforeCoins)} → ${JSON.stringify(afterCoins)} — a restore route that reads a purchase out of ` +
+    "the request body is a coin faucet in a decompiled build");
+  if (pool !== null) {
+    const planted = await sql("select count(*)::int as n from dsx_order where intent like $1", [`%${forgedTxn}%`]);
+    check("...and writes no order row for the transaction it was handed", planted.rows[0].n === 0,
+      `${planted.rows[0].n} order row(s) carry the forged transaction — the client named a purchase and the server believed it`);
+  }
+
+  // ── AND THE CEILING IS ON THE SCREEN, not only in a comment ───────────────────────────
+  // Article 7: a limit a viewer discovers after tapping is a limit the UI hid. <RestoreRow>
+  // renders a per-lane ceiling line, and the web lane's is the one SSR can carry — so it is
+  // asserted over the delivered bytes of the surface that sells.
+  for (const path of ["/store", "/vip"]) {
+    const text = bodyText(await fetch(`${base}${path}`).then((r) => r.text()));
+    check(`${path} names what restore cannot reach on this lane`,
+      /cannot read an App Store or Play receipt/.test(text),
+      `the delivered body of ${path} does not carry the restore ceiling — Components/parts/RestoreRow.dsx ` +
+      "must say, where the reader is, that a browser cannot restore a purchase made inside the native app");
+  }
+}
+
 // ── 8 · NEITHER BALANCE EXPIRES (App Store 3.1.1) ──────────────────────────────────────
 // "Any credits or in-game currencies purchased via in-app purchase may not expire." The
 // backend used to stamp a 7-day expiry on every granted-bonus ledger row, and `bonus` is
@@ -800,7 +882,8 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
   // is skipped silently by the loader (fail-open, Article 7), and an app that silently
   // stayed English is precisely what this catches.
   {
-    const { extract, classify, tableFiles } = await import(pathToFileURL(resolve(root, "scripts/strings.mjs")).href);
+    const { extract, classify, tableFiles, extractServer, SERVER_COPY } =
+      await import(pathToFileURL(resolve(root, "scripts/strings.mjs")).href);
     const { keys } = extract();
     const viewer = [...keys.keys()].filter((k) => classify(k, keys.get(k)) === "viewer");
     const registry = JSON.parse(readFileSync(resolve(root, "dist/registry.json"), "utf8"));
@@ -864,6 +947,69 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
       check(`the ${tag} locale is a translation and not a copy (${pct}% identical to English)`, pct < 30,
         `${identical.length}/${rows.length} values are byte-identical to their English key — e.g. ${identical.slice(0, 5).map(([k]) => JSON.stringify(k.slice(0, 24))).join(" · ")}`);
     }
+
+    // ── AND THE PRICE LIST A BOOTED ORIGIN ACTUALLY SENDS ─────────────────────────────
+    // Everything above reads SOURCE and compares it to the built registry. That is exactly
+    // the gate the Store's price list walked past for its whole life: plan names, the term
+    // notes and BEST VALUE are fields on the rows `server/store.dsx storeCatalog` returns,
+    // no extractor looked at a server file, so thirteen tables reported 248/248 while a
+    // Japanese reader bought in English. The corpus knows about them now
+    // (scripts/strings.mjs SERVER_COPY, which carries the whole argument for the plane).
+    // This is the half that cannot be satisfied by knowing about them: it asks a RUNNING
+    // origin what words it puts on the wire and requires every locale to answer.
+    //
+    // TWO ASSERTIONS, BECAUSE THEY CATCH DIFFERENT MISTAKES and either alone leaves a door.
+    //   · the per-locale one below fails when the REGISTRY does not carry a word the wire
+    //     sends — a translation deleted, a tier added, a note reworded, a stale dist/;
+    //   · `unseen` fails when the EXTRACTOR cannot see a word the wire sends, which the
+    //     coverage gate can never notice, because a key that left the corpus leaves the
+    //     tables merely STALE and stale has never been a failure. That is the door the
+    //     source-reading half structurally cannot close: SERVER_COPY reads literals, so a
+    //     copy field a body computes is invisible to it and visible here.
+    // Fields are matched by the name SERVER_COPY declares, walked over the whole payload —
+    // no rule can tell a row's `label` from its `id` without being told which one a screen
+    // prints, and inference is what would put skus in thirteen tables.
+    const copyFields = new Set(Object.values(SERVER_COPY).flatMap((a) => Object.values(a).flat()));
+    const livePrices = await fetch(`${base}/store/catalog`).then((r) => r.json());
+    const sent = new Set();
+    (function walk(v) {
+      if (Array.isArray(v)) { for (const x of v) walk(x); return; }
+      if (v === null || typeof v !== "object") return;
+      for (const [k, x] of Object.entries(v)) {
+        if (copyFields.has(k) && typeof x === "string" && x !== "") sent.add(x);
+        walk(x);
+      }
+    })(livePrices);
+    // THE PAIRED POSITIVE, and it is structural rather than worded on purpose: asserting
+    // the payload still says "BEST VALUE" would bake this template's marketing into a gate
+    // and go red on a deployment that renamed it. What must hold is that every tier the
+    // origin sells arrives with a name and a term, and that the badge slot is reachable at
+    // all — without that line the negatives below pass beautifully on an empty catalogue.
+    const vipRows = Array.isArray(livePrices?.vip) ? livePrices.vip : [];
+    check(`the live price list sends copy to translate (${vipRows.length} tiers, ${sent.size} strings)`,
+      vipRows.length > 0
+      && vipRows.every((r) => typeof r.label === "string" && r.label !== "" && typeof r.note === "string" && r.note !== "")
+      && vipRows.some((r) => typeof r.badge === "string" && r.badge !== ""),
+      `/store/catalog answered ${JSON.stringify(livePrices).slice(0, 180)} — every assertion below would pass ` +
+      "vacuously on a catalogue with no tiers, no names or no badge");
+    // `reason` rides the same payload and stays English by the SAME rule markup obeys: it
+    // cites REVENUECAT_KEY and a source path, so classify() files it DEVELOPER. Translating
+    // a config key makes the instruction wrong in the target language.
+    const sentViewer = [...sent].filter((s) => classify(s, new Set(["server/store.dsx"])) === "viewer");
+    for (const tag of Object.keys(shipped)) {
+      const english = sentViewer.filter((s) => typeof shipped[tag][s] !== "string" || shipped[tag][s] === "");
+      check(`the ${tag} locale translates the price list the origin sends (${sentViewer.length})`,
+        english.length === 0,
+        `${english.length} of the words /store/catalog just sent have no ${tag} entry in the built registry — ` +
+        `e.g. ${english.slice(0, 3).map((s) => JSON.stringify(s.slice(0, 40))).join(" · ")}. This is the money screen ` +
+        `in English inside a ${tag} app: run node scripts/strings.mjs --write ${tag}, translate, rebuild`);
+    }
+    const fromSource = new Set(extractServer().keys());
+    const unseen = [...sent].filter((s) => !fromSource.has(s));
+    check(`the extractor can see every word the origin sends (${sent.size})`, unseen.length === 0,
+      `${JSON.stringify(unseen.slice(0, 3))} reached the wire but no SERVER_COPY field yields it from source, ` +
+      "so `--write` will never offer it to a translator and the coverage gate will never miss it. " +
+      "Either the field is undeclared, or its value is computed where scripts/strings.mjs reads literals");
 
     // ── THE PLURAL PLANE IS EXERCISED, AND ARABIC IS WHY ──────────────────────────────
     // A locale is not measured only by how many keys it fills. A `{n, plural, …}` entry

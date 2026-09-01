@@ -458,17 +458,32 @@
       const bought = seen.data.subscriber.non_subscriptions
       const runs = bought == null || bought[sku] == null ? [] : bought[sku]
       let store_txn = ''
+      // SANDBOX DOES NOT PAY, and this guard was on the WEBHOOK path only — which made the
+      // two server-to-server paths disagree about the same purchase. A sandbox purchase is
+      // free and infinitely repeatable, so a pull path that grants on one is a coin faucet
+      // for anyone who can run a sandbox transaction, which on iOS is every TestFlight
+      // tester. `storeEvent` has skipped these since it was written (`ev.environment`);
+      // the REST document carries the same fact per run as `is_sandbox`.
+      let sandboxOnly = false
       for (const one of runs) {
         if (one.id === transaction || one.store_transaction_id === transaction) {
+          if (one.is_sandbox === true) { sandboxOnly = true }
           // THE KEY IS THE STORE TRANSACTION, on both paths. The webhook reports
           // `event.transaction_id` and this REST document reports `store_transaction_id`,
           // and they are the same identifier — which is what makes the two grant paths
           // collapse onto ONE ledger row instead of crediting twice. Preferring it here,
           // rather than the id the client happened to report, is what keeps that true.
-          store_txn = one.store_transaction_id == null || one.store_transaction_id === ''
-            ? transaction
-            : one.store_transaction_id
+          if (one.is_sandbox !== true) {
+            store_txn = one.store_transaction_id == null || one.store_transaction_id === ''
+              ? transaction
+              : one.store_transaction_id
+          }
         }
+      }
+      // NAMED, not swallowed: a tester whose sandbox purchase is refused must be told WHY,
+      // or they file a bug against the grant path that is working correctly.
+      if (store_txn === '' && sandboxOnly) {
+        throw { reason: 'conflict', message: 'This is a sandbox purchase. Sandbox purchases are free and repeatable, so this deployment does not grant them — see storeEvent in server/store.dsx for the one line to relax while testing.' }
       }
       if (store_txn === '') {
         throw { reason: 'conflict', message: 'the store has no record of this purchase on your account' }
@@ -649,17 +664,17 @@
          This walks the caller's own unsettled orders, asks Stripe about each, and settles the
          ones that succeeded. It is exactly-once for the same reason settleOrder is: the same
          ledger unique index refuses a second grant.
-         NOT THIS LANE, and named rather than implied: a NATIVE store purchase never creates
-         one of these rows, so there is nothing here to sweep for it. Its restore is the
-         store module own `store.restore` on the client (it re-reads what the platform says
-         this device owns) plus `settleNative`, which re-verifies against RevenueCat and is
-         idempotent by the same ledger lock — so a viewer can run it as often as they like.
-         Wiring that pair into <RestoreRow> is the handoff this pass leaves behind; that file
-         is not ours to edit. -->
+         NOT THIS LANE: a NATIVE store purchase never creates a `pi_` order, so this sweep
+         skips it by construction. Its twin is `restoreNative` immediately below. -->
+
     <action as="restoreOrders">
       const open = await dsx.module.data.order.list({ filters: { status: 'created' }, limit: 100 })
       const rows = open.ok ? open.data : []
-      if (rows.length === 0) { return { checked: 0, restored: 0, coins: 0, orders: [] } }
+      // EVERY RETURN CARRIES THE WHOLE SHAPE. Two of these used to be short — no `vipDays`,
+      // no `done` — and a caller adding the two lanes together read `undefined` off one of
+      // them. JSE `+` is TOTAL ARITHMETIC, so that does not throw; it quietly answers the
+      // wrong number about somebody money. Caught by the resumability assertion in verify.
+      if (rows.length === 0) { return { checked: 0, restored: 0, coins: 0, bonus: 0, vipDays: 0, orders: [], done: true, remaining: 0 } }
       const key = await dsx.module.secret.read({ name: 'STRIPE_KEY' })
       if (!key.ok) { throw { reason: 'unavailable', message: 'payments are not configured' } }
 
@@ -714,7 +729,7 @@
         restored = restored + 1
         done.push({ order: o.id, sku: o.sku, kind: o.kind })
       }
-      if (restored === 0) { return { checked: checked, restored: 0, coins: 0, bonus: 0, vipDays: 0, orders: [] } }
+      if (restored === 0) { return { checked: checked, restored: 0, coins: 0, bonus: 0, vipDays: 0, orders: [], done: rows.length <= 20, remaining: rows.length > 20 ? rows.length - 20 : 0 } }
       let vipUntil = w.vip_until
       if (vipDays > 0) {
         const from = w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
@@ -728,7 +743,158 @@
       if (vipDays > 0) { values.vip_until = vipUntil }
       const paid = await dsx.module.data.wallet.update({ id: w.id, values: values })
       if (!paid.ok) { throw { reason: 'unavailable', message: 'the balance could not be updated — contact support' } }
-      return { checked: checked, restored: restored, coins: coins, bonus: bonus, vipDays: vipDays, vipUntil: vipUntil, orders: done }
+      return { checked: checked, restored: restored, coins: coins, bonus: bonus, vipDays: vipDays, vipUntil: vipUntil,
+               orders: done, done: rows.length <= 20, remaining: rows.length > 20 ? rows.length - 20 : 0 }
+    </action>
+
+    <!-- ══ RESTORE, THE NATIVE TWIN — AND IT NEEDS NO LOGIN ═══════════════════════════════
+         `restoreOrders` above asks Stripe about orders this backend opened. Nothing on the
+         native lanes opens one: a StoreKit or Play purchase reaches this backend only as a
+         RevenueCat transaction, through `settleNative` (we pull) or the webhook (they push).
+         So the sweep for that lane has to ask RevenueCat what the CALLER already owns, and
+         grant whatever this deployment has not granted yet. That is this action.
+
+         ── IT REQUIRES A SUBJECT, NOT A SIGNED-IN HUMAN, AND THAT IS THE WHOLE POINT ───────
+         The founder is explicit that most revenue here will come from viewers who never make
+         an account, so a restore behind a login strands exactly the buyer it exists for. This
+         action takes NO argument. The caller id is read off `owner_id` on their own wallet
+         row — stamped by Postgres from the verified subject, unreachable from the wire — and
+         that same value IS the RevenueCat `app_user_id` (see `settleNative`). An anonymous
+         session satisfies `auth="required"` exactly as a signed-in one does.
+
+         ── WHAT THIS CAN AND CANNOT RECOVER, WHICH IS THE HONEST HALF ─────────────────────
+         RECOVERS: a purchase RevenueCat recorded against THIS subject that this deployment
+         never granted — the app was killed, offline, or the settle call was lost between
+         Apple taking the money and the grant landing. That is the same money-taken-and-
+         invisible failure `restoreOrders` closes one lane over, and it is the failure a
+         restore button is actually for.
+
+         DOES NOT RECOVER: a purchase made under a DIFFERENT subject — the reinstall case.
+         And the reason is a product truth rather than a missing feature, so it is worth
+         being exact, because the tempting fix is a coin faucet:
+
+           · Apple keys a receipt to an APPLE ID and Google keys a purchase token to a GOOGLE
+             ACCOUNT. Neither is per-device, so the platform genuinely CAN recognise a
+             returning buyer with no app account. That constraint is the mechanism, not the
+             obstacle.
+           · But every product this app sells is a CONSUMABLE — coin packs by nature, and the
+             VIP pass by design (see the price table header: no renewal, no grace period, no
+             billing retry, which is what makes a `verify="bearer"` receiver sufficient). The
+             platforms do not restore consumables: StoreKit leaves them out of
+             `currentEntitlements`, and Play stops returning a purchase token once the pack is
+             CONSUMED, which a coin pack must be or the viewer can never buy it again.
+             RevenueCat keeps the history regardless, which is why this sweep can see it at
+             all — but seeing it is not the same as being allowed to replay it.
+           · AND REPLAYING IT WOULD BE WRONG. A consumable was already DELIVERED. Someone who
+             bought 1,000 coins and spent 400 holds a balance of 600, not a 1,000-coin
+             receipt; re-granting the transaction mints 1,000 fresh coins on every reinstall.
+             `unique (intent)` in policies.local.sql already refuses that — the transaction
+             grants once, to one owner, for good — and that refusal is the correct answer,
+             not a limitation to route around.
+
+         So a reinstall is an IDENTITY problem, not a purchase problem: the coins are safe, on
+         the subject that bought them, and the job is to reach that subject. Anonymously the
+         only durable handle is the store account itself, which means deriving the subject
+         from something that survives a reinstall — an auth-seam decision, named in the UI by
+         <RestoreRow>, in the deploy checklist, and in PLAN.md §6.86. It is deliberately NOT
+         faked here.
+
+         ── BOUNDED AND RESUMABLE ─────────────────────────────────────────────────────────
+         A request gets 64 module calls (ACTION_CALL_CAP). `grantStore` spends about eight of
+         them per purchase, so this grants at most five per call and returns `done` — the
+         caller loops. A blown budget is a 503 with the work half-finished, which on this path
+         means a customer whose restore stopped in the middle of their own money. The route's
+         `rate` is sized to the SWEEP rather than to the intent for the same reason. -->
+    <action as="restoreNative">
+      const rc = await dsx.module.secret.read({ name: 'REVENUECAT_KEY' })
+      if (!rc.ok || rc.data == null || rc.data === '') {
+        throw { reason: 'unavailable', message: 'This build cannot reach the store to check your purchases, so it has nothing it could restore. The deployment needs REVENUECAT_KEY (server/store.dsx settleNative names what it does with it).' }
+      }
+
+      // the caller, taken from a row rather than from the request — the same reasoning as
+      // settleNative, and the reason this action takes no arguments at all
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) {
+        const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (made.ok) { w = made.data } else {
+          const again = await dsx.module.data.wallet.list({ limit: 1 })
+          w = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+      }
+      if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
+      const uid = w.owner_id
+      if (uid == null || uid === '') {
+        throw { reason: 'unavailable', message: 'this session cannot be matched to a store account, so there is nothing to restore onto' }
+      }
+
+      const seen = await fetch('https://api.revenuecat.com/v1/subscribers/' + encodeURIComponent(uid), {
+        method: 'GET',
+        headers: { authorization: 'Bearer ' + rc.data, accept: 'application/json' }
+      })
+      // AN UNREACHABLE STORE IS NOT AN EMPTY ONE. The store module own docs make the same
+      // point about its offline behaviour, and it matters most here: answering "nothing to
+      // restore" to a paying customer whose network blipped is the one wrong answer.
+      if (!seen.ok || seen.data == null || seen.data.subscriber == null) {
+        throw { reason: 'upstream', message: 'The store could not be reached. Your purchases are safe — try again when you are back online.' }
+      }
+
+      // WHAT IS ALREADY GRANTED, in ONE query rather than one per purchase. `grantStore`
+      // would refuse a replay anyway (two database locks stand behind it), but paying eight
+      // module calls to be told so would burn the request budget on work already done.
+      const held = await dsx.module.data.order.list({ filters: { status: 'paid' }, limit: 100 })
+      const already = (held.ok ? held.data : []).map(o => o.intent)
+
+      const bought = seen.data.subscriber.non_subscriptions
+      const pending = []
+      for (const pair of Object.entries(bought == null ? {} : bought)) {
+        const sku = pair[0]
+        for (const run of pair[1]) {
+          // sandbox does not pay — the same rule the webhook and settleNative apply
+          if (run.is_sandbox === true) { continue }
+          const txn = run.store_transaction_id == null || run.store_transaction_id === ''
+            ? run.id
+            : run.store_transaction_id
+          if (txn == null || txn === '') { continue }
+          if (already.includes('revenuecat:' + txn)) { continue }
+          pending.push({ sku: sku, transaction: txn })
+        }
+      }
+
+      const CAP = 5
+      let coins = 0
+      let bonus = 0
+      let vipDays = 0
+      let vipUntil = w.vip_until
+      let restored = 0
+      let handled = 0
+      const orders = []
+      for (const one of pending) {
+        if (handled >= CAP) { continue }
+        handled = handled + 1
+        const got = await dsx.action.grantStore({
+          owner: uid, sku: one.sku, transaction: one.transaction, provider: 'revenuecat'
+        })
+        // A SKU THE PRICE TABLE DOES NOT SELL IS SKIPPED, NOT FATAL. RevenueCat answers with
+        // every product ever bought on this account, which can include one an operator
+        // retired. Failing the whole sweep on it would strand the purchases either side.
+        if (!got.ok || got.data == null) { continue }
+        if (got.data.granted !== true) { continue }
+        if (got.data.coins != null) { coins = coins + got.data.coins }
+        if (got.data.bonus != null) { bonus = bonus + got.data.bonus }
+        if (got.data.days != null) { vipDays = vipDays + got.data.days }
+        if (got.data.vipUntil != null) { vipUntil = got.data.vipUntil }
+        restored = restored + 1
+        orders.push({ order: got.data.order, sku: one.sku })
+      }
+
+      // `done` false means the budget ran out with purchases left, and the caller runs it
+      // again — never a half-answer presented as a whole one
+      return {
+        checked: pending.length, restored: restored,
+        coins: coins, bonus: bonus, vipDays: vipDays, vipUntil: vipUntil,
+        orders: orders, done: pending.length <= CAP, remaining: pending.length - handled
+      }
     </action>
 
   </head>
@@ -750,7 +916,14 @@
                      purchase whose settle is lost is money already taken at Apple, so the
                      app must be able to keep asking (AGENTS.md: size the rate to the sweep).
          · restore     6/h — up to twenty Stripe reads per call. It is a deliberate,
-                     user-initiated action, not something a screen polls. -->
+                     user-initiated action, not something a screen polls.
+         · restore
+           (native)   20/h — ONE RevenueCat read plus at most five grants, and it is
+                     RESUMABLE: a viewer with more than five ungranted purchases has to be
+                     able to call it again and finish. Sized to the SWEEP, not to the intent
+                     — `6/h` here would lock a customer out of their own money on pass two,
+                     which is the mistake AGENTS.md records against an account deletion. -->
+
   <route method="GET"  path="/store/catalog"  action="storeCatalog"   auth="none"     rate="120/m"/>
   <route method="POST" path="/store/checkout" action="createCheckout" auth="required" rate="6/h"/>
   <route method="POST" path="/store/settle"   action="settleOrder"    auth="required" rate="20/h"/>
@@ -767,4 +940,11 @@
   <worker as="drain-store-events" queue="store_events" action="storeEvent"
           schedule="* * * * *" idempotencyKey="event"/>
   <route method="POST" path="/store/restore"  action="restoreOrders"  auth="required" rate="6/h"/>
+  <!-- TWO RESTORE ROUTES, ONE VERB, AND NEITHER ASKS WHO YOU ARE. `auth="required"` verifies
+       a token; it does not ask for a human behind it, so an anonymous session reaches both.
+       They are separate routes rather than one because the QUESTION differs: the Stripe lane
+       asks a payment provider about orders this backend opened, the native lane asks
+       RevenueCat what the store says this subject owns. A screen picks by capability and
+       says which one it ran (Components/parts/RestoreRow.dsx). -->
+  <route method="POST" path="/store/restore/native" action="restoreNative" auth="required" rate="20/h"/>
 </server>
