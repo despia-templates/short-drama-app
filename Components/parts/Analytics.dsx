@@ -26,14 +26,21 @@
      into the kernel log ring the dev-center console streams. A DRAIN, not a transport:
      nothing leaves the device, and the Manage screen says exactly that.
 
-     ══ ARTICLE 7, NAMED: NO BUILD CAN REACH THE SINK TODAY ════════════════════════════
-     `Core/PostHog` ships `web/index.js` complete and its manifest declares no `web.entry`,
-     so `cli/src/build.ts` (`if (pkg.entry === undefined) continue`) emits no chunk and
-     `has('posthog')` is false on every web build. Same for `Core/Consent`. Not a new class
-     of defect: `Core/SocialShare/dsx.json` records exactly it about itself — "every web
-     build silently had has('share') === false and no chunk on disk, while the implementation
-     sat there complete. Declaring the entry is the whole fix." SocialShare was fixed; these
-     two were not. Filed as PLAN.md §6.92 — three lines per manifest.
+     ══ THE SINK IS REACHABLE NOW, AND THE FALLBACK STAYS ANYWAY ═══════════════════════
+     This block used to say no build could reach a sink, and it was right: `Core/PostHog`
+     shipped a complete `web/index.js`, its manifest restated no `web.entry`, and
+     `cli/src/build.ts` emitted a chunk only for a manifest that did — so `has('posthog')`
+     was false on every web build while the implementation sat there finished. Filed as
+     PLAN.md §6.92, and fixed upstream: FILE PRESENCE is the gate now (`webLaneEntry`), which
+     turned out to be the same defect in 98 first-party modules, not three. `Core/PostHog`
+     and `Core/Consent` are declared in `dsx.config.json` `packages` and the browser fetches
+     `/vendor/packages/posthog.js` on boot — measured before and after: the `dsx.log('funnel', …)`
+     fallback line that used to appear on every page load is gone, because the `has()` branch
+     above it is now the one taken.
+     The fallback below is NOT dead code and must not be deleted. A build that excludes these
+     packages is legitimate — an embed, a slice, an adopter who does not want analytics — and
+     the guard is what makes that build run instead of throw. Article 7: the degradation stays,
+     and the Manage screen keeps naming which sink is live.
 
      So `posthog` and `consent` are declared in dsx.config.json `modules`, the DECLARE-THEN-
      REACH list for platform schemes no configured package claims. That is what admits these
