@@ -320,7 +320,10 @@
          taps out of an ad to read a paywall is done with the ad. -->
     <action as="seePlans">
       dsx.action.close()
-      dsx.module.route.push({ path: '/vip' })
+      // RESET, not push: /vip mounts the tab bar, and a push slides the whole frame with
+      // the bar riding along — the founder's rule, and PLAN.md 6.29's reasoning from the
+      // product side. A screen with a menu bar is entered laterally, never pushed.
+      dsx.module.route.reset({ path: '/vip' })
     </action>
     <action as="report">
       global.adOptOut = true

@@ -16,7 +16,7 @@
   <head>
     <attribute as="active" default="'home'"/>   <!-- home | foryou | vip | list | profile -->
 
-    <variable as="on" computed="true">'#FF2C55'</variable>
+    <variable as="on" computed="true">return brand()</variable>
     <variable as="off" computed="true">'rgba(255,255,255,0.45)'</variable>
 
     <style as="bar" background="#000000" paddingTop="9" paddingBottom="9" alignItems="flex-start"/>
@@ -26,6 +26,12 @@
     <style as="vipGem" width="30" height="30" radius="10" alignItems="center"/>
     <style as="dot" background="#FF2C55" width="7" height="7" radius="4"/>
   </head>
+
+  <!-- FIRST CHILD, always. `<functions global="true">` registers at INSTANTIATE, not at
+       declaration, so the palette reads above resolve only if this mount has already run.
+       Every other shared part does the same; the bar was the one left out because it was
+       held back from the pass that collapsed the vocabulary. -->
+  <Theme/>
 
   <vstack class="item" on:tap="dsx.module.route.reset({ path: '/' })" a11yTrait="button" a11yLabel="Home">
     <image icon="{{ dsx.attribute.active == 'home' ? 'house.fill' : 'house' }}" iconSize="22"
@@ -49,7 +55,7 @@
          says "an authored width still wins", and the width does win; the POSITION does not.
          Filed upstream (PLAN.md §6.21) with the fix — `width: 100%` instead of stretch leaves
          `align-self: auto`, so the parent's `align-items` keeps governing. -->
-    <vstack class="vipGem" style="align-self: center; position: relative; justify-content: center; background: linear-gradient(150deg, #FF7BAA 0%, #FF2C55 45%, #B3103A 100%); box-shadow: 0 4px 14px rgba(255,44,85,0.45)">
+    <vstack class="vipGem" style="align-self: center; position: relative; justify-content: center; background: linear-gradient(150deg, {{ gemLift() }} 0%, {{ brand() }} 45%, {{ gemDeep() }} 100%); box-shadow: 0 4px 14px rgba(255,44,85,0.45)">
       <image icon="crown.fill" iconSize="15" color="#FFE9A8" a11yHidden="true"/>
       <stack class="dot" style="position: absolute; top: -1px; right: -1px; border: 2px solid #000000"/>
     </vstack>

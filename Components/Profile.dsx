@@ -347,8 +347,17 @@
                where signing in lives. Every row here works without an account; the ones that
                need one say so when you arrive. -->
           <vstack class="cardFlush">
-            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)" href="/list"
-                    a11yGroup="true" a11yLabel="My list and history">
+            <!-- RESET, not href. /list is a TAB ROOT: it mounts the tab bar, and `href` pushes,
+                 so this row slid a second copy of My List over Profile with its own bar riding
+                 in on the transform — the founder's rule ("a push is only for pages with no
+                 menu bar that go back via a back button"), and PLAN.md 6.29's reasoning from
+                 the product side. Nothing is lost by dropping the anchor here: a row inside a
+                 grouped card is not a link a crawler or a cmd-click wants, unlike the desktop
+                 footer, and the a11y contract is already carried by a11yGroup + a11yLabel.
+                 The chevron stays, because the destination IS forward from here. -->
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
+                    on:tap="dsx.module.route.reset({ path: '/list' })"
+                    a11yTrait="button" a11yGroup="true" a11yLabel="My list and history">
               <image icon="bookmark.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
               <text value="My List &amp; History" class="menuLabel" style="flex: 1"/>
               <image icon="chevron.right" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
