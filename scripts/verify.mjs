@@ -1533,13 +1533,23 @@ console.log("\ndevice identity, the 90% path");
   if (pool !== null) {
     // pg returns int8 as a STRING through this test pool (serve.mjs installs a Number parser; this
     // harness does not), so coerce before comparing.
+    // THE SIGN-IN REWARD rides the same transaction (spec §9.3 row 1: "Login with any account,
+    // +60"): the link is the one event the provider can verify, so the merge writes a `signin`
+    // ledger row under dsx_ledger_once_per_owner and adds 60 bonus — once per ACCOUNT, however
+    // many devices link to it or how often one re-links.
+    const SIGNIN = 60;
     const w = await sql("select coins, bonus from dsx_wallet where owner_id = $1", [acctSub]);
-    check("the device wallet SUMMED into the account (250 coins + 30 bonus)", Number(w.rows[0]?.coins) === 250 && Number(w.rows[0]?.bonus) === 30, JSON.stringify(w.rows[0]));
+    check(`the device wallet SUMMED into the account, plus the sign-in reward (250 coins + 30 + ${SIGNIN} bonus)`,
+      Number(w.rows[0]?.coins) === 250 && Number(w.rows[0]?.bonus) === 30 + SIGNIN, JSON.stringify(w.rows[0]));
+    const signin = await sql("select count(*)::int as n, coalesce(sum(amount),0)::int as coins from dsx_ledger where owner_id = $1 and source = 'signin'", [acctSub]);
+    check("the sign-in reward is one ledger row the account can read back", signin.rows[0].n === 1 && signin.rows[0].coins === SIGNIN, JSON.stringify(signin.rows[0]));
     await POST("/auth/link", acct, { deviceId, secret });                                   // replay
     const w2 = await sql("select coins, bonus from dsx_wallet where owner_id = $1", [acctSub]);
     const marker = await sql("select count(*)::int as n from dsx_ledger where owner_id = $1 and source = 'merge'", [acctSub]);
-    check("re-linking folds NOTHING twice — one merge ledger row, the balance unchanged",
-      Number(w2.rows[0]?.coins) === 250 && Number(w2.rows[0]?.bonus) === 30 && marker.rows[0].n === 1, `${JSON.stringify(w2.rows[0])} marker=${marker.rows[0].n}`);
+    const signin2 = await sql("select count(*)::int as n from dsx_ledger where owner_id = $1 and source = 'signin'", [acctSub]);
+    check("re-linking folds NOTHING twice — one merge row, one sign-in row, the balance unchanged",
+      Number(w2.rows[0]?.coins) === 250 && Number(w2.rows[0]?.bonus) === 30 + SIGNIN && marker.rows[0].n === 1 && signin2.rows[0].n === 1,
+      `${JSON.stringify(w2.rows[0])} merge=${marker.rows[0].n} signin=${signin2.rows[0].n}`);
   }
   const exLinked = await asJson(await POST("/auth/device", H, { deviceId, secret }));
   check("a LINKED device now exchanges to the account subject",
