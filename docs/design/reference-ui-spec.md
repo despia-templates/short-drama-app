@@ -225,12 +225,7 @@ PLAN.md), grid cells as §1. Empty state: bookmark 44 ink-3, "Nothing saved yet"
   client refreshes `/wallet/state`. No refusal cards, no "purchasing is off" notes anywhere.
 
 ## 7 · Live Activity / widget — "Currently Watching"
-A dark card (`#0E0E10`, radius 20): poster 72×108 radius 8 left; "Currently Watching" 13 ink-3;
-title 20 bold ink 2 lines; "EP.1" 13 ink-3; teal button `#6EE7C5`, h 44, radius 12, "▶ Continue
-Watching" 17 bold `#000` (deep link `/watch/<show>/<idx>`); the app mark 24pt top-right in a
-`#1C1C1E` tile. iOS: a Live Activity while an episode is in progress and a Lock Screen /
-Home widget after; Android: a Glance widget. Through the framework's Widgets / Live Activity
-lanes (Core/Widgets, Core/OneSignalLiveActivity, `StackActivity.swift`, `:glance`).
+A dark card (`#0E0E10`, radius 16, padding 14 × 10): poster 72×108 radius 8 left, a 12pt gap; "Currently Watching" 12 ink-3; the title 20 bold, two lines; `EP.n` 12 ink-3 (column spacing 2); top-right a 20pt tile (`#1C1C1E`, radius 6, padding 3) holding the 14pt app mark; the CTA pill full-width at the bottom of the column — `#FF3D5D` (ReelShort's player pink, the founder's accent call) radius 10, 7pt vertical padding, "▶︎ Continue Watching" 14 bold white — so the card is about 1.2× the poster height and the button about a third of it, the reference's proportions. The first cut (radius 20, padding 16, a 42pt button with 17pt ink, a 36pt tile) read "too chunky" beside the reference on 2026-09-02 and these are the re-measured numbers. The whole card deep-links to `/watch/<show>/<idx>`. iOS: a Live Activity while an episode is in progress and a Lock Screen / Home widget after; Android: a Glance widget. Through the framework's Widgets / Live Activity lanes (Core/Widgets, Core/OneSignalLiveActivity, `StackActivity.swift`, `:glance`).
 
 ## 8 · Tab bar (five tabs, replaces Home / For You / VIP / My List / Profile)
 `Home` (house) · `Explore` (play.circle — the vertical feed) · `My List` (bookmark) · `Rewards`

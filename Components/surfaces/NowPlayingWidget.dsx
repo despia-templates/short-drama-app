@@ -54,23 +54,23 @@
     <expects variable="poster"/>   <!-- the poster's file path on this device (module-fetched) -->
     <expects variable="mark"/>     <!-- the app mark's file path, the same way -->
   </head>
-  <hstack bg="#0E0E10" radius="20" paddingh="16" paddingv="16" spacing="14" align="top" grow="width"
+  <hstack bg="#0E0E10" radius="16" paddingh="14" paddingv="10" spacing="12" align="top" grow="width"
             href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}">
     <image src="{{ dsx.variable.poster }}" width="72" height="108" radius="8" fit="cover"/>
     <vstack align="leading" spacing="0" grow="width">
       <hstack align="top" spacing="8">
-        <vstack align="leading" spacing="3" grow="width">
-          <text size="13" color="#8E8E93" lines="1">{{ dsx.variable.caption }}</text>
+        <vstack align="leading" spacing="2" grow="width">
+          <text size="12" color="#8E8E93" lines="1">{{ dsx.variable.caption }}</text>
           <text size="20" weight="bold" color="#FFFFFF" lines="2">{{ dsx.variable.title }}</text>
-          <text size="13" color="#8E8E93" lines="1">{{ dsx.variable.ep }}</text>
+          <text size="12" color="#8E8E93" lines="1">{{ dsx.variable.ep }}</text>
         </vstack>
-        <hstack bg="#1C1C1E" radius="8" padding="6">
-          <image src="{{ dsx.variable.mark }}" width="24" height="24" fit="contain"/>
+        <hstack bg="#1C1C1E" radius="6" padding="3">
+          <image src="{{ dsx.variable.mark }}" width="14" height="14" fit="contain"/>
         </hstack>
       </hstack>
       <spacer/>
-      <hstack bg="#FF3D5D" radius="12" paddingv="12" paddingh="14" grow="width" align="center">
-        <text size="17" weight="bold" color="#FFFFFF" lines="1">{{ dsx.variable.cta }}</text>
+      <hstack bg="#FF3D5D" radius="10" paddingv="7" paddingh="12" grow="width" align="center">
+        <text size="14" weight="bold" color="#FFFFFF" lines="1">{{ dsx.variable.cta }}</text>
       </hstack>
     </vstack>
   </hstack>
