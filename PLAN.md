@@ -4410,3 +4410,14 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      Claim pill, and its grant is a server fact (`/rewards/draw`, the memberday marker) — no wheel
      UI anywhere. The rewards loop is now the check-in, the task catalogue and the rewarded ad,
      none of them random.
+
+     RIDER — THE FOLLOW ROWS WERE A LANE DIVERGENCE TOO. The web showed four "Follow us on"
+     rows, iOS and Android none. `dsx.config.json` carried `consts.followFacebookUrl` and three
+     siblings as `https://www.facebook.com/`-style placeholders, and that override is a WEB
+     BUILD-TIME layer with no native twin by design (cli/src/config.ts `readConsts`: a device
+     reads the shipped App.json and nothing else) — so the web rendered rows whose link was the
+     network's home page while the natives, reading App.json's empty strings, hid them.
+     FollowRow's own rule stands ("a placeholder URL is a broken promise to a reviewer; a row
+     with no URL is not rendered"): the placeholders are gone from dsx.config.json, the rows
+     appear on every lane the day the operator sets the real URLs in App.json `consts`, and
+     never one lane before the other.

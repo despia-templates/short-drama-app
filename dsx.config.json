@@ -167,12 +167,7 @@
     }
   ],
   "_consts_note": "THE FOLLOW ROWS (docs/design/reference-ui-spec.md 9.3 row 6) read their destinations from `dsx.const.follow*Url`, which App.json ships EMPTY on purpose — a placeholder URL reads as a broken promise to a store reviewer — and a row whose URL is empty is not rendered. This local overlay points the demo at the networks' own front pages so the page can be judged against the reference; an adopter puts their real pages in App.json.",
-  "consts": {
-    "followFacebookUrl": "https://www.facebook.com/",
-    "followYoutubeUrl": "https://www.youtube.com/",
-    "followTiktokUrl": "https://www.tiktok.com/",
-    "followInstagramUrl": "https://www.instagram.com/"
-  },
+  "consts": {},
   "router": {
     "transition": "ios",
     "swipeBack": true,
