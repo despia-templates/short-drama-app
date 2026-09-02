@@ -3868,3 +3868,33 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      shrank the show header to its poster's height and a rail card to its caption (measured,
      both, and reverted the same hour). After: probe rows A–G within 0.3pt of the browser and
      the page back at x = 16; the player's rail 8pt from the web, the CTA identical.
+
+188. **THE iOS SHEET CHROME IS THE OS'S, AND iOS 26 FLOATS IT — the web draws the app's**
+     (found 2026-09-02 on the player's More sheet, iPhone 17 Pro simulator on iOS 26 against
+     the browser at 402×874; NOT fixed — filed for the engine, the top open parity item).
+
+     `<sheet detents="content">` under `design: "custom"` presents through SwiftUI's `.sheet`
+     (Sheet.swift: "the iOS default: edge-to-edge card, rounded top"), and on iOS 26 the OS
+     draws that container as a floating card: 16pt side insets, every corner rounded, the
+     panel lifted 34pt off the bottom edge ("presentation pays bottom inset = 34.0pt"). The
+     web's `.dsx-sheet-panel` is edge-to-edge, radius 20 on the top corners only, flush with
+     the bottom, the safe inset paid INSIDE the panel as padding. Same rows, same grabber,
+     different frame — and the difference is platform chrome leaking through the custom
+     design, which docs/design/reference-ui-spec.md §−1 names an engine defect. The fix is
+     an app-drawn presentation under custom design (a clear OS background with the panel
+     painted by CustomDesign at the web's geometry), not a template attribute; Android's
+     ModalBottomSheet twin needs the same reading before it is called done.
+
+189. **TWO SMALL TEXT-BOX READINGS LEFT DIVERGENT, NAMED** (measured 2026-09-02 on the
+     flagship probe, all three lanes).
+
+     (a) A wrapped text run in a hugging iOS column paints its BACKGROUND over its wrapped
+     extent (178pt for a two-line title whose fit box is 244), where the web and Android paint
+     the full fit-content box (244): the layout is right (the run wraps at 244 on every lane),
+     the paint is the SwiftUI Text's own bounds. A `.frame` inside the text element's paint
+     arm would close it; not done this pass. (b) On Android a non-growing text run in a row
+     keeps its ideal width like the web, but the sibling after it (a 14pt chevron) is squeezed
+     to zero rather than pushed past the row's edge as CSS overflow paints it. Both are
+     invisible in the template today (no bare text carries a background in a hugging column;
+     the player title grows), and both are pinned here so the next pass reads them as
+     engine work, not template styling.
