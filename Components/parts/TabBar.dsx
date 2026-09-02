@@ -1,10 +1,19 @@
-<!-- TabBar — the category-standard five: Home · For You · VIP · My List · Profile, with
-     VIP raised in the centre as its own gold moment (measured off the DramaWave reference:
-     outline icons at rest, accent-filled when active, an 11px caption under each, and a
-     dot badge on the surfaces that have news).
+<!-- TabBar — the reference's five (docs/design/reference-ui-spec.md §8): Home · Explore ·
+     My List · Rewards · My Page. Icons 24, captions 11, active ink / inactive ink-3, 56pt plus
+     the safe bottom, over a hairline. VIP LEFT THE BAR: it lives in the crown button on Home,
+     the unlock pills and the Membership page, so the bar sells nothing and the fifth slot
+     went to the viewer.
 
-     A tap is a RESET to that root, never a push — tabs are lateral moves, so the stack
-     never grows and the bar never travels with a transition (writing-an-app.md §5). -->
+     THE REWARDS CALLOUT is the one live element: a teal bubble above the coin reads the coins
+     the viewer could claim RIGHT NOW — the day's unclaimed check-in, the tasks not yet
+     claimed, the rewarded ads still inside the cap — every term a server fact off
+     /rewards/state, summed here and never invented. It reads the app-wide stash the Rewards
+     screen already keeps (PLAN.md §6.30) and fetches it itself only when no screen has yet,
+     so the bubble is right on the first tab a signed-in viewer sees and costs one request per
+     session. Signed out, or with nothing to claim, there is no bubble: a "+0" is a nag.
+
+     A tap is a RESET to that root, never a push — tabs are lateral moves, so the stack never
+     grows and the bar never travels with a transition (writing-an-app.md §5). -->
 <!-- ONE GEOMETRY, EVERY SCREEN. This bar deliberately reads NOTHING about the safe area.
      A route frame proposes the safe region, so the bar is already clear of the home
      indicator, and the only way its captions can land at two different heights is if some
@@ -12,65 +21,103 @@
      to compensate for — an earlier pass added a per-screen `inset` here and the compensation
      itself became the drift the founder saw: 70pt on Home, 104pt on For You, captions at two
      different y. The bar is a fixed rung; screens conform to it. -->
-<hstack chrome="true" class="bar" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.07); justify-content: space-around">
+<!-- The hairline is `border-top`, a per-edge word both native bridges fold now (PLAN.md
+     §6.118b) — the same declaration paints the same 1px on all three lanes. -->
+<hstack chrome="true" class="bar" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.12); justify-content: space-around">
   <head>
-    <attribute as="active" default="'home'"/>   <!-- home | foryou | vip | list | profile -->
+    <attribute as="active" default="'home'"/>   <!-- home | explore | list | rewards | profile -->
 
-    <variable as="on" computed="true">return brand()</variable>
-    <variable as="off" computed="true">'rgba(255,255,255,0.45)'</variable>
+    <!-- the claimable total's source. Gated on identity AND on the stash being empty: the
+         Rewards screen refreshes the stash every time it mounts, so this block only ever
+         fires for a viewer who has not opened Rewards this session -->
+    <api as="rewards" url="/rewards/state" ssr="false"
+         auto="global.auth.ok == true &amp;&amp; global.cacheRewards == null" headers="global.auth.headers"
+         on:success="global.cacheRewards = global.auth.ok == true ? rewards.data : null"/>
 
-    <style as="bar" background="#000000" paddingTop="9" paddingBottom="9" alignItems="flex-start"/>
-    <style as="item" spacing="4" alignItems="center" paddingV="2" paddingH="4" width="66"/>
+    <variable as="on" computed="true">return ink()</variable>
+    <variable as="off" computed="true">return ink3()</variable>
+    <!-- ONE ARITHMETIC, SHARED. Every term is a SERVER number — the streak curve's next
+         step, each COMPLETED task's reward, the ad cap left times the ad reward for a
+         non-member — and the sum lives in the global library (Theme.dsx rewardsClaimable),
+         which the Rewards screen's own "+N to claim" pill calls too, so the bubble and the
+         page cannot disagree. The wheel is left out: its prize is drawn, not owed. -->
+    <variable as="claimable" computed="true">
+      if (global.auth.ok != true) { return 0 }
+      const w = global.cacheWallet
+      const vip = w != null &amp;&amp; w.vip === true
+      return rewardsClaimable(global.cacheRewards, vip)
+    </variable>
+    <!-- the label grows from an anchor that can never parse as a number, so every `+` is a
+         concatenation (JSE `+` is total arithmetic — AGENTS.md) -->
+    <variable as="claimLabel" computed="true">
+      let out = '+'
+      out = out + dsx.variable.claimable
+      return out
+    </variable>
+
+    <style as="bar" background="#000000" paddingTop="7" paddingBottom="7" alignItems="flex-start"/>
+    <style as="item" spacing="3" alignItems="center" paddingV="1" paddingH="4" width="64"/>
+    <style as="glyph" width="24" height="24" alignItems="center" alignY="center"/>
     <style as="cap" fontSize="11" fontWeight="medium"/>
-    <style as="vipWrap" alignItems="center" spacing="4" paddingH="4" width="66"/>
-    <style as="vipGem" width="30" height="30" radius="10" alignItems="center"/>
-    <style as="dot" background="#FF2C55" width="7" height="7" radius="4"/>
+    <!-- the callout: teal, fully round, ink-on-light figures; sits above and to the right
+         of the coin, over the bar's top edge — position: absolute + edge insets are bridged
+         on both native lanes now, so this is one declaration on three renderers -->
+    <style as="callout" background="#4ADFB4" radius="9" paddingH="6" paddingV="2" alignItems="center" zIndex="2"/>
+    <style as="calloutTxt" fontSize="11" fontWeight="bold" color="#111111" lineLimit="1"/>
   </head>
 
   <!-- FIRST CHILD, always. `<functions global="true">` registers at INSTANTIATE, not at
-       declaration, so the palette reads above resolve only if this mount has already run.
-       Every other shared part does the same; the bar was the one left out because it was
-       held back from the pass that collapsed the vocabulary. -->
+       declaration, so the palette reads above resolve only if this mount has already run. -->
   <Theme/>
 
   <vstack class="item" on:tap="dsx.module.route.reset({ path: '/' })" a11yTrait="button" a11yLabel="Home">
-    <image icon="{{ dsx.attribute.active == 'home' ? 'house.fill' : 'house' }}" iconSize="22"
-           color="{{ dsx.attribute.active == 'home' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
-    <text value="Home" class="cap" color="{{ dsx.attribute.active == 'home' ? '#FFFFFF' : dsx.variable.off }}"/>
-  </vstack>
-
-  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/discover' })" a11yTrait="button" a11yLabel="For You">
-    <image icon="play.rectangle.fill" iconSize="22"
-           color="{{ dsx.attribute.active == 'foryou' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
-    <text value="For You" class="cap" color="{{ dsx.attribute.active == 'foryou' ? '#FFFFFF' : dsx.variable.off }}"/>
-  </vstack>
-
-  <!-- VIP: the centre slot the category reserves for the subscription -->
-  <vstack class="vipWrap" on:tap="dsx.module.route.reset({ path: '/vip' })" a11yTrait="button" a11yLabel="VIP">
-    <!-- `align-self: center` is LOAD-BEARING, not decoration. A column stack nested in a
-         column stack is given `align-self: stretch` by the web sheet (globals.ts, "a form is
-         a block") — and CSS says a stretch with a DEFINITE cross size behaves as flex-start,
-         so this 30pt gem ignored `alignItems="center"` on its parent and sat 14px left of the
-         tab centre while the "VIP" caption under it stayed centred. The sheet's own comment
-         says "an authored width still wins", and the width does win; the POSITION does not.
-         Filed upstream (PLAN.md §6.21) with the fix — `width: 100%` instead of stretch leaves
-         `align-self: auto`, so the parent's `align-items` keeps governing. -->
-    <vstack class="vipGem" style="align-self: center; position: relative; justify-content: center; background: linear-gradient(150deg, {{ gemLift() }} 0%, {{ brand() }} 45%, {{ gemDeep() }} 100%); box-shadow: 0 4px 14px rgba(255,44,85,0.45)">
-      <image icon="crown.fill" iconSize="15" color="#FFE9A8" a11yHidden="true"/>
-      <stack class="dot" style="position: absolute; top: -1px; right: -1px; border: 2px solid #000000"/>
+    <vstack class="glyph">
+      <image icon="{{ dsx.attribute.active == 'home' ? 'house.fill' : 'house' }}" iconSize="24"
+             color="{{ dsx.attribute.active == 'home' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
     </vstack>
-    <text value="VIP" class="cap" color="{{ dsx.attribute.active == 'vip' ? '#FFFFFF' : dsx.variable.off }}"/>
+    <text value="Home" class="cap" color="{{ dsx.attribute.active == 'home' ? dsx.variable.on : dsx.variable.off }}"/>
+  </vstack>
+
+  <!-- Explore is the vertical feed (Components/Discover.dsx): the reference names it Explore
+       and draws it as a play triangle in a circle, which the shared catalog now carries -->
+  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/discover' })" a11yTrait="button" a11yLabel="Explore">
+    <vstack class="glyph">
+      <image icon="{{ dsx.attribute.active == 'explore' ? 'play.circle.fill' : 'play.circle' }}" iconSize="24"
+             color="{{ dsx.attribute.active == 'explore' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    </vstack>
+    <text value="Explore" class="cap" color="{{ dsx.attribute.active == 'explore' ? dsx.variable.on : dsx.variable.off }}"/>
   </vstack>
 
   <vstack class="item" on:tap="dsx.module.route.reset({ path: '/list' })" a11yTrait="button" a11yLabel="My List">
-    <image icon="{{ dsx.attribute.active == 'list' ? 'bookmark.fill' : 'bookmark' }}" iconSize="21"
-           color="{{ dsx.attribute.active == 'list' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
-    <text value="My List" class="cap" color="{{ dsx.attribute.active == 'list' ? '#FFFFFF' : dsx.variable.off }}"/>
+    <vstack class="glyph">
+      <image icon="{{ dsx.attribute.active == 'list' ? 'bookmark.fill' : 'bookmark' }}" iconSize="24"
+             color="{{ dsx.attribute.active == 'list' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    </vstack>
+    <text value="My List" class="cap" color="{{ dsx.attribute.active == 'list' ? dsx.variable.on : dsx.variable.off }}"/>
   </vstack>
 
-  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/profile' })" a11yTrait="button" a11yLabel="Profile">
-    <image icon="person.crop.circle" iconSize="22"
-           color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
-    <text value="Profile" class="cap" color="{{ dsx.attribute.active == 'profile' ? '#FFFFFF' : dsx.variable.off }}"/>
+  <!-- Rewards: the coin, and the callout above it when there is something to claim. The
+       coin is the app's one coin glyph (the balance pill, the wallet row, the ledger all draw
+       `dollarsign.circle.fill`); the reference draws a stacked pair, which SF Symbols has no
+       name for, so the same coin serves here rather than a synthetic catalog key. -->
+  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/rewards' })" a11yTrait="button" a11yGroup="true"
+          a11yLabel="{{ dsx.variable.claimable > 0 ? 'Rewards, ' + dsx.variable.claimable + ' coins to claim' : 'Rewards' }}">
+    <vstack class="glyph" style="position: relative">
+      <image icon="dollarsign.circle.fill" iconSize="24"
+             color="{{ dsx.attribute.active == 'rewards' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+      <hstack class="callout" visible-if="dsx.variable.claimable > 0" a11yHidden="true"
+              style="position: absolute; top: -11px; left: 14px; white-space: nowrap">
+        <text value="{{ dsx.variable.claimLabel }}" class="calloutTxt" style="white-space: nowrap"/>
+      </hstack>
+    </vstack>
+    <text value="Rewards" class="cap" color="{{ dsx.attribute.active == 'rewards' ? dsx.variable.on : dsx.variable.off }}"/>
+  </vstack>
+
+  <vstack class="item" on:tap="dsx.module.route.reset({ path: '/profile' })" a11yTrait="button" a11yLabel="My Page">
+    <vstack class="glyph">
+      <image icon="{{ dsx.attribute.active == 'profile' ? 'person.fill' : 'person.crop.circle' }}" iconSize="24"
+             color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}" a11yHidden="true"/>
+    </vstack>
+    <text value="My Page" class="cap" color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}"/>
   </vstack>
 </hstack>

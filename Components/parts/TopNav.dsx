@@ -74,14 +74,18 @@
       }
       return base + 'background-color: rgba(20,20,20,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.07)'
     </variable>
+    <!-- the same five destinations as the phone bar (docs/design/reference-ui-spec.md §8),
+         plus Browse, which is a page only a wide viewport has room to link. VIP is not a
+         link any more: the crown in the tools cluster opens the Membership page, exactly as
+         the crown beside the phone's search field does. -->
     <variable as="links" computed="true">
       return [
         { key: 'home',     label: 'Home',    path: '/' },
-        { key: 'discover', label: 'For You', path: '/discover' },
+        { key: 'discover', label: 'Explore', path: '/discover' },
         { key: 'browse',   label: 'Browse',  path: '/browse' },
-        { key: 'vip',      label: 'VIP',     path: '/vip' },
+        { key: 'list',     label: 'My List', path: '/list' },
         { key: 'rewards',  label: 'Rewards', path: '/rewards' },
-        { key: 'list',     label: 'My List', path: '/list' }
+        { key: 'profile',  label: 'My Page', path: '/profile' }
       ]
     </variable>
 
@@ -129,7 +133,11 @@
 
     <hstack class="tools">
       <SearchOverlay size="21"/>
-      <image icon="person.crop.circle" iconSize="23" on:tap="dsx.module.route.reset({ path: '/profile' })" a11yTrait="button" a11yLabel="Profile"
+      <!-- the crown: gold, no background, the Membership page — the same control the phone
+           home carries beside its search field (spec §1), so VIP has one door on every lane -->
+      <image icon="crown.fill" iconSize="22" color="{{ crownGold() }}" a11yTrait="button" a11yLabel="Membership"
+             on:tap="dsx.module.route.push({ path: membershipPath() })"/>
+      <image icon="person.crop.circle" iconSize="23" on:tap="dsx.module.route.reset({ path: '/profile' })" a11yTrait="button" a11yLabel="My Page"
              color="{{ dsx.attribute.active == 'profile' ? dsx.variable.on : dsx.variable.off }}"/>
       <!-- the CTA lives inside the tools cluster so the 22px rhythm owns its gap too -->
       <text value="Get Coins" class="cta" on:tap="dsx.module.route.push({ path: '/store' })" a11yTrait="button" a11yLabel="Get coins — open the store"/>

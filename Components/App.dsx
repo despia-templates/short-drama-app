@@ -1,21 +1,29 @@
-<!-- Home — the storefront, built to the category reference measured live at 1440×900:
-     an 80px transparent sticky nav floating over a 480px full-bleed hero, then the
-     rails — Continue Watching · New Release · TOP (giant ranked numerals) · genre
-     grids — over a link-column footer.
+<!-- Home — TWO LANES, ONE SCREEN.
 
-     Measured constants, not invented ones: gutter 77 · poster 3:4 at radius 16 · rail
-     gap 18 · section head 24/700 at rgba(255,255,255,0.8) · card title 14 at 0.8 ·
-     card meta 14 at 0.9 · brand red #FF2C55 · hero title 32/700 at 0.9.
+     THE PHONE LANE is the founder's reference app, built 1:1 to docs/design/reference-ui-spec.md
+     §1 and §2 (measured off 390×847 screenshots): a search field carrying a trending title with
+     the gold crown beside it · a text tab strip (Hot · New · Picks · Ranking) with a 2pt rule
+     under the active label · "Trending Now" over a 3-column grid of 2:3 covers wearing the HOT /
+     NEW badge, the ORIGINAL mark and the play count · a New tab that opens on the "Coming soon"
+     rail (panel cards with an inline Remind Me) over the "New Titles" list · the coming-soon
+     sheet (§2a) and, NESTED over it, the notification-permission sheet (§2b). Every number is
+     the spec's, every colour a named tone (Components/parts/Theme.dsx).
 
-     Hero type lives OUTSIDE the pager, bound to the resting page: a caption that
-     restyles itself mid-swipe flickers. Hover is a REAL pointer affordance
-     (on:hoverStart/End) — on touch it never fires and every card stays a plain link.
-     No emoji anywhere: icons come from the shared catalog and have per-platform twins. -->
+     THE WIDE LANE (tablet and desktop) keeps the category reference measured live at 1440×900:
+     a 64px transparent nav floating over a 480px full-bleed hero, then the rails — Continue
+     Watching · New Release · TOP (giant ranked numerals) · genre grids — over a link-column
+     footer. The phone reference is a phone; the wide reference is the web the category ships.
+
+     REMIND ME is the one flow on this screen that reaches past the app: Core/Notify asks for
+     the permission the §2b checkbox stands for, Core/LocalPush schedules the one-shot at the
+     premiere on the two lanes that can, and server/reminders.dsx keeps the row that survives a
+     reinstall. Each lane says exactly which halves it managed (the `remindNote`), never a
+     success it did not earn — the web facet of `send` is a page timer that dies with the tab,
+     so a nine-day premiere is never armed there (dsx.config.json `_remind_note`). -->
 <!-- min-height rides the :web suffix: it is the BODY-HEIGHT mechanism of the web page
      (the .dsx-frame pads the safe areas and flexes its child), while a native route frame
      already proposes exactly the SAFE region — window height forced 34pt of content under
-     the home indicator (measured: the tab bar's captions at 840–860pt against a safe
-     bottom of 840). The screen class's grow="true" is the cross-platform fill. -->
+     the home indicator. The screen class's grow="true" is the cross-platform fill. -->
 <vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <api as="home" url="/catalog/home" on:success="dsx.action.homeLanded()"/>
@@ -24,26 +32,76 @@
     <api as="continue" url="/viewer/continue" ssr="false"
          auto="global.auth.ok == true" headers="global.auth.headers"
          on:success="global.cacheContinue = global.auth.ok == true ? continue.data : null"/>
+    <!-- the viewer's reminders: what lights "Reminder set" on a coming-soon card. Stashed
+         app-wide like every viewer read (PLAN.md §6.30) and dropped with the token. -->
+    <api as="reminders" url="/viewer/reminders" ssr="false"
+         auto="global.auth.ok == true" headers="global.auth.headers"
+         on:success="global.cacheReminders = global.auth.ok == true ? reminders.data : null"/>
+    <api as="setRemind" url="/viewer/reminders/{{ dsx.variable.soonId }}" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="clearRemind" url="/viewer/reminders/{{ dsx.variable.soonId }}" method="DELETE" auto="false" headers="global.auth.headers"/>
 
     <variable as="heroPage">return 0</variable>
-    <variable as="hovId">return ''</variable>   <!-- the card under the pointer -->
-    <!-- the phone home's tab row (Popular · New · Ranking) — the category's own top-level
-         switch. Wide viewports keep the measured desktop layout and never see it. -->
-    <variable as="homeTab">return 'popular'</variable>
+    <variable as="hovId">return ''</variable>   <!-- the card under the pointer (wide lane) -->
+    <!-- the phone home's tab strip: Hot · New · Picks · Ranking (spec §1 row 2) -->
+    <variable as="homeTab">return 'hot'</variable>
+    <!-- ── Remind Me state ── -->
+    <variable as="soonOpen">return false</variable>     <!-- the coming-soon sheet (§2a) -->
+    <variable as="permOpen">return false</variable>     <!-- the permission sheet (§2b), nested -->
+    <variable as="soonShow">return null</variable>      <!-- the card the sheet is about -->
+    <variable as="allow">return false</variable>        <!-- the §2b checkbox -->
+    <variable as="remindBusy">return false</variable>
+    <variable as="remindNote">return ''</variable>      <!-- the lane's honest line under the button -->
+    <variable as="toast">return ''</variable>
+    <!-- a guest has no account row, so the session remembers what it scheduled locally —
+         rows are DICTS ({ show }), never bare ids (a repeater row is a dict, AGENTS.md) -->
+    <variable as="localReminded">return []</variable>
 
-    <!-- ONE breakpoint vocabulary from the LIVE screen fact (dsx.screen.width is
-         reactive — a computed variable re-derives as the window changes). -->
-    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
-         last good payload lives in the app-wide store and is the FIRST PAINT while the
-         refetch runs. Read continueView, never continue.data, or the blank frame returns. -->
-    <!-- a guest has no Continue rail, and the app-wide stash is one person, so the
-         rail empties the instant the token drops (docs/auth.md) -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the last good
+         payload lives in the app-wide store and is the FIRST PAINT while the refetch runs. -->
     <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <!-- a DEVICE viewer (no account yet) is the web-home link-banner audience; an account viewer
+         has nothing to link and the banner self-hides -->
+    <variable as="isDevice" computed="true">return global.auth != null &amp;&amp; global.auth.kind == 'device'</variable>
     <variable as="continueView" computed="true">
       if (dsx.variable.signedIn == false) { return null }
       if (continue.data != null) { return continue.data }
       return global.cacheContinue
     </variable>
+    <variable as="remindersView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
+      if (reminders.data != null) { return reminders.data }
+      return global.cacheReminders
+    </variable>
+    <!-- the ids a bell is lit for: the account's rows plus what this session set as a guest -->
+    <variable as="remindedIds" computed="true">
+      const v = dsx.variable.remindersView
+      let ids = []
+      if (v != null) { if (v.items != null) { ids = v.items.map(r => r.show) } }
+      for (const r of dsx.variable.localReminded) { ids = ids.concat([r.show]) }
+      return ids
+    </variable>
+    <variable as="soonId" computed="true">
+      const s = dsx.variable.soonShow
+      return s == null ? '' : s.id
+    </variable>
+    <variable as="soonReminded" computed="true">
+      return dsx.variable.remindedIds.indexOf(dsx.variable.soonId) != -1
+    </variable>
+    <variable as="soonTags" computed="true">
+      const s = dsx.variable.soonShow
+      if (s == null) { return [] }
+      if (s.chips == null) { return [] }
+      return s.chips
+    </variable>
+    <!-- Ask the CAPABILITY plane before the platform (AGENTS.md): `has('localpush')` says the
+         scheduler is in this build; `os` then says whether its `send` outlives the page —
+         the web facet is a page timer, and the module has no capability word for that
+         horizon yet (PLAN.md §6, the LocalPush horizon ask). -->
+    <variable as="canSchedule" computed="true">
+      if (has('localpush') == false) { return false }
+      return os != 'web'
+    </variable>
+
     <variable as="bp" computed="true">
       const w = dsx.screen.width
       if (w >= 1120) { return 'desktop' }
@@ -51,47 +109,29 @@
       return 'phone'
     </variable>
     <variable as="wide" computed="true">return dsx.variable.bp != 'phone'</variable>
-    <!-- THE HOVER REVEAL IS A DESKTOP AFFORDANCE, and `wide` is not the right question for
-         it — `wide` includes TABLET, and a tablet is a touch surface that happens to be
-         roomy. The engine already gates `on:hoverStart` on a real pointer, so the card only
-         lights up for someone with a mouse; what it cannot know is that replacing a poster
-         with a wall of synopsis is a POINTER-AND-ROOM pattern, not a pointer pattern. On a
-         tablet — and on a phone browser that reports a hoverable pointer, which several do —
-         the reveal reads as a tap that went wrong, because a touch reader has no way to
-         un-hover it. Both halves must hold: a pointer that hovers, and a viewport with the
-         room to justify the trade. -->
+    <!-- THE HOVER REVEAL IS A DESKTOP AFFORDANCE — `wide` includes TABLET, a touch surface
+         that happens to be roomy; the engine gates on:hoverStart on a real pointer, and a
+         poster that turns into a wall of synopsis under a finger reads as a tap gone wrong -->
     <variable as="hoverReveal" computed="true">return dsx.variable.bp == 'desktop'</variable>
     <variable as="gutter" computed="true">
       if (dsx.variable.bp == 'desktop') { return 86 }
       if (dsx.variable.bp == 'tablet') { return 40 }
-      return 16
+      return 14
     </variable>
     <variable as="posterW" computed="true">
       if (dsx.variable.bp == 'desktop') { return 239 }
       if (dsx.variable.bp == 'tablet') { return 186 }
       return 150
     </variable>
-    <!-- 3:4 is the measured category ratio (both references), not the 2:3 book ratio -->
+    <!-- 3:4 is the measured category ratio on the WIDE lane; the phone lane is 2:3 (spec §1) -->
     <variable as="posterH" computed="true">return Math.round(dsx.variable.posterW * 4 / 3)</variable>
     <variable as="heroH" computed="true">
       if (dsx.variable.bp == 'desktop') { return 480 }
-      if (dsx.variable.bp == 'tablet') { return 420 }
-      return Math.round(dsx.screen.height * 0.62)
+      return 420
     </variable>
-    <variable as="heroTitleSize" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 32 }
-      if (dsx.variable.bp == 'tablet') { return 28 }
-      return 24
-    </variable>
-    <!-- section heads, re-measured against the reference set: flextv 28/700,
-         my-drama 32/700, shortical 20/700. 24 was under all but one of them. -->
-    <variable as="headSize" computed="true">return dsx.variable.wide ? 28 : 20</variable>
-    <variable as="shelfCols" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 5 }
-      if (dsx.variable.bp == 'tablet') { return 4 }
-      return 3
-    </variable>
-    <!-- TOP rail: the numeral overlaps the poster's leading edge -->
+    <variable as="heroTitleSize" computed="true">return dsx.variable.bp == 'desktop' ? 32 : 28</variable>
+    <variable as="headSize" computed="true">return 28</variable>
+    <variable as="shelfCols" computed="true">return dsx.variable.bp == 'desktop' ? 5 : 4</variable>
     <variable as="rankOvl" computed="true">return Math.round(dsx.variable.posterW * 0.36)</variable>
     <variable as="rankSize" computed="true">return Math.round(dsx.variable.posterH * 0.62)</variable>
 
@@ -101,11 +141,8 @@
       const g = dsx.variable.gutter
       return 'width: 100%; max-width: 1440px; margin-left: auto; margin-right: auto; padding-left: ' + g + 'px; padding-right: ' + g + 'px'
     </variable>
-    <!-- A RAIL TRACK IS NOT A PAGE SHELL. `width: 100%` caps the track at the scroller and
-         the cards inside it eat the difference (measured: 150px posters rendered at 72.25px
-         on a 375pt phone). The track is `max-content` and the gutter is its padding, so the
-         first card lines up with the section head and the last one keeps a trailing margin;
-         past 1440 the extra is split the way the shell's `margin: auto` splits it. -->
+    <!-- A RAIL TRACK IS NOT A PAGE SHELL: `max-content` with the gutter as its padding, or
+         the cards eat the difference (measured, AGENTS.md) -->
     <variable as="railShell" computed="true">
       const g = dsx.variable.gutter
       const over = dsx.screen.width - 1440
@@ -124,22 +161,55 @@
     <variable as="posterBox" computed="true">
       return 'width: ' + dsx.variable.posterW + 'px; height: ' + dsx.variable.posterH + 'px; justify-content: flex-end'
     </variable>
-    <!-- CONTENT SURVIVES A REVISIT. `<api cache>` is keyed by the per-MOUNT store
-         (mount.ts makes a new ReactiveStore per component, and the api cache is a WeakMap
-         over it), so leaving a tab and coming back refetches from zero and this screen
-         painted EMPTY RAILS for 103ms on localhost — measured tap-to-content, and far
-         worse on a real network. `global.*` is the app-wide store and outlives the frame,
-         so the last good payload is the first paint while the fresh fetch runs underneath:
-         stale-then-fresh, never blank. Every read below goes through `feed`, never
-         `dsx.variable.homeView`, or the hole comes back. Upstream ask: PLAN.md §6.30. -->
     <variable as="homeView" computed="true">
       if (home.data != null) { return home.data }
       return global.cacheHome
     </variable>
-    <!-- SOCIAL PROOF, formatted the way the category does it: my-drama runs "2.6M · 9.67"
-         in the hero meta, flextv puts a play count on every card, ReelShort prints
-         13.2M/115.5k on the detail. A catalogue with no numbers reads as an empty shelf.
-         These are DEMO values (scripts/catalogue.mjs) — nothing here increments them. -->
+    <!-- THE FIRST VISIT HAD NO STATE: a cold load has nothing to fall back to, so the phase
+         drives skeletons; `empty` is a real state too (a seeded-but-unpublished catalogue) -->
+    <variable as="phase" computed="true">
+      const v = dsx.variable.homeView
+      if (v != null) { return v.latest.length == 0 && v.hero.length == 0 ? 'empty' : 'ready' }
+      if (home.error != null) { return 'error' }
+      return 'loading'
+    </variable>
+    <variable as="skelRows" computed="true">return [0, 1, 2, 3, 4, 5]</variable>
+    <!-- the grid the Hot tab draws: hot-first then by play count (server/catalog.dsx). A
+         payload stashed before the field existed has no `grid`, so the older rails stand in -->
+    <variable as="gridRows" computed="true">
+      const v = dsx.variable.homeView
+      if (v == null) { return [] }
+      if (v.grid != null) { return v.grid }
+      return v.latest
+    </variable>
+    <variable as="pickRows" computed="true">
+      const v = dsx.variable.homeView
+      if (v == null) { return [] }
+      if (v.picks != null) { return v.picks }
+      return v.hero
+    </variable>
+    <variable as="soonRows" computed="true">
+      const v = dsx.variable.homeView
+      if (v == null) { return [] }
+      if (v.comingSoon == null) { return [] }
+      return v.comingSoon
+    </variable>
+    <variable as="newRows" computed="true">
+      const v = dsx.variable.homeView
+      if (v == null) { return [] }
+      if (v.newTitles == null) { return [] }
+      return v.newTitles
+    </variable>
+    <!-- THE SEARCH HINT IS A TRENDING TITLE (spec §1), never the word "Search". It rotates
+         per landing — the catalogue advances an app-wide index every time it lands, so each
+         visit to Home offers the next hot title — rather than on a timer the markup has no
+         word for. -->
+    <variable as="searchHint" computed="true">
+      const rows = dsx.variable.gridRows
+      if (rows.length == 0) { return 'Search dramas' }
+      const i = global.searchHintIdx == null ? 0 : Number(global.searchHintIdx)
+      return rows[i % rows.length].title
+    </variable>
     <variable as="heroTags" computed="true">
       const h = dsx.variable.heroShow
       if (h == null || h.tags == null) { return [] }
@@ -148,21 +218,8 @@
     <variable as="heroViews" computed="true">
       const h = dsx.variable.heroShow
       if (h == null || h.views == null || h.views < 1000) { return '' }
-      if (h.views < 1000000) { return Math.round(h.views / 100) / 10 + 'K' }
-      return Math.round(h.views / 100000) / 10 + 'M'
+      return compactCount(h.views)
     </variable>
-    <!-- THE FIRST VISIT HAD NO STATE. The app-wide stash (above) fixed REVISITS, but a cold
-         first load has nothing to fall back to, so this screen painted section headings over
-         empty rails until the fetch landed — the exact failure the stash comment describes,
-         one case short. `empty` is real too: a fresh deployment with a seeded-but-unpublished
-         catalogue reaches here with zero shows and used to render silent void. -->
-    <variable as="phase" computed="true">
-      const v = dsx.variable.homeView
-      if (v != null) { return v.latest.length == 0 && v.hero.length == 0 ? 'empty' : 'ready' }
-      if (home.error != null) { return 'error' }
-      return 'loading'
-    </variable>
-    <variable as="skelRows" computed="true">return [0, 1, 2, 3, 4, 5]</variable>
     <variable as="heroShow" computed="true">
       if (dsx.variable.homeView == null) { return null }
       const p = Number(dsx.variable.heroPage)
@@ -174,11 +231,11 @@
       return dsx.variable.homeView.hero.length
     </variable>
 
-    <!-- ONE computed list: `style="{{ chunk }}; extras"` discards the chunk (the linter
-         now says so out loud — that is how this bug was found after shipping). -->
-    <!-- The lift rides the same gate as the reveal (see `hoverReveal`): a poster that
-         swells under a tablet's finger and never settles is the same wrong affordance in a
-         quieter register. -->
+    <!-- per-row: is this coming-soon card's bell lit -->
+    <formula as="reminded" id="item.id">
+      return dsx.variable.remindedIds.indexOf(id) != -1
+    </formula>
+    <!-- ONE computed list: `style="{{ chunk }}; extras"` discards the chunk (AGENTS.md) -->
     <formula as="posterHover" id="item.id">
       const lift = (dsx.variable.hoverReveal && dsx.variable.hovId == id) ? 1.04 : 1
       return dsx.variable.posterStyle + '; transition: transform 0.22s ease; transform: scale(' + lift + ')'
@@ -196,11 +253,8 @@
       if (r == 3) { return '#CE8B5C' }
       return '#43434D'
     </formula>
-<!-- COVERFLOW, the category's shape: the resting title is whole and the ones either side
-         of it recede — measured off shortical (centre card at full opacity, neighbours dimmed
-         and scaled down) rather than the border-only highlight this rail shipped with, which
-         read as five equal thumbnails with one outlined. Scale and opacity both move, because
-         a border alone does not survive against busy poster art. -->
+    <!-- coverflow: the resting title is whole and the ones either side recede (measured
+         off the category reference; scale and opacity both move) -->
     <formula as="coverCell" r="item.rank">
       const on = r - 1 == Number(dsx.variable.heroPage)
       return 'width: 78px; height: 104px; border-radius: 8px; object-fit: cover; '
@@ -209,25 +263,19 @@
         + 'transform: scale(' + (on ? 1.1 : 0.92) + '); '
         + 'transition: opacity 0.24s ease, border-color 0.24s ease, transform 0.24s ease'
     </formula>
-        <formula as="topBadge" r="item.rank" f="item.featured">
+    <formula as="topBadge" r="item.rank" f="item.featured">
       if (r == 1) { return 'Trending' }
       if (f) { return 'Hot' }
       return ''
     </formula>
 
-    <!-- THE WIDE HERO IS A CAROUSEL, NOT A SWIPE SURFACE. `<pager>` advances by drag, which
-         is a touch affordance: on a 1440px window with a mouse there is nothing to tell a
-         reader the hero holds five titles, and dragging a full-bleed image reads as a
-         mis-click. Every reference carousel in the category (my-drama, shortical, flextv)
-         ships chevrons on the wide lane and only the wide lane. These wrap, so the control
-         is never a dead end at either end of the set. -->
-    <!-- A REAL payload retires the offline-demo degradation: the chip names "you are
-         looking at captured data" (Article 7), so the moment the origin answers, the
-         flag — and the chip — must drop. Latched forever, it lied on every dev boot
-         where the seed merely won the mount race against a live fetch. -->
+    <!-- A REAL payload retires the offline-demo degradation (Article 7): the chip drops the
+         moment the origin answers. The search hint advances with every landing. -->
     <action as="homeLanded">
       global.cacheHome = home.data
       global.demoSeeded = false
+      const i = global.searchHintIdx == null ? 0 : Number(global.searchHintIdx)
+      global.searchHintIdx = i + 1
     </action>
 
     <action as="heroPrev">
@@ -243,30 +291,194 @@
       dsx.variable.heroPage = p >= n - 1 ? 0 : p + 1
     </action>
 
-    <!-- THE ROOT CARRIES ITS SIZE AS ATTRIBUTES, not CSS. `min-height: {{ screen.height }}px`
-         on the root and `flex: 1; min-height: 0` on the scroller are web spellings, and the
-         native renderers drop an unmapped declaration per-declaration — so on iOS the screen
-         and its scroller had no box, and the app rendered near-blank with real data behind it
-         (measured on an iPhone 17 Pro simulator). `grow` is the cross-platform twin: the
-         catalog's own "fill available space" word, honoured by every renderer. PLAN.md §6.43. -->
+    <!-- ══ REMIND ME ══════════════════════════════════════════════════════════════════
+         Three doors, one confirm. The poster opens the coming-soon sheet; its Remind Me and
+         the rail card's inline Remind Me both go through `askRemind`, which skips the
+         permission level when the OS already granted notifications (a sheet that asks for
+         a permission the viewer gave last week is a nag) and otherwise raises §2b OVER §2a.
+         The child is declared inside the parent's slot, so on iOS it can only present while
+         the parent is up — `openSoon` first, the level after, in the same action. -->
+    <action as="openSoon" inputs="show">
+      dsx.variable.soonShow = show
+      dsx.variable.remindNote = ''
+      dsx.variable.allow = false
+      dsx.variable.soonOpen = true
+    </action>
+    <action as="closeSoon">
+      // one write; the engine cascades the nested permission level with its parent (§6.114)
+      dsx.variable.soonOpen = false
+      dsx.variable.permOpen = false
+    </action>
+    <action as="closePerm">
+      dsx.variable.permOpen = false
+    </action>
+    <!-- the rail card's button: set, or clear when already set -->
+    <action as="remindTap" inputs="show">
+      dsx.variable.soonShow = show
+      dsx.variable.remindNote = ''
+      if (dsx.variable.soonReminded) { dsx.action.cancelRemind(); return }
+      dsx.variable.allow = false
+      dsx.variable.soonOpen = true
+      dsx.action.askRemind()
+    </action>
+    <!-- the sheet's button (and the rail's, once the sheet is up) -->
+    <action as="askRemind">
+      if (dsx.variable.soonReminded) { dsx.action.cancelRemind(); return }
+      let granted = false
+      if (has('notify')) {
+        const st = await dsx.module.notify.status({})
+        if (st.ok) { if (st.data != null) { granted = st.data.status == 'granted' } }
+      }
+      if (granted) {
+        dsx.variable.allow = true
+        dsx.action.confirmRemind()
+        return
+      }
+      dsx.variable.permOpen = true
+    </action>
+    <!-- THE CONFIRM. Order matters and each step is named in `remindNote`:
+           1. the permission — Core/Notify's one ladder, the checkbox is its consent
+           2. the row — server/reminders.dsx, the half that survives a reinstall (account only)
+           3. the schedule — Core/LocalPush `send` at the premiere, on the lanes that can
+         Nothing here claims a notification it did not arm. -->
+    <action as="confirmRemind">
+      if (dsx.variable.allow == false) { return }
+      if (dsx.variable.remindBusy) { return }
+      const s = dsx.variable.soonShow
+      if (s == null) { return }
+      dsx.variable.remindBusy = true
+      // 1 · permission
+      if (has('notify')) {
+        const p = await dsx.module.notify.permission({})
+        let status = 'unknown'
+        if (p.ok) { if (p.data != null) { if (p.data.status != null) { status = p.data.status } } }
+        if (status == 'denied') {
+          dsx.variable.remindBusy = false
+          dsx.variable.remindNote = localize('Notifications are off for this app. Turn them on in Settings, then try again.')
+          return
+        }
+      }
+      // 2 · the durable row, when there is an account to hang it on
+      let saved = false
+      if (dsx.variable.signedIn) {
+        const r = await setRemind.send({})
+        saved = r.ok
+        if (r.ok) { reminders.refresh() }
+      }
+      // 3 · the schedule
+      let armed = false
+      if (dsx.variable.canSchedule) {
+        const at = s.releaseAt == null ? '' : s.releaseAt
+        const seconds = at == '' ? 0 : Math.round((Date.parse(at) - Date.now()) / 1000)
+        if (seconds > 0) {
+          const a = await dsx.module.localpush.send({
+            seconds: seconds,
+            id: 'release-' + s.id,
+            title: s.title,
+            message: localize('Episode 1 is out — start watching now.'),
+            url: '/show/' + s.id
+          })
+          armed = a.ok
+        }
+      }
+      dsx.variable.remindBusy = false
+      if (saved == false) {
+        dsx.variable.localReminded = dsx.variable.localReminded.concat([{ show: s.id }])
+      }
+      // the honest line: which halves this lane managed
+      if (armed && saved) { dsx.variable.toast = localize('Reminder set — we will notify you at the premiere.') }
+      else if (armed) { dsx.variable.toast = localize('Reminder set on this device. Sign in to keep it on your account.') }
+      else if (saved) { dsx.variable.toast = localize('Reminder saved to your account. This browser cannot schedule a notification days ahead.') }
+      else { dsx.variable.toast = localize('Reminder kept for this session only — sign in to keep it, and use the app to be notified.') }
+      dsx.action.closeSoon()
+    </action>
+    <action as="cancelRemind">
+      const s = dsx.variable.soonShow
+      if (s == null) { return }
+      if (dsx.variable.remindBusy) { return }
+      dsx.variable.remindBusy = true
+      if (dsx.variable.signedIn) {
+        const r = await clearRemind.send({})
+        if (r.ok) { reminders.refresh() }
+      }
+      if (has('localpush')) { await dsx.module.localpush.unschedule({ id: 'release-' + s.id }) }
+      dsx.variable.localReminded = dsx.variable.localReminded.filter(r => r.show != s.id)
+      dsx.variable.remindBusy = false
+      dsx.variable.toast = localize('Reminder removed.')
+      dsx.action.closeSoon()
+    </action>
+
+    <!-- THE ROOT CARRIES ITS SIZE AS ATTRIBUTES, not CSS: `grow` is the cross-platform twin
+         of the web's flex fill (PLAN.md §6.43). -->
     <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch" grow="true"/>
     <style as="page" spacing="0" paddingBottom="0" alignItems="stretch" grow="width"/>
     <style as="section" spacing="14" alignItems="stretch" paddingTop="44" grow="width"/>
 
-    <style as="phoneBar" paddingV="12" alignItems="center" spacing="12"/>
-    <style as="tabRow" spacing="22" alignItems="flex-end" paddingBottom="4"/>
-    <style as="tabCol" spacing="5" alignItems="center"/>
-    <style as="tabTxt" fontSize="16" fontWeight="bold" tracking="-0.2"/>
-    <style as="tabDash" width="18" height="3" radius="2"/>
+    <!-- ── the phone lane (spec §1, §2) ── -->
+    <style as="searchRow" paddingTop="8" paddingBottom="8" paddingLeading="14" paddingTrailing="14" spacing="12" alignItems="center"/>
+    <style as="tabTrack" spacing="20" alignItems="flex-end" paddingLeading="14" paddingTrailing="14" paddingTop="6" paddingBottom="2"/>
+    <!-- `width="fit"`: the column HUGS its label (the catalog's hug primitive) on every lane —
+         inside a horizontal scroll the native row otherwise proposed each column a share of
+         the viewport and truncated "Picks" to "Pic…" (measured on the iPhone 17 Pro) -->
+    <style as="tabCol" spacing="6" alignItems="stretch" width="fit"/>
+    <style as="tabTxt" fontSize="17" fontWeight="semibold" lineLimit="1"/>
+    <style as="tabRule" height="2" radius="1"/>
+    <style as="block" spacing="16" alignItems="stretch" paddingTop="24" grow="width"/>
+    <style as="h2" fontSize="22" fontWeight="bold" color="#FFFFFF" tracking="-0.3" paddingLeading="14" paddingTrailing="14"/>
+    <style as="gridWrap" paddingLeading="14" paddingTrailing="14" alignItems="stretch"/>
+    <style as="railTrack" spacing="8" alignItems="flex-start"/>
+    <style as="soonCard" background="#141414" radius="12" width="113" spacing="0" alignItems="stretch"/>
+    <style as="soonMeta" paddingLeading="8" paddingTrailing="8" paddingTop="8" paddingBottom="8" spacing="2" alignItems="stretch"/>
+    <style as="soonTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+    <style as="soonGenre" fontSize="13" color="#8E8E93" lineLimit="1"/>
+    <style as="soonBtnWrap" paddingLeading="8" paddingTrailing="8" paddingBottom="8" alignItems="stretch"/>
+    <!-- paddingH 0: the label is 15 semibold in a 97pt button, and the control's default side
+         padding wrapped "Remind Me" onto two lines (measured on the web lane) -->
+    <style as="remindInline" background="#2C2C2E" radius="8" height="32" paddingH="0" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+    <style as="footRow" spacing="4" alignItems="center" zIndex="2"/>
+    <style as="markRow" spacing="2" alignItems="center"/>
+    <!-- 10pt: the spec's measure for the ORIGINAL mini badge (§1), the one size under the
+         ramp's 11 the reference declares -->
+    <style as="markTxt" fontSize="10" fontWeight="bold" color="#FFFFFF" textCase="uppercase" lineLimit="1"/>
+    <style as="scrim" gradient="rgba(0,0,0,0)|rgba(0,0,0,0.6)" gradientDir="vertical" height="56" zIndex="1"/>
+    <style as="badge" background="#E0342C" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF" zIndex="2"/>
+    <style as="countRow" spacing="2" alignItems="center"/>
+    <style as="countTxt" fontSize="12" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+    <style as="countTxtSm" fontSize="11" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+    <style as="newList" paddingLeading="14" paddingTrailing="14" alignItems="stretch"/>
+    <style as="newRow" spacing="12" alignItems="flex-start"/>
+    <style as="newCol" spacing="6" alignItems="stretch"/>
+    <style as="newTitle" fontSize="16" fontWeight="bold" color="#FFFFFF" lineLimit="1"/>
+    <style as="chipRow" spacing="6" alignItems="center"/>
+    <style as="chip" background="#2C2C2E" radius="6" paddingH="8" paddingV="4" fontSize="12" color="#FFFFFF" lineLimit="1"/>
+    <style as="newSyn" fontSize="13" color="#8E8E93" lineLimit="2" lineSpacing="5"/>
     <style as="rankRow" spacing="12" alignItems="center" paddingV="10"/>
     <style as="rankBig" fontWeight="heavy" fontSize="24" width="34" textAlign="center"/>
     <style as="rankTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="rankMeta" fontSize="12" color="rgba(255,255,255,0.5)"/>
-    <style as="rankPlay" background="rgba(255,44,85,0.14)" radius="16" paddingH="14" paddingV="8" fontSize="12" fontWeight="semibold" color="#FF2C55"/>
-    <style as="logoBox" background="#FF2C55" radius="8" alignItems="center" width="29" height="29"/>
-    <style as="wordmark" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
+    <style as="rankMeta" fontSize="13" color="#8E8E93"/>
+    <style as="rankPlay" background="#2C2C2E" radius="8" paddingH="14" paddingV="8" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="emptyTab" fontSize="15" color="#8E8E93" textAlign="center" paddingV="40"/>
+    <!-- the sheets (§2a, §2b): 16pt gutter, everything centred -->
+    <style as="soonBody" paddingLeading="16" paddingTrailing="16" paddingTop="8" paddingBottom="24" spacing="14" alignItems="center"/>
+    <style as="sheetTitle" fontSize="20" fontWeight="bold" color="#FFFFFF" textAlign="center" lineLimit="2" tracking="-0.3"/>
+    <style as="sheetSyn" fontSize="15" color="#C7C7CC" textAlign="center" lineLimit="4" lineSpacing="7"/>
+    <style as="remindBtn" background="#FFFFFF" radius="12" height="48" spacing="8" alignItems="center" alignY="center"/>
+    <style as="remindLabel" fontSize="17" fontWeight="semibold" color="#000000"/>
+    <style as="sheetNote" fontSize="13" color="#8E8E93" textAlign="center" lineSpacing="4"/>
+    <style as="permBody" paddingLeading="16" paddingTrailing="16" paddingTop="12" paddingBottom="20" spacing="14" alignItems="center"/>
+    <style as="permSub" fontSize="15" color="#8E8E93" textAlign="center" lineSpacing="5"/>
+    <style as="permCard" background="#1C1C1E" radius="12" paddingH="16" paddingV="16" spacing="12" alignItems="center"/>
+    <style as="checkOff" width="20" height="20" radius="5" borderWidth="1.5" borderColor="#48484A" background="#1C1C1E" alignItems="center" alignY="center"/>
+    <style as="checkOn" width="20" height="20" radius="5" background="#4ADFB4" alignItems="center" alignY="center"/>
+    <style as="permLabel" fontSize="15" color="#FFFFFF"/>
+    <style as="required" fontSize="15" color="#4ADFB4"/>
+    <style as="maybe" fontSize="15" color="#8E8E93" textAlign="center" paddingTop="2"/>
+    <!-- the toast: card fill, radius 10, 13 ink, padding 10×14 (spec −1) -->
+    <style as="toastRow" background="#1C1C1E" radius="10" paddingH="14" paddingV="10" spacing="10" alignItems="center"/>
+    <style as="toastLine" fontSize="13" color="#FFFFFF" lineSpacing="3"/>
 
+    <!-- ── the wide lane (the category web reference at 1440×900) ── -->
     <style as="heroBlock" spacing="16" alignItems="flex-start"/>
     <style as="heroTagRow" spacing="6" alignItems="center"/>
     <style as="tagSoft" background="rgba(255,233,168,0.10)" radius="4" paddingH="9" paddingV="4" fontSize="12" color="#FFE9A8"/>
@@ -274,43 +486,33 @@
     <style as="metaTxt" fontSize="13" fontWeight="medium" color="rgba(255,255,255,0.62)"/>
     <style as="heroTitle" fontWeight="bold" color="rgba(255,255,255,0.9)" lineLimit="2" tracking="-0.5"/>
     <style as="heroPills" spacing="8" alignItems="center"/>
-    <style as="pillHot" background="#FF2C55" radius="13" paddingH="12" paddingV="5" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="pillHot" background="#E0342C" radius="13" paddingH="12" paddingV="5" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
     <style as="pillTag" background="rgba(255,255,255,0.14)" radius="13" paddingH="12" paddingV="5" fontSize="12" fontWeight="medium" color="rgba(255,255,255,0.92)"/>
     <style as="heroSyn" fontSize="14" color="rgba(255,255,255,0.72)" lineLimit="2" lineSpacing="4"/>
     <style as="playPill" background="#FFFFFF" radius="24" paddingH="34" paddingV="13" spacing="9" alignItems="center"/>
     <style as="playLabel" fontSize="15" fontWeight="bold" color="#111111"/>
     <style as="thumbRow" spacing="14" alignItems="center"/>
-    <!-- alignY: the chevron CENTERS in the circle — measured, the glyph sat at the box
-         top on BOTH lanes (web iconTop was 0; the class never declared the vertical) -->
-    <style as="heroArrow" width="44" height="44" radius="22" alignItems="center" alignY="center"
-           background="rgba(18,18,20,0.55)"/>
-    <style as="heroPhoneBlock" spacing="14" alignItems="center" paddingLeading="24" paddingTrailing="24" paddingBottom="24"/>
-    <style as="heroPhoneTitle" fontWeight="bold" color="#FFFFFF" lineLimit="2" textAlign="center" tracking="-0.4"/>
-    <style as="dashRow" spacing="5" alignItems="center" paddingTop="4"/>
-
+    <style as="heroArrow" width="44" height="44" radius="22" alignItems="center" alignY="center" background="rgba(18,18,20,0.55)"/>
     <style as="sectionHead" alignItems="center"/>
     <style as="sectionTitle" fontWeight="bold" color="rgba(255,255,255,0.8)" tracking="-0.3"/>
     <style as="viewAll" fontSize="14" color="#FFFFFF"/>
     <style as="viewAllRow" spacing="4" alignItems="center"/>
     <style as="rail" spacing="18" alignItems="flex-start"/>
-
     <style as="card" spacing="8" alignItems="stretch"/>
     <style as="shelfMore" spacing="4" alignItems="center"/>
     <style as="shelfMoreLabel" fontSize="13" fontWeight="medium" color="rgba(255,255,255,0.5)"/>
     <style as="cardTitle" fontSize="14" color="rgba(255,255,255,0.8)" lineLimit="1"/>
     <style as="cardMeta" fontSize="14" color="rgba(255,255,255,0.9)" lineLimit="1"/>
-    <style as="badge" background="#FF2C55" radius="4" paddingH="8" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="badgeWide" background="#E0342C" radius="4" paddingH="8" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
     <style as="badgeDark" background="rgba(0,0,0,0.72)" radius="4" paddingH="8" paddingV="3" fontSize="11" fontWeight="semibold" color="#FFFFFF"/>
     <style as="badgeWrap" paddingLeading="10" paddingTop="10" alignItems="flex-start" zIndex="1"/>
     <style as="hovPanel" spacing="9" alignItems="flex-start" paddingH="14" paddingBottom="14"/>
     <style as="hovSyn" fontSize="12" color="rgba(255,255,255,0.86)" lineLimit="3" lineSpacing="2"/>
     <style as="hovPlay" background="#FFFFFF" radius="15" paddingH="14" paddingV="7" spacing="6" alignItems="center"/>
     <style as="hovPlayLabel" fontSize="12" fontWeight="bold" color="#111111"/>
-
     <style as="rankNum" fontWeight="heavy"/>
     <style as="resumeTrack" background="rgba(255,255,255,0.22)" radius="2"/>
-    <style as="resumeFill" background="#FF2C55" radius="2"/>
-
+    <style as="resumeFill" background="#E0342C" radius="2"/>
     <style as="footer" alignItems="stretch" spacing="26" paddingTop="40" paddingBottom="34"/>
     <style as="footCols" spacing="70" alignItems="flex-start"/>
     <style as="footBrand" spacing="12" alignItems="flex-start"/>
@@ -318,96 +520,218 @@
     <style as="footCol" spacing="12" alignItems="flex-start"/>
     <style as="footHead" fontSize="14" fontWeight="bold" color="#FFFFFF" tracking="0.3"/>
     <style as="footLink" fontSize="14" color="rgba(255,255,255,0.55)"/>
-
-    <style as="skelBlock" background="#141419" radius="12"/>
-    <style as="errCard" background="#141419" radius="16" spacing="10" paddingH="18" paddingV="20" alignItems="center"/>
-    <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="10" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="logoBox" background="#E0342C" radius="8" alignItems="center" width="29" height="29"/>
+    <style as="wordmark" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.4"/>
+    <style as="skelBlock" background="#141414" radius="6"/>
+    <style as="errCard" background="#141414" radius="12" spacing="10" paddingH="18" paddingV="20" alignItems="center"/>
+    <style as="retryBtn" background="#FFFFFF" radius="12" paddingH="20" paddingV="12" fontSize="15" fontWeight="semibold" color="#000000"/>
   </head>
 
-  <!-- THE PRESENTATION PLANE, FIRST. This screen derives its own breakpoints (it predates
-       the shared vocabulary), so it used to reach Theme only through whichever of TopNav or
-       TabBar the viewport happened to mount — and both are `visible-if`. That was survivable
-       while Theme only registered functions; it is not, now that Theme also restores the
-       viewer's saved UI language, because the entry route is the one a cold link lands on. -->
+  <!-- THE PRESENTATION PLANE, FIRST: this screen reads its own computeds on the next line -->
   <Theme/>
-  <!-- OFFLINE DEMO SEED (native test lanes only — the component gates itself; Article 7:
-       `global.demoSeeded` lights the pill in the phone bar below) -->
+  <!-- OFFLINE DEMO SEED (native test lanes only — the component gates itself; Article 7) -->
   <DemoSeed/>
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page">
 
-      <!-- the nav rides INSIDE the scroll so the hero art runs under it (measured:
-           nav 80px transparent sticky, hero top edge at y≈-8) -->
-      <!-- zIndex ON THE MOUNT TAG: the nav's own z-index: 50 lives on its root INSIDE the
-           component instance, and native sibling paint order at THIS level cannot see it
-           (CSS z crosses the wrapper; SwiftUI does not) — the pulled-under hero painted
-           over the whole bar. A universal attr on the component tag lifts the instance
-           itself; web already stacks via the inner sticky z, so this is additive. -->
+      <!-- the wide nav rides INSIDE the scroll so the hero art runs under it; zIndex ON THE
+           MOUNT TAG lifts the instance above the pulled-under hero on native (AGENTS.md) -->
       <TopNav active="home" overArt="true" zIndex="50" visible-if="dsx.variable.wide"/>
 
-      <hstack class="phoneBar" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.wide == false">
-        <vstack class="logoBox" style="justify-content: center">
-          <image icon="play.fill" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
-        </vstack>
-        <!-- grow ON THE MOUNT TAG (the zIndex-on-mount sibling rule): the pill's own
-             flex:1 lives inside the instance, and the row cannot see through the
-             component boundary — the tag's grow makes the INSTANCE the flexible child;
-             the engine's flex-fill then stretches the pill within it. -->
-        <SearchOverlay pill="true" grow="width"/>
-        <image icon="person.crop.circle" iconSize="23" color="#FFFFFF" a11yLabel="Profile" a11yTrait="button"
-               on:tap="dsx.module.route.reset({ path: '/profile' })"/>
+      <!-- ══════════════════════════ PHONE · the search row (spec §1.1) ══════════════════ -->
+      <hstack class="searchRow" visible-if="dsx.variable.wide == false">
+        <SearchOverlay pill="true" placeholder="{{ dsx.variable.searchHint }}" grow="width"/>
+        <image icon="crown.fill" iconSize="22" color="{{ crownGold() }}" a11yLabel="Membership" a11yTrait="button"
+               on:tap="dsx.module.route.push({ path: membershipPath() })"/>
       </hstack>
 
-      <!-- the tab row: text tabs with a brand-red dash under the active one -->
-      <hstack class="tabRow" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.wide == false">
-        <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'popular'" a11yTrait="button" a11yLabel="Popular">
-          <text value="Popular" class="tabTxt"
-                color="{{ dsx.variable.homeTab == 'popular' ? '#FFFFFF' : 'rgba(255,255,255,0.5)' }}"/>
-          <stack class="tabDash" style="align-self: center" background="{{ dsx.variable.homeTab == 'popular' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
-        </vstack>
-        <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'new'" a11yTrait="button" a11yLabel="New">
-          <text value="New" class="tabTxt"
-                color="{{ dsx.variable.homeTab == 'new' ? '#FFFFFF' : 'rgba(255,255,255,0.5)' }}"/>
-          <stack class="tabDash" style="align-self: center" background="{{ dsx.variable.homeTab == 'new' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
-        </vstack>
-        <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'ranking'" a11yTrait="button" a11yLabel="Ranking">
-          <text value="Ranking" class="tabTxt"
-                color="{{ dsx.variable.homeTab == 'ranking' ? '#FFFFFF' : 'rgba(255,255,255,0.5)' }}"/>
-          <stack class="tabDash" style="align-self: center" background="{{ dsx.variable.homeTab == 'ranking' ? '#FF2C55' : 'rgba(0,0,0,0)' }}"/>
-        </vstack>
-        <spacer/>
-      
-        <spacer/>
-        <text value="offline demo" visible-if="global.demoSeeded == true"
-              background="rgba(246,182,61,0.14)" color="#F6B63D" fontSize="11" fontWeight="semibold"
-              radius="9" paddingH="8" paddingV="3"
-              a11yLabel="Offline demo data — no server is connected"/>
-      </hstack>
+      <!-- ══════════════════════════ PHONE · the tab strip (spec §1.2) ═══════════════════
+           text tabs, 17 semibold, ink / ink-3, a 2pt rule the width of the active label, 6pt
+           under it; the strip scrolls sideways the day a fifth tab arrives -->
+      <scroll axis="horizontal" indicators="false" visible-if="dsx.variable.wide == false">
+        <hstack class="tabTrack" style="width: max-content">
+          <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'hot'" a11yTrait="button"
+                  a11yLabel="Hot{{ dsx.variable.homeTab == 'hot' ? ', selected' : '' }}">
+            <text value="Hot" class="tabTxt" color="{{ dsx.variable.homeTab == 'hot' ? ink() : ink3() }}"/>
+            <stack class="tabRule" background="{{ dsx.variable.homeTab == 'hot' ? ink() : 'rgba(0,0,0,0)' }}"/>
+          </vstack>
+          <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'new'" a11yTrait="button"
+                  a11yLabel="New{{ dsx.variable.homeTab == 'new' ? ', selected' : '' }}">
+            <text value="New" class="tabTxt" color="{{ dsx.variable.homeTab == 'new' ? ink() : ink3() }}"/>
+            <stack class="tabRule" background="{{ dsx.variable.homeTab == 'new' ? ink() : 'rgba(0,0,0,0)' }}"/>
+          </vstack>
+          <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'picks'" a11yTrait="button"
+                  a11yLabel="Picks{{ dsx.variable.homeTab == 'picks' ? ', selected' : '' }}">
+            <text value="Picks" class="tabTxt" color="{{ dsx.variable.homeTab == 'picks' ? ink() : ink3() }}"/>
+            <stack class="tabRule" background="{{ dsx.variable.homeTab == 'picks' ? ink() : 'rgba(0,0,0,0)' }}"/>
+          </vstack>
+          <vstack class="tabCol" on:tap="dsx.variable.homeTab = 'ranking'" a11yTrait="button"
+                  a11yLabel="Ranking{{ dsx.variable.homeTab == 'ranking' ? ', selected' : '' }}">
+            <text value="Ranking" class="tabTxt" color="{{ dsx.variable.homeTab == 'ranking' ? ink() : ink3() }}"/>
+            <stack class="tabRule" background="{{ dsx.variable.homeTab == 'ranking' ? ink() : 'rgba(0,0,0,0)' }}"/>
+          </vstack>
+          <text value="offline demo" visible-if="global.demoSeeded == true"
+                background="rgba(246,182,61,0.14)" color="#F6B63D" fontSize="11" fontWeight="semibold"
+                radius="9" paddingH="8" paddingV="3" a11yLabel="Offline demo data — no server is connected"/>
+        </hstack>
+      </scroll>
 
-      <!-- LOADING: the real shape, not a spinner — a hero band and one rail of poster cells,
-           so the page does not resize under the viewer when the catalogue lands. -->
-      <vstack visible-if="dsx.variable.phase == 'loading'" alignItems="stretch" spacing="18"
-              style="{{ dsx.variable.shell }}" paddingTop="24">
-        <stack class="skelBlock" style="width: 100%; height: {{ dsx.variable.heroH }}px"/>
-        <stack class="skelBlock" style="width: 180px; height: 22px"/>
-        <grid bind="dsx.variable.skelRows" key="index" columns="{{ dsx.variable.shelfCols }}" spacing="18" scroll="false">
-          <vstack spacing="8" alignItems="stretch">
-            <stack class="skelBlock" style="width: 100%; aspect-ratio: 3/4"/>
+      <!-- LOADING: the real shape, so the page does not resize under the viewer -->
+      <vstack visible-if="dsx.variable.phase == 'loading'" alignItems="stretch" spacing="16" class="gridWrap" paddingTop="24">
+        <stack class="skelBlock" style="width: 160px; height: 22px" visible-if="dsx.variable.wide == false"/>
+        <stack class="skelBlock" style="width: 100%; height: {{ dsx.variable.heroH }}px" visible-if="dsx.variable.wide"/>
+        <grid bind="dsx.variable.skelRows" key="index" columns="{{ dsx.variable.wide ? dsx.variable.shelfCols : 3 }}" spacing="{{ dsx.variable.wide ? 18 : 7 }}" scroll="false">
+          <vstack spacing="6" alignItems="stretch">
+            <stack class="skelBlock" style="width: 100%; aspect-ratio: {{ dsx.variable.wide ? '3/4' : '2/3' }}"/>
             <stack class="skelBlock" style="width: 70%; height: 13px"/>
           </vstack>
         </grid>
       </vstack>
 
-      <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="dsx.variable.phase == 'empty'">
+      <vstack class="block gridWrap" visible-if="dsx.variable.phase == 'empty'">
         <vstack class="errCard">
-          <image icon="rectangle.stack.fill" iconSize="30" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+          <image icon="rectangle.stack.fill" iconSize="30" color="{{ ink3() }}" a11yHidden="true"/>
           <text value="No series are live yet." fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-          <text value="Published series appear here as they go live." fontSize="13" color="rgba(255,255,255,0.55)"/>
+          <text value="Published series appear here as they go live." fontSize="13" color="#8E8E93"/>
         </vstack>
       </vstack>
 
-      <!-- ============ HERO · wide ============ -->
-      <vstack visible-if="dsx.variable.wide && heroShow != null && dsx.variable.phase == 'ready'" style="width: 100%; margin-top: -64px" alignItems="stretch">
+      <!-- ══════════════════════════ PHONE · HOT (spec §1.3–4) ═══════════════════════════ -->
+      <vstack class="block" visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide == false &amp;&amp; dsx.variable.homeTab == 'hot'">
+        <text value="Trending Now" class="h2"/>
+        <vstack class="gridWrap">
+          <grid bind="dsx.variable.gridRows" key="id" columns="3" spacing="7" scroll="false">
+            <CoverCard id="{{ item.id }}" title="{{ item.title }}" genre="{{ item.genre }}" cover="{{ item.cover }}"
+                       hot="{{ item.hot }}" isNew="{{ item.isNew }}" original="{{ item.original }}" views="{{ item.views }}"
+                       path="/watch/{{ item.id }}/1"/>
+          </grid>
+        </vstack>
+      </vstack>
+
+      <!-- ══════════════════════════ PHONE · NEW (spec §2) ═══════════════════════════════ -->
+      <vstack class="block" visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide == false &amp;&amp; dsx.variable.homeTab == 'new' &amp;&amp; dsx.variable.soonRows.length > 0">
+        <text value="Coming soon" class="h2"/>
+        <scroll axis="horizontal" indicators="false">
+          <hstack class="railTrack" style="width: max-content; padding-left: 14px; padding-right: 14px">
+            <list bind="dsx.variable.soonRows" key="id" axis="horizontal" scroll="false" spacing="8">
+              <vstack class="soonCard" style="overflow: hidden">
+                <!-- the poster opens the sheet; the cover is 113×170 (2:3) at radius 8 -->
+                <zstack style="width: 113px; height: 170px; position: relative; border-radius: 8px; overflow: hidden"
+                        on:tap="dsx.action.openSoon({ show: item })" a11yTrait="button"
+                        a11yLabel="{{ item.title }}, coming soon">
+                  <image src="{{ item.cover }}" contentFit="cover" a11yHidden="true" width="113" height="170" radius="8"
+                         style="width: 113px; height: 170px; object-fit: cover"/>
+                  <stack class="scrim" a11yHidden="true"
+                         style="position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%); pointer-events: none"/>
+                  <hstack class="markRow" visible-if="item.original" a11yHidden="true" style="position: absolute; left: 6px; bottom: 6px">
+                    <image icon="play.fill" iconSize="10" color="#FFFFFF" a11yHidden="true"/>
+                    <text value="ORIGINAL" class="markTxt"/>
+                  </hstack>
+                </zstack>
+                <vstack class="soonMeta">
+                  <text value="{{ item.title }}" class="soonTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                  <text value="{{ item.genre }}" class="soonGenre" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                </vstack>
+                <vstack class="soonBtnWrap">
+                  <button label="{{ reminded ? 'Reminder set' : 'Remind Me' }}" class="remindInline"
+                          style="white-space: nowrap; padding-left: 0; padding-right: 0"
+                          on:tap="dsx.action.remindTap({ show: item })"/>
+                </vstack>
+              </vstack>
+            </list>
+          </hstack>
+        </scroll>
+      </vstack>
+
+      <vstack class="block" visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide == false &amp;&amp; dsx.variable.homeTab == 'new'">
+        <text value="New Titles" class="h2"/>
+        <text value="Nothing new this week — check back soon." class="emptyTab" visible-if="dsx.variable.newRows.length == 0"/>
+        <vstack class="newList">
+          <list bind="dsx.variable.newRows" key="id" scroll="false" spacing="16">
+            <hstack class="newRow" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="{{ item.title }}, {{ item.genre }}">
+              <!-- 81×127, radius 6, the same three overlays as the grid cell -->
+              <zstack style="width: 81px; height: 127px; position: relative; border-radius: 6px; overflow: hidden">
+                <image src="{{ item.cover }}" contentFit="cover" a11yHidden="true" width="81" height="127" radius="6"
+                       style="width: 81px; height: 127px; object-fit: cover"/>
+                <stack class="scrim" a11yHidden="true"
+                       style="position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%); pointer-events: none"/>
+                <text value="{{ item.hot ? 'HOT' : 'NEW' }}" class="badge" a11yHidden="true" visible-if="item.hot || item.isNew"
+                      style="position: absolute; top: 6px; right: 6px"/>
+                <!-- AN 81pt POSTER CANNOT HOLD BOTH BOTTOM OVERLAYS at the spec's sizes (the mark
+                     alone is ~60pt), so when the title is an ORIGINAL the count takes the top-left
+                     corner — the one the NEW badge leaves free — and only a title without the
+                     mark keeps the count bottom-right as §1 draws it. Measured, not preferred. -->
+                <hstack class="markRow" visible-if="item.original" a11yHidden="true"
+                        style="position: absolute; left: 5px; bottom: 5px">
+                  <image icon="play.fill" iconSize="9" color="#FFFFFF" a11yHidden="true"/>
+                  <text value="ORIGINAL" class="markTxt" style="white-space: nowrap"/>
+                </hstack>
+                <hstack class="countRow" visible-if="item.views >= 1000 &amp;&amp; item.original == false" a11yHidden="true"
+                        style="position: absolute; right: 5px; bottom: 5px">
+                  <image icon="flame.fill" iconSize="10" color="#FFFFFF" a11yHidden="true"/>
+                  <text value="{{ compactCount(item.views) }}" class="countTxtSm" style="white-space: nowrap"/>
+                </hstack>
+                <hstack class="countRow" visible-if="item.views >= 1000 &amp;&amp; item.original" a11yHidden="true"
+                        style="position: absolute; left: 5px; top: 5px">
+                  <image icon="flame.fill" iconSize="10" color="#FFFFFF" a11yHidden="true"/>
+                  <text value="{{ compactCount(item.views) }}" class="countTxtSm" style="white-space: nowrap"/>
+                </hstack>
+              </zstack>
+              <vstack class="newCol" style="flex: 1; min-width: 0">
+                <text value="{{ item.title }}" class="newTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                <hstack class="chipRow" style="overflow: hidden; white-space: nowrap">
+                  <list bind="item.chips" key="name" axis="horizontal" scroll="false" spacing="6">
+                    <text value="{{ item.name }}" class="chip" style="white-space: nowrap"/>
+                  </list>
+                </hstack>
+                <text value="{{ item.synopsis }}" class="newSyn"
+                      style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+              </vstack>
+            </hstack>
+          </list>
+        </vstack>
+      </vstack>
+
+      <!-- ══════════════════════════ PHONE · PICKS — the operator's featured set ══════════ -->
+      <vstack class="block" visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide == false &amp;&amp; dsx.variable.homeTab == 'picks'">
+        <text value="Editor's Picks" class="h2"/>
+        <vstack class="gridWrap">
+          <grid bind="dsx.variable.pickRows" key="id" columns="3" spacing="7" scroll="false">
+            <CoverCard id="{{ item.id }}" title="{{ item.title }}" genre="{{ item.genre }}" cover="{{ item.cover }}"
+                       hot="{{ item.hot }}" isNew="{{ item.isNew }}" original="{{ item.original }}" views="{{ item.views }}"
+                       path="/watch/{{ item.id }}/1"/>
+          </grid>
+        </vstack>
+      </vstack>
+
+      <!-- ══════════════════════════ PHONE · RANKING — the top ten by play count ═════════ -->
+      <vstack class="block" visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide == false &amp;&amp; dsx.variable.homeTab == 'ranking'">
+        <text value="Top 10" class="h2"/>
+        <vstack class="newList">
+          <list bind="dsx.variable.gridRows" key="id" scroll="false" spacing="0">
+            <hstack class="rankRow" href="/show/{{ item.id }}" a11yGroup="true" visible-if="item.rank <= 10"
+                    a11yLabel="Number {{ item.rank }}, {{ item.title }}"
+                    style="border-bottom: 1px solid rgba(255,255,255,0.12)">
+              <text value="{{ item.rank }}" class="rankBig" color="{{ rankColor }}"/>
+              <!-- the ONE origin for Show's shared flight (a match id names one rect per frame) -->
+              <image src="{{ item.cover }}" contentFit="cover" a11yHidden="true" shared="poster-{{ item.id }}"
+                     width="62" height="93" radius="6" style="width: 62px; height: 93px; border-radius: 6px; object-fit: cover"/>
+              <vstack spacing="4" alignItems="stretch" style="flex: 1; min-width: 0">
+                <text value="{{ item.title }}" class="rankTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                <text value="{{ metaLine }}" class="rankMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                <hstack spacing="4" alignItems="center" visible-if="item.views >= 1000">
+                  <image icon="flame.fill" iconSize="11" color="{{ crownGold() }}" a11yHidden="true"/>
+                  <text value="{{ compactCount(item.views) }}" class="rankMeta" color="{{ crownGold() }}"/>
+                </hstack>
+              </vstack>
+              <text value="Watch" class="rankPlay"/>
+            </hstack>
+          </list>
+        </vstack>
+      </vstack>
+
+      <!-- ══════════════════════════ WIDE · HERO ═════════════════════════════════════════ -->
+      <vstack visible-if="dsx.variable.wide &amp;&amp; heroShow != null &amp;&amp; dsx.variable.phase == 'ready'" style="width: 100%; margin-top: -64px" alignItems="stretch">
         <zstack>
           <pager bind="dsx.variable.homeView.hero" key="id" height="{{ dsx.variable.heroH }}" dots="false" value="dsx.variable.heroPage">
             <image src="{{ item.hero }}" contentFit="cover" a11yLabel="{{ item.title }}"
@@ -418,9 +742,8 @@
               <vstack class="heroBlock" style="max-width: 560px; pointer-events: auto">
                 <text value="{{ heroShow == null ? '' : heroShow.title }}" class="heroTitle" fontSize="{{ dsx.variable.heroTitleSize }}"/>
                 <hstack class="heroPills">
-                  <text value="Hot" class="pillHot" visible-if="heroShow != null && heroShow.featured"/>
+                  <text value="HOT" class="pillHot" visible-if="heroShow != null &amp;&amp; heroShow.hot"/>
                   <text value="{{ heroShow == null ? '' : heroShow.genre }}" class="pillTag"/>
-                  <text value="EP 1–{{ heroShow == null ? '' : heroShow.free_until }} Free" class="pillTag"/>
                 </hstack>
                 <hstack class="heroTagRow" visible-if="dsx.variable.heroTags.length > 0">
                   <list bind="dsx.variable.heroTags" key="name" axis="horizontal" scroll="false" spacing="6">
@@ -429,9 +752,8 @@
                   </list>
                 </hstack>
                 <hstack class="heroMeta" visible-if="dsx.variable.heroViews != ''">
-                  <image icon="play.fill" iconSize="13" color="rgba(255,255,255,0.55)" a11yHidden="true"/>
-                  <text value="{{ dsx.variable.heroViews }}" class="metaTxt"
-                        a11yLabel="{{ dsx.variable.heroViews }} views"/>
+                  <image icon="flame.fill" iconSize="13" color="rgba(255,255,255,0.55)" a11yHidden="true"/>
+                  <text value="{{ dsx.variable.heroViews }}" class="metaTxt" a11yLabel="{{ dsx.variable.heroViews }} views"/>
                   <text value="·" class="metaTxt" a11yHidden="true"/>
                   <image icon="star.fill" iconSize="12" color="#F6B63D" a11yHidden="true"/>
                   <text value="{{ heroShow == null ? '' : heroShow.rating }}" class="metaTxt"
@@ -446,22 +768,8 @@
               </vstack>
             </vstack>
           </vstack>
-          <!-- the thumb rail drives the pager (value= is two-way)
-
-               THE ONLY TWO DIRECTIONAL ICONS IN THIS APP THAT STAY PHYSICAL, and they
-               are no longer a local exception defended by prose — they are the catalog's
-               `physical` class, and `Conformance/icons/direction.json` carries a case
-               naming this pager as the reason. Every other chevron in the app now writes
-               a LOGICAL name (`chevron.backward` / `chevron.forward`) and each renderer
-               turns it against the layout direction it already holds. These two do not,
-               because they point at a `<pager>`, and a pager's PAGE ORDER does not turn:
-               the engine pins its viewport `dir="ltr"` on purpose ("one scroll-coordinate
-               model in every engine", dom mount.ts), so index 0 sits at the left in Arabic
-               exactly as it does in English. Measured: `.dsx-paged-viewport` carries
-               `dir="ltr"` while every ancestor computes `rtl`. An arrow that mirrored
-               while its track did not would point away from the slide it fetches.
-               PLAN.md §6.103 is where the control itself is filed. -->
-
+          <!-- the thumb rail drives the pager; its two chevrons stay PHYSICAL because a pager's
+               page order does not turn with the reading direction (PLAN.md §6.103) -->
           <vstack style="width: 100%; height: {{ dsx.variable.heroH }}px; justify-content: flex-end; pointer-events: none">
             <hstack style="{{ dsx.variable.thumbShellBox }}">
               <hstack class="thumbRow" style="pointer-events: auto; z-index: 3">
@@ -469,16 +777,10 @@
                         a11yGroup="true" a11yTrait="button" a11yLabel="Previous feature">
                   <image icon="chevron.left" iconSize="17" color="rgba(255,255,255,0.92)" a11yHidden="true"/>
                 </vstack>
-                <!-- THE STRIP IS A DESKTOP AFFORDANCE. At 1000px it costs 546px beside a
-                     560px copy column in a 920px stage, and the synopsis box measured a 4px
-                     overlap with the first cell — one longer line and the text runs under the
-                     posters. Tablet keeps the chevrons, which is what the references do at
-                     this width; the copy never has to yield. -->
                 <list bind="dsx.variable.homeView.hero" key="id" axis="horizontal" scroll="false" spacing="10"
                       visible-if="dsx.variable.bp == 'desktop'">
                   <image src="{{ item.poster }}" contentFit="cover" a11yLabel="Feature {{ item.title }}" a11yTrait="button"
-                         on:tap="dsx.variable.heroPage = item.rank - 1"
-                         style="{{ coverCell }}"/>
+                         on:tap="dsx.variable.heroPage = item.rank - 1" style="{{ coverCell }}"/>
                 </list>
                 <vstack class="heroArrow" visible-if="dsx.variable.heroCount > 1" on:tap="dsx.action.heroNext()"
                         a11yGroup="true" a11yTrait="button" a11yLabel="Next feature">
@@ -490,41 +792,8 @@
         </zstack>
       </vstack>
 
-      <!-- ============ HERO · phone ============ -->
-      <vstack visible-if="dsx.variable.wide == false && dsx.variable.homeTab == 'popular' && heroShow != null" style="width: 100%" alignItems="stretch">
-        <zstack>
-          <!-- the PHONE hero reads the tall asset: this frame is 0.75:1 and the wide one is
-               3:1, so `cover` on a single 16:9 file either loses the sides here or magnifies
-               the subject into the desktop band -->
-          <pager bind="dsx.variable.homeView.hero" key="id" height="{{ dsx.variable.heroH }}" dots="false" value="dsx.variable.heroPage">
-            <image src="{{ item.hero_tall == null || item.hero_tall == '' ? item.hero : item.hero_tall }}"
-                   contentFit="cover" a11yLabel="{{ item.title }}"
-                   style="width: 100%; height: {{ dsx.variable.heroH }}px; object-fit: cover"/>
-          </pager>
-          <vstack style="width: 100%; height: {{ dsx.variable.heroH }}px; justify-content: flex-end; align-items: center; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.62) 76%, #000000 100%)">
-            <vstack class="heroPhoneBlock" style="pointer-events: auto">
-              <text value="{{ heroShow == null ? '' : heroShow.title }}" class="heroPhoneTitle" fontSize="{{ dsx.variable.heroTitleSize }}"/>
-              <text value="{{ heroShow == null ? '' : heroShow.genre }}" class="pillTag"/>
-              <hstack class="playPill" style="min-width: 210px; justify-content: center" a11yGroup="true" a11yTrait="button"
-                      a11yLabel="Play {{ heroShow == null ? '' : heroShow.title }}"
-                      on:tap="dsx.module.route.push({ path: '/watch/' + (heroShow == null ? '' : heroShow.id) + '/1' })">
-                <image icon="play.fill" iconSize="14" color="#111111" a11yHidden="true"/>
-                <text value="Play" class="playLabel"/>
-              </hstack>
-              <hstack class="dashRow" a11yHidden="true">
-                <list bind="dsx.variable.homeView.hero" key="id" axis="horizontal" scroll="false" spacing="5">
-                  <stack height="4" radius="2"
-                         background="{{ item.rank - 1 == Number(dsx.variable.heroPage) ? '#FFFFFF' : 'rgba(255,255,255,0.35)' }}"
-                         width="{{ item.rank - 1 == Number(dsx.variable.heroPage) ? 26 : 13 }}"/>
-                </list>
-              </hstack>
-            </vstack>
-          </vstack>
-        </zstack>
-      </vstack>
-
-      <!-- ============ Continue Watching ============ -->
-      <vstack class="section" visible-if="dsx.variable.phase == 'ready' && (dsx.variable.wide || dsx.variable.homeTab == 'popular') && dsx.variable.continueView != null && dsx.variable.continueView.items.length > 0">
+      <!-- ══════════════════════════ WIDE · Continue Watching ════════════════════════════ -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide &amp;&amp; dsx.variable.continueView != null &amp;&amp; dsx.variable.continueView.items.length > 0">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="Continue Watching" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
         </hstack>
@@ -534,16 +803,10 @@
               <vstack class="card" style="width: {{ dsx.variable.posterW }}px" href="/watch/{{ item.show }}/{{ item.idx }}" a11yGroup="true" a11yLabel="Continue {{ item.title }}, episode {{ item.idx }}">
                 <zstack>
                   <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" style="{{ dsx.variable.posterStyle }}"/>
-                  <!-- the EP pill lives TOP-left, the zone the key art keeps clear; the
-                       art's own title is bottom-left and the two collided when this sat
-                       at the foot of the poster (measured on the desktop rail) -->
                   <vstack class="badgeWrap" style="width: {{ dsx.variable.posterW }}px; height: {{ dsx.variable.posterH }}px; pointer-events: none">
                     <text value="EP {{ item.idx }}" class="badgeDark"/>
                   </vstack>
                   <vstack style="{{ dsx.variable.posterBox }}">
-                    <!-- the fill is COMPUTED PX, not a % of the track: percent lengths have
-                         no native twin today (the CSS bridge drops them, measured — upstream
-                         filing), and the track's width is already a known variable -->
                     <stack class="resumeTrack" style="width: {{ dsx.variable.posterW }}px; height: 3px; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px">
                       <stack class="resumeFill" style="width: {{ Math.round(dsx.variable.posterW * item.pct / 100) }}px; height: 3px"/>
                     </stack>
@@ -559,8 +822,8 @@
         </scroll>
       </vstack>
 
-      <!-- ============ New Release ============ -->
-      <vstack class="section" visible-if="dsx.variable.phase == 'ready' && (dsx.variable.wide || dsx.variable.homeTab == 'popular')">
+      <!-- ══════════════════════════ WIDE · New Release ══════════════════════════════════ -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="New Release" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           <spacer/>
@@ -578,7 +841,7 @@
                 <zstack>
                   <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" style="{{ posterHover }}"/>
                   <vstack class="badgeWrap" style="width: {{ dsx.variable.posterW }}px; height: {{ dsx.variable.posterH }}px; pointer-events: none">
-                    <text value="New" class="badge" visible-if="item.rank <= 2"/>
+                    <text value="{{ item.hot ? 'HOT' : 'NEW' }}" class="badgeWide" visible-if="item.hot || item.isNew"/>
                   </vstack>
                   <vstack visible-if="dsx.variable.hoverReveal &amp;&amp; dsx.variable.hovId == item.id"
                           style="width: {{ dsx.variable.posterW }}px; height: {{ dsx.variable.posterH }}px; justify-content: flex-end; border-radius: 16px; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.88) 100%); transform: scale(1.04); transition: transform 0.22s ease; z-index: 2">
@@ -601,12 +864,12 @@
         </scroll>
       </vstack>
 
-      <!-- ============ TOP · ranked numerals ============ -->
-      <vstack class="section" visible-if="dsx.variable.phase == 'ready' && (dsx.variable.wide || dsx.variable.homeTab == 'popular')">
+      <!-- ══════════════════════════ WIDE · TOP · ranked numerals ════════════════════════ -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide">
         <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
           <text value="TOP" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
           <spacer/>
-          <image icon="flame.fill" iconSize="16" color="#FF2C55" a11yHidden="true"/>
+          <image icon="flame.fill" iconSize="16" color="{{ hotRed() }}" a11yHidden="true"/>
         </hstack>
         <scroll axis="horizontal" indicators="false">
           <hstack class="rail" style="{{ dsx.variable.railShell }}">
@@ -622,7 +885,7 @@
                           style="font-size: {{ dsx.variable.rankSize }}px; line-height: 0.76; font-weight: 900; letter-spacing: -7px; text-shadow: 0 6px 22px rgba(0,0,0,0.85)"/>
                   </vstack>
                   <vstack class="badgeWrap" style="width: 100%; height: {{ dsx.variable.posterH }}px; padding-left: {{ dsx.variable.rankOvl + 10 }}px; pointer-events: none">
-                    <text value="{{ topBadge }}" class="badge" visible-if="topBadge != ''"/>
+                    <text value="{{ topBadge }}" class="badgeWide" visible-if="topBadge != ''"/>
                   </vstack>
                 </zstack>
                 <vstack spacing="4" alignItems="stretch" style="padding-left: {{ dsx.variable.rankOvl }}px">
@@ -635,15 +898,10 @@
         </scroll>
       </vstack>
 
-      <!-- ============ genre shelves ============ -->
+      <!-- ══════════════════════════ WIDE · genre shelves ════════════════════════════════ -->
       <list bind="dsx.variable.homeView.shelves" key="genre" scroll="false" spacing="0"
-            visible-if="dsx.variable.phase == 'ready' && (dsx.variable.wide || dsx.variable.homeTab == 'popular')">
+            visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide">
         <vstack class="section">
-          <!-- VIEW ALL — the affordance every shelf on ReelShort carries, and the reason
-               Browse exists: a genre rail shows a handful, and the eleventh title had
-               nowhere to live. Only the GENRE shelves get it, because only they have an
-               exact destination; a "View all" on New Release would land on an unfiltered
-               grid whose heading says something else. -->
           <hstack class="sectionHead" style="{{ dsx.variable.shell }}">
             <text value="{{ item.genre }}" class="sectionTitle" fontSize="{{ dsx.variable.headSize }}"/>
             <spacer/>
@@ -681,66 +939,16 @@
         </vstack>
       </list>
 
-      <!-- ============ NEW · phone tab ============ -->
-      <vstack class="section" visible-if="dsx.variable.phase == 'ready' && dsx.variable.wide == false && dsx.variable.homeTab == 'new'">
-        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <grid bind="dsx.variable.homeView.latest" key="id" columns="3" spacing="12" scroll="false">
-            <vstack class="card" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="{{ item.title }}">
-              <zstack>
-                <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                       style="width: 100%; aspect-ratio: 3/4; border-radius: 10px; object-fit: cover"/>
-                <vstack class="badgeWrap" style="width: 100%; height: 100%; pointer-events: none">
-                  <text value="New" class="badge" visible-if="item.rank <= 4"/>
-                </vstack>
-              </zstack>
-              <vstack spacing="2" alignItems="stretch">
-                <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
-                <text value="EP {{ item.episodes }}" class="cardMeta"/>
-              </vstack>
-            </vstack>
-          </grid>
-        </vstack>
-      </vstack>
-
-      <!-- ============ RANKING · phone tab: the ranked list ============ -->
-      <vstack class="section" visible-if="dsx.variable.phase == 'ready' && dsx.variable.wide == false && dsx.variable.homeTab == 'ranking'">
-        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <list bind="dsx.variable.homeView.trending" key="id" scroll="false" spacing="0">
-            <hstack class="rankRow" href="/show/{{ item.id }}" a11yGroup="true"
-                    a11yLabel="Number {{ item.rank }}, {{ item.title }}"
-                    style="border-bottom: 1px solid rgba(255,255,255,0.05)">
-              <text value="{{ item.rank }}" class="rankBig" color="{{ rankColor }}"/>
-              <!-- the ONE origin for Show's shared flight (a match id names one rect per
-                   frame — the linter refuses a second even in a runtime-exclusive tab):
-                   the ranked thumb flying into the 9:16 stage is the flight worth having,
-                   and sharedMode="clip" on the far end reconciles the ratios -->
-              <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                     shared="poster-{{ item.id }}"
-                     style="width: 62px; height: 83px; border-radius: 8px; object-fit: cover"/>
-              <vstack spacing="4" alignItems="stretch" style="flex: 1; min-width: 0">
-                <text value="{{ item.title }}" class="rankTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
-                <text value="{{ metaLine }}" class="rankMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
-                <hstack spacing="6" alignItems="center" visible-if="item.rank <= 3">
-                  <image icon="flame.fill" iconSize="11" color="#F6B63D" a11yHidden="true"/>
-                  <text value="Trending now" class="rankMeta" color="#F6B63D"/>
-                </hstack>
-              </vstack>
-              <text value="Watch" class="rankPlay"/>
-            </hstack>
-          </list>
-        </vstack>
-      </vstack>
-
       <!-- only when there is nothing to show — a failed refresh over a painted stash is silent -->
-      <vstack class="section" style="{{ dsx.variable.shell }}" visible-if="home.error != null && dsx.variable.homeView == null">
+      <vstack class="block gridWrap" visible-if="home.error != null &amp;&amp; dsx.variable.homeView == null">
         <vstack class="errCard">
-          <text value="The catalogue is unavailable." fontSize="14" color="#FFFFFF"/>
+          <text value="The catalogue is unavailable." fontSize="15" color="#FFFFFF"/>
           <button label="Retry" class="retryBtn" on:tap="home.refresh()"/>
         </vstack>
       </vstack>
 
-      <!-- ============ footer ============ -->
-      <vstack class="footer" visible-if="dsx.variable.wide" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 44px">
+      <!-- ══════════════════════════ WIDE · footer ═══════════════════════════════════════ -->
+      <vstack class="footer" visible-if="dsx.variable.wide" style="border-top: 1px solid rgba(255,255,255,0.12); margin-top: 44px">
         <hstack class="footCols" style="{{ dsx.variable.shell }}">
           <vstack class="footBrand" style="flex: 1">
             <hstack spacing="10" alignItems="center">
@@ -752,16 +960,10 @@
             <text value="© 2026 Short Drama — the Despia DSX flagship template.
 One source. Native on iOS, Android, web and desktop." class="footCopy"/>
           </vstack>
-          <!-- A TAB ROOT IS ENTERED LATERALLY, EVEN FROM A FOOTER. These four used to be
-               `href=`, which is a PUSH: the frame slides and a tab bar rides in with it
-               (`hidesBottomBarWhenPushed`, AGENTS.md). The footer only renders on the wide
-               lane where no bar mounts, so nothing was visibly wrong — but the rule is about
-               the destination, not the origin, and the linter is right to read it statically.
-               `route.reset` is also the honest verb: going Home from a footer is not deeper. -->
           <vstack class="footCol">
             <text value="BROWSE" class="footHead"/>
             <text value="Home" class="footLink" href="/"/>
-            <text value="Discover" class="footLink" href="/discover"/>
+            <text value="Explore" class="footLink" href="/discover"/>
             <text value="My List" class="footLink" href="/list"/>
           </vstack>
           <vstack class="footCol">
@@ -772,7 +974,7 @@ One source. Native on iOS, Android, web and desktop." class="footCopy"/>
           </vstack>
           <vstack class="footCol">
             <text value="ACCOUNT" class="footHead"/>
-            <text value="Wallet" class="footLink" href="/profile"/>
+            <text value="My Page" class="footLink" href="/profile"/>
             <text value="Manage this app" class="footLink" href="/admin"/>
           </vstack>
         </hstack>
@@ -780,6 +982,102 @@ One source. Native on iOS, Android, web and desktop." class="footCopy"/>
 
     </vstack>
   </scroll>
+
+  <!-- the toast: a snackbar row between the scroll and the bar, where one belongs on every
+       lane with no positioning to degrade; tap the ✕ to dismiss -->
+  <hstack class="toastRow" visible-if="dsx.variable.toast != ''" style="margin: 8px 14px">
+    <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
+    <image icon="xmark" iconSize="12" color="{{ ink3() }}" on:tap="dsx.variable.toast = ''"
+           a11yLabel="Dismiss message" a11yTrait="button"/>
+  </hstack>
+
+  <!-- ══════════ THE COMING-SOON SHEET (spec §2a) ══════════════════════════════════════
+       `half,full` over the panel fill, content centred; `on:dismiss` runs closeSoon so a
+       swipe-dismiss and the button agree on one path. No `title=`: the reference draws its
+       own heading in the slot, so the panel's accessible name is `a11yLabel` (the universal
+       attribute; the web lane names the panel with it since dev@this-pass, the native lanes
+       are filed — PLAN.md §6). -->
+  <sheet present="dsx.variable.soonOpen" detents="half,full" background="#141414"
+         a11yLabel="{{ dsx.variable.soonShow == null ? 'Coming soon' : dsx.variable.soonShow.title }}"
+         on:dismiss="dsx.action.closeSoon()">
+    <scroll style="flex: 1; min-height: 0">
+      <vstack class="soonBody">
+        <zstack style="width: 110px; height: 165px; position: relative; border-radius: 8px; overflow: hidden">
+          <image src="{{ dsx.variable.soonShow == null ? '' : dsx.variable.soonShow.cover }}" contentFit="cover" a11yHidden="true"
+                 width="110" height="165" radius="8" style="width: 110px; height: 165px; object-fit: cover"/>
+          <stack class="scrim" a11yHidden="true"
+                 style="position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%); pointer-events: none"/>
+          <hstack class="markRow" visible-if="dsx.variable.soonShow != null &amp;&amp; dsx.variable.soonShow.original" a11yHidden="true"
+                  style="position: absolute; left: 6px; bottom: 6px">
+            <image icon="play.fill" iconSize="10" color="#FFFFFF" a11yHidden="true"/>
+            <text value="ORIGINAL" class="markTxt"/>
+          </hstack>
+        </zstack>
+        <text value="{{ dsx.variable.soonShow == null ? '' : dsx.variable.soonShow.title }}" class="sheetTitle"
+              style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+        <hstack class="chipRow" style="justify-content: center; flex-wrap: wrap" visible-if="dsx.variable.soonTags.length > 0">
+          <list bind="dsx.variable.soonTags" key="name" axis="horizontal" scroll="false" spacing="6">
+            <text value="{{ item.name }}" class="chip" style="white-space: nowrap"/>
+          </list>
+        </hstack>
+        <text value="{{ dsx.variable.soonShow == null ? '' : dsx.variable.soonShow.synopsis }}" class="sheetSyn"
+              style="display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden"/>
+        <!-- icon + text is an hstack with on:tap, never a `button` (which carries icon OR label) -->
+        <hstack class="remindBtn" style="width: 100%; justify-content: center" a11yGroup="true" a11yTrait="button"
+                a11yLabel="{{ dsx.variable.soonReminded ? 'Reminder set, tap to remove it' : 'Remind me when it is out' }}"
+                on:tap="dsx.action.askRemind()">
+          <image icon="{{ dsx.variable.soonReminded ? 'checkmark' : 'bell.fill' }}" iconSize="16" color="#000000" a11yHidden="true"/>
+          <text value="{{ dsx.variable.soonReminded ? 'Reminder set' : 'Remind Me' }}" class="remindLabel"/>
+        </hstack>
+        <text value="{{ dsx.variable.remindNote }}" class="sheetNote" visible-if="dsx.variable.remindNote != ''"/>
+
+        <!-- ══════ LEVEL 2 — the permission sheet (spec §2b) ════════════════════════════
+             DECLARED INSIDE ITS PARENT'S SLOT, which is what makes it a stack (on iOS the slot
+             is an escaping closure, so this anchor exists only while the parent is up), and
+             the LAST child so its zero-size anchor pays no visible gap. `content` detent: it
+             hugs the card. The engine cascades it when the parent closes (§6.114). -->
+        <sheet present="dsx.variable.permOpen" detents="content" background="#141414"
+               a11yLabel="Turn on notifications"
+               on:dismiss="dsx.variable.permOpen = false">
+          <vstack class="permBody">
+            <!-- a REAL asset, not a glyph (AGENTS.md): scripts/gen-art.mjs draws it -->
+            <image src="/assets/bell.svg" contentFit="contain" a11yHidden="true" width="64" height="64"
+                   style="width: 64px; height: 64px"/>
+            <vstack spacing="2" alignItems="center">
+              <text value="‘{{ dsx.variable.soonShow == null ? '' : dsx.variable.soonShow.title }}’" class="sheetTitle"
+                    style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+              <text value="Don't miss the release!" class="sheetTitle"/>
+            </vstack>
+            <text value="To receive notifications, turn on the settings below." class="permSub"/>
+            <!-- the checkbox is DRAWN (spec −1, the custom-UI law): 20×20 radius 5, teal fill
+                 with a 12pt check when on, a 1.5pt #48484A outline on the card fill when off —
+                 never a platform control. The whole card is the target. -->
+            <hstack class="permCard" style="width: 100%" on:tap="dsx.variable.allow = !dsx.variable.allow"
+                    a11yGroup="true" a11yTrait="button"
+                    a11yLabel="Allow notifications, required{{ dsx.variable.allow ? ', on' : ', off' }}">
+              <vstack class="checkOn" visible-if="dsx.variable.allow">
+                <image icon="checkmark" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
+              </vstack>
+              <vstack class="checkOff" visible-if="dsx.variable.allow == false" style="border: 1.5px solid #48484A"/>
+              <text value="Allow notifications" class="permLabel"/>
+              <text value="(Required)" class="required"/>
+              <spacer/>
+            </hstack>
+            <hstack class="remindBtn" style="width: 100%; justify-content: center; opacity: {{ dsx.variable.allow ? 1 : 0.4 }}"
+                    opacity="{{ dsx.variable.allow ? 1 : 0.4 }}" a11yGroup="true" a11yTrait="button"
+                    a11yLabel="{{ dsx.variable.allow ? 'Remind me' : 'Remind me — tick Allow notifications first' }}"
+                    on:tap="dsx.action.confirmRemind()">
+              <image icon="bell.fill" iconSize="16" color="#000000" a11yHidden="true"/>
+              <text value="{{ dsx.variable.remindBusy ? 'One moment…' : 'Remind Me' }}" class="remindLabel"/>
+            </hstack>
+            <text value="{{ dsx.variable.remindNote }}" class="sheetNote" visible-if="dsx.variable.remindNote != ''"/>
+            <text value="Maybe next time" class="maybe" a11yTrait="button" on:tap="dsx.action.closePerm()"/>
+          </vstack>
+        </sheet>
+      </vstack>
+    </scroll>
+  </sheet>
+
   <TabBar active="home" visible-if="dsx.variable.wide == false"/>
   <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of
        the layout, so a zero-height child here cannot disturb any chrome. -->

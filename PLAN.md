@@ -2730,3 +2730,66 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      clip band sits at the top of the Android page where iOS centres it, and the locked key art hugs
      its intrinsic width inside the pager page instead of filling the band — a layout question
      (`grow` / `width: 100%` inside pager pages), filed for the next pass.
+
+137. **AN ABSOLUTE BOX PINNED AT BOTH EDGES WAS PROPOSED THE BASE'S FULL WIDTH ON iOS, so its
+     trailing content painted past the host and was clipped** (found 2026-09-02 building the
+     reference home's poster cell; fixed in `OpenSource/Engine/iOS/Stack.swift`). CSS resolves
+     `position: absolute; left: 6px; right: 6px` to `width = containing block − 12`, anchored 6
+     in from the left, and both the web and the Compose bridge draw exactly that. The SwiftUI
+     overlay lane read the pair only as "not shrink-to-fit" (`StackAbsolutePlane.shrinkAxes`):
+     the child was proposed the BASE's width and then slid by `left`, so a bottom row on a
+     116pt cell spanned 6 → 122 and the play count read "5.4N" on the iPhone 17 Pro while the
+     same markup read "5.4M" on the web and the API 36 phone. `StackAbsolutePlane.pinnedInsets`
+     now names a pinned axis, and `attachAbsolute` pays the pair as PADDING inside a full-size
+     frame (`base − lead − trail` from `lead`) instead of an offset; every other spelling —
+     one edge, an explicit size, `grow` — keeps the shrink-to-fit + offset path unchanged.
+     STILL OPEN: no corpus pins the absolute plane's SIZING on any lane (the plane's own comment
+     cites a measurement, not a row). The ask is a `style-semantics/absolute-insets.json` —
+     one edge / both edges / explicit width, per axis — executed by the three runners the
+     per-edge border corpus already has (§6.118b), so the next divergence is red before it ships.
+
+138. **A `<sheet>` THAT DRAWS ITS OWN HEADING HAD NO ACCESSIBLE NAME** (found 2026-09-02; web
+     half fixed `despia-framework dev@4fd3b2a7`). The reference's coming-soon and permission
+     sheets (docs/design/reference-ui-spec.md §2a, §2b) carry no header row — an illustration,
+     then the words — so they declare no `title=`, and the web panel's `aria-labelledby` pointed
+     at an EMPTY `h2`: a dialog with no name, the nested one at level 2 of a stack. `title=`
+     is not the answer there (it renders the built-in chrome the design does not have), so the
+     universal `a11yLabel=` now names the panel on the web (`aria-label`, `aria-labelledby`
+     removed; `title=` still wins when both are declared). Measured: the two panels announce
+     "The Runaway Bride of the Crown Prince" and "Turn on notifications". THE ASKS: (1) the
+     native halves — `Sheet.swift` reads `dsx.string("a11yLabel")` and applies
+     `.accessibilityLabel` to the presented slot when `title` is empty; the Compose sheet the
+     same through `semantics { contentDescription }`; (2) the lint note §6.95 asked for, widened:
+     a stacked child with NEITHER `title=` NOR `a11yLabel=` is an unnamed level-2 dialog.
+
+139. **`localpush.send` ON THE WEB RESOLVES `ok: true` FOR A DELAY THE PAGE CANNOT KEEP, and the
+     capability plane has no word for the difference** (found 2026-09-02 building Remind Me,
+     spec §2b). The module is honest about recurrence — `cronjob`/`skip` are narrowed off the web
+     lane because "arming a seven-day setTimeout would resolve ok:true for a reminder that can
+     never arrive" — but `send` stays on it with exactly that horizon: the facet arms a page-side
+     timer, so a premiere nine days out resolves `{ ok: true, delayInSeconds: 777600 }` and fires
+     for nobody. `has('localpush')` therefore answers "the scheduler is in this build" on every
+     lane and cannot answer "it outlives the page", which is the question a reminder asks. The
+     template asks the capability first and the platform second (AGENTS.md): on the web it
+     records the server row (server/reminders.dsx) and does not arm the timer, and the toast says
+     so — "This browser cannot schedule a notification days ahead" — rather than reporting a
+     success it did not earn. THE ASK: a module-level fact a screen can read (`horizon` /
+     `persistent: false` on the web facet, or `send` refusing past a page-honest bound of a few
+     minutes with a named error), so the decision moves out of an `os ==` branch. THE OTHER HALF
+     OF THIS LANE is §6.115: Core/LocalPush and Core/Notify reach the web build from `packages`
+     and no device build yet, so `has('localpush')` / `has('notify')` are false on a phone and
+     the permission sheet's confirm degrades to the server row with the toast naming it.
+
+140. **A NEW ICON ROW NEEDS A FONT THE REPO DOES NOT CARRY** (found 2026-09-02; the rows landed
+     `despia-framework dev@b79bc85c`). The reference's Explore tab is a play triangle in a
+     circle — `play.circle` / `play.circle.fill`, real SF names the shared catalog never had.
+     A full row pins a Material codepoint that the bundled Android subset font must cover
+     (`FontSubsetTest` fails the build otherwise), and regenerating that subset needs the 10 MB
+     variable font, which lives outside the repo (`_subset_provenance`). The two rows sit in
+     `icons` with the web path and the unicode fallback and NO codepoint — legal to every reader,
+     drawn by the unified lane on all three renderers, the SF name on iOS platform mode, the
+     fallback glyph on Android platform mode — and the catalog's `_vector_only_rows` note says
+     so. THE ASK: an `icons:subset` script that fetches the variable font by pinned URL + hash
+     and re-instances the subset, so promoting a row is one command in the same change, and a
+     coin-stack row for the Rewards tab (SF Symbols has no such name; the template draws
+     `dollarsign.circle.fill`, its one coin glyph, and says why in TabBar.dsx).

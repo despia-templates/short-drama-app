@@ -34,10 +34,7 @@
       "meta": {
         "title": "VIP — Short Drama"
       },
-      "motion": {
-        "mobile": "none",
-        "wide": "dsx"
-      }
+      "_note": "NOT A TAB ROOT ANY MORE (docs/design/reference-ui-spec.md §8): the five-tab bar is Home · Explore · My List · Rewards · My Page, and VIP lives in the crown button, the unlock pills and the Membership page. /vip stays a route — the crown's destination until /membership carries every plan (Components/parts/Theme.dsx membershipPath) — and it is PUSHED like every other non-tab page, so no `motion` key here either."
     },
     {
       "path": "/store",
@@ -52,7 +49,11 @@
       "meta": {
         "title": "Rewards — Short Drama"
       },
-      "_motion_note": "NO `motion` HERE, and that is the fix rather than an omission. `motion: {mobile: none}` is the TAB-ROOT declaration: it exists so a screen reached by `route.reset` does not slide on a phone, because a tab switch is not a push and the tab bar would ride the transition. Rewards is reached by PUSH from Profile, Store and the player — never by a tab — so wearing the tab-root motion made it the one pushed screen in the app that teleported in on the phone while every other pushed screen slid. Measured 2026-09-01 on both lanes: web hard-cut at 390px, iOS slid anyway (the key was dropped in resolution before this pass), so the same tap produced two different products. With the key gone the phone lane slides on both lanes and the wide lane crossfades, which is what every other pushed route already did."
+      "motion": {
+        "mobile": "none",
+        "wide": "dsx"
+      },
+      "_note": "A TAB ROOT now (docs/design/reference-ui-spec.md 8: the fourth tab). `motion: {mobile: none}` is the tab-root declaration — a tab switch is a reset, not a push, so the screen swaps in place and the tab bar never rides a transition (PLAN.md 6.29). Every door that used to PUSH /rewards resets to it now, for the same reason."
     },
     {
       "path": "/list",
@@ -156,3 +157,4 @@
     "consent"
   ]
 }
+  "_remind_note": "REMIND ME (docs/design/reference-ui-spec.md §2–§2b) is two modules. Core/Notify (scheme `notify`) owns the PERMISSION: `dsx.module.notify.permission()` is the one ladder on three renderers (the kernel's NotifyCore, corpus-pinned), and it is what the permission sheet's 'Allow notifications' asks. Core/LocalPush (scheme `localpush`) owns the SCHEDULE: `send({ seconds, id, title, message, url })` is a one-shot the OS fires at the premiere, after force-quit and reboot, on iOS and Android. The web facet of `send` is a page-side timer that dies with the tab — honest for a delay of minutes, a lie for a premiere in nine days — so Components/App.dsx does not arm it there and says so in the sheet; the server row (server/reminders.dsx) is what survives on every lane. Both packages reach the web build from this list; the native exports read `Modules/` and the lockfile (PLAN.md 6.115), so on a device `has('localpush')` is false until that fold lands and the sheet names the gap instead of pretending.",

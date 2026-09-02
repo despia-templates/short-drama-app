@@ -191,6 +191,36 @@ check("home cards carry a tags ARRAY", Array.isArray(card.tags) && card.tags.len
   `got ${JSON.stringify(card.tags)} — the card helper is handing back a raw string`);
 check("show detail carries a tags ARRAY", Array.isArray(detail.show.tags) && detail.show.tags.length > 0,
   `got ${JSON.stringify(detail.show.tags)} — showDetail returns the raw row, which stores tags comma-joined`);
+// THE REFERENCE HOME'S RAILS (docs/design/reference-ui-spec.md §1–§2). Four more arrays, and
+// the shape the phone lane reads off each card: the 2:3 cover, the three badge booleans, the
+// title art. `comingSoon` is the one that can rot silently — a premiere date in the past is a
+// rail of "coming soon" titles that came and went — so its dates must be ahead of now and its
+// rows must carry NO live episode (they are on their own rail because nothing is watchable).
+for (const k of ["grid", "picks", "newTitles", "comingSoon"]) {
+  check(`/catalog/home carries the ${k} rail`, Array.isArray(home[k]), `got ${JSON.stringify(home[k]).slice(0, 60)}`);
+}
+check("home grid cards carry the reference fields",
+  home.grid.length > 0 && home.grid.every((c) => typeof c.cover === "string" && c.cover !== ""
+    && typeof c.hot === "boolean" && typeof c.isNew === "boolean" && typeof c.original === "boolean"
+    && typeof c.titleArt === "string" && Array.isArray(c.chips)),
+  "a grid card is missing cover / hot / isNew / original / titleArt / chips — the twin in scripts/serve.mjs upsertShow or server/catalog.dsx card() dropped one");
+check("the HOT badge is a catalogue fact, not a rank", home.grid.some((c) => c.hot === true) && home.grid.some((c) => c.hot !== true),
+  `${home.grid.filter((c) => c.hot).length} of ${home.grid.length} cards are HOT — every card or none means the flag is not being read`);
+check("the New Titles list is exactly the NEW-flagged titles",
+  home.newTitles.length > 0 && home.newTitles.every((c) => c.isNew === true),
+  `${home.newTitles.length} rows, ${home.newTitles.filter((c) => c.isNew !== true).length} not flagged`);
+check("the coming-soon rail premieres in the future and carries nothing watchable",
+  home.comingSoon.length > 0 && home.comingSoon.every((c) => c.comingSoon === true && Date.parse(c.releaseAt) > Date.now() && c.episodes === 0),
+  `${JSON.stringify(home.comingSoon.map((c) => [c.title, c.releaseAt, c.episodes])).slice(0, 200)} — re-seed (dates are relative to seed time) or a coming-soon show has a live episode`);
+check("no coming-soon title leaks onto a watchable rail",
+  ["hero", "latest", "trending", "grid", "picks", "newTitles"].every((k) => home[k].every((c) => c.comingSoon !== true)),
+  "a coming-soon card on a watchable rail is a tap that lands on an empty grid");
+check("browse and search never offer a coming-soon title", await (async () => {
+  const soon = home.comingSoon[0];
+  const all = await fetch(`${base}/catalog/browse/all`).then((r) => r.json());
+  const found = await fetch(`${base}/catalog/search`, { method: "POST", headers: anon, body: JSON.stringify({ q: soon.title.slice(0, 12) }) }).then((r) => r.json());
+  return !all.items.some((i) => i.id === soon.id) && !found.items.some((i) => i.id === soon.id);
+})(), "a coming-soon show is reachable through browse or search, which lands on an empty grid");
 check("browse offers tag chips beside the genres",
   Array.isArray(browse.tags) && browse.tags.length > 0 && browse.tags.every((t) => t.count > 1),
   `${JSON.stringify(browse.tags ?? null).slice(0, 120)} — a chip that narrows to one title is a dead end`);
@@ -270,6 +300,36 @@ check("an unauthenticated unlock is refused", unlock.status >= 400,
 console.log("\nentitlement");
 {
   let lockedSeen = 0;
+// ── REMIND ME (server/reminders.dsx) ───────────────────────────────────────────────────
+// The durable half of the coming-soon reminder: one row per (viewer, show), set through
+// POST, read back through GET, gone after DELETE — and refused for a series that is already
+// out, because a reminder for it would fire for nothing. The DELETE verb is the one to prove:
+// the route grammar allows it, the client `<api method="DELETE">` sends it, and nothing else
+// in this backend uses it, so a regression in either would show up here first.
+console.log("\nreminders");
+{
+  const soon = home.comingSoon[0];
+  const set = await asJson(await POST(`/viewer/reminders/${soon.id}`, viewer));
+  check("a reminder is set on a coming-soon series", set.status === 200 && set.body?.show === soon.id && typeof set.body?.releaseAt === "string",
+    `${set.status} ${JSON.stringify(set.body).slice(0, 120)}`);
+  const twice = await asJson(await POST(`/viewer/reminders/${soon.id}`, viewer));
+  check("setting it again is idempotent", twice.status === 200 && twice.body?.created === false, `${twice.status} ${JSON.stringify(twice.body).slice(0, 120)}`);
+  const mine = await asJson(await GET("/viewer/reminders", viewer));
+  check("the viewer's reminders list carries it once",
+    mine.status === 200 && Array.isArray(mine.body?.items) && mine.body.items.filter((r) => r.show === soon.id).length === 1,
+    `${mine.status} ${JSON.stringify(mine.body).slice(0, 120)}`);
+  const gone = await asJson(await fetch(`${base}/viewer/reminders/${soon.id}`, { method: "DELETE", headers: viewer }));
+  check("DELETE clears it", gone.status === 200 && gone.body?.cleared >= 1, `${gone.status} ${JSON.stringify(gone.body).slice(0, 120)}`);
+  const after = await asJson(await GET("/viewer/reminders", viewer));
+  check("...and the list no longer carries it", after.status === 200 && !after.body.items.some((r) => r.show === soon.id),
+    JSON.stringify(after.body).slice(0, 120));
+  const live = await asJson(await POST(`/viewer/reminders/${home.grid[0].id}`, viewer));
+  check("a reminder on a series that is already out is refused", live.status >= 400 && live.body?.reason === "invalid",
+    `${live.status} ${JSON.stringify(live.body).slice(0, 120)}`);
+  const guest = await asJson(await POST(`/viewer/reminders/${soon.id}`, anon));
+  check("a guest cannot set one", guest.status === 401, `answered ${guest.status}`);
+}
+
   let lockedWithSource = 0;
   let freeWithSource = 0;
   let sampleShow = null;

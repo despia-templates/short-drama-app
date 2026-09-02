@@ -91,10 +91,6 @@
       const on = dsx.variable.hovId == ('h-' + ep)
       return 'width: 132px; height: 198px; border-radius: 8px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.04 : 1) + ')'
     </formula>
-    <formula as="favFx" id="item.show">
-      const on = dsx.variable.hovId == ('f-' + id)
-      return 'width: 100%; aspect-ratio: 3/4; border-radius: 8px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.03 : 1) + ')'
-    </formula>
 
     <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
@@ -119,8 +115,12 @@
     <style as="badgeWrap" paddingLeading="7" paddingBottom="9" alignItems="flex-start"/>
     <style as="resumeTrack" background="rgba(255,255,255,0.22)"/>
     <style as="resumeFill" background="#FF2C55"/>
-    <style as="signCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="24" alignItems="center"/>
-    <style as="signBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="signCard" background="#141414" radius="12" spacing="10" paddingH="16" paddingV="24" alignItems="center"/>
+    <style as="signBtn" background="#FFFFFF" radius="12" paddingH="20" paddingV="12" fontSize="15" fontWeight="semibold" color="#000000"/>
+    <!-- the spec's empty state (§5): bookmark 44 ink-3 · 17 semibold · 15 ink-3 -->
+    <style as="emptyState" spacing="8" alignItems="center" paddingV="40"/>
+    <style as="emptyTitle" fontSize="17" fontWeight="semibold" color="#FFFFFF" textAlign="center"/>
+    <style as="emptyNote" fontSize="15" color="#8E8E93" textAlign="center"/>
   </head>
 
   <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
@@ -156,9 +156,10 @@
 
           <!-- the shared signed-out card; its button raises the seam sheet, where "Reload"
                used to re-fetch the static session file that defined the state -->
-          <SignInCard visible-if="dsx.variable.signedOut"
-                      icon="bookmark.fill"
-                      title="Your list lives on your account"
+          <!-- device identity means this list already WORKS with no account; the card is now an
+               invitation to link it so it follows the viewer to another device (guest lane: sign in) -->
+          <LinkPrompt icon="bookmark.fill"
+                      title="Keep your list on your account"
                       note="Sign in and everything you save or start watching lands here — on this device and any other."/>
 
           <vstack spacing="20" alignItems="stretch" visible-if="dsx.variable.listLoading">
@@ -209,22 +210,20 @@
             </scroll>
           </vstack>
 
-          <!-- favorites -->
+          <!-- favorites — the reference cell (docs/design/reference-ui-spec.md §5 draws My
+               List with the §1 cell: 2:3 cover, radius 6, the three badges, the count), three
+               up on a phone at the spec's 7pt gap, and the spec's empty state -->
           <vstack class="section" visible-if="dsx.variable.signedOut == false && dsx.variable.listLoading == false && dsx.variable.listFailed == false">
             <text value="My list" class="sectionTitle"/>
-            <text class="empty" visible-if="dsx.variable.favsView != null && dsx.variable.favsView.items.length == 0"
-                  value="Tap My List on any show to keep it here."/>
-            <grid bind="dsx.variable.favsView.items" key="show" columns="{{ dsx.variable.cols }}" spacing="14" scroll="false">
-              <vstack class="card" href="/show/{{ item.show }}"
-                      on:hoverStart="dsx.variable.hovId = 'f-' + item.show" on:hoverEnd="dsx.variable.hovId = ''"
-                      a11yGroup="true" a11yLabel="{{ item.title }}">
-                <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                       style="{{ favFx }}"/>
-                <vstack spacing="2" alignItems="stretch">
-                  <text value="{{ item.title }}" class="cardTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
-                  <text value="{{ item.genre }}  |  Series" class="cardMeta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
-                </vstack>
-              </vstack>
+            <vstack class="emptyState" visible-if="dsx.variable.favsView != null && dsx.variable.favsView.items.length == 0">
+              <image icon="bookmark" iconSize="44" color="{{ ink3() }}" a11yHidden="true"/>
+              <text value="Nothing saved yet" class="emptyTitle"/>
+              <text value="Tap Save on any episode" class="emptyNote"/>
+            </vstack>
+            <grid bind="dsx.variable.favsView.items" key="show" columns="{{ dsx.variable.cols }}" spacing="{{ dsx.variable.wide ? 14 : 7 }}" scroll="false">
+              <CoverCard id="{{ item.show }}" title="{{ item.title }}" genre="{{ item.genre }}" cover="{{ item.cover == null ? item.poster : item.cover }}"
+                         hot="{{ item.hot }}" isNew="{{ item.isNew }}" original="{{ item.original }}" views="{{ item.views }}"
+                         path="/show/{{ item.show }}"/>
             </grid>
           </vstack>
         </vstack>

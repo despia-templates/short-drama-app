@@ -1,0 +1,94 @@
+<!-- CoverCard — the reference home's poster cell (docs/design/reference-ui-spec.md §1): a
+     2:3 cover at radius 6 with three overlays — HOT / NEW top-right, the ORIGINAL mark
+     bottom-left on a 56pt scrim, the flame and the play count bottom-right — then the title
+     (15 semibold, two lines) and the genre (13 ink-3) under it. ONE file for every grid that
+     draws it: the Hot and Picks grids on Home, My List, the sheets' related rails. A grid
+     sizes its DIRECT children (AGENTS.md), and a file component IS a direct child, so the
+     column width reaches the cover through `grow="width"` + the 2:3 aspect on the image.
+
+     THE OVERLAYS ARE `position: absolute` + edge insets, which both native bridges fold now
+     (dev@37e1c82c) — one declaration on three renderers. The scrim carries both spellings:
+     the CSS gradient for web and the catalog's `gradient` words for native, because a
+     `linear-gradient()` inside `style=` has no native twin (AGENTS.md).
+
+     Attributes arrive as STRINGS unless the caller interpolates a value, so the three flags
+     accept both spellings (AGENTS.md: a component cannot make its callers remember). -->
+<vstack class="card" href="{{ dsx.attribute.path }}" a11yGroup="true"
+        a11yLabel="{{ dsx.attribute.title }}, {{ dsx.attribute.genre }}">
+  <head>
+    <attribute as="id" default="''"/>
+    <attribute as="title" default="''"/>
+    <attribute as="genre" default="''"/>
+    <attribute as="cover" default="''"/>
+    <attribute as="hot" default="false"/>
+    <attribute as="isNew" default="false"/>
+    <attribute as="original" default="false"/>
+    <attribute as="views" default="0"/>
+    <!-- where a tap lands; the host decides (the Hot grid opens the player, My List the show) -->
+    <attribute as="path" default="''"/>
+
+    <variable as="hotOn" computed="true">
+      const v = dsx.attribute.hot
+      return v === true || v === 'true'
+    </variable>
+    <variable as="newOn" computed="true">
+      const v = dsx.attribute.isNew
+      return v === true || v === 'true'
+    </variable>
+    <variable as="origOn" computed="true">
+      const v = dsx.attribute.original
+      return v === true || v === 'true'
+    </variable>
+    <!-- the count at glance width, locale-formatted (Theme.dsx compactCount); nothing under
+         a thousand is worth a flame -->
+    <variable as="count" computed="true">
+      const v = Number(dsx.attribute.views)
+      if (v == null || v < 1000) { return '' }
+      return compactCount(v)
+    </variable>
+
+    <style as="card" spacing="0" alignItems="stretch" grow="width"/>
+    <style as="frame" radius="6"/>
+    <style as="badge" background="#E0342C" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF" zIndex="2"/>
+    <style as="scrim" gradient="rgba(0,0,0,0)|rgba(0,0,0,0.6)" gradientDir="vertical" height="56" zIndex="1"/>
+    <style as="footRow" spacing="4" alignItems="center" zIndex="2"/>
+    <style as="markRow" spacing="2" alignItems="center"/>
+    <!-- 10pt, the spec's own measure for the mini badge (§1) and the one size under the
+         ramp's 11 it declares; no tracking, so the word fits beside the count on a 116pt cell -->
+    <style as="markTxt" fontSize="10" fontWeight="bold" color="#FFFFFF" textCase="uppercase" lineLimit="1"/>
+    <style as="countRow" spacing="2" alignItems="center"/>
+    <style as="countTxt" fontSize="12" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+    <style as="title" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="2" paddingTop="6" lineSpacing="3"/>
+    <style as="genre" fontSize="13" color="#8E8E93" lineLimit="1" paddingTop="2"/>
+  </head>
+
+  <zstack class="frame" style="width: 100%; position: relative; overflow: hidden; border-radius: 6px">
+    <image src="{{ dsx.attribute.cover }}" contentFit="cover" a11yHidden="true" grow="width" aspectRatio="2:3"
+           style="width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block"/>
+    <!-- 56pt bottom scrim, so the mark and the count read on any art -->
+    <stack class="scrim" a11yHidden="true"
+           style="position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%); pointer-events: none"/>
+    <text value="{{ dsx.variable.hotOn ? 'HOT' : 'NEW' }}" class="badge" a11yHidden="true"
+          visible-if="dsx.variable.hotOn || dsx.variable.newOn"
+          style="position: absolute; top: 6px; right: 6px"/>
+    <!-- ONE bottom row, the mark at its leading edge and the count at its trailing edge:
+         two independently positioned overlays collided on a 116pt cell (measured: "ORIGINAL"
+         ran into "5.4M"), and a row that distributes cannot overlap. OUR mark and the word —
+         the play glyph the wordmark wears, never the reference's. -->
+    <hstack class="footRow" a11yHidden="true"
+            style="position: absolute; left: 6px; right: 6px; bottom: 6px; justify-content: space-between">
+      <hstack class="markRow" visible-if="dsx.variable.origOn">
+        <image icon="play.fill" iconSize="9" color="#FFFFFF" a11yHidden="true"/>
+        <text value="ORIGINAL" class="markTxt" style="white-space: nowrap"/>
+      </hstack>
+      <spacer visible-if="dsx.variable.origOn == false"/>
+      <hstack class="countRow" visible-if="dsx.variable.count != ''">
+        <image icon="flame.fill" iconSize="11" color="#FFFFFF" a11yHidden="true"/>
+        <text value="{{ dsx.variable.count }}" class="countTxt" style="white-space: nowrap"/>
+      </hstack>
+    </hstack>
+  </zstack>
+  <text value="{{ dsx.attribute.title }}" class="title"
+        style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+  <text value="{{ dsx.attribute.genre }}" class="genre" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+</vstack>

@@ -29,8 +29,10 @@ import { themeTones } from "./theme.mjs";
 //  all shipping and all absent here), which is the exact failure a second copy always has.
 const PALETTE = new Set(themeTones().keys());
 
-// the measured ramp: the iOS scale plus the category-reference sizes this app is built to
-const TYPE_RAMP = new Set([11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32, 34]);
+// the measured ramp: the iOS scale plus the category-reference sizes this app is built to.
+// 10 is the reference's ORIGINAL badge and its bottom-left mark (docs/design/reference-ui-spec.md
+// §1, read off the founder's screenshots at 601×1306) — a measured size, not a slider stop.
+const TYPE_RAMP = new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32, 34]);
 
 let out = "";
 try { out = execSync("npx despia review --strict 2>&1", { encoding: "utf8" }); }

@@ -106,7 +106,9 @@
 
 
     <style as="caption" paddingLeading="16" paddingTrailing="16" paddingBottom="20" spacing="8" alignItems="flex-start"/>
-    <style as="capGenre" fontSize="11" fontWeight="semibold" color="#F7C948" tracking="0.8" textCase="uppercase"/>
+    <!-- the reference tones (docs/design/reference-ui-spec.md §0): the genre kicker in the
+         crown's gold, the ink CTA, the accent spinner — Explore is the same app as Home -->
+    <style as="capGenre" fontSize="11" fontWeight="semibold" color="#F5C518" tracking="0.8" textCase="uppercase"/>
     <style as="capTitle" fontSize="22" fontWeight="bold" color="#FFFFFF" lineLimit="2" tracking="-0.3"/>
     <style as="capSyn" fontSize="13" color="rgba(255,255,255,0.72)" lineLimit="2" lineSpacing="2"/>
     <style as="capCta" spacing="10" alignItems="center" paddingTop="2"/>
@@ -114,7 +116,7 @@
     <style as="watchLabel" fontSize="13" fontWeight="bold" color="#111111"/>
     <style as="soundBtn" background="rgba(255,255,255,0.16)" radius="20" paddingH="12" paddingV="11" alignItems="center"/>
     <style as="statusWrap" alignItems="center" paddingV="40" spacing="10"/>
-    <style as="retryBtn" background="#FF2C55" radius="22" paddingH="20" paddingV="11" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="retryBtn" background="#FFFFFF" radius="12" paddingH="20" paddingV="12" fontSize="15" fontWeight="semibold" color="#000000"/>
   </head>
 
   <!-- Theme first, and for the same reason App.dsx now mounts it: this screen derives its
@@ -171,7 +173,7 @@
             height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
             style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center; background: radial-gradient(120% 70% at 50% 30%, #17171C 0%, #0A0A0E 70%)">
       <vstack spacing="14" alignItems="center">
-        <spinner color="#FF2C55"/>
+        <spinner color="{{ accent() }}"/>
         <text value="Loading the feed…" fontSize="13" color="rgba(255,255,255,0.6)"/>
       </vstack>
     </vstack>
@@ -218,5 +220,5 @@
 
   </zstack>
 
-  <TabBar active="foryou" measure="dsx.variable.barBox" visible-if="dsx.variable.wide == false"/>
+  <TabBar active="explore" measure="dsx.variable.barBox" visible-if="dsx.variable.wide == false"/>
 </vstack>

@@ -257,6 +257,31 @@
         const l = global.locale
         if (l == null) { return '' }
         return String(l)
+      /* ── THE CLAIMABLE TOTAL, ONE ARITHMETIC ────────────────────────────────────────
+         The coins a viewer can claim RIGHT NOW with a tap, from the SERVER facts in
+         /rewards/state: the day`s check-in reward while it is unclaimed, every completed
+         task not yet claimed, and the rewarded ads still available (a non-member`s lane).
+         The Rewards tab prints it and the tab bar`s callout binds the same function over
+         the app-wide stash (global.cacheRewards), so the two never disagree. A null state
+         is 0, never a guess. Statements rather than `+`-joined expressions, and no `&&`,
+         for the body caveat above. */
+      function rewardsClaimable(state, vip) {
+        if (state == null) { return 0 }
+        let total = 0
+        if (state.checkedToday == false) { total = total + Number(state.nextReward) }
+        if (state.tasks != null) {
+          for (const t of state.tasks) {
+            if (t.claimed != true) {
+              if (Number(t.progress) >= Number(t.target)) { total = total + Number(t.reward) }
+            }
+          }
+        }
+        if (vip != true) {
+          if (state.adsLeft != null) { total = total + Number(state.adsLeft) * Number(state.adReward) }
+        }
+        return total
+      }
+
       }
 
       /* ── THE DIRECTION VOCABULARY, AND WHY THE APP HAS TO OWN ONE ─────────────────

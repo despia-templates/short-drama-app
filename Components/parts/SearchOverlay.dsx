@@ -14,6 +14,9 @@
     <!-- pill mode: the trigger is a full search FIELD look (the phone home's category
          standard), not just the glass icon; both open the same overlay -->
     <attribute as="pill" default="false"/>
+    <!-- the pill's placeholder: the reference (docs/design/reference-ui-spec.md §1) shows a
+         TRENDING TITLE in the field, never the word "Search" — the host passes one -->
+    <attribute as="placeholder" default="'Search dramas'"/>
 
     <!-- lazy: the overlay is mounted on every screen, so the catalogue is
          fetched when it OPENS, never on page load -->
@@ -143,8 +146,10 @@
     <style as="cardTitle" fontSize="14" color="rgba(255,255,255,0.8)" lineLimit="1"/>
     <style as="cardMeta" fontSize="14" color="rgba(255,255,255,0.9)" lineLimit="1"/>
     <style as="status" fontSize="14" color="rgba(255,255,255,0.55)" textAlign="center" paddingV="14"/>
-    <style as="pillTrigger" background="rgba(255,255,255,0.1)" radius="18" paddingH="14" paddingV="9" spacing="8" alignItems="center"/>
-    <style as="pillHint" fontSize="14" color="rgba(255,255,255,0.45)"/>
+    <!-- the phone field, measured off the reference (spec §1): h 40, radius 12, card fill,
+         a 16pt ink-3 magnifier inset 12, the hint 15 ink-3 -->
+    <style as="pillTrigger" background="#1C1C1E" radius="12" height="40" paddingLeading="12" paddingTrailing="12" spacing="8" alignItems="center" alignY="center"/>
+    <style as="pillHint" fontSize="15" color="#8E8E93" lineLimit="1"/>
   </head>
 
   <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
@@ -156,8 +161,8 @@
          on:tap="dsx.action.openSearch()" a11yLabel="Search" a11yTrait="button"/>
   <hstack class="pillTrigger" visible-if="dsx.attribute.pill" style="flex: 1; min-width: 0"
           on:tap="dsx.action.openSearch()" a11yGroup="true" a11yTrait="button" a11yLabel="Search">
-    <image icon="magnifyingglass" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
-    <text value="Search dramas" class="pillHint"/>
+    <image icon="magnifyingglass" iconSize="16" color="{{ ink3() }}" a11yHidden="true"/>
+    <text value="{{ dsx.attribute.placeholder }}" class="pillHint" style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
   </hstack>
 
   <sheet present="dsx.variable.open" mode="cover" background="#000000"
