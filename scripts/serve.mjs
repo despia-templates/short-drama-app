@@ -106,7 +106,6 @@ const opsHandlers = {
       rating: String(args.rating ?? ""),
       // tags arrive as an array and are stored comma-joined (see the entity's note)
       tags: Array.isArray(args.tags) ? args.tags.join(",") : String(args.tags ?? ""),
-    };
       // the reference home's fields (docs/design/reference-ui-spec.md §1–§2): the 2:3 cover,
       // the title art, the three badge flags and the coming-soon pair. Mirrored from
       // server/admin.dsx adminUpsertShow field for field — `npm run verify` reads them back
@@ -117,6 +116,7 @@ const opsHandlers = {
       is_new: args.isNew === true,
       original: args.original === true,
       coming_soon: args.comingSoon === true,
+    };
     if (typeof args.id === "string" && args.id !== "") {
     // a release date is only ever written when one was sent — a show that is out has none
     if (typeof args.releaseAt === "string" && args.releaseAt !== "") values.release_at = args.releaseAt;

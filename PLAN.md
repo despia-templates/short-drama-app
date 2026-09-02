@@ -2793,3 +2793,435 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      and re-instances the subset, so promoting a row is one command in the same change, and a
      coin-stack row for the Rewards tab (SF Symbols has no such name; the template draws
      `dollarsign.circle.fill`, its one coin glyph, and says why in TabBar.dsx).
+
+141. **A MODULE'S `config.json` HAS NO APP-SIDE OVERRIDE, so the RevenueCat SDK keys live in the
+     package** (found 2026-09-02 wiring the in-app-purchase lane). `Core/RevenueCat` reads
+     `apiKey` / `androidApiKey` from its own `config.json`; the web build folds every configured
+     package's `config.json` into `moduleConfig.byScheme` (cli/src/config.ts readModuleConfig)
+     and the native export folds the same file into `KernelTables.configByScheme` (export.ts
+     readModuleConfig) — and neither reads an override from the APP. So an adopter configuring
+     RevenueCat edits a file inside the framework checkout their `packages` list points at,
+     which is the one place a template cannot ask them to write. `App.json consts` is not the
+     answer: it publishes `dsx.const.*` to markup, and the module's Swift/Kotlin lane never
+     reads that plane. THE ASK: an app-level module-config overlay — `dsx.config.json`
+     `moduleConfig: { revenuecat: { apiKey, androidApiKey } }` for the web build and the same
+     block in `App.json` for the native exports — folded OVER the package's `config.json` by both
+     readers, so a package ships its defaults and an app supplies its values without touching
+     the package. Until then docs/monetization.md names the package path, and the Membership
+     page's purchase control refuses in one line on a build whose module has no key (the
+     module reports `no_provider`, which BuyButton prints as the store's own message).
+
+142. **THE iOS EXPORT HAD NO WAY TO SHIP A STOREKIT CONFIGURATION, so a developer could not run a
+     purchase in the simulator on day one** (found 2026-09-02; the template side is
+     `scripts/storekit.mjs` → `ShortDrama.storekit`, asserted against the live price table by
+     `npm run verify`). Xcode's StoreKit Testing needs two things the export did not produce: the
+     `.storekit` file inside the project, and a `StoreKitConfigurationFileReference` on the
+     shared scheme's LaunchAction. Without the reference the file is inert, and a developer has to
+     edit the scheme by hand after every export — which is the workaround this ledger refuses.
+     THE ASK (upstream, export.ts `exportIos` + `iosScheme`): when the project root carries a
+     `*.storekit` file, copy it into the export and point the generated scheme at it. LANDED
+     (dev@eefd4ad4): measured on this template, `ShortDrama.storekit` rides `despia export ios` and
+     the shared scheme's LaunchAction carries `StoreKitConfigurationFileReference
+     identifier="../../../ShortDrama.storekit"`.
+
+143. **NEITHER NATIVE EXPORT COULD PUT A CARD OUTSIDE THE APP: no extension target, no Glance
+     receiver, no App Group, no node registry, no widget type** (found 2026-09-02 building the
+     "Currently Watching" surface of spec §7; fixed upstream on `dev` in this pass — export.ts
+     "SNAPSHOT SURFACES"). Both framework lanes existed — `Core/Extensions/ActivityKit`
+     (`dsx.module.liveactivity.layout/start/update/end`, a LOCAL start, not push-only: the
+     OneSignal package is only the backend update channel) rendering a DSX `<activity>` document
+     in its `ActivityKitExtension`, and `Core/Widgets` (`dsx.module.widget.layout`) rendering a
+     layout in `ImageWidgetExtension` on iOS and a Glance receiver on Android — and both were
+     synthesized ONLY by `prepare_modules(.rb/_android.rb)` for Runtime.app. `dsx export ios`
+     vendored the module lanes into one app target and no `.appex`, so `liveactivity.start`
+     resolved `started: true` and nothing ever painted; the Android export named `androidManifest`
+     and `gradle.resources` as "uncarried" and shipped no receiver, and the Widgets kotlin lane
+     imported a `despia.registry.NodeCapabilities` nothing generated. Now: the iOS export reads
+     each folded package's `extensionTargets` and builds the target — its sources, its `runtime`
+     tiers' engine files (dsx_graph.rb's BOM, mirrored), `extraSources`, `capabilities.json`, an
+     asset catalog, the app's fonts + registry, a generated Info.plist and an entitlements file
+     carrying `group.<bundleId>.container`; the app target gets the group, the manifests'
+     `NSSupportsLiveActivities`, an "Embed Foundation Extensions" phase and a dependency per
+     target; an extension's `sharedSources` count as the module's own declarations in the fold's
+     refusal cascade (measured: without that line ActivityKit's app lane was REFUSED for naming
+     the attributes type its own extension declares). The Android export carries receivers,
+     resources and dependencies through the manifest fold (772ddf58) and generates
+     `NodeCapabilities.generated.kt` (fail-closed) plus the widget type resources (§6.144). SPM
+     products are not linked by an export, so `ImageWidget.swift` now compiles behind
+     `#if canImport(SVGView)` and names the gap in its error card. Measured: `xcodebuild` of the
+     exported project BUILD SUCCEEDED with both `.appex` bundles under `PlugIns/`, each carrying
+     `Fonts/`, `DSXFontRegistry.json` and `capabilities.json`.
+
+144. **THE SNAPSHOT DIALECT COULD NOT DRAW THE CARD: no picture, no link, no app face, no ground,
+     no widget document, no name** (found 2026-09-02; fixed upstream on `dev` in this pass,
+     pinned by the new corpus `OpenSource/Conformance/live-surfaces/` — links · images · type ·
+     layouts, 95 rows, executed by `LiveSurfacesConformance.swift` in the Apple-free
+     `swift_conformance_run_test.rb` lane, red on a mutated row before green, and by the Kotlin
+     twin). What StackLive rendered before: `<image symbol=>` (SF Symbols only, nothing on
+     Android), text in the platform face, no `href` anywhere, a `bg` on the root behind the
+     platform's own container material, and `layout` as a raw markup string pasted into a call.
+     Now, on both lanes: (1) `href` on any node — a relative path joins the app's OWN URL scheme
+     (`/watch/x/1` → `shortdrama://watch/x/1`, the inverse of `router/inbound.json`; an iOS
+     extension reads the scheme off the containing app's Info.plist, Android reads the `scheme`
+     the export stamps into App.json); the ROOT's href is the whole card's tap (`widgetURL`),
+     a nested href a `Link` where the family allows one. (2) `<image src= width= height= fit=>`
+     renders a file already on the device, and the module's new `images: { name: "https://…" }`
+     argument fetches each picture app-side (https only, ≤512px, into
+     `dsx.snapshot/<surface>/<name>` in the shared container) before the first frame and hands
+     the layout the path as `dsx.variable.<name>` — a widget process fetches nothing, so this is
+     the only honest shape. (3) `weight` folds words and the numeric 100…900 ramp to one class,
+     and the text is set in the registry's `default` face: the export ships the registry + faces
+     into every extension and `StackLiveType` drives a variable face's `wght`; on Android a Glance
+     text can only name a system family (`TextStyle.fontFamily` becomes a `TypefaceSpan(String)`
+     in the launcher process — decompiled from glance-appwidget 1.1.1), so the export generates
+     `res/font/<face>` + `DespiaLiveType_100…900` TextAppearances the Glance backend wears. (4)
+     the lockscreen / layout root's `bg` and `color` become the platform container's tint and
+     action-glyph colour (`activityBackgroundTint`, `containerBackground`, the Glance root box) —
+     the custom-UI law's one legal knob on each surface. (5) `<widget>` is a document root, the
+     `<activity>` grammar's twin (`StackWidgetDocument`): the first visual child is every
+     family's layout, `<small>/<medium>/<large>/<rectangular>/<circular>/<inline>` override per
+     family. (6) `layout` names a BUNDLED `.dsx` document — `Components/surfaces/NowPlaying*.dsx`
+     here, lint-checked and shipped byte-exact by both exports — so a template never pastes
+     markup into a call; `stale` seconds bound a Live Activity's freshness and `dismiss:
+     'immediate'` removes the card the moment an episode ends. The linter learned the dialect
+     too: a document rooted in `<activity>` / `<widget>` is censused against
+     `facts.json`'s snapshot tables (an attribute the surface drops in silence is an ERROR —
+     the app's `style=` habit was the first one caught), pinned by
+     `Conformance/lint/cases/web/snapshot-dialect`. TEMPLATE RULE: a snapshot document carries
+     literal colours as checked mirrors of Theme.dsx (no JSE runs there) and no `<head>` inside a
+     bare layout (every child of a bare layout renders); the surface is published from ONE part,
+     `Components/parts/NowPlayingSurface.dsx`, on episode boundaries and pause/resume only.
+
+145. **`href` WAS MISSING FROM THE ELEMENT CENSUS, so every card, row and plain-text link in this
+     app was a lint ERROR under the dev CLI** (found 2026-09-02 when `dsx export` refused the
+     project with 44 errors in 34 files: `<vstack> href=: not an attribute this element honours
+     — did you mean ref=?`; fixed upstream in this pass). The runtime honours `href` on every
+     element (Stack.swift's tap plane, the web's WIRING_ATTRS) and AGENTS.md teaches it — "href
+     containers are for cards/links whose text stays plain" — but `stack-elements.json`'s
+     `universalAttributes` never listed it, and the R9 census only knew the `button`'s. Added to
+     `generate_editor_catalog.rb` UNIVERSAL_ATTRIBUTES and the committed catalog (the generator's
+     full regeneration was NOT taken: it rewrites 2,400 lines of the committed file, which has
+     drifted from it — a separate ask). Note for the next pass: the Ruby lint gate
+     (`lint_conformance.rb`) already reports 10 drifts against the TS twin at HEAD, before any
+     of this — its `unknown-and-placement` fixture gets zero findings — so the Ruby column of the
+     lint corpus is not judging anything right now.
+
+127. **WHAT THE SNAPSHOT DIALECT STILL CANNOT SAY, and what Android does not have** (filed
+     2026-09-02, open). (a) No unified-icon element: the in-app catalog (`sf-map.json`, the
+     Boxicons paths native draws under `icons: "unified"`) is the app renderer's; a widget
+     process has no catalog and `<image symbol=>` is an SF symbol with no Android twin — so the
+     one glyph spec §7 puts in the button ("▶ Continue Watching") is a text character today, the
+     only spelling that renders identically on both lanes. THE ASK: `<image icon="play">`
+     resolved through the same catalog, drawn as a path on both snapshot backends. (b) No Live
+     Activity lane on Android: the platform twin (Android 16 Live Updates —
+     `Notification.ProgressStyle` + `setRequestPromotedOngoing`) is a separate package on the
+     framework's ledger (`Core/Extensions/LiveUpdates`); until it lands the Glance widget is the
+     Android surface of this feature and the Live Activity is iOS-only, said in
+     `NowPlayingSurface.dsx`. (c) The Glance type seam (§6.144) rides a `setTextAppearance`
+     RemoteViews call the Android agent is proving on the emulator as this entry is written; if
+     the launcher does not apply it, the widget text falls back to the platform face and this
+     entry records the measured reason. (d) `dsx.config.json packages` now fold into the native
+     exports (772ddf58) — but a project bundling premium packages needs `despia-entitlement.json`
+     before an export runs at all, so the device proof for this pass was exported from a scratch
+     copy without them; the template as committed still exports only with a licence or with
+     those five packages removed, exactly as the CLI says.
+
+124. **THE STRIPE MODULE'S ANDROID LANE DOES NOT COMPILE INSIDE AN EXPORT, and it takes the whole
+     app with it** (found 2026-09-02 building the first Android export that folds configured
+     packages, dev@772ddf58 + d88905d0). `despia export android` folded `Core/Payments/Stripe`
+     from this template's `packages` and `:app:compileDebugKotlin` failed on 24 lines of the
+     module's own lane: `StripeBridge.kt` references `FinancialConnectionsSheet`,
+     `FinancialConnectionsSheetResult` and `CollectBankAccountResult` — types in
+     `com.stripe:financial-connections`, which the manifest's `gradle.dependencies` does not
+     declare (it declares `com.stripe:stripe-android:23.17.0` only) — plus an `internal`
+     constructor (`MandateDataParams.Type.Online`) and three `ctx` references in
+     `StripeInline.kt:123` that resolve nothing. iOS is unaffected only because CocoaPods could
+     not resolve the Stripe pods either, so the iOS export REFUSED the module by name and
+     continued; Android has no such refusal for a lane that folds and then fails to compile, so
+     the export succeeded and the build died. Measured: with the Stripe path removed from
+     `packages` (a test-environment change — Stripe is the WEB lane and has no business on a
+     device) the same export builds and `store` / `revenuecat` bootstrap. THE ASKS (upstream):
+     (1) `Core/Payments/Stripe/dsx.json` declares the Financial Connections artifact it uses,
+     and the two source defects are fixed; (2) the Android export gains the iOS export's
+     discipline — a package whose lane cannot compile in this target is refused BY NAME and
+     the app still builds — or, better, a package may declare the platforms its lanes are FOR
+     (`platforms: ["web"]` for a web-only payment provider) so a web-lane module never folds
+     into a device build at all. Until then an adopter who keeps Stripe in `packages` cannot
+     build the Android export, and docs/monetization.md names the one-line workaround.
+
+128. **DEVICE IDENTITY — THE 90% PATH LANDED, AND THE ONE FRAMEWORK GAP IT NAMES** (built and
+     measured 2026-09-02). The founder's rule: most viewers never make an account, so favourites,
+     history, the wallet and restore must work on device auth alone, and the anchor must survive an
+     uninstall on iOS and Android (§6.86, the anonymous-session gap, is now CLOSED). Built:
+     `server/auth.dsx` declares a `device_identity` entity (`ownership="service"` — no viewer, signed
+     in or not, can read a device row through any client route); `Components/parts/AuthSeam.dsx` reads
+     ONE credential from the platform vault (Core/IdentityVault: iOS Keychain→iCloud, Android Block
+     Store, web AES-GCM IndexedDB + a durable 400-day cookie mirror), registers if absent, and
+     exchanges it for a **1h HS256 session** on every cold start and near expiry (one keyed timer, no
+     busy loop); `Components/parts/LinkPrompt.dsx` turns the four old guest cards into device-aware
+     LINK invitations whose copy reads the vault's own durability plane. A real sign-in auto-links the
+     device (`POST /auth/link`) and MERGES the guest data into the account.
+     THE TRUST CHAIN, measured against the founder's constraints: the secret is SERVER-generated
+     (`randomBytes(32)`), returned once, stored only as `sha256`; the exchange is timing-safe
+     (`crypto.timingSafeEqual`, a fixed dummy hash on an unknown deviceId, so it is no existence
+     oracle); the session carries a UUID `sub` and a `kind` and NEVER a `role` (probed: a device
+     session gets the prober's 404 at `/internal/admin/*`); the merge sums two wallets SERVER-SIDE
+     under an exactly-once `merge` ledger row (`dsx_ledger_merge_once`) — probed: 250+100 coins,
+     30+30 bonus, ONE marker, and a replayed link folds nothing twice. `npm run verify` gained a
+     15-assertion "device identity" section; the web flow is Playwright-proven end to end (cold load
+     mints a session, the credential persists in the 400-day cookie, a return visit EXCHANGES rather
+     than re-registers, the My List link card renders with the web durability copy, all custom DSX —
+     no native dialog).
+     THE GAP, NAMED NOT WORKED AROUND (the code tags it §6.128): the mint/link endpoints are the PROVIDER,
+     served by `scripts/serve.mjs` beside `/dev-session.json`, because a session comes from the
+     provider and never from `server/*.dsx` (docs/auth.md §1) — AND because it CANNOT be a declared
+     action even if wanted. Measured: a declared body reaches the database only user-scoped
+     (`repo.ts`), and `repoFor().create` throws `forbidden` for a caller with no identity, which every
+     public registration is; and this store needs SERVICE authority `serviceRepo()` never grants a
+     declared action. So the declared server lane has no way to express a public route that writes
+     with service authority — the same missing word (§6.7 / §6.2) that keeps the `/internal/admin/*`
+     twins in the provider. THE ASK (upstream): a declared, gate-controlled way for a public route to
+     write service-scoped rows (a device-registration endpoint), so this whole lane can move from the
+     provider origin into `server/auth.dsx` and ship on the hosted lane unchanged. Until then an
+     adopter re-implements the four endpoints in their IdP or a thin exchange service, exactly where
+     `docs/auth.md` §1 says identity decisions belong.
+     RESOLVED BY THE FRAMEWORK THIS PASS, and now depended on: §6.82's ask (a crypto/HMAC seam on the
+     declared server lane) LANDED as `packages/server/src/crypto-seam.ts` (dev@cefa1233 · 05adf0d9) —
+     `dsx.module.crypto.{randomToken,sha256,hmacSha256,jwtSign,equals}`, with `jwtSign` refusing a
+     `role`/`app_metadata.role` claim from a public route. This template's device provider signs with
+     `node:crypto` (it lives in the node origin, like `dev-session.mjs`), so it does not need the
+     declared verbs — but an adopter implementing device auth INSIDE the declared backend does, and
+     they exist now. The IdentityVault export fold also LANDED (dev@772ddf58): `has('identityvault')`
+     is true on iOS and Android, so the durability lane is real on device and `AuthSeam` keys its
+     fallback on the vault answering rather than on `os`. Premium packages make the native export
+     refuse without a local unsigned `despia-entitlement.json` (never committed) — named in
+     docs/auth.md and documented in docs/monetization.md.
+
+137. **AN ABSOLUTE BOX PINNED AT BOTH EDGES WAS PROPOSED THE BASE'S FULL WIDTH ON iOS, so its
+     trailing content painted past the host and was clipped** (found 2026-09-02 building the
+     reference home's poster cell; fixed in `OpenSource/Engine/iOS/Stack.swift`). CSS resolves
+     `position: absolute; left: 6px; right: 6px` to `width = containing block − 12`, anchored 6
+     in from the left, and both the web and the Compose bridge draw exactly that. The SwiftUI
+     overlay lane read the pair only as "not shrink-to-fit" (`StackAbsolutePlane.shrinkAxes`):
+     the child was proposed the BASE's width and then slid by `left`, so a bottom row on a
+     116pt cell spanned 6 → 122 and the play count read "5.4N" on the iPhone 17 Pro while the
+     same markup read "5.4M" on the web and the API 36 phone. `StackAbsolutePlane.pinnedInsets`
+     now names a pinned axis, and `attachAbsolute` pays the pair as PADDING inside a full-size
+     frame (`base − lead − trail` from `lead`) instead of an offset; every other spelling —
+     one edge, an explicit size, `grow` — keeps the shrink-to-fit + offset path unchanged.
+     STILL OPEN: no corpus pins the absolute plane's SIZING on any lane (the plane's own comment
+     cites a measurement, not a row). The ask is a `style-semantics/absolute-insets.json` —
+     one edge / both edges / explicit width, per axis — executed by the three runners the
+     per-edge border corpus already has (§6.118b), so the next divergence is red before it ships.
+
+138. **A `<sheet>` THAT DRAWS ITS OWN HEADING HAD NO ACCESSIBLE NAME** (found 2026-09-02; web
+     half fixed `despia-framework dev@4fd3b2a7`). The reference's coming-soon and permission
+     sheets (docs/design/reference-ui-spec.md §2a, §2b) carry no header row — an illustration,
+     then the words — so they declare no `title=`, and the web panel's `aria-labelledby` pointed
+     at an EMPTY `h2`: a dialog with no name, the nested one at level 2 of a stack. `title=`
+     is not the answer there (it renders the built-in chrome the design does not have), so the
+     universal `a11yLabel=` now names the panel on the web (`aria-label`, `aria-labelledby`
+     removed; `title=` still wins when both are declared). Measured: the two panels announce
+     "The Runaway Bride of the Crown Prince" and "Turn on notifications". THE ASKS: (1) the
+     native halves — `Sheet.swift` reads `dsx.string("a11yLabel")` and applies
+     `.accessibilityLabel` to the presented slot when `title` is empty; the Compose sheet the
+     same through `semantics { contentDescription }`; (2) the lint note §6.95 asked for, widened:
+     a stacked child with NEITHER `title=` NOR `a11yLabel=` is an unnamed level-2 dialog.
+
+139. **`localpush.send` ON THE WEB RESOLVES `ok: true` FOR A DELAY THE PAGE CANNOT KEEP, and the
+     capability plane has no word for the difference** (found 2026-09-02 building Remind Me,
+     spec §2b). The module is honest about recurrence — `cronjob`/`skip` are narrowed off the web
+     lane because "arming a seven-day setTimeout would resolve ok:true for a reminder that can
+     never arrive" — but `send` stays on it with exactly that horizon: the facet arms a page-side
+     timer, so a premiere nine days out resolves `{ ok: true, delayInSeconds: 777600 }` and fires
+     for nobody. `has('localpush')` therefore answers "the scheduler is in this build" on every
+     lane and cannot answer "it outlives the page", which is the question a reminder asks. The
+     template asks the capability first and the platform second (AGENTS.md): on the web it
+     records the server row (server/reminders.dsx) and does not arm the timer, and the toast says
+     so — "This browser cannot schedule a notification days ahead" — rather than reporting a
+     success it did not earn. THE ASK: a module-level fact a screen can read (`horizon` /
+     `persistent: false` on the web facet, or `send` refusing past a page-honest bound of a few
+     minutes with a named error), so the decision moves out of an `os ==` branch. THE OTHER HALF
+     OF THIS LANE is §6.115: Core/LocalPush and Core/Notify reach the web build from `packages`
+     and no device build yet, so `has('localpush')` / `has('notify')` are false on a phone and
+     the permission sheet's confirm degrades to the server row with the toast naming it.
+
+140. **A NEW ICON ROW NEEDS A FONT THE REPO DOES NOT CARRY** (found 2026-09-02; the rows landed
+     `despia-framework dev@b79bc85c`). The reference's Explore tab is a play triangle in a
+     circle — `play.circle` / `play.circle.fill`, real SF names the shared catalog never had.
+     A full row pins a Material codepoint that the bundled Android subset font must cover
+     (`FontSubsetTest` fails the build otherwise), and regenerating that subset needs the 10 MB
+     variable font, which lives outside the repo (`_subset_provenance`). The two rows sit in
+     `icons` with the web path and the unicode fallback and NO codepoint — legal to every reader,
+     drawn by the unified lane on all three renderers, the SF name on iOS platform mode, the
+     fallback glyph on Android platform mode — and the catalog's `_vector_only_rows` note says
+     so. THE ASK: an `icons:subset` script that fetches the variable font by pinned URL + hash
+     and re-instances the subset, so promoting a row is one command in the same change, and a
+     coin-stack row for the Rewards tab (SF Symbols has no such name; the template draws
+     `dollarsign.circle.fill`, its one coin glyph, and says why in TabBar.dsx).
+
+132. **THE PLAYER'S OPTION SHEETS NEEDED WHAT THE STREAM CARRIES, AND `<video>` COULD NOT SAY IT**
+     (found 2026-09-02 building the reference player, docs/design/reference-ui-spec.md §3a/§3d;
+     RESOLVED upstream the same day — dev@912ebda0 iOS · 05d8872b Android · 5ee05a9d the web HLS
+     lane · 5ef01167 the web facts, the long-press pair and the MIME rows · 5a7aa8c4 the index).
+     Before: `<video>` had `subtitles` (a bool — "the platform's preferred-language legible
+     option") and `speed`, and nothing else: no track list, no rendition ladder, no way to pick a
+     language or pin a height, no cue text. So "Subtitles · 日本語 ›" and "Video Quality ·
+     Auto(720p) ›" — two rows of the reference's More sheet — were unreachable by any markup, and
+     the previous player honestly shipped the Quality row as a disabled readout (§6.36).
+     After: `subtitle="<bcp47>|off"` picks a legible track BY TAG (exact, then primary language,
+     else nothing — never the platform default), `quality="auto|<height>"` CAPS the ladder
+     (largest rung at or under; the floor when nothing fits), and four published facts —
+     `tracks` [{lang,label}] · `variants` [{height,bitrate}] · `resolution` (the height rendering
+     now) · `cue` (the active cue's text, trimmed) — with the choice made by ONE renderer-neutral
+     core, `Conformance/media/playback-selection.json` (51 cases + 11 invariants; TS
+     `kernel/src/playback-core.ts`, Kotlin `:core PlaybackCore`, Swift `Engine/iOS/PlaybackCore.swift`,
+     three runners green). `cue` BOUND suppresses the platform's own subtitle drawing
+     (AVPlayerItemLegibleOutput `suppressesPlayerRendering`, ExoPlayer's SubtitleView GONE, the web
+     track at `hidden`) so the app draws the line in its own type at 58% of the stage — the
+     custom-UI law (spec §−1): the same pixels on three lanes.
+     THE WEB HAD NO HLS. An `.m3u8` src is the one container that carries both lists on every
+     lane; measured on Chromium, the element played the master NATIVELY (`canPlayType` answers
+     "maybe" on current builds) and exposed no text track and no ladder — both sheets read empty
+     with playback fine, the worst kind of silent. `dom/src/hls-lite.ts` is the framework's own
+     dependency-free MSE lane (VOD fMP4 ladders + WebVTT renditions, adaptive with a pin, query
+     inheritance so a tokenized grant rides the whole tree), taken wherever `MediaSource` exists;
+     only a browser with no MSE (iPhone Safari) keeps the native pipeline. `content-type.ts`
+     learned `.m3u8 / .m4s / .ts / .vtt` — an octet-stream playlist is "not a playlist" to
+     AVPlayer and ExoPlayer.
+     THE TEMPLATE SIDE: `scripts/gen-hls.mjs` (ffmpeg; 360p · 240p · 144p, honest to the 360p
+     masters, and ten WebVTT renditions in the §3d languages; a source with no audio gets a
+     video-only CODECS — measured, "Initialization segment misses expected aac track" when the
+     master promised AAC the silent clips never had), `scripts/serve.mjs` gates an HLS episode's
+     whole DIRECTORY as one grant and TOKENIZES every playlist it serves (child URIs inherit
+     `?ep&ticket` — no native player carries a query onto playlist children), and the seed points
+     every episode at the master. Measured on web (390×844, Chromium): More sheet rows 52pt with
+     `Playback Speed · 1.0x › · Subtitles · Off › · Video Quality · Auto(360p) › · Mini View (PIP
+     mode) 👑 · toggle · Report`; Subtitles sheet = Off ✓ + the ten endonyms; picking 日本語 →
+     the element's track reads `ja:hidden` with 2 cues and the app-drawn line "日本語 · Demo"
+     sits on the stage; Quality = Auto(360p) · 360p · 240p · 144p; a hold → `playbackRate` 2 +
+     the "2.0x ▶▶" overlay with the chrome at opacity 0, release → 1. RIDER: the pager mounts one
+     MSE session per preloaded page (five masters fetched on entry) — the warm-asset contract,
+     unchanged in kind from the MP4 days; a lighter preload (master only until activation) is a
+     follow-up for hls-lite.ts.
+
+133. **THE LONG-PRESS LIFECYCLE EXISTED ON TWO LANES AND NOT THE THIRD** (found 2026-09-02;
+     fixed dev@5ef01167). Pressable.swift and StackPressable.kt run `on:longPress` (0.4 s) +
+     `on:longPressEnd` (lift or cancel after a recognized hold — Conformance/elements/pressable.json);
+     the web `mount.ts` had only the lowercase one-shot `on:longpress` at 500 ms with no end, so a
+     "hold for 2×, release to restore" that every phone releases would have held 2× forever in the
+     browser. Both spellings ride one recognizer now; the camel pair takes the corpus number, the
+     lowercase word keeps its 500 ms. TWO TEMPLATE RULES FROM THE SAME AFTERNOON, both measured:
+     (1) the stage gesture surface is a `<pressable>` as a zstack LAYER inside the pager page —
+     `position: absolute; inset: 0` resolved against the viewport (the button measured 390×844,
+     not the page) and is not a page overlay on any lane; a `width/height: 100%` grid child is;
+     (2) the chrome's bottom row is `pointer-events: none` with only its CONTROLS at `auto`: the
+     row is as tall as the rail plus its 170pt clearance, sat over the middle of the clip, and
+     swallowed every tap and hold meant for the stage (elementFromPoint at the clip's centre
+     answered the hstack, and the hold probe read rate 1 / overlay false until it was fixed).
+
+134. **A NESTED SHEET'S TITLE CHROME PAINTS THE LIGHT THEME'S INK ON THE APP'S DARK SHEET** — an
+     ENGINE LEAK under `design: "custom"` (found 2026-09-02, web; reported to the custom-design
+     audit, not worked around). A level-2 `<sheet title="Subtitles" background="#141414">` draws
+     its title as an `h2` with computed `color: rgb(23, 23, 27)` — the light theme's label ink on
+     the app's own near-black panel — so the reference's 20-bold sheet title is INVISIBLE
+     (scratchpad shot `web-subtitles.png`: a faint "Subtitles" ghost above the × control). The
+     sheet chrome must take its ink from the sheet's own `background` (or the app's ink token),
+     exactly as the grabber and the close control already do. Meanwhile the back row ("‹ More")
+     names the level for a sighted reader and the a11y name is intact (§6.129), so nothing is
+     lost but the title's pixels — which are the founder's whole point.
+
+135. **THE COMMENT THREAD AND ITS APP STORE 1.2 SAFETY SET LOST THEIR ONLY SURFACE** (a hand-over,
+     2026-09-02). The reference player's rail is Save · Episodes · Share · More, and the founder
+     asked for it 1:1, so the comments item and the three-pane sheet (thread · report/block ·
+     safety and filters) left Components/Watch.dsx. `server/social.dsx` and its routes are
+     untouched — `npm run verify` still posts, filters, reports, blocks and deletes through them —
+     and the More sheet's Report row now files against the EPISODE (`reportEpisode`,
+     `/social/report/episode`, `kind: 'episode'`, one report per reporter per episode under the
+     existing partial unique index). The thread UI needs a home before ship: the show page is the
+     natural one (below the episode grid), and the old Watch.dsx at 020ae1d is the reference
+     implementation to lift (three panes in ONE sheet, optimistic hide, the receipt line). Two
+     smaller facts from the same pass: a "(Completed)" suffix on the last range chip is a
+     catalogue fact (`show.status`) no server sends today, so the chip prints the range alone;
+     and `setTimeout(fn, ms, key)` IS in the JSE builtin table (jse.md) — the AdGate comment
+     saying DSX has no timer primitive predates it, and the player's 1.5 s toast rides it.
+
+136. **THE ELEMENT CENSUS IS A GENERATED FILE THE GENERATOR CANNOT REPRODUCE** (found 2026-09-02).
+     `stack-elements.json` says "GENERATED by generate_editor_catalog.rb — DO NOT EDIT BY HAND",
+     and running that generator DROPPED `href`, `chrome`, `dismissEdge`, `lockOrientation` and the
+     four `shared*` universal attributes (added by hand since the last generation): the linter
+     then refused 44 attributes across this template's own parts. The six `<video>` rows were
+     added by hand (the only way the file accepts them today) and the file was overwritten once
+     more by a concurrent session before they were committed. THE ASK: the generator learns the
+     universal-attribute set from the same source the runtime reads, so a regeneration is safe —
+     until then every row addition is a hand edit, and the file is committed before anything else.
+
+125. **`has('store')` READS FALSE ON A DEVICE WHOSE REGISTRY JUST BOOTSTRAPPED `store`** (measured
+     2026-09-02 on the iPhone 17 Pro simulator, twice — this pass's export from a clean
+     HEAD+d88905d0 kernel, and the Home agent's build from the shared tree — and on the
+     Pixel_10_Pro emulator). The console says `[ModuleRegistry] Bootstrapped 6 plugin(s):
+     ["consent", "getpurchasehistory", "posthog", "revenuecat", "route", "store"]` (Android: 11,
+     `store` and `revenuecat` among them, then `[RevenueCat] Android API key is empty - SDK not
+     initialised`), the app renders the Membership page with the catalogue's three plans, and the
+     purchase control prints its `blocked` line — "In-app purchases are not available in this
+     build" — which is `has('store')` false with `os != 'web'`. `has()` is
+     `ModuleRegistry.shared.isAvailable(scheme)` (Engine/iOS/Context.swift:507, JSE.swift:2358),
+     which is `routes.keys.contains(scheme)` (Engine/iOS/Module.swift:150) — a module is
+     "available" once it has REGISTERED AN ACTION under its scheme, and the bootstrap message lists
+     the classes the tables named, not the schemes with routes. So the two facts can disagree: a
+     premium-shelf module the runtime licence refuses to activate (the export ran under an
+     UNSIGNED entitlement — "the runtime licence module decides"), or a module registering its
+     actions lazily, bootstraps by name and never fills `routes`. Not isolated further in this pass
+     (the console carries no licence line at all, which is itself the finding: a refusal that says
+     nothing is a refusal nobody can act on). THE ASK: (1) the registry logs WHY a bootstrapped
+     module has no routes — licence refused, deferred, or the module registered none — once, at
+     bootstrap; (2) `isAvailable` and the bootstrap list answer from one set. The template side is
+     correct and stays: the control refuses in one line and charges nothing, exactly the designed
+     `blocked` state (Components/parts/BuyButton.dsx).
+
+126. **TWO FILE COMPONENTS RENDER NOTHING ON ANDROID INSIDE THE MEMBERSHIP PAGE** (measured
+     2026-09-02, Pixel_10_Pro emulator, the export above). `/membership` on Android paints the
+     nav row, three EMPTY card frames where `<PlanCard>` is the `<list>` row template, the three
+     benefit rows (plain markup — correct), and then NOTHING where the `<vstack visible-if="phase
+     == 'content'">` holding `<BuyButton>` and two plain `<text>` footnotes should be; iOS paints
+     every one of them. The catalogue arrived (three frames), the phase was `content` (the plan
+     list and the benefit list rendered), and logcat carries no exception, no "unresolved
+     component" and no line naming either part — the Android instance log does not name
+     components at all, which is the second finding here. Plain component mounts DO render on
+     Android (`<TabBar>`, `<AdGate>`, `<TopNav>` on other screens), so the shape to probe is a FILE
+     component as a repeater row (`item.*` into its attributes) and a component mounted inside a
+     `visible-if` subtree beside plain siblings. Filed as measured, not yet isolated (the shared
+     emulator was taken over by another app's ANR before a second capture); a throwaway probe
+     (AGENTS.md "probe before you generalise") is the next step.
+
+128. **A PART'S BOUND ATTRIBUTES WERE INVISIBLE TO ITS OWN LOGIC TIER ON iOS: a `<watch>`, a
+     computed or an `<action>` reading `dsx.attribute.x` got the declared DEFAULT** (found
+     2026-09-02 wiring `Components/parts/NowPlayingSurface.dsx`; fixed upstream on `dev` in this
+     pass, `Stack.swift` StackComponentInstanceHost). Measured on the iPhone 17 Pro simulator with
+     two probes side by side: the player's own action logged `cur: 1, showId: <id>, title: …,
+     locked: false` while the part mounted with `idx="{{ dsx.variable.cur }}"` logged `rawIdx: 1`
+     from its `on:appear` and `rawIdx: 0` — `default="0"` — from the very next watch. The
+     mechanism: a mount's attributes ride the RENDER scope (`item:`), so markup interpolations
+     read them live, but JSE's `attribute.*` lookup falls from `item` to the store's
+     `dsx.attribute` dict and then to the defaults — and the iOS instance store never seeded that
+     dict (the web seeds it and re-seeds it per attribute effect in `mount.ts`; Android seeds a
+     FRAME's in `RouterHost.kt` and, as of this entry, not a component instance's either — the
+     Android agent has the twin). The instance store now carries `dsx.attribute` from birth and is
+     re-seeded after every consumer re-render that changed a value, so the three tiers read one
+     truth. TEMPLATE RULE, unchanged: a part reacts to its attributes through a `<watch>` over ONE
+     computed key — that idiom was right; the engine was not.
+
+141. **AN ABSOLUTE BOX ON AN UNPINNED AXIS WAS CLAMPED TO ITS HOST'S SIZE ON ANDROID, so a badge
+     wider than the box it decorates truncated its own label** (found 2026-09-02 on the tab bar's
+     coin callout; fixed in `OpenSource/Engine/Android/render/.../StackNodeView.kt AbsoluteHost`).
+     The Compose plane measures every layer inside a pane that matches the host's size, and a
+     `Box` hands its child that pane's MAX constraint — correct for a pinned axis (both edges →
+     span), wrong for an unpinned one: CSS measures an absolute box at max-content there and lets
+     it overflow its containing block (the VIP-dot-past-the-corner law the plane's own header
+     states). Measured on the API 36 phone: the callout `left: 14px; top: -11px` over the 24pt
+     glyph box rendered `…` where iOS (`.fixedSize`) and the web read `+165`. The layer now
+     measures `wrapContentWidth/Height(unbounded = true)` on each unpinned axis, overflowing away
+     from the anchored edge (Start for a `left` anchor, End for `right`; Top/Bottom likewise), and
+     the pinned case keeps its span. Same corpus ask as §6.137: the absolute plane's SIZING has no
+     row on any lane, and the two divergences found in one day (iOS over-wide when pinned, Android
+     under-wide when free) are exactly what an `absolute-insets.json` would have caught.

@@ -1,0 +1,270 @@
+<!-- Membership — the plan page (docs/design/reference-ui-spec.md §6), pushed from the crown,
+     the player's unlock pill and every "see plans" door in the app. Three plan cards from
+     the store catalogue with the selected one outlined; the benefit rows; the gold CTA
+     carrying the selected plan's price; a footnote saying exactly what the plan is; and
+     Restore · Terms of Use · Privacy Policy under it.
+
+     THE PURCHASE IS REAL ON EVERY LANE, and this screen never touches money itself.
+     <BuyButton> owns the sequence (Components/parts/BuyButton.dsx) — Core/Store `checkout`
+     through the RevenueCat provider on a device, Stripe on the web — and the entitlement is
+     granted SERVER-side either way (server/store.dsx). This page selects, prices, explains.
+
+     PRICES ARE THE STORE'S. On a device the cards show the localized price StoreKit or Play
+     Billing returns for each product id (`store.catalog`), because that is the number the
+     purchase sheet will show; the server's list price is the fallback and the web's answer.
+     Periods, notes, the reference price and the "% OFF" arithmetic come from the same
+     catalogue row the purchase is granted from — the price list is ONE table (§6.107).
+
+     WHAT A PLAN IS, SAID WHERE THE PRICE IS. Every plan here is a dated pass — one charge,
+     no auto-renewal — because that is what the backend grants (server/store.dsx, the price
+     table header). The reference app's footnote reads "Auto-Renewal"; this one prints the
+     server's own note for the selected row, so the page cannot describe a product the
+     server does not sell. -->
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <expects variable="nav"/>
+
+    <api as="catalog" url="/store/catalog" on:success="dsx.action.catalogLanded()"/>
+    <!-- the seam owns the token (<AuthSeam/> at the foot); every authenticated read is gated
+         on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
+    <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
+
+    <variable as="sel">return ''</variable>        <!-- the tapped plan; empty = the default (the first row) -->
+    <variable as="prices">return {}</variable>     <!-- productId -> localized price string, from the store -->
+    <variable as="toast">return ''</variable>
+
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the last good
+         payload lives app-wide and is the FIRST PAINT while the refetch runs -->
+    <variable as="catalogView" computed="true">
+      if (catalog.data != null) { return catalog.data }
+      return global.cacheCatalog
+    </variable>
+    <variable as="walletView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
+      if (wallet.data != null) { return wallet.data }
+      return global.cacheWallet
+    </variable>
+    <variable as="tiers" computed="true">
+      const c = dsx.variable.catalogView
+      if (c == null) { return [] }
+      if (c.vip == null) { return [] }
+      return c.vip
+    </variable>
+    <!-- an error branch must also test the view is empty: a failed refresh never throws a
+         dead end over good content (AGENTS.md) -->
+    <variable as="phase" computed="true">
+      if (catalog.error != null &amp;&amp; dsx.variable.catalogView == null) { return 'error' }
+      if (dsx.variable.catalogView == null) { return 'loading' }
+      return 'content'
+    </variable>
+    <variable as="selId" computed="true">
+      if (dsx.variable.sel != '') { return dsx.variable.sel }
+      const t = dsx.variable.tiers
+      if (t.length == 0) { return '' }
+      return t[0].id
+    </variable>
+    <variable as="selTier" computed="true">
+      for (const t of dsx.variable.tiers) { if (t.id == dsx.variable.selId) { return t } }
+      return null
+    </variable>
+    <variable as="selProductId" computed="true">
+      const t = dsx.variable.selTier
+      if (t == null) { return '' }
+      return t.productId == null ? t.id : t.productId
+    </variable>
+    <variable as="selPrice" computed="true">
+      const t = dsx.variable.selTier
+      if (t == null) { return '' }
+      const m = dsx.variable.prices
+      const pid = t.productId == null ? t.id : t.productId
+      if (m != null &amp;&amp; m[pid] != null) { return m[pid] }
+      return t.price
+    </variable>
+    <variable as="selLabel" computed="true">
+      const t = dsx.variable.selTier
+      return t == null ? '' : t.label
+    </variable>
+    <variable as="selNote" computed="true">
+      const t = dsx.variable.selTier
+      return t == null ? '' : t.note
+    </variable>
+    <variable as="isVip" computed="true">
+      if (dsx.variable.walletView == null) { return false }
+      return dsx.variable.walletView.vip === true
+    </variable>
+    <variable as="vipUntil" computed="true">
+      if (dsx.variable.walletView == null || dsx.variable.walletView.vipUntil == null) { return '' }
+      return shortDate(dsx.variable.walletView.vipUntil)
+    </variable>
+    <!-- the verb on the CTA goes through localize() so the string table reaches it: a
+         component attribute is not a display point the extractor reads (scripts/strings.mjs) -->
+    <variable as="ctaLabel" computed="true">
+      if (dsx.variable.isVip) { return localize('Add days for') }
+      return localize('Unlock for')
+    </variable>
+    <!-- the benefit rows are the ONE paid promise, read from the global library rather than
+         copied (Components/parts/Theme.dsx vipBenefits) -->
+    <variable as="benefits" computed="true">return vipBenefits()</variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
+    <!-- a purchase column, capped like a form: the plan cards are a decision, not a grid -->
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 560)</variable>
+
+    <!-- the price a row displays: the store's localized string when the build asked one,
+         else the server's list price. Read by BARE NAME inside the repeater (AGENTS.md). -->
+    <formula as="planPrice" pid="item.productId" listed="item.price">
+      const m = dsx.variable.prices
+      if (m != null &amp;&amp; pid != null &amp;&amp; m[pid] != null) { return m[pid] }
+      return listed
+    </formula>
+
+    <action as="goBack">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/' }) }
+    </action>
+    <action as="pick" id="id">
+      dsx.variable.sel = id
+    </action>
+    <!-- the catalogue landed: stash it app-wide (one key per ENDPOINT), then ask the store
+         for the localized prices of the products it names -->
+    <action as="catalogLanded">
+      global.cacheCatalog = catalog.data
+      dsx.action.loadPrices()
+    </action>
+    <!-- LOCALIZED PRICES, from the store, on a build that has one. `store.catalog` answers
+         the unified product shape: `price.formatted` is the string the purchase sheet shows.
+         An unreachable store answers ok:false (network_unavailable) and the list prices stay. -->
+    <action as="loadPrices">
+      if (!has('store')) { return }
+      const t = dsx.variable.tiers
+      if (t.length == 0) { return }
+      const ids = []
+      for (const row of t) { ids.push(row.productId == null ? row.id : row.productId) }
+      const r = await dsx.module.store.catalog({ provider: 'revenuecat', product: ids })
+      if (r == null || r.ok === false || r.products == null) { return }
+      const map = {}
+      for (const p of r.products) {
+        if (p.id != null && p.price != null && p.price.formatted != null) { map[p.id] = p.price.formatted }
+      }
+      dsx.variable.prices = map
+    </action>
+    <action as="bought" kind="kind" days="days">
+      wallet.refresh()
+      dsx.variable.toast = 'VIP is active. Every episode is unlocked.'
+    </action>
+    <action as="buyFailed" message="message">
+      dsx.variable.toast = message
+    </action>
+
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
+    <style as="scroller" alignItems="stretch"/>
+    <style as="page" spacing="0" paddingBottom="34" alignItems="stretch"/>
+    <style as="navRow" alignItems="center" minHeight="44" paddingTop="8" paddingBottom="8"/>
+    <style as="navBtn" width="44" minHeight="44" alignItems="center"/>
+    <style as="navTitle" fontSize="17" fontWeight="semibold" color="#FFFFFF" textAlign="center"/>
+    <style as="statusPill" background="rgba(246,182,61,0.16)" radius="14" paddingH="14" paddingV="8" spacing="6" alignItems="center"/>
+    <style as="statusTxt" fontSize="13" fontWeight="semibold" color="#F6B63D"/>
+    <style as="h2" fontSize="17" fontWeight="bold" color="#FFFFFF" paddingTop="24" paddingBottom="14"/>
+    <style as="benefitRow" spacing="12" alignItems="center" paddingBottom="14"/>
+    <style as="benefitTile" width="36" height="36" radius="8" background="#2C2C2E" alignItems="center"/>
+    <style as="benefitLabel" fontSize="15" color="#FFFFFF"/>
+    <style as="foot" fontSize="12" color="#8E8E93" textAlign="center" lineSpacing="4"/>
+    <style as="footRow" spacing="4" alignItems="center" paddingTop="4"/>
+    <style as="linksRow" spacing="8" alignItems="center" paddingTop="8"/>
+    <style as="errCard" background="#141414" radius="12" spacing="10" paddingH="16" paddingV="20" alignItems="center"/>
+    <style as="errTxt" fontSize="15" color="#FFFFFF"/>
+    <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
+    <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
+  </head>
+
+  <!-- the design vocabulary registers here. FIRST CHILD, always (Components/parts/Theme.dsx). -->
+  <Theme/>
+  <!-- the funnel (Components/parts/Analytics.dsx) -->
+  <Analytics/>
+  <scroll class="scroller" grow="true" style="flex: 1; min-height: 0">
+    <vstack class="page">
+      <!-- a pushed route on every width: the wide lane keeps the bar above a centred column -->
+      <TopNav active="" visible-if="dsx.variable.wide"/>
+
+      <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+        <!-- the nav row: back chevron leading, the title CENTRED, a blank 44pt slot trailing
+             so the title sits on the true centre -->
+        <hstack class="navRow">
+          <vstack class="navBtn" style="justify-content: center" on:tap="dsx.action.goBack()"
+                  a11yTrait="button" a11yLabel="Back">
+            <image icon="chevron.backward" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
+          </vstack>
+          <text value="Membership" class="navTitle" grow="width" style="flex: 1; min-width: 0"/>
+          <stack class="navBtn"/>
+        </hstack>
+
+        <!-- a member is told so, with the date the server holds -->
+        <hstack class="statusPill" visible-if="dsx.variable.isVip" style="align-self: center">
+          <image icon="crown.fill" iconSize="13" color="{{ gold() }}" a11yHidden="true"/>
+          <text value="{{ dsx.variable.vipUntil == '' ? 'VIP is active' : 'VIP is active until' }}" class="statusTxt"/>
+          <text value="{{ dsx.variable.vipUntil }}" class="statusTxt" visible-if="dsx.variable.vipUntil != ''"/>
+        </hstack>
+
+        <!-- loading: the shapes the cards will land in -->
+        <vstack spacing="10" alignItems="stretch" paddingTop="8" visible-if="dsx.variable.phase == 'loading'">
+          <Skeleton height="108" radius="12"/>
+          <Skeleton height="108" radius="12"/>
+          <Skeleton height="108" radius="12"/>
+        </vstack>
+        <vstack class="errCard" visible-if="dsx.variable.phase == 'error'">
+          <text value="Plans could not be loaded." class="errTxt"/>
+          <button label="Retry" class="retryBtn" on:tap="catalog.refresh()"/>
+        </vstack>
+
+        <!-- THE PLANS: one row template, every fact from the catalogue row, the selection
+             echoed back as an event -->
+        <list bind="dsx.variable.tiers" key="id" scroll="false" spacing="10" paddingTop="8"
+              visible-if="dsx.variable.phase == 'content'">
+          <PlanCard id="{{ item.id }}" label="{{ item.label }}" price="{{ planPrice }}" period="{{ item.period }}"
+                    refPrice="{{ item.refPrice }}" off="{{ item.off }}" note="{{ item.note }}"
+                    selected="{{ item.id == dsx.variable.selId }}" on:pick="dsx.action.pick()"/>
+        </list>
+
+        <!-- the benefit rows — each one a thing server/*.dsx actually grants -->
+        <text value="Membership Rewards" class="h2"/>
+        <list bind="dsx.variable.benefits" key="id" scroll="false" spacing="0">
+          <hstack class="benefitRow">
+            <vstack class="benefitTile" style="justify-content: center">
+              <image icon="{{ item.icon }}" iconSize="18" color="#FFFFFF" a11yHidden="true"/>
+            </vstack>
+            <text value="{{ item.label }}" class="benefitLabel" grow="width" style="flex: 1; min-width: 0"/>
+          </hstack>
+        </list>
+
+        <!-- THE CTA and everything a store reviewer looks for under it -->
+        <vstack spacing="8" alignItems="stretch" paddingTop="10" visible-if="dsx.variable.phase == 'content'">
+          <BuyButton sku="{{ dsx.variable.selId }}" productId="{{ dsx.variable.selProductId }}" kind="vip"
+                     label="{{ dsx.variable.ctaLabel }}" price="{{ dsx.variable.selPrice }}"
+                     variant="gold" surface="membership"
+                     on:purchased="dsx.action.bought()" on:failed="dsx.action.buyFailed()"/>
+          <hstack class="footRow" style="justify-content: center; flex-wrap: wrap">
+            <text value="Selected plan:" class="foot"/>
+            <text value="{{ dsx.variable.selLabel }}" class="foot"/>
+          </hstack>
+          <text value="{{ dsx.variable.selNote }}" class="foot"/>
+          <hstack class="linksRow" style="justify-content: center; flex-wrap: wrap">
+            <RestoreRow variant="link" on:restored="wallet.refresh()"/>
+            <text value="·" class="foot"/>
+            <LegalLinks variant="links"/>
+          </hstack>
+        </vstack>
+      </vstack>
+    </vstack>
+  </scroll>
+
+  <!-- THE TOAST LIVES OUTSIDE THE SCROLL, pinned at the foot on every renderer -->
+  <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
+    <text value="{{ dsx.variable.toast }}" class="toastLine" grow="width" style="flex: 1"/>
+    <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
+           a11yLabel="Dismiss message" a11yTrait="button"/>
+  </hstack>
+  <!-- NO TAB BAR: a pushed route is full-bleed with a back affordance (PLAN.md §6.29) -->
+  <AuthSeam/>
+</vstack>

@@ -34,7 +34,9 @@
      nothing until it is answerable. Filed for PLAN.md §6 as the SSR-consts ask. -->
 <vstack spacing="0" alignItems="stretch">
   <head>
-    <!-- line: one compact sentence for a purchase sheet · rows: tappable settings rows -->
+    <!-- line: one compact sentence for a purchase sheet · rows: tappable settings rows ·
+         links: the bare pair (Terms of Use · Privacy Policy) for a footer that already has
+         its own sentence — the Membership page's "Restore · Terms of Use · Privacy Policy" -->
     <attribute as="variant" default="'rows'"/>
 
     <variable as="terms" computed="true">
@@ -51,6 +53,7 @@
     </variable>
     <variable as="constsKnown" computed="true">return dsx.const != null</variable>
     <variable as="isLine" computed="true">return dsx.attribute.variant == 'line'</variable>
+    <variable as="isLinks" computed="true">return dsx.attribute.variant == 'links'</variable>
     <variable as="bothSet" computed="true">
       return dsx.variable.terms != '' &amp;&amp; dsx.variable.privacy != ''
     </variable>
@@ -87,8 +90,19 @@
           value="Terms of Use and Privacy Policy — not set in this build. Both stores require them in-app beside a paid plan; set `termsUrl` and `privacyUrl` in App.json `consts` before submitting."/>
   </vstack>
 
+  <!-- ══ LINKS — the bare pair, for a footer row that carries its own sentence ═══════════ -->
+  <hstack class="lineWrap" visible-if="dsx.variable.isLinks &amp;&amp; dsx.variable.constsKnown &amp;&amp; dsx.variable.bothSet" style="flex-wrap: wrap">
+    <text value="Terms of Use" class="lineLink" href="{{ dsx.variable.terms }}" minHeight="32"
+          a11yTrait="link" a11yLabel="Terms of Use — opens in your browser"/>
+    <text value="·" class="lineTxt"/>
+    <text value="Privacy Policy" class="lineLink" href="{{ dsx.variable.privacy }}" minHeight="32"
+          a11yTrait="link" a11yLabel="Privacy Policy — opens in your browser"/>
+  </hstack>
+  <text class="lineTxt" visible-if="dsx.variable.isLinks &amp;&amp; dsx.variable.constsKnown &amp;&amp; dsx.variable.bothSet == false"
+        value="Terms of Use and Privacy Policy — not set in this build. Both stores require them in-app beside a paid plan; set `termsUrl` and `privacyUrl` in App.json `consts` before submitting."/>
+
   <!-- ══ ROWS — the settings spelling ═════════════════════════════════════════════════ -->
-  <vstack class="rows" visible-if="dsx.variable.isLine == false &amp;&amp; dsx.variable.constsKnown">
+  <vstack class="rows" visible-if="dsx.variable.isLine == false &amp;&amp; dsx.variable.isLinks == false &amp;&amp; dsx.variable.constsKnown">
     <hstack class="row" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
             visible-if="dsx.variable.terms != ''" href="{{ dsx.variable.terms }}"
             a11yGroup="true" a11yTrait="link" a11yLabel="Terms of Use — opens in your browser">

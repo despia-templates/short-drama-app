@@ -208,23 +208,30 @@ exists because money Stripe confirmed and the server has not yet granted must ne
 end. Set `STRIPE_KEY` and `STRIPE_PUBLISHABLE` (test mode) in `.env.local`; leave them unset and
 the Store shows the server's honest refusal instead of a payment sheet.
 
-**Native: RevenueCat, and the backend is built and waiting.** App Store 3.1.1 names in-game
-currencies and premium-content unlocks as in-app-purchase products, so coins and the VIP pass
-may **not** be sold through Stripe inside an iOS or Android build; Stripe is legal on the web
-storefront only. The server half is done: `POST /store/native` verifies a transaction against
-RevenueCat's own API (a single server-to-server GET — RevenueCat has already validated the
-receipt with Apple or Google, so the app never parses one), and a `verify="bearer"` webhook at
-`/webhooks/revenuecat` receives renewal, cancellation and refund into the same single granter.
-Two secrets turn it on, both documented in `.env.local.example`: `REVENUECAT_KEY` (**never
-reaches a client — it is a full-account credential**) and `REVENUECAT_WEBHOOK_SECRET` (a shared
-value RevenueCat echoes; paste the same string into its dashboard).
+**Native: StoreKit and Play Billing through RevenueCat, and it is wired.** App Store 3.1.1
+names in-game currencies and premium-content unlocks as in-app-purchase products, so coins and
+the VIP pass are sold through the platform store inside an iOS or Android build; Stripe is legal
+on the web storefront only. `Core/Store` and `Core/RevenueCat` are configured packages; the one
+purchase control, `Components/parts/BuyButton.dsx`, picks the lane by capability (`has('store')`
+first, `os == 'web'` second) and calls `store.checkout` with the RevenueCat provider, the
+catalogue row's store product id, and the viewer's subject as the app user id — the platform's
+purchase sheet is the only platform surface in the flow. The grant is the server's on both lanes:
+`POST /store/native` verifies the transaction against RevenueCat's REST API (a single
+server-to-server GET; RevenueCat has already validated the receipt with Apple or Google, so the
+app never parses one), and a `verify="bearer"` webhook at `/webhooks/revenuecat` grants the same
+transaction into the same single granter if that call is lost — one ledger lock, so nothing is
+credited twice. `/membership` is the plan page (the store's localized prices on a device, the
+server's list on the web); `ShortDrama.storekit` is the simulator's store, generated from the
+price table. **Everything an adopter configures is one page: [docs/monetization.md](docs/monetization.md)**
+— the two public SDK keys, the two server secrets (`REVENUECAT_KEY`, never to a client;
+`REVENUECAT_WEBHOOK_SECRET`), the product ids on the catalogue rows, and sandbox testing.
 
-**What is NOT wired, and it is not a choice.** The client half needs `Core/Store`, and adding
-that module to `dsx.config.json` **aborts the build**: the package ships 20 Paywall components
-and one of them mounts `<shared.VipCard>`, which nothing in the module tree defines. Tried
-2026-09-01, recorded verbatim in `dsx.config.json`. So `has('store')` is false on every lane and
-the purchase surfaces **refuse on native and say why**, rather than falling back to a card sheet
-that would be a rejection. Re-add the package the day it compiles; nothing else changes.
+**What is honestly still upstream.** The native exports fold a project's `Modules/` and its
+lockfile, not yet the `packages` list this web build honours (PLAN.md §6.115; an engine agent is
+landing the fold), so `has('store')` is false on a device build until it lands and the purchase
+control shows one line — "In-app purchases are not available in this build" — and charges
+nothing. A module's `config.json` (the RevenueCat SDK keys) has no app-side override yet
+(§6.141), so today they are set in the package.
 
 **Restore: two routes, one verb, and neither asks who you are.** App Store 3.1.1 wants a restore
 mechanism, and the founder's constraint is sharper than the guideline — it has to work with **no

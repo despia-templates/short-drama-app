@@ -192,6 +192,32 @@
       function sheetEdge() { return '#2A2A2E' }
       function sheetCell() { return '#2C2C2E' }
 
+      /* ── THE REFERENCE PALETTE (docs/design/reference-ui-spec.md §0) ─────────────────
+         The founder's reference app, transcribed: the redesigned Home, Explore, My List and
+         the five-tab bar paint these and only these. Named by job, like everything above;
+         `sheet()` / `sheetCard()` / `sheetCell()` already ARE the spec's panel / card / chip
+         tones (#141414 / #1C1C1E / #2C2C2E), so those three are not repeated here. */
+      function accent() { return '#4ADFB4' }         /* teal: the current episode, the timer ring, a required mark, the checkbox, the coin callout */
+      function accentWidget() { return '#6EE7C5' }   /* the Live Activity CTA's brighter teal */
+      function crownGold() { return '#F5C518' }      /* the crown, plan titles, % OFF badges, unlock-pill text */
+      function ctaGold() { return '#F5D33D' }        /* the membership CTA fill */
+      function goldDim() { return '#3B3410' }        /* the unlock pill fill */
+      function hotRed() { return '#E0342C' }         /* the HOT and NEW badges */
+      function selectGreen() { return '#8DD35F' }    /* the selected plan card outline */
+      function savedLime() { return '#C6E36A' }      /* the player's saved bookmark */
+      function ink2() { return '#C7C7CC' }           /* synopsis body, locked episode numbers */
+      function ink3() { return '#8E8E93' }           /* secondary labels, inactive tabs, footnotes */
+      function grabber() { return '#48484A' }        /* the sheet grabber, a checkbox outline at rest */
+      function toggleOff() { return '#39393D' }      /* a toggle track at rest */
+      function widgetCard() { return '#0E0E10' }     /* the Live Activity card */
+
+      /* WHERE THE CROWN GOES. The crown button on Home, the unlock pills and the plans all
+         open the Membership page (spec 6): /membership, the route Components/Membership.dsx
+         serves — the store catalogue's three plans, Core/Store through RevenueCat on a device
+         and Stripe on the web (Components/parts/BuyButton.dsx). Every crown reads the
+         destination from here so a rename is ONE edit rather than a hunt. */
+      function membershipPath() { return '/membership' }
+
       /* one-off brand moments, each earned */
       function recoveryViolet() { return '#1E1830' }  /* the Stripe settle-recovery card */
       function violetEdge() { return '#3A3547' }
@@ -200,6 +226,7 @@
       function rankBronze() { return '#CE8B5C' }
       function gemLift() { return '#FF7BAA' }         /* the VIP gem gradient, top stop */
       function gemDeep() { return '#B3103A' }         /* ... and its end stop */
+
 
       /* ── THE VIP PROMISE, SAID ONCE ───────────────────────────────────────────────
          Product copy in the presentation library needs a reason, and this is it: a PAID
@@ -230,6 +257,31 @@
         ]
       }
 
+      /* ── THE CLAIMABLE TOTAL, ONE ARITHMETIC ────────────────────────────────────────
+         The coins a viewer can claim RIGHT NOW with a tap, from the SERVER facts in
+         /rewards/state: the day`s check-in reward while it is unclaimed, every completed
+         task not yet claimed, and the rewarded ads still available (a non-member`s lane).
+         The Rewards tab prints it and the tab bar`s callout binds the same function over
+         the app-wide stash (global.cacheRewards), so the two never disagree. A null state
+         is 0, never a guess. Statements rather than `+`-joined expressions, and no `&&`,
+         for the body caveat above. */
+      function rewardsClaimable(state, vip) {
+        if (state == null) { return 0 }
+        let total = 0
+        if (state.checkedToday == false) { total = total + Number(state.nextReward) }
+        if (state.tasks != null) {
+          for (const t of state.tasks) {
+            if (t.claimed != true) {
+              if (Number(t.progress) >= Number(t.target)) { total = total + Number(t.reward) }
+            }
+          }
+        }
+        if (vip != true) {
+          if (state.adsLeft != null) { total = total + Number(state.adsLeft) * Number(state.adReward) }
+        }
+        return total
+      }
+
       /* THE TERM, derived from the tiers the SERVER shipped rather than authored — so the
          day a deployment changes its pass lengths this sentence changes with them. Pass
          `catalog.vip` (or null while it is still loading). */
@@ -257,31 +309,6 @@
         const l = global.locale
         if (l == null) { return '' }
         return String(l)
-      /* ── THE CLAIMABLE TOTAL, ONE ARITHMETIC ────────────────────────────────────────
-         The coins a viewer can claim RIGHT NOW with a tap, from the SERVER facts in
-         /rewards/state: the day`s check-in reward while it is unclaimed, every completed
-         task not yet claimed, and the rewarded ads still available (a non-member`s lane).
-         The Rewards tab prints it and the tab bar`s callout binds the same function over
-         the app-wide stash (global.cacheRewards), so the two never disagree. A null state
-         is 0, never a guess. Statements rather than `+`-joined expressions, and no `&&`,
-         for the body caveat above. */
-      function rewardsClaimable(state, vip) {
-        if (state == null) { return 0 }
-        let total = 0
-        if (state.checkedToday == false) { total = total + Number(state.nextReward) }
-        if (state.tasks != null) {
-          for (const t of state.tasks) {
-            if (t.claimed != true) {
-              if (Number(t.progress) >= Number(t.target)) { total = total + Number(t.reward) }
-            }
-          }
-        }
-        if (vip != true) {
-          if (state.adsLeft != null) { total = total + Number(state.adsLeft) * Number(state.adReward) }
-        }
-        return total
-      }
-
       }
 
       /* ── THE DIRECTION VOCABULARY, AND WHY THE APP HAS TO OWN ONE ─────────────────

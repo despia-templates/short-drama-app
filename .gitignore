@@ -8,3 +8,6 @@ server/generated/
 .claude/skills/
 public/posters/*.png
 public/assets/*.png
+
+# a local, unsigned export entitlement (docs/monetization.md §6) — never committed; a release needs a signed one
+despia-entitlement.json

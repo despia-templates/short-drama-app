@@ -63,7 +63,7 @@
      "Sign in" and performed a restore anyway, so the label and the action disagreed. -->
 <vstack spacing="0" alignItems="stretch">
   <head>
-    <attribute as="variant" default="'row'"/>   <!-- row | compact -->
+    <attribute as="variant" default="'row'"/>   <!-- row | compact | link -->
 
     <event as="restored" payload="coins"/>
 
@@ -222,11 +222,23 @@
     <style as="note" fontSize="13" color="rgba(255,255,255,0.45)" lineSpacing="3"/>
     <style as="btn" background="#26262C" radius="18" paddingH="16" paddingV="12" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
     <style as="compact" spacing="8" alignItems="stretch" paddingTop="4"/>
+    <!-- the footer-link spelling (the Membership page): 12pt, a 32pt tap floor, the result
+         line under it when there is one -->
+    <style as="linkWrap" spacing="4" alignItems="center"/>
+    <style as="linkTxt" fontSize="12" fontWeight="semibold" color="#8E8E93" minHeight="32"/>
+    <style as="linkNote" fontSize="12" color="#8E8E93" textAlign="center" lineSpacing="4"/>
     <style as="compactBtn" background="rgba(255,255,255,0.08)" radius="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
   </head>
 
+  <!-- LINK — the footer spelling: one word beside Terms and Privacy (Membership) -->
+  <vstack class="linkWrap" visible-if="dsx.attribute.variant == 'link'">
+    <text value="{{ dsx.variable.signedIn ? 'Restore' : 'Sign in to restore' }}" class="linkTxt"
+          on:tap="dsx.action.tapped()" a11yTrait="button" a11yLabel="Restore purchases made on this account"/>
+    <text value="{{ dsx.variable.line }}" class="linkNote" visible-if="dsx.variable.result != '' || dsx.variable.busy"/>
+  </vstack>
+
   <!-- ROW — the disclosure spelling, under a benefit list -->
-  <hstack class="row" visible-if="dsx.attribute.variant != 'compact'">
+  <hstack class="row" visible-if="dsx.attribute.variant != 'compact' &amp;&amp; dsx.attribute.variant != 'link'">
     <image icon="arrow.clockwise" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
     <vstack spacing="3" style="flex: 1; min-width: 0" alignItems="stretch">
       <text value="Restore purchases" class="label"/>

@@ -44,7 +44,16 @@
       }
     },
     {
+      "path": "/membership",
+      "component": "shortdrama.Membership",
+      "meta": {
+        "title": "Membership — Short Drama"
+      },
+      "_note": "PUSHED on every width (no `motion` key, the same reasoning /store carries): the crown, the player's unlock pill and every 'see plans' door push it, and it goes back with a back chevron. The plans it sells are the SERVER's catalogue (server/store.dsx storeCatalog); the purchase is Core/Store through the RevenueCat provider on a device and Stripe on the web (Components/parts/BuyButton.dsx)."
+    },
+    {
       "path": "/rewards",
+      "tabRoot": true,
       "component": "shortdrama.Rewards",
       "meta": {
         "title": "Rewards — Short Drama"
@@ -70,14 +79,28 @@
     {
       "path": "/profile",
       "tabRoot": true,
-      "component": "shortdrama.Profile",
+      "component": "shortdrama.MyPage",
       "meta": {
-        "title": "Profile — Short Drama"
+        "title": "My Page — Short Drama"
       },
       "motion": {
         "mobile": "none",
         "wide": "dsx"
-      }
+      },
+      "_note": "AN ALIAS of /me, kept so every link, bookmark and TopNav/PersonalNav path that says /profile still lands on the same screen. Both routes are tab roots and render Components/MyPage.dsx — the Profile screen restyled to the reference (spec 8 'My Page'). Components/Profile.dsx is no longer routed."
+    },
+    {
+      "path": "/me",
+      "tabRoot": true,
+      "component": "shortdrama.MyPage",
+      "meta": {
+        "title": "My Page — Short Drama"
+      },
+      "motion": {
+        "mobile": "none",
+        "wide": "dsx"
+      },
+      "_note": "THE FIFTH TAB (docs/design/reference-ui-spec.md 8, 'My Page'): Components/MyPage.dsx, the Profile screen restyled to the reference with every row it had. /profile aliases it."
     },
     {
       "path": "/notices",
@@ -142,19 +165,25 @@
     "motionBreakpoint": 768,
     "wide": "dsx"
   },
-  "_packages_note": "THE IN-APP-PURCHASE LANE IS STILL MISSING FROM THIS LIST, AND AS OF 2026-09-02 THE REASON HAS CHANGED. App Store 3.1.1 names in-game currencies and premium-content unlocks as in-app-purchase products, so coins and the VIP pass may not be sold through Stripe inside an iOS or Android build; Stripe is legal on the WEB storefront only. The module that would fix it is Core/Store (scheme 'store', shelf premium like Stripe) at ClosedSource/DSX/Modules/Core/Store. UNTIL 2026-09-02 adding it ABORTED THE BUILD: 'PaywallVIP.dsx:18: <shared.VipCard>: no global component VipCard'. That was a LINTER defect, not the module's - the lint pool folded only configured packages while the build folds every mandatory one, and Foundation's VipCard IS the shared global (PLAN.md 6.115, fixed upstream dev@77f4e65d). Re-measured after the fix with this path and 'store' added: lint 48 files 0 errors, despia build writes the artifact, and BOTH native exports build. WHY IT IS STILL NOT HERE: both native exports read the project's Modules/ folder and the lockfile, never this `packages` list (which is the WEB build's) - so a package declared here by path reaches no device build, has('store') stays false on every native lane, and the purchase surfaces (Components/Store.dsx, Components/parts/PlansSheet.dsx) keep refusing rather than opening a card sheet. The same is true today of Stripe, SocialShare, PostHog and Consent. The ask is filed in PLAN.md 6.115 (one declaration, three lanes). The backend half is complete and asserted by `npm run verify`: POST /store/native, POST /store/restore/native, the RevenueCat <webhook> and its drain. The day the native exports honour this list, add the path below and 'store' to modules, supply the product ids and the RevenueCat secret, and switch payLane to 'iap' where the two comments in Store.dsx and PlansSheet.dsx say so.",
+  "_packages_note": "THE IN-APP-PURCHASE LANE IS HERE: Core/Store (scheme `store`) and Core/RevenueCat (scheme `revenuecat`, the provider the Store module cross-calls for `provider: \"revenuecat\"`). App Store 3.1.1 names in-game currencies and premium-content unlocks as in-app-purchase products, so coins and the VIP pass are sold through StoreKit and Play Billing inside a native build and through Stripe on the web storefront only; Components/parts/BuyButton.dsx picks the lane by capability (`has('store')` first, `os == 'web'` second) and the server grants on both (server/store.dsx: POST /store/native, the RevenueCat <webhook> and one shared granter). WHAT AN ADOPTER CONFIGURES is one page, docs/monetization.md: the RevenueCat public SDK keys, the two server secrets, the product ids on the catalogue rows, and the StoreKit configuration file for the simulator. The native exports read `Modules/` and the lockfile today, so a package declared here by path reaches the WEB build and not yet a device build (PLAN.md 6.115 records the upstream ask; an engine agent is landing the fold). Until it lands `has('store')` is false on a device and the purchase control shows one line — 'In-app purchases are not available in this build' — and charges nothing.",
   "packages": [
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Payments/Stripe",
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/SocialShare",
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/PostHog",
-    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Consent"
+    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Consent",
+    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Store",
+    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/RevenueCat"
   ],
   "_modules_note": "DECLARE-THEN-REACH. `modules` is the LINTER's allowlist of platform module schemes this app reaches and no configured `package` claims. `posthog` and `consent` are for Components/parts/Analytics.dsx: Core/PostHog is the framework's product-analytics verb and Core/Consent its gate. They used to be deliberately ABSENT from `packages`, because both shipped a complete web/index.js that no build could load — a browser chunk was emitted only for a manifest that restated `web.entry`, ten modules did, and 98 did not. That was PLAN.md §6.92 and it is fixed upstream: file presence is the gate now (`webLaneEntry`), so declaring them here emits real chunks and has('posthog') can finally answer true. The guards stay on every call regardless — a build that excludes them must still run.",
   "modules": [
     "stripe",
     "share",
     "posthog",
-    "consent"
-  ]
+    "consent",
+    "store",
+    "identityvault",
+    "notify",
+    "localpush"
+  ],
+  "_remind_note": "REMIND ME (docs/design/reference-ui-spec.md §2–§2b) is two modules. Core/Notify (scheme `notify`) owns the PERMISSION: `dsx.module.notify.permission()` is the one ladder on three renderers (the kernel's NotifyCore, corpus-pinned), and it is what the permission sheet's 'Allow notifications' asks. Core/LocalPush (scheme `localpush`) owns the SCHEDULE: `send({ seconds, id, title, message, url })` is a one-shot the OS fires at the premiere, after force-quit and reboot, on iOS and Android. The web facet of `send` is a page-side timer that dies with the tab — honest for a delay of minutes, a lie for a premiere in nine days — so Components/App.dsx does not arm it there and says so in the sheet; the server row (server/reminders.dsx) is what survives on every lane. Both packages reach the web build from this list; the native exports read `Modules/` and the lockfile (PLAN.md 6.115), so on a device `has('localpush')` is false until that fold lands and the sheet names the gap instead of pretending."
 }
-  "_remind_note": "REMIND ME (docs/design/reference-ui-spec.md §2–§2b) is two modules. Core/Notify (scheme `notify`) owns the PERMISSION: `dsx.module.notify.permission()` is the one ladder on three renderers (the kernel's NotifyCore, corpus-pinned), and it is what the permission sheet's 'Allow notifications' asks. Core/LocalPush (scheme `localpush`) owns the SCHEDULE: `send({ seconds, id, title, message, url })` is a one-shot the OS fires at the premiere, after force-quit and reboot, on iOS and Android. The web facet of `send` is a page-side timer that dies with the tab — honest for a delay of minutes, a lie for a premiere in nine days — so Components/App.dsx does not arm it there and says so in the sheet; the server row (server/reminders.dsx) is what survives on every lane. Both packages reach the web build from this list; the native exports read `Modules/` and the lockfile (PLAN.md 6.115), so on a device `has('localpush')` is false until that fold lands and the sheet names the gap instead of pretending.",

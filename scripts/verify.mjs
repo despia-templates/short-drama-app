@@ -242,6 +242,9 @@ for (const [path, needle] of [
   ["/browse", "series"],
   ["/vip", "VIP"],
   ["/store", "Store"],
+  ["/membership", "Membership"],
+  ["/rewards", "Rewards"],
+  ["/me", "My Page"],
 ]) {
   const html = await fetch(`${base}${path}`).then((r) => r.text());
   const text = bodyText(html);
@@ -646,6 +649,89 @@ console.log("\nrestore, both lanes");
       `the delivered body of ${path} does not carry the restore ceiling — Components/parts/RestoreRow.dsx ` +
       "must say, where the reader is, that a browser cannot restore a purchase made inside the native app");
   }
+}
+
+// ── 7c · THE STORE LANE'S CONTRACT: product ids, the reference-price arithmetic, the
+//         simulator's store, the Membership page, and restore for a DEVICE session ──────
+// The native lane sells through StoreKit and Play Billing under the product ids the price
+// table names, RevenueCat reports those ids back, and `grantStore` matches on them — so a
+// row without one is a purchase nothing could grant. The "% OFF" badge is derived from the
+// row's own cents (server/store.dsx storeCatalog), and this re-derives it from the payload
+// rather than trusting the number that came with it. The StoreKit configuration the iOS
+// export ships (ShortDrama.storekit, scripts/storekit.mjs) is generated from the same rows,
+// and this is the assertion that keeps the simulator's shelf and the origin's shelf one
+// shelf. Finally: the founder's law that buying and restoring need a SUBJECT and never a
+// login — a device session (a UUID subject with no wallet row yet) must be answered.
+console.log("\nthe store lane's contract");
+{
+  const cat = await fetch(`${base}/store/catalog`).then((r) => r.json());
+  const tiers = Array.isArray(cat?.vip) ? cat.vip : [];
+  const packs = Array.isArray(cat?.packs) ? cat.packs : [];
+  const rows = [...tiers, ...packs];
+  check("every catalogue row names its store product id",
+    rows.length > 0 && rows.every((r) => typeof r.productId === "string" && r.productId !== ""),
+    `${JSON.stringify(rows.map((r) => [r.id, r.productId]))} — a row without a productId is a product RevenueCat can report and grantStore cannot match`);
+  check("every tier carries the period word the Membership page prints beside the price",
+    tiers.length > 0 && tiers.every((t) => typeof t.period === "string" && t.period !== ""),
+    JSON.stringify(tiers.map((t) => t.period)));
+  check("the reference-price arithmetic holds on every tier (the badge cannot say what the cents do not)",
+    tiers.length > 0 && tiers.every((t) => {
+      const perDay = tiers[0].cents / tiers[0].days;
+      const ref = Math.round(perDay * t.days);
+      const off = ref > t.cents ? Math.round((1 - t.cents / ref) * 100) : 0;
+      return t.refCents === ref && t.off === off && (off > 0 ? t.refPrice !== "" : t.refPrice === "");
+    }),
+    JSON.stringify(tiers.map((t) => [t.id, t.cents, t.refCents, t.off, t.refPrice])));
+  check("at least one tier is discounted against the shortest pass, so the badge slot is reachable",
+    tiers.some((t) => t.off > 0), "no tier has off > 0 — the % OFF badge would never render");
+
+  const { catalogueRows, storekitDocument, STOREKIT_FILE } = await import("./storekit.mjs");
+  const skPath = resolve(root, STOREKIT_FILE);
+  check("the StoreKit configuration file ships at the app root", existsSync(skPath), `${STOREKIT_FILE} missing — run node scripts/storekit.mjs`);
+  if (existsSync(skPath)) {
+    const sk = JSON.parse(readFileSync(skPath, "utf8"));
+    const skIds = sk.products.map((p) => p.productID).sort();
+    const liveIds = rows.map((r) => r.productId).sort();
+    check("the StoreKit configuration sells exactly the products the origin sells",
+      JSON.stringify(skIds) === JSON.stringify(liveIds),
+      `storekit ${JSON.stringify(skIds)} vs origin ${JSON.stringify(liveIds)} — run node scripts/storekit.mjs`);
+    check("...at the prices the table charges, every one a consumable",
+      sk.products.every((p) => {
+        const row = rows.find((r) => r.productId === p.productID);
+        return row !== undefined && Number(p.displayPrice) === row.cents / 100 && p.type === "Consumable";
+      }),
+      JSON.stringify(sk.products.map((p) => [p.productID, p.displayPrice, p.type])));
+    check("...and the file is current against server/store.dsx",
+      JSON.stringify(storekitDocument(catalogueRows()), null, 2) + "\n" === readFileSync(skPath, "utf8"),
+      "the price table changed after the file was generated — run node scripts/storekit.mjs");
+  }
+
+  // THE MEMBERSHIP PAGE is server-rendered with the plans in it: a crawler and a cold load
+  // both get the price list, not a skeleton, and no refusal card sits where the plans are.
+  const mText = bodyText(await fetch(`${base}/membership`).then((r) => r.text()));
+  check("/membership server-renders every plan the origin sells, with its price",
+    tiers.length > 0 && tiers.every((t) => mText.includes(t.label) && mText.includes(t.price)),
+    `missing: ${tiers.filter((t) => !mText.includes(t.label) || !mText.includes(t.price)).map((t) => t.label).join(" · ")} — got: ${mText.slice(0, 160)}`);
+  check("/membership server-renders the membership rewards", /Membership Rewards/.test(mText) && /Every episode unlocked/.test(mText),
+    mText.slice(0, 200));
+  check("/membership carries no purchasing refusal on the web lane",
+    !/Purchasing is off|not available in this build|not available yet/.test(mText),
+    "a refusal is server-rendered on the page that sells — the web lane is Stripe and has nothing to refuse");
+
+  // A DEVICE SESSION is a UUID subject with no account and, on its first restore, no wallet
+  // row at all. Both restore routes must answer it exactly as they answer a signed-in viewer.
+  const device = { authorization: `Bearer ${mint({ sub: randomUUID(), kind: "device" })}`, "content-type": "application/json" };
+  const dr = await asJson(await POST("/store/restore", device));
+  check("the Stripe restore answers a device session that never signed in and has no wallet yet",
+    dr.status === 200 && dr.body?.done === true && dr.body?.restored === 0,
+    `${dr.status} ${JSON.stringify(dr.body)} — restore must need a subject, never a login`);
+  const dn = await asJson(await POST("/store/restore/native", device));
+  const hasRc = typeof process.env.REVENUECAT_KEY === "string" && process.env.REVENUECAT_KEY !== "";
+  check("the native restore answers a device session (refusing only for a missing verifier, never for a missing login)",
+    hasRc ? dn.status === 200 && typeof dn.body?.done === "boolean" : (dn.status >= 400 && /REVENUECAT_KEY/.test(dn.body?.message ?? "")),
+    `${dn.status} ${JSON.stringify(dn.body)}`);
+  const dAnon = await POST("/store/restore/native", anon);
+  check("...and still refuses a caller with no token at all", dAnon.status === 401, `answered ${dAnon.status}`);
 }
 
 // ── 8 · NEITHER BALANCE EXPIRES (App Store 3.1.1) ──────────────────────────────────────

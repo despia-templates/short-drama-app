@@ -147,6 +147,14 @@
       const c = dsx.variable.catalogView
       return vipTermLine(c == null ? null : c.vip)
     </variable>
+    <!-- the cheapest pass the catalogue sent, for the door to the Membership page -->
+    <variable as="fromPrice" computed="true">
+      const c = dsx.variable.catalogView
+      if (c == null || c.vip == null || c.vip.length == 0) { return '' }
+      let low = c.vip[0]
+      for (const t of c.vip) { if (t.cents < low.cents) { low = t } }
+      return low.price
+    </variable>
     <variable as="posterW" computed="true">return dsx.variable.bp == 'phone' ? 150 : 186</variable>
     <variable as="phase" computed="true">
       if (catalog.error != null || home.error != null) { return 'error' }
@@ -194,6 +202,10 @@
     <style as="tierNote" fontSize="12" color="rgba(42,29,4,0.7)"/>
     <style as="tierBadge" background="#FF2C55" radius="4" paddingH="7" paddingV="3" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
     <style as="cta" background="#FF2C55" radius="24" paddingV="15" fontSize="16" fontWeight="semibold" color="#FFFFFF"/>
+    <!-- the door to the plans: the membership CTA's own gold (spec 6), 52 tall, radius 14 -->
+    <style as="planDoor" background="#F5D33D" radius="14" minHeight="52" paddingH="16" paddingV="12" spacing="12" alignItems="center"/>
+    <style as="planDoorTitle" fontSize="17" fontWeight="bold" color="#000000"/>
+    <style as="planDoorNote" fontSize="13" color="#3A2A08"/>
     <style as="statusPill" background="rgba(246,182,61,0.16)" radius="14" paddingH="14" paddingV="8" spacing="7" alignItems="center"/>
     <style as="statusTxt" fontSize="13" fontWeight="semibold" color="#F6B63D"/>
     <style as="skeleton" background="#141419" radius="14"/>
@@ -346,13 +358,26 @@
         </vstack>
       </vstack>
 
-      <!-- the tiers — the SAME component the Profile card raises and the Store embeds, so
-           VIP's own plan list buys through the one checkout instead of bouncing to /store -->
+      <!-- THE PLANS LIVE ON THE MEMBERSHIP PAGE (Components/Membership.dsx, spec 6): the three
+           cards from the store catalogue, the localized store price on a device, and the one
+           purchase control on every lane. This page is the benefit story; the door below
+           opens the page that sells, at the destination every crown in the app reads from
+           Theme.dsx membershipPath(). -->
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <text value="Choose your plan" class="sectionTitle"/>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch" spacing="12">
-          <PlansSheet mode="inline"
-                      vip="{{ dsx.variable.isVip }}" on:purchased="wallet.refresh()"/>
+          <hstack class="planDoor" on:tap="dsx.module.route.push({ path: membershipPath() })"
+                  a11yGroup="true" a11yTrait="button" a11yLabel="See the membership plans">
+            <image icon="crown.fill" iconSize="22" color="#000000" a11yHidden="true"/>
+            <vstack spacing="2" grow="width" style="flex: 1; min-width: 0" alignItems="stretch">
+              <text value="{{ dsx.variable.isVip ? 'Add days to your pass' : 'See the plans' }}" class="planDoorTitle"/>
+              <hstack spacing="4" alignItems="center" visible-if="dsx.variable.fromPrice != ''">
+                <text value="From" class="planDoorNote"/>
+                <text value="{{ dsx.variable.fromPrice }}" class="planDoorNote"/>
+              </hstack>
+            </vstack>
+            <image icon="chevron.forward" iconSize="14" color="#000000" a11yHidden="true"/>
+          </hstack>
         </vstack>
       </vstack>
     </vstack>

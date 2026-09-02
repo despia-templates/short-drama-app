@@ -63,6 +63,16 @@ for (const line of lines) {
     console.log(`WAIVED (static chrome, constant bind): ${line.replace(/ — screens with data.*$/, "")}`);
     continue;
   }
+  // A CONFIGURED PACKAGE'S SECTION COMPONENT renders whatever its caller binds (Core/Store's
+  // PaywallCTA draws the `products` the paywall call handed it): its loading, empty and error
+  // states belong to the paywall that mounts it, not to the section. The same §5 notice, waived
+  // for that one shape only — a package's WARNINGS still fail here, and are fixed upstream.
+  const packageStates = /\/ClosedSource\/DSX\/Modules\/[^:]+\.dsx:1: notice: a data-bound screen with no conditional branch/.exec(line);
+  if (packageStates) {
+    waived++;
+    console.log(`WAIVED (package section, caller-bound data): ${line.replace(/ — screens with data.*$/, "")}`);
+    continue;
+  }
   const typeRule = /fontSize="(\d+)">: off the type scale/.exec(line);
   if (typeRule && TYPE_RAMP.has(Number(typeRule[1]))) {
     waived++;

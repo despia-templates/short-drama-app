@@ -1380,7 +1380,7 @@ Please unlock to watch." class="lockHead"/>
                    renderer bug, white-space: normal is the web default; the pill idiom
                    is nowrap + hug) -->
               <button label="Get coins" class="earnBtn" style="flex: 1; white-space: nowrap" on:tap="dsx.module.route.push({ path: '/store' })"/>
-              <button label="Earn free" class="earnBtn" style="flex: 1; white-space: nowrap" on:tap="dsx.module.route.push({ path: '/rewards' })"/>
+              <button label="Earn free" class="earnBtn" style="flex: 1; white-space: nowrap" on:tap="dsx.module.route.reset({ path: '/rewards' })"/>
             </hstack>
             <hstack class="lockMetaRow" a11yGroup="true" a11yLabel="Balance {{ dsx.variable.balance }} coins">
               <text value="Balance:" class="lockMeta"/>

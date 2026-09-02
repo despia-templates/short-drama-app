@@ -31,6 +31,14 @@
          in the scheme table at all, and why the framework names it for what it is. Rotate by
          listing a second env name on the <webhook> row. -->
     <secret as="REVENUECAT_WEBHOOK_SECRET" env="REVENUECAT_WEBHOOK_SECRET"/>
+    <!-- THE SANDBOX SWITCH, for a DEVELOPMENT deployment only. A sandbox purchase is free
+         and infinitely repeatable, so by default all three server-to-server paths below
+         (settleNative, the webhook drain, restoreNative) skip one — granting it would be a
+         coin faucet for every TestFlight tester. Set this to exactly `1` on a dev origin
+         and the same three paths grant sandbox transactions, which is what lets a developer
+         run a StoreKit-configuration purchase in the simulator on day one and watch the
+         coins land. Never on production — docs/monetization.md says so in bold. -->
+    <secret as="REVENUECAT_ALLOW_SANDBOX" env="REVENUECAT_ALLOW_SANDBOX"/>
     <egress host="api.stripe.com"/>
     <egress host="api.revenuecat.com"/>
 
@@ -93,7 +101,18 @@
          BADGES ARE ARITHMETIC OR THEY ARE GONE. "21% OFF" priced $11.99 against the
          "$14.99/week" that never existed, and "POPULAR" measured nothing this app counts.
          "BEST VALUE" survives because it is checkable from the row it sits on: 19999/365 is
-         55c a day against 1199/7 = 171c and 4999/30 = 167c. -->
+         55c a day against 1199/7 = 171c and 2499/30 = 83c. The "% OFF" badge the Membership
+         page paints is the same discipline made general: `off` and `refPrice` are DERIVED
+         below from the shortest pass's per-day rate, so a badge can only ever say what the
+         row's own cents support.
+
+         `productId` IS THE STORE PRODUCT IDENTIFIER — the id an adopter creates in App Store
+         Connect and Play Console and attaches to the RevenueCat project (docs/monetization.md).
+         It defaults to the sku so a fresh clone works with one id per row; an adopter who
+         already has store ids changes THIS field and leaves the sku alone, because the sku is
+         also the order row's key and the Stripe lane's lookup. Every native-lane path
+         (`settleNative`, the webhook drain, `restoreNative`) reaches the row through
+         `grantStore`, which matches either spelling. -->
     <action as="storeCatalog">
       // `native.ready` is the one fact that decides whether the app may open a NATIVE store
       // purchase, and it is a SERVER fact on purpose: the client can see whether the IAP
@@ -102,25 +121,48 @@
       // Google takes money this deployment could not honour. See `settleNative`.
       const rc = await dsx.module.secret.read({ name: 'REVENUECAT_KEY' })
       const verifier = rc.ok && rc.data != null && rc.data !== ''
+      const vip = [
+        { id: 'vip_pass_7',   productId: 'vip_pass_7',   label: '7-day pass',   period: '7 days',   price: '$11.99',  cents: 1199,  days: 7,   note: 'One charge for 7 days. No auto-renewal.',   badge: '',           best: false },
+        { id: 'vip_pass_30',  productId: 'vip_pass_30',  label: '30-day pass',  period: '30 days',  price: '$24.99',  cents: 2499,  days: 30,  note: 'One charge for 30 days. No auto-renewal.',  badge: '',           best: false },
+        { id: 'vip_pass_365', productId: 'vip_pass_365', label: '365-day pass', period: '365 days', price: '$199.99', cents: 19999, days: 365, note: 'One charge for 365 days. No auto-renewal.', badge: 'BEST VALUE', best: true  }
+      ]
+      // THE REFERENCE PRICE IS ARITHMETIC. The first (shortest) pass sets the per-day rate; a
+      // longer pass is compared against what its days would cost at that rate, and `off` is
+      // the whole-percent saving, 0 when there is none. The Membership page paints the badge
+      // and the struck price from these two fields and never types a percentage itself.
+      // The dollar string is grown from a non-numeric anchor on purpose: JSE + is total
+      // arithmetic, so a bare zero-pad would collapse to a number (AGENTS.md).
+      const perDay = vip[0].cents / vip[0].days
+      const tiers = []
+      for (const t of vip) {
+        const refCents = Math.round(perDay * t.days)
+        const off = refCents > t.cents ? Math.round((1 - t.cents / refCents) * 100) : 0
+        let refPrice = ''
+        if (off > 0) {
+          const whole = Math.floor(refCents / 100)
+          const rest = refCents - whole * 100
+          refPrice = '$' + whole
+          refPrice = refPrice + '.'
+          if (rest < 10) { refPrice = refPrice + '0' }
+          refPrice = refPrice + rest
+        }
+        tiers.push({ ...t, refCents: refCents, off: off, refPrice: refPrice })
+      }
       return {
-        vip: [
-          { id: 'vip_pass_7',   label: '7-day pass',   price: '$11.99',  cents: 1199,  days: 7,   note: 'One charge for 7 days. No auto-renewal.',   badge: '',           best: false },
-          { id: 'vip_pass_30',  label: '30-day pass',  price: '$49.99',  cents: 4999,  days: 30,  note: 'One charge for 30 days. No auto-renewal.',  badge: '',           best: false },
-          { id: 'vip_pass_365', label: '365-day pass', price: '$199.99', cents: 19999, days: 365, note: 'One charge for 365 days. No auto-renewal.', badge: 'BEST VALUE', best: true  }
-        ],
+        vip: tiers,
         packs: [
-          { id: 'coins_500',   coins: 500,   free: 25,    cents: 499,  price: '$4.99',  bonus: '+5%' },
-          { id: 'coins_1000',  coins: 1000,  free: 100,   cents: 999,  price: '$9.99',  bonus: '+10%' },
-          { id: 'coins_2000',  coins: 2000,  free: 400,   cents: 1999, price: '$19.99', bonus: '+20%' },
-          { id: 'coins_3000',  coins: 3000,  free: 900,   cents: 2999, price: '$29.99', bonus: '+30%' },
-          { id: 'coins_5000',  coins: 5000,  free: 2500,  cents: 4999, price: '$49.99', bonus: '+50%' },
-          { id: 'coins_10000', coins: 10000, free: 10000, cents: 9999, price: '$99.99', bonus: '+100%' }
+          { id: 'coins_500',   productId: 'coins_500',   coins: 500,   free: 25,    cents: 499,  price: '$4.99',  bonus: '+5%' },
+          { id: 'coins_1000',  productId: 'coins_1000',  coins: 1000,  free: 100,   cents: 999,  price: '$9.99',  bonus: '+10%' },
+          { id: 'coins_2000',  productId: 'coins_2000',  coins: 2000,  free: 400,   cents: 1999, price: '$19.99', bonus: '+20%' },
+          { id: 'coins_3000',  productId: 'coins_3000',  coins: 3000,  free: 900,   cents: 2999, price: '$29.99', bonus: '+30%' },
+          { id: 'coins_5000',  productId: 'coins_5000',  coins: 5000,  free: 2500,  cents: 4999, price: '$49.99', bonus: '+50%' },
+          { id: 'coins_10000', productId: 'coins_10000', coins: 10000, free: 10000, cents: 9999, price: '$99.99', bonus: '+100%' }
         ],
         native: {
           ready: verifier,
           reason: verifier
             ? ''
-            : 'This build cannot verify a native store receipt yet, so it will not open a purchase it could not honour. Set REVENUECAT_KEY on the deployment (server/store.dsx settleNative names what it does with it).'
+            : 'Set REVENUECAT_KEY on this deployment: the server verifies every store purchase with RevenueCat before it grants (server/store.dsx settleNative, docs/monetization.md).'
         }
       }
     </action>
@@ -163,10 +205,10 @@
       if (!cat.ok || cat.data == null) { throw { reason: 'unavailable', message: 'the price list is unavailable' } }
       let picked = null
       for (const v of cat.data.vip) {
-        if (v.id === sku) { picked = { kind: 'vip', cents: v.cents, coins: 0, bonus: 0, days: v.days, label: v.label } }
+        if (v.id === sku || v.productId === sku) { picked = { kind: 'vip', cents: v.cents, coins: 0, bonus: 0, days: v.days, label: v.label } }
       }
       for (const p of cat.data.packs) {
-        if (p.id === sku) { picked = { kind: 'coins', cents: p.cents, coins: p.coins, bonus: p.free, days: 0, label: p.coins + ' coins' } }
+        if (p.id === sku || p.productId === sku) { picked = { kind: 'coins', cents: p.cents, coins: p.coins, bonus: p.free, days: 0, label: p.coins + ' coins' } }
       }
       if (picked == null) { throw { reason: 'invalid', message: 'unknown item' } }
 
@@ -463,17 +505,22 @@
       // free and infinitely repeatable, so a pull path that grants on one is a coin faucet
       // for anyone who can run a sandbox transaction, which on iOS is every TestFlight
       // tester. `storeEvent` has skipped these since it was written (`ev.environment`);
-      // the REST document carries the same fact per run as `is_sandbox`.
+      // the REST document carries the same fact per run as `is_sandbox`. The ONE exception
+      // is the development switch declared in the head: REVENUECAT_ALLOW_SANDBOX=1 lets a
+      // dev origin grant a sandbox transaction so a simulator purchase can be watched landing.
+      const sb = await dsx.module.secret.read({ name: 'REVENUECAT_ALLOW_SANDBOX' })
+      const allowSandbox = sb.ok && sb.data === '1'
       let sandboxOnly = false
       for (const one of runs) {
         if (one.id === transaction || one.store_transaction_id === transaction) {
-          if (one.is_sandbox === true) { sandboxOnly = true }
+          const sandboxRefused = one.is_sandbox === true && !allowSandbox
+          if (sandboxRefused) { sandboxOnly = true }
           // THE KEY IS THE STORE TRANSACTION, on both paths. The webhook reports
           // `event.transaction_id` and this REST document reports `store_transaction_id`,
           // and they are the same identifier — which is what makes the two grant paths
           // collapse onto ONE ledger row instead of crediting twice. Preferring it here,
           // rather than the id the client happened to report, is what keeps that true.
-          if (one.is_sandbox !== true) {
+          if (!sandboxRefused) {
             store_txn = one.store_transaction_id == null || one.store_transaction_id === ''
               ? transaction
               : one.store_transaction_id
@@ -483,7 +530,7 @@
       // NAMED, not swallowed: a tester whose sandbox purchase is refused must be told WHY,
       // or they file a bug against the grant path that is working correctly.
       if (store_txn === '' && sandboxOnly) {
-        throw { reason: 'conflict', message: 'This is a sandbox purchase. Sandbox purchases are free and repeatable, so this deployment does not grant them — see storeEvent in server/store.dsx for the one line to relax while testing.' }
+        throw { reason: 'conflict', message: 'This is a sandbox purchase. Sandbox purchases are free and repeatable, so this deployment does not grant them. A development origin may set REVENUECAT_ALLOW_SANDBOX=1 (docs/monetization.md).' }
       }
       if (store_txn === '') {
         throw { reason: 'conflict', message: 'the store has no record of this purchase on your account' }
@@ -544,9 +591,13 @@
 
       // SANDBOX DOES NOT PAY. A sandbox purchase is free and infinitely repeatable, so
       // granting on one is a hole with a queue in front of it. It is skipped rather than
-      // failed, so an adopter testing in sandbox sees `skipped: sandbox` in the drain and
-      // knows exactly which line to relax while they test:  this one.
-      if (ev.environment != null && ev.environment !== 'PRODUCTION') { return { skipped: 'sandbox' } }
+      // failed, so an adopter testing in sandbox sees `skipped: sandbox` in the drain —
+      // unless the deployment is a development origin that set REVENUECAT_ALLOW_SANDBOX=1,
+      // the one declared way to let a simulator purchase land (head, docs/monetization.md).
+      if (ev.environment != null && ev.environment !== 'PRODUCTION') {
+        const sb = await dsx.module.secret.read({ name: 'REVENUECAT_ALLOW_SANDBOX' })
+        if (!(sb.ok && sb.data === '1')) { return { skipped: 'sandbox' } }
+      }
 
       const owner = ev.app_user_id
       const sku = ev.product_id
@@ -589,12 +640,16 @@
       // the SAME table the storefront displays and the Stripe lane charges (H2)
       const cat = await dsx.action.storeCatalog()
       if (!cat.ok || cat.data == null) { throw { reason: 'unavailable', message: 'the price list is unavailable' } }
+      // `sku` here is whatever the STORE called the product — RevenueCat reports the store
+      // product identifier — so the row is matched on `productId` first and on the
+      // catalogue id second, and the order row is written under the CATALOGUE id so support
+      // reads one spelling whichever lane sold it.
       let picked = null
       for (const v of cat.data.vip) {
-        if (v.id === sku) { picked = { kind: 'vip', cents: v.cents, coins: 0, bonus: 0, days: v.days } }
+        if (v.id === sku || v.productId === sku) { picked = { id: v.id, kind: 'vip', cents: v.cents, coins: 0, bonus: 0, days: v.days } }
       }
       for (const p of cat.data.packs) {
-        if (p.id === sku) { picked = { kind: 'coins', cents: p.cents, coins: p.coins, bonus: p.free, days: 0 } }
+        if (p.id === sku || p.productId === sku) { picked = { id: p.id, kind: 'coins', cents: p.cents, coins: p.coins, bonus: p.free, days: 0 } }
       }
       // A product the price table does not sell is not granted. On the webhook path this is
       // also the guard against a product id created in App Store Connect that nobody added
@@ -619,7 +674,7 @@
       // `intent` carries the provider-qualified transaction, which is also the FIRST of the
       // two locks: `unique (intent) where intent <> ''` in policies.local.sql.
       const row = await dsx.module.data.order.create({
-        owner_id: owner, sku: sku, kind: picked.kind, amount_cents: picked.cents,
+        owner_id: owner, sku: picked.id, kind: picked.kind, amount_cents: picked.cents,
         coins: picked.coins, bonus: picked.bonus, days: picked.days,
         status: 'created', intent: tag
       })
@@ -846,12 +901,15 @@
       const already = (held.ok ? held.data : []).map(o => o.intent)
 
       const bought = seen.data.subscriber.non_subscriptions
+      // sandbox does not pay — the same rule the webhook and settleNative apply, with the
+      // same one development switch (head)
+      const sb = await dsx.module.secret.read({ name: 'REVENUECAT_ALLOW_SANDBOX' })
+      const allowSandbox = sb.ok && sb.data === '1'
       const pending = []
       for (const pair of Object.entries(bought == null ? {} : bought)) {
         const sku = pair[0]
         for (const run of pair[1]) {
-          // sandbox does not pay — the same rule the webhook and settleNative apply
-          if (run.is_sandbox === true) { continue }
+          if (run.is_sandbox === true && !allowSandbox) { continue }
           const txn = run.store_transaction_id == null || run.store_transaction_id === ''
             ? run.id
             : run.store_transaction_id

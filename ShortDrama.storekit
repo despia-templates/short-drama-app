@@ -1,0 +1,201 @@
+{
+  "identifier": "18987827-2A67-4420-AC53-97974A9D930D",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "11.99",
+      "familyShareable": false,
+      "internalID": "468910B9-7584-4483-A69A-181D6119F01F",
+      "localizations": [
+        {
+          "description": "One charge for 7 days. No auto-renewal.",
+          "displayName": "7-day pass",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "vip_pass_7",
+      "referenceName": "7-day pass",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "24.99",
+      "familyShareable": false,
+      "internalID": "28E85C53-8032-4F21-A648-A94CC4EA9040",
+      "localizations": [
+        {
+          "description": "One charge for 30 days. No auto-renewal.",
+          "displayName": "30-day pass",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "vip_pass_30",
+      "referenceName": "30-day pass",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "199.99",
+      "familyShareable": false,
+      "internalID": "38D28999-F6BA-401B-AE89-8D148DDF3C4E",
+      "localizations": [
+        {
+          "description": "One charge for 365 days. No auto-renewal.",
+          "displayName": "365-day pass",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "vip_pass_365",
+      "referenceName": "365-day pass",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "B5E2EE4D-176E-470B-AD24-176903C2EF34",
+      "localizations": [
+        {
+          "description": "500 coins plus 25 bonus coins",
+          "displayName": "500 coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "coins_500",
+      "referenceName": "500 coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "9.99",
+      "familyShareable": false,
+      "internalID": "83F60C90-ECFF-439E-A7F3-03B9A8E670E1",
+      "localizations": [
+        {
+          "description": "1000 coins plus 100 bonus coins",
+          "displayName": "1000 coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "coins_1000",
+      "referenceName": "1000 coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "19.99",
+      "familyShareable": false,
+      "internalID": "7B0DC13F-15BC-4E84-AF1E-38B1C3F731C8",
+      "localizations": [
+        {
+          "description": "2000 coins plus 400 bonus coins",
+          "displayName": "2000 coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "coins_2000",
+      "referenceName": "2000 coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "29.99",
+      "familyShareable": false,
+      "internalID": "97C30F48-3F23-43CD-A471-4E7B6D1D2EE3",
+      "localizations": [
+        {
+          "description": "3000 coins plus 900 bonus coins",
+          "displayName": "3000 coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "coins_3000",
+      "referenceName": "3000 coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "49.99",
+      "familyShareable": false,
+      "internalID": "74B6DF32-2632-4E94-A5CD-BE66192936D5",
+      "localizations": [
+        {
+          "description": "5000 coins plus 2500 bonus coins",
+          "displayName": "5000 coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "coins_5000",
+      "referenceName": "5000 coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "99.99",
+      "familyShareable": false,
+      "internalID": "36510B5D-8AAB-45E1-A535-0043343B1D3D",
+      "localizations": [
+        {
+          "description": "10000 coins plus 10000 bonus coins",
+          "displayName": "10000 coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "coins_10000",
+      "referenceName": "10000 coins",
+      "type": "Consumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "",
+    "_developerTeamID": "",
+    "_failTransactionsEnabled": false,
+    "_lastSynchronizedDate": 0,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": [
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Load Products"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Purchase"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Verification"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "App Store Sync"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Subscription Status"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "App Transaction"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Manage Subscriptions Sheet"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Refund Request Sheet"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

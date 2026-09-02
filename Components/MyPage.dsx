@@ -1,0 +1,436 @@
+<!-- MyPage — the personal centre (docs/design/reference-ui-spec.md §8 "My Page"), the fifth
+     tab, at /me (and /profile, which aliases it so every older link still lands). It is the
+     Profile screen restyled to the reference's tokens (§0) with every row it had: identity ·
+     the ONE gold surface (now a door to the Membership page) · the wallet card · transaction
+     history · the grouped menu — My List & History, Notifications, Rewards, Language, Manage
+     this app, Account. Wide viewports keep the two-column centre (sidebar + balance strip).
+
+     THE CUSTOM-UI LAW (spec §−1): no platform control anywhere. The language row used to be a
+     `<picker>` — the system menu on iOS, a `<select>` on web — and it is now a SHEET OF ROWS
+     WITH A CHECK, the reference's own selection idiom (§3d), drawn by this app on every lane.
+
+     FUNNEL ROLE: this is where a viewer checks what they own and is offered the one upgrade
+     that ends coin math forever. Exactly one gold surface. Buying coins is /store, the pass is
+     /membership, earning is the Rewards tab, and all three are one tap from here.
+
+     Honest numbers: a wallet that has not answered renders an em dash, never a zero — a '0'
+     on a screen about money is a claim, and while loading it is a false one. Signed out, the
+     screen says so and offers the sign-in; it never renders headings over void. -->
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <!-- THE SEAM, NOT A SESSION BLOCK (<AuthSeam/> at the foot): every authenticated read is
+         gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
+    <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
+    <api as="ledger" url="/wallet/ledger" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheLedger = global.auth.ok == true ? ledger.data : null"/>
+
+    <variable as="toast">return ''</variable>
+    <variable as="langOpen">return false</variable>
+
+    <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
+    <variable as="authKnown" computed="true">return global.auth != null &amp;&amp; global.auth.state != null</variable>
+    <variable as="signedOut" computed="true">
+      return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
+    </variable>
+    <!-- a DEVICE session is a subject with no account behind it (server/auth.dsx): the
+         identity card says so, and the Account row still offers the link -->
+    <variable as="isAccount" computed="true">
+      if (global.auth == null) { return false }
+      if (global.auth.kind == null) { return dsx.variable.signedIn }
+      return global.auth.kind == 'account'
+    </variable>
+    <!-- stale-then-fresh stashes are VIEWER-scoped (PLAN.md §6.30, docs/auth.md) -->
+    <variable as="ledgerView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
+      if (ledger.data != null) { return ledger.data }
+      return global.cacheLedger
+    </variable>
+    <variable as="walletView" computed="true">
+      if (dsx.variable.signedIn == false) { return null }
+      if (wallet.data != null) { return wallet.data }
+      return global.cacheWallet
+    </variable>
+    <variable as="uid" computed="true">
+      if (dsx.variable.signedIn == false) { return '' }
+      const s = global.auth.sub
+      return s == null ? '' : String(s).slice(0, 8)
+    </variable>
+    <variable as="whoName" computed="true">
+      if (global.auth != null &amp;&amp; global.auth.name != null &amp;&amp; global.auth.name != '') { return global.auth.name }
+      return dsx.variable.isAccount ? 'Viewer' : 'Guest'
+    </variable>
+    <variable as="walletFailed" computed="true">
+      return dsx.variable.signedOut == false &amp;&amp; wallet.error != null &amp;&amp; dsx.variable.walletView == null
+    </variable>
+    <variable as="coins" computed="true">
+      return dsx.variable.walletView == null ? null : dsx.variable.walletView.coins
+    </variable>
+    <variable as="bonus" computed="true">
+      return dsx.variable.walletView == null ? null : dsx.variable.walletView.bonus
+    </variable>
+    <variable as="isVip" computed="true">
+      if (dsx.variable.walletView == null) { return false }
+      return dsx.variable.walletView.vip === true
+    </variable>
+    <variable as="vipUntil" computed="true">
+      if (dsx.variable.walletView == null || dsx.variable.walletView.vipUntil == null) { return '' }
+      return shortDate(dsx.variable.walletView.vipUntil)
+    </variable>
+    <variable as="ledgerPhase" computed="true">
+      if (dsx.variable.signedOut) { return 'signedout' }
+      if (ledger.error != null &amp;&amp; dsx.variable.ledgerView == null) { return 'error' }
+      if (dsx.variable.ledgerView == null) { return 'loading' }
+      if (dsx.variable.ledgerView.rows.length == 0) { return 'empty' }
+      return 'content'
+    </variable>
+    <!-- the language rows come from the one list that also gates the build (Theme.dsx
+         languageRows); the active tag is the choice made IN THE APP, empty = the device -->
+    <variable as="langRows" computed="true">return languageRows()</variable>
+    <variable as="activeTag" computed="true">
+      const l = global.locale
+      return l == null ? '' : String(l)
+    </variable>
+    <variable as="langLabel" computed="true">
+      for (const r of dsx.variable.langRows) { if (r.id == dsx.variable.activeTag) { return r.label } }
+      return ''
+    </variable>
+    <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
+    <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 1440)</variable>
+
+    <formula as="rowSign" amt="item.amount">
+      if (amt > 0) { return '+' + amt }
+      return '' + amt
+    </formula>
+    <formula as="rowLabel" src="item.source">
+      if (src == 'checkin') { return 'Daily check-in' }
+      if (src == 'spin') { return 'Spin the wheel' }
+      if (src == 'task') { return 'Task reward' }
+      if (src == 'ad') { return 'Rewarded ad' }
+      if (src == 'watch') { return 'Watch Mission' }
+      if (src == 'unlock') { return 'Episode unlocked' }
+      if (src == 'pack') { return 'Coin pack' }
+      if (src == 'vip') { return 'VIP bonus' }
+      return src
+    </formula>
+    <formula as="langOn" id="item.id">return id == dsx.variable.activeTag</formula>
+
+    <!-- the gold surface opens the Membership page — a route, because the plans are a real
+         page with a URL (Theme.dsx membershipPath) -->
+    <action as="openMembership">dsx.module.route.push({ path: membershipPath() })</action>
+    <action as="openStore">dsx.module.route.push({ path: '/store' })</action>
+    <!-- RESET, not push: /rewards and /list are TAB ROOTS and mount the bar (PLAN.md §6.29) -->
+    <action as="openRewards">dsx.module.route.reset({ path: '/rewards' })</action>
+    <action as="openList">dsx.module.route.reset({ path: '/list' })</action>
+    <action as="openLanguage">dsx.variable.langOpen = true</action>
+    <action as="closeLanguage">dsx.variable.langOpen = false</action>
+    <!-- ONE STATE WRITE switches every live display string (the kernel ladder reads
+         `global.locale`); the cookie REMEMBERS it. The device row carries the empty tag and
+         DELETES the cookie rather than storing an empty one, so "no choice" and "chose
+         nothing" read the same on the next launch. { value, days } is the durable spelling. -->
+    <action as="pickLocale" tag="item.id">
+      if (tag == null) { return }
+      global.locale = tag
+      if (tag == '') { dsx.cookie.uiLocale = null }
+      else { dsx.cookie.uiLocale = { value: tag, days: 365 } }
+      dsx.variable.langOpen = false
+    </action>
+
+    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
+    <style as="scroller" alignItems="stretch"/>
+    <style as="page" spacing="16" paddingTop="12" paddingBottom="24" alignItems="stretch"/>
+    <style as="split" spacing="26" alignItems="flex-start"/>
+    <style as="content" spacing="14" alignItems="stretch"/>
+
+    <style as="crumb" fontSize="13" color="#8E8E93"/>
+    <style as="crumbOn" fontSize="13" fontWeight="medium" color="#FFFFFF"/>
+    <style as="crumbRow" spacing="7" alignItems="center"/>
+    <style as="h1" fontSize="22" fontWeight="bold" color="#FFFFFF" paddingTop="4"/>
+
+    <style as="card" background="#1C1C1E" radius="12" paddingH="16" paddingV="16" spacing="14" alignItems="stretch"/>
+    <style as="cardTight" background="#1C1C1E" radius="12" paddingH="16" paddingV="12" spacing="4" alignItems="stretch"/>
+    <style as="cardFlush" background="#1C1C1E" radius="12" paddingH="16" paddingV="4" spacing="0" alignItems="stretch"/>
+
+    <style as="stripRow" alignItems="center" spacing="16"/>
+    <style as="stripCap" fontSize="13" color="#8E8E93"/>
+    <style as="stripNum" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
+
+    <style as="idRow" alignItems="center" spacing="12"/>
+    <style as="avatar" background="#2C2C2E" radius="22" width="44" height="44" alignItems="center"/>
+    <style as="who" spacing="3"/>
+    <style as="whoName" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="whoNote" fontSize="13" color="#8E8E93"/>
+    <style as="vipChip" background="#F6B63D" radius="10" paddingH="8" paddingV="4" fontSize="11" fontWeight="bold" color="#000000"/>
+
+    <!-- the one gold surface -->
+    <style as="vipCard" radius="12" paddingH="16" paddingV="16" spacing="12" alignItems="center"/>
+    <style as="vipTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="vipSub" fontSize="13" color="#C7C7CC" lineSpacing="3"/>
+    <style as="vipGo" background="#F5D33D" radius="10" paddingH="14" minHeight="36" fontSize="13" fontWeight="bold" color="#000000" alignItems="center"/>
+
+    <style as="stats" spacing="12" alignItems="stretch"/>
+    <style as="stat" background="#2C2C2E" radius="10" paddingV="12" spacing="4" alignItems="center"/>
+    <style as="statNum" fontSize="22" fontWeight="bold"/>
+    <style as="statCap" fontSize="12" color="#8E8E93"/>
+    <style as="topupBtn" background="#FFFFFF" radius="12" minHeight="48" paddingV="14" fontSize="15" fontWeight="semibold" color="#000000"/>
+    <style as="earnBtn" background="#2C2C2E" radius="12" minHeight="48" paddingV="14" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="note" fontSize="12" color="#8E8E93" lineSpacing="3"/>
+
+    <style as="h2" fontSize="17" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="ledgerRow" alignItems="center" paddingV="12"/>
+    <style as="ledgerCol" spacing="2" alignItems="stretch"/>
+    <style as="ledgerTitle" fontSize="15" color="#FFFFFF"/>
+    <style as="ledgerMeta" fontSize="13" color="#8E8E93"/>
+    <style as="amount" fontSize="15" fontWeight="semibold"/>
+    <style as="empty" fontSize="13" color="#8E8E93"/>
+    <style as="retryBtn" background="#FFFFFF" radius="12" minHeight="44" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#000000"/>
+
+    <style as="toastRow" background="#1C1C1E" radius="10" paddingH="14" paddingV="10" spacing="10" alignItems="center"/>
+    <style as="toastLine" fontSize="13" fontWeight="medium" color="#FFFFFF" lineSpacing="3"/>
+    <style as="menuRow" alignItems="center" minHeight="52" paddingV="12" spacing="12"/>
+    <style as="menuLabel" fontSize="17" color="#FFFFFF"/>
+    <style as="menuNote" fontSize="13" color="#8E8E93" lineSpacing="3"/>
+    <style as="menuValue" fontSize="15" color="#8E8E93"/>
+
+    <!-- the language sheet: rows 52, 17 ink, a trailing 16pt check on the current value -->
+    <style as="sheetBody" spacing="0" alignItems="stretch" paddingH="16" paddingTop="4" paddingBottom="22"/>
+    <style as="sheetHead" alignItems="center" spacing="12" paddingTop="6" paddingBottom="8"/>
+    <style as="sheetTitle" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
+    <style as="closeBtn" width="32" height="32" radius="16" background="#2C2C2E" alignItems="center"/>
+    <style as="langRow" alignItems="center" minHeight="52" spacing="12"/>
+    <style as="langTxt" fontSize="17" color="#FFFFFF"/>
+  </head>
+
+  <!-- the design vocabulary registers here. FIRST CHILD, always (Components/parts/Theme.dsx). -->
+  <Theme/>
+  <!-- the funnel (Components/parts/Analytics.dsx) -->
+  <Analytics/>
+  <TopNav active="profile" visible-if="dsx.variable.wide"/>
+  <scroll class="scroller" grow="true" style="flex: 1; min-height: 0">
+    <vstack class="page" style="{{ dsx.variable.shell }}">
+
+      <hstack class="crumbRow" visible-if="dsx.variable.wide">
+        <text value="Personal Center" class="crumb"/>
+        <text value="/" class="crumb"/>
+        <text value="Wallet" class="crumbOn"/>
+      </hstack>
+
+      <hstack class="split">
+        <PersonalNav active="wallet" visible-if="dsx.variable.wide"
+                     uid="{{ dsx.variable.uid }}" coins="{{ dsx.variable.coins }}"
+                     bonus="{{ dsx.variable.bonus }}" vip="{{ dsx.variable.isVip }}"/>
+
+        <vstack class="content" grow="width" style="flex: 1; min-width: 0">
+          <text value="My Page" class="h1" visible-if="dsx.variable.wide == false"/>
+
+          <!-- device identity means the wallet, list and history below already work; this card
+               invites linking them to an account so they follow the viewer to another device. It
+               self-hides for an account viewer and shows a sign-in for a bare guest (LinkPrompt). -->
+          <LinkPrompt title="Keep your coins and list on your account"
+                      note="Coins, VIP, your list and your history live on an account, so they follow you to another device. The catalogue is open either way."/>
+
+          <!-- phone identity (the sidebar carries this on wide) -->
+          <vstack class="card" visible-if="dsx.variable.wide == false &amp;&amp; dsx.variable.signedOut == false &amp;&amp; dsx.variable.walletFailed == false">
+            <hstack class="idRow">
+              <vstack class="avatar" style="justify-content: center">
+                <image icon="person.crop.circle" iconSize="22" color="{{ ink2() }}" a11yHidden="true"/>
+              </vstack>
+              <vstack class="who" grow="width" style="flex: 1; min-width: 0">
+                <text value="{{ dsx.variable.whoName }}" class="whoName"/>
+                <hstack spacing="4" alignItems="center">
+                  <text value="{{ dsx.variable.isAccount ? 'Account' : 'This device' }}" class="whoNote"/>
+                  <text value="·" class="whoNote" visible-if="dsx.variable.uid != ''"/>
+                  <text value="{{ dsx.variable.uid }}" class="whoNote" visible-if="dsx.variable.uid != ''"/>
+                </hstack>
+              </vstack>
+              <text value="VIP" class="vipChip" visible-if="dsx.variable.isVip"/>
+            </hstack>
+          </vstack>
+
+          <!-- THE gold surface: the door to the Membership page. A member reads the date the
+               server holds and can add days; everyone else sees the offer. -->
+          <hstack class="vipCard" on:tap="dsx.action.openMembership()"
+                  a11yGroup="true" a11yTrait="button"
+                  a11yLabel="{{ dsx.variable.isVip ? 'Your VIP membership — add days' : 'Unlock unlimited watching — see the membership plans' }}"
+                  style="background: linear-gradient(150deg, #3B3410 0%, #1C1C1E 100%); border: 1px solid rgba(246,182,61,0.35)">
+            <image icon="crown.fill" iconSize="24" color="{{ gold() }}" a11yHidden="true"/>
+            <vstack spacing="3" grow="width" style="flex: 1; min-width: 0" alignItems="stretch">
+              <text value="{{ dsx.variable.isVip ? 'VIP is active' : 'Unlock Unlimited Watching' }}" class="vipTitle"/>
+              <text value="{{ dsx.variable.isVip ? 'Every episode unlocked, no ads, your coins untouched.' : 'Every episode, no coin math, no ads.' }}" class="vipSub" visible-if="dsx.variable.vipUntil == ''"/>
+              <hstack spacing="4" alignItems="center" visible-if="dsx.variable.vipUntil != ''">
+                <text value="Every episode unlocked until" class="vipSub"/>
+                <text value="{{ dsx.variable.vipUntil }}" class="vipSub"/>
+              </hstack>
+            </vstack>
+            <vstack class="vipGo" style="justify-content: center">
+              <text value="{{ dsx.variable.isVip ? 'Add days' : 'See plans' }}" fontSize="13" fontWeight="bold" color="#000000"/>
+            </vstack>
+          </hstack>
+
+          <vstack class="card" visible-if="dsx.variable.walletFailed">
+            <text value="Your wallet is unavailable." class="vipTitle"/>
+            <text value="Balances and VIP status could not be read. Nothing has been spent." class="note"/>
+            <button label="Retry" class="retryBtn" on:tap="wallet.refresh()"/>
+          </vstack>
+
+          <!-- wallet: phone card (wide gets the strip below) -->
+          <vstack class="card" visible-if="dsx.variable.wide == false &amp;&amp; dsx.variable.signedOut == false">
+            <hstack class="stats">
+              <vstack class="stat" grow="width" style="flex: 1">
+                <text value="{{ dsx.variable.coins == null ? '—' : dsx.variable.coins }}" class="statNum" color="{{ coin() }}"/>
+                <text value="Coins" class="statCap"/>
+              </vstack>
+              <vstack class="stat" grow="width" style="flex: 1">
+                <text value="{{ dsx.variable.bonus == null ? '—' : dsx.variable.bonus }}" class="statNum" color="#FFFFFF"/>
+                <text value="Bonus" class="statCap"/>
+              </vstack>
+            </hstack>
+            <hstack spacing="10" alignItems="stretch">
+              <button label="Get Coins" class="topupBtn" grow="width" style="flex: 1; white-space: nowrap"
+                      on:tap="dsx.action.openStore()" a11yLabel="Get coins — open the store"/>
+              <button label="Earn free" class="earnBtn" grow="width" style="flex: 1; white-space: nowrap"
+                      on:tap="dsx.action.openRewards()" a11yLabel="Earn free coins in Rewards"/>
+            </hstack>
+          </vstack>
+
+          <!-- balance strip (wide) -->
+          <vstack class="cardTight" visible-if="dsx.variable.wide &amp;&amp; dsx.variable.signedOut == false">
+            <hstack class="stripRow">
+              <hstack spacing="7" alignItems="center">
+                <text value="Coins:" class="stripCap"/>
+                <image icon="dollarsign.circle.fill" iconSize="15" color="{{ coin() }}" a11yHidden="true"/>
+                <text value="{{ dsx.variable.coins == null ? '—' : dsx.variable.coins }}" class="stripNum"/>
+              </hstack>
+              <text value="|" class="stripCap"/>
+              <hstack spacing="7" alignItems="center">
+                <text value="Bonus:" class="stripCap"/>
+                <image icon="dollarsign.circle.fill" iconSize="15" color="{{ coin() }}" a11yHidden="true"/>
+                <text value="{{ dsx.variable.bonus == null ? '—' : dsx.variable.bonus }}" class="stripNum"/>
+              </hstack>
+              <spacer/>
+              <!-- App Store 3.1.1: purchased currency may not expire, and earned coins keep
+                   the same promise -->
+              <text value="Coins never expire — bought or earned" class="note"/>
+            </hstack>
+          </vstack>
+
+          <!-- ledger, with all five states -->
+          <vstack class="cardTight" visible-if="dsx.variable.signedOut == false">
+            <text value="Transaction History" class="h2" paddingV="8"/>
+            <vstack spacing="10" alignItems="stretch" visible-if="dsx.variable.ledgerPhase == 'loading'" paddingV="8">
+              <Skeleton height="18" radius="6"/>
+              <Skeleton height="18" radius="6"/>
+              <Skeleton height="18" radius="6"/>
+            </vstack>
+            <text class="empty" visible-if="dsx.variable.ledgerPhase == 'empty'" paddingV="8"
+                  value="No activity yet — your first check-in, unlock or purchase lands here."/>
+            <vstack spacing="10" alignItems="flex-start" visible-if="dsx.variable.ledgerPhase == 'error'" paddingV="8">
+              <text class="empty" value="The ledger could not be loaded."/>
+              <button label="Retry" class="retryBtn" on:tap="ledger.refresh()"/>
+            </vstack>
+            <list bind="dsx.variable.ledgerView.rows" key="id" scroll="false" spacing="0" visible-if="dsx.variable.ledgerPhase == 'content'">
+              <hstack class="ledgerRow" style="border-bottom: 1px solid rgba(255,255,255,0.12)">
+                <vstack class="ledgerCol" grow="width" style="flex: 1; min-width: 0">
+                  <text value="{{ rowLabel }}" class="ledgerTitle" lineLimit="1" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                  <text value="{{ item.kind == 'bonus' ? 'Bonus coins' : 'Coins' }}" class="ledgerMeta"/>
+                </vstack>
+                <text value="{{ rowSign }}" class="amount" color="{{ item.amount > 0 ? coin() : brandTint() }}"/>
+              </hstack>
+            </list>
+          </vstack>
+
+          <!-- THE MENU IS NOT GATED ON A SESSION: every row works without an account, and the
+               ones that need one say so when you arrive -->
+          <vstack class="cardFlush">
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.12)"
+                    on:tap="dsx.action.openList()"
+                    a11yTrait="button" a11yGroup="true" a11yLabel="My list and history">
+              <image icon="bookmark.fill" iconSize="16" color="{{ ink2() }}" a11yHidden="true"/>
+              <text value="My List &amp; History" class="menuLabel" grow="width" style="flex: 1"/>
+              <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+            </hstack>
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.12)" href="/notices"
+                    a11yGroup="true" a11yLabel="Notifications">
+              <image icon="bell.fill" iconSize="16" color="{{ ink2() }}" a11yHidden="true"/>
+              <text value="Notifications" class="menuLabel" grow="width" style="flex: 1"/>
+              <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+            </hstack>
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.12)"
+                    on:tap="dsx.action.openRewards()" a11yGroup="true" a11yTrait="button" a11yLabel="Rewards">
+              <image icon="gift.fill" iconSize="16" color="{{ ink2() }}" a11yHidden="true"/>
+              <text value="Rewards" class="menuLabel" grow="width" style="flex: 1"/>
+              <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+            </hstack>
+            <!-- LANGUAGE: the UI language is real (a flat Strings.<tag>.json per locale, one
+                 state write to switch); the audio and subtitle tracks are a separate control
+                 the renderer cannot offer yet (PLAN.md §6.36). The row opens the app's own
+                 sheet of rows with a check — never the system picker (spec §−1). -->
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.12)"
+                    on:tap="dsx.action.openLanguage()" a11yGroup="true" a11yTrait="button" a11yLabel="App language">
+              <image icon="globe" iconSize="16" color="{{ ink2() }}" a11yHidden="true"/>
+              <vstack spacing="2" grow="width" style="flex: 1; min-width: 0" alignItems="stretch">
+                <text value="Language" class="menuLabel"/>
+                <text value="The app’s own words. Audio and subtitle tracks are a separate control the renderer cannot offer yet." class="menuNote"/>
+              </vstack>
+              <text value="{{ dsx.variable.langLabel }}" class="menuValue" lineLimit="1"/>
+              <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+            </hstack>
+            <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.12)" href="/admin"
+                    a11yGroup="true" a11yLabel="Manage this app — operator surface">
+              <image icon="gearshape" iconSize="16" color="{{ ink2() }}" a11yHidden="true"/>
+              <text value="Manage this app" class="menuLabel" grow="width" style="flex: 1"/>
+              <text value="operator" class="menuValue" color="{{ coin() }}"/>
+              <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+            </hstack>
+            <!-- ACCOUNT IS THE LAST ROW, and it is the one a store reviewer looks for: sign in,
+                 sign out, restore purchases, terms, privacy, and DELETE ACCOUNT (App Store
+                 5.1.1(v)) -->
+            <hstack class="menuRow" href="/account" a11yGroup="true"
+                    a11yLabel="Account — sign in or out, restore purchases, terms, privacy, and delete your account">
+              <image icon="person.crop.circle" iconSize="16" color="{{ ink2() }}" a11yHidden="true"/>
+              <vstack spacing="2" grow="width" style="flex: 1; min-width: 0" alignItems="stretch">
+                <text value="Account" class="menuLabel"/>
+                <text value="Sign in or out · restore purchases · terms &amp; privacy · delete account" class="menuNote"/>
+              </vstack>
+              <text value="{{ dsx.variable.isAccount ? 'signed in' : 'guest' }}" class="menuValue"/>
+              <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+            </hstack>
+          </vstack>
+        </vstack>
+      </hstack>
+    </vstack>
+  </scroll>
+
+  <!-- THE TOAST LIVES OUTSIDE THE SCROLL, pinned at the foot on every renderer -->
+  <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
+    <text value="{{ dsx.variable.toast }}" class="toastLine" grow="width" style="flex: 1"/>
+    <image icon="xmark" iconSize="12" color="{{ ink3() }}" on:tap="dsx.variable.toast = ''"
+           a11yLabel="Dismiss message" a11yTrait="button"/>
+  </hstack>
+  <TabBar active="profile" visible-if="dsx.variable.wide == false"/>
+
+  <!-- THE LANGUAGE SHEET — the reference's selection idiom (§3d): rows of 52 with a trailing
+       check on the current value, the app's own chrome on every lane. `on:dismiss` mirrors
+       the state so a swipe-down and the row's own tap agree. -->
+  <sheet present="dsx.variable.langOpen" detents="content" background="#141414"
+         on:dismiss="dsx.action.closeLanguage()">
+    <vstack class="sheetBody">
+      <!-- the sheet's own header — the app's chrome, never the platform's title bar -->
+      <hstack class="sheetHead">
+        <text value="Language" class="sheetTitle" grow="width" style="flex: 1; min-width: 0"/>
+        <vstack class="closeBtn" style="justify-content: center" on:tap="dsx.action.closeLanguage()"
+                a11yTrait="button" a11yLabel="Close">
+          <image icon="xmark" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
+        </vstack>
+      </hstack>
+      <list bind="dsx.variable.langRows" key="id" scroll="false" spacing="0">
+        <hstack class="langRow" on:tap="dsx.action.pickLocale()" a11yGroup="true" a11yTrait="button"
+                a11yLabel="{{ item.label }}" style="border-bottom: 1px solid rgba(255,255,255,0.12)">
+          <text value="{{ item.label }}" class="langTxt" grow="width" style="flex: 1; min-width: 0"/>
+          <image icon="checkmark" iconSize="16" color="#FFFFFF" visible-if="langOn" a11yHidden="true"/>
+        </hstack>
+      </list>
+    </vstack>
+  </sheet>
+  <!-- THE SEAM. One mount per screen, at the foot of the root. -->
+  <AuthSeam/>
+</vstack>

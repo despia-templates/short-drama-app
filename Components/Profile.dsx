@@ -304,7 +304,7 @@
               <button label="Get Coins" class="topupBtn" style="flex: 1; white-space: nowrap"
                       on:tap="dsx.module.route.push({ path: '/store' })" a11yLabel="Get coins — open the store"/>
               <button label="Earn free" class="earnBtn" style="flex: 1; white-space: nowrap"
-                      on:tap="dsx.module.route.push({ path: '/rewards' })" a11yLabel="Earn free coins in Rewards"/>
+                      on:tap="dsx.module.route.reset({ path: '/rewards' })" a11yLabel="Earn free coins in Rewards"/>
             </hstack>
           </vstack>
 
@@ -407,7 +407,7 @@
               <image icon="chevron.forward" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
             </hstack>
             <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
-                    on:tap="dsx.module.route.push({ path: '/rewards' })" a11yGroup="true" a11yTrait="button" a11yLabel="Rewards">
+                    on:tap="dsx.module.route.reset({ path: '/rewards' })" a11yGroup="true" a11yTrait="button" a11yLabel="Rewards">
               <image icon="gift.fill" iconSize="15" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
               <text value="Rewards" class="menuLabel" style="flex: 1"/>
               <image icon="chevron.forward" iconSize="12" color="rgba(255,255,255,0.35)" a11yHidden="true"/>

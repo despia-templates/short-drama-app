@@ -1,0 +1,89 @@
+<!-- PlanCard — one plan on the Membership page (docs/design/reference-ui-spec.md §6), drawn
+     to the measured geometry: card fill, radius 12, padding 16; a 1.5pt select-green outline
+     on the SELECTED card; the title 13 semibold gold; the price 22 bold beside its period 13
+     and — when the plan is cheaper than the shortest pass would be over the same days — the
+     struck reference price; the tier note 13; a 40pt gold crown; and the "% OFF" badge
+     overhanging the top-right corner by 4pt.
+
+     A ROW TEMPLATE, NOT A SCREEN. Membership binds a <list> to the store catalogue and
+     mounts this file as the row, so every fact arrives as an attribute from `item.*` and the
+     ONE thing the card does back is say it was tapped (`pick`). It owns no money code and
+     fetches nothing: the price it prints is whatever its owner resolved — the server's list
+     price on the web, the store's localized price on a device (Membership `planPrice`).
+
+     EVERY NUMBER IS DATA. `off` and `refPrice` are computed by the SERVER from the row's own
+     cents (server/store.dsx storeCatalog), so the badge cannot claim a percentage the price
+     does not support; a row whose `off` is 0 has no badge and no struck price.
+
+     THE OUTLINE IS SPELLED TWICE ON PURPOSE (AGENTS.md: add the attribute, keep the CSS):
+     `borderWidth`/`borderColor` are the cross-platform twins the native bridges read, and the
+     `border:` declaration is what the web sheet reads. `position: absolute` on the badge is
+     bridged on both native lanes now (edge insets), so the overhang is one spelling. -->
+<vstack class="card" style="{{ dsx.variable.cardFx }}" borderWidth="1.5" borderColor="{{ dsx.variable.ring }}"
+        on:tap="dsx.event('pick', { id: dsx.attribute.id })"
+        a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.attribute.label }}, {{ dsx.attribute.price }}">
+  <head>
+    <attribute as="id" default="''"/>          <!-- the catalogue id, echoed back on pick -->
+    <attribute as="label" default="''"/>       <!-- the plan name the server sent -->
+    <attribute as="price" default="''"/>       <!-- the price the OWNER resolved (localized on a device) -->
+    <attribute as="period" default="''"/>      <!-- "7 days" — the server's word for the term -->
+    <attribute as="refPrice" default="''"/>    <!-- the struck reference price, or empty -->
+    <attribute as="off" default="0"/>          <!-- whole-percent saving, 0 = no badge -->
+    <attribute as="note" default="''"/>        <!-- the tier note: what one charge buys -->
+    <attribute as="selected" default="false"/>
+
+    <event as="pick" payload="id"/>
+
+    <!-- a markup attribute arrives as a STRING unless the caller interpolates a value, so
+         both spellings are accepted rather than every caller having to remember (AGENTS.md) -->
+    <variable as="isSelected" computed="true">
+      const s = dsx.attribute.selected
+      return s === true || s === 'true'
+    </variable>
+    <variable as="hasOff" computed="true">return Number(dsx.attribute.off) > 0</variable>
+    <variable as="ring" computed="true">return dsx.variable.isSelected ? selectGreen() : 'rgba(0,0,0,0)'</variable>
+    <variable as="cardFx" computed="true">
+      return 'position: relative; border: 1.5px solid ' + dsx.variable.ring + '; transition: border-color 0.15s ease'
+    </variable>
+
+    <style as="card" background="#1C1C1E" radius="12" paddingH="16" paddingV="16" spacing="0" alignItems="stretch"/>
+    <style as="body" spacing="12" alignItems="center"/>
+    <style as="col" spacing="6" alignItems="stretch"/>
+    <style as="title" fontSize="13" fontWeight="semibold" color="#F6B63D"/>
+    <style as="priceRow" spacing="6" alignItems="flex-end"/>
+    <style as="price" fontSize="22" fontWeight="bold" color="#FFFFFF"/>
+    <style as="period" fontSize="13" color="#8E8E93"/>
+    <style as="struck" fontSize="13" color="#8E8E93" strikethrough="true"/>
+    <style as="note" fontSize="13" color="#8E8E93" lineSpacing="5"/>
+    <style as="badge" background="#F6B63D" radius="6" paddingH="6" paddingV="2" spacing="3" alignItems="center"/>
+    <style as="badgeTxt" fontSize="11" fontWeight="bold" color="#000000"/>
+  </head>
+
+  <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
+       Theme.dsx), and a caller must not have to remember to register it first. -->
+  <Theme/>
+  <hstack class="body">
+    <vstack class="col" grow="width" style="flex: 1; min-width: 0">
+      <text value="{{ dsx.attribute.label }}" class="title"/>
+      <hstack class="priceRow" style="flex-wrap: wrap">
+        <text value="{{ dsx.attribute.price }}" class="price"/>
+        <hstack spacing="0" alignItems="flex-end" paddingBottom="3">
+          <text value="/" class="period"/>
+          <text value="{{ dsx.attribute.period }}" class="period"/>
+        </hstack>
+        <text value="{{ dsx.attribute.refPrice }}" class="struck" paddingBottom="3"
+              style="text-decoration: line-through" visible-if="dsx.variable.hasOff"/>
+      </hstack>
+      <text value="{{ dsx.attribute.note }}" class="note"/>
+    </vstack>
+    <image icon="crown.fill" iconSize="40" color="{{ gold() }}" a11yHidden="true"/>
+  </hstack>
+
+  <!-- the badge: two texts, not one composite, so "OFF" is a word the string table can
+       translate while the number stays a number -->
+  <hstack class="badge" visible-if="dsx.variable.hasOff" zIndex="1"
+          style="position: absolute; top: -4px; right: -4px; z-index: 1">
+    <text value="{{ dsx.attribute.off }}%" class="badgeTxt"/>
+    <text value="OFF" class="badgeTxt"/>
+  </hstack>
+</vstack>

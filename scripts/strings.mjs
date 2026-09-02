@@ -325,7 +325,9 @@ export function classify(key, files) {
 //  a BOOTED origin actually answers with: source-reading is what fills the tables, and the
 //  running server is what proves them.
 export const SERVER_COPY = {
-  "store.dsx": { storeCatalog: ["label", "note", "badge", "reason"] },
+  // `period` is the term beside the price on the Membership page ("7 days"), a word a reader
+  // sees, so it rides the same plane as the label and the note
+  "store.dsx": { storeCatalog: ["label", "note", "badge", "reason", "period"] },
 };
 
 /** the body of one `<action as="NAME">`, whole-line `//` comments dropped. Only whole-line,

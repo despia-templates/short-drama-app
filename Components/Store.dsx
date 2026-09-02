@@ -454,7 +454,7 @@
             <text value="Don't want to pay?" class="earnTitle"/>
             <text value="Check in daily, spin the wheel, watch a short ad or finish tasks — every one of them pays in coins." class="earnNote"/>
             <button label="Earn free coins" class="earnCta"
-                    on:tap="dsx.module.route.push({ path: '/rewards' })"/>
+                    on:tap="dsx.module.route.reset({ path: '/rewards' })"/>
           </vstack>
         </vstack>
       </vstack>

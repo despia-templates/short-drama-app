@@ -1,0 +1,308 @@
+<!-- BuyButton — THE purchase control. One file owns the money sequence on every lane, so the
+     Membership page, the coin store and any future door buy through the same lines and a
+     fix lands once.
+
+     ══ TWO LANES, PICKED BY CAPABILITY, ONE GRANTER ═════════════════════════════════════
+     App Store 3.1.1 names in-game currencies and premium-content unlocks as in-app-purchase
+     products, so coins and the VIP pass go through StoreKit and Play Billing inside an iOS
+     or Android build; Stripe is legal on the web storefront only. The pick is the house
+     form (AGENTS.md, the <AdGate> precedent) — capability first, platform second:
+
+       has('store')   → 'iap'     Core/Store `checkout` through the RevenueCat provider. The
+                                  platform's own purchase sheet is the ONLY platform surface
+                                  in the flow; everything around it is this app's design.
+       os == 'web'    → 'stripe'  the server-created PaymentIntent and the Stripe sheet.
+       otherwise      → 'blocked' a native build shipped without the module. One line says
+                                  so; nothing else renders, and nothing is charged.
+
+     ══ THE CLIENT NEVER GRANTS, ON EITHER LANE ══════════════════════════════════════════
+     A native purchase resolves the unified envelope and this file then POSTs /store/native
+     naming WHICH transaction to check; the server asks RevenueCat and grants from its own
+     price table (server/store.dsx settleNative). The RevenueCat webhook grants the same
+     transaction if that call is lost, on the same ledger lock, so a retry here can never
+     credit twice — which is exactly what lets the recovery card below exist. The Stripe
+     lane is the same shape one provider over: /store/checkout, the sheet, /store/settle.
+
+     ══ THE SUBJECT IS THE APP USER ID ═══════════════════════════════════════════════════
+     `externalId` / `appAccountToken` are the viewer's subject (`global.auth.sub`, a UUID).
+     RevenueCat keys the purchase to it, the server reads the same value off the wallet row
+     the caller owns, and the webhook carries it back as `app_user_id` — one identifier on
+     all three legs. An anonymous device session has a subject too (<AuthSeam>), which is
+     what makes buying without a login work.
+
+     MONEY GETS EVERY STATE: the control renders its own in-flight label the frame it is
+     tapped, a cancel is a quiet line and never an error, a pending purchase says it will
+     land, and a settle that failed after the store took the money keeps its transaction on
+     screen with an idempotent Confirm. -->
+<vstack class="wrap">
+  <head>
+    <attribute as="sku" default="''"/>            <!-- the catalogue id (server/store.dsx) -->
+    <attribute as="productId" default="''"/>      <!-- the store product identifier the row carries -->
+    <attribute as="kind" default="'vip'"/>        <!-- vip | coins -->
+    <attribute as="label" default="''"/>          <!-- the verb: "Unlock for", already localized by the owner -->
+    <attribute as="price" default="''"/>          <!-- the price the owner resolved; empty disables -->
+    <attribute as="variant" default="'gold'"/>    <!-- gold (membership) | brand (coins) -->
+    <attribute as="surface" default="'membership'"/>
+    <!-- THE SEAM IS THE DEFAULT (<AuthSeam>): every authenticated call carries the session -->
+    <attribute as="headers" default="global.auth.headers"/>
+
+    <event as="purchased" payload="kind coins days"/>
+    <event as="failed" payload="message"/>
+
+    <api as="checkoutCall" url="/store/checkout" method="POST" auto="false" headers="dsx.attribute.headers"/>
+    <api as="settleCall" url="/store/settle" method="POST" auto="false" headers="dsx.attribute.headers"/>
+    <api as="nativeCall" url="/store/native" method="POST" auto="false" headers="dsx.attribute.headers"/>
+
+    <variable as="busy">return false</variable>
+    <variable as="paying">return false</variable>
+    <variable as="order">return ''</variable>         <!-- Stripe: the order row to settle -->
+    <variable as="txn">return ''</variable>           <!-- native: the store transaction to settle -->
+    <variable as="settleFailed">return false</variable>
+    <variable as="settleMsg">return ''</variable>
+    <variable as="toast">return ''</variable>
+
+    <variable as="payLane" computed="true">
+      if (has('store')) { return 'iap' }
+      if (os == 'web') { return 'stripe' }
+      return 'blocked'
+    </variable>
+    <!-- the SERVER half of the native lane: `native.ready` on the catalogue says whether
+         this deployment can verify a store receipt (REVENUECAT_KEY). False means the
+         purchase is refused BEFORE the store takes money the backend could not grant. The
+         catalogue rides the app-wide stash every price surface writes. -->
+    <variable as="serverReady" computed="true">
+      const c = global.cacheCatalog
+      if (c == null) { return false }
+      if (c.native == null) { return false }
+      return c.native.ready == true
+    </variable>
+    <variable as="isGold" computed="true">return dsx.attribute.variant != 'brand'</variable>
+    <!-- ONE LINE, never a paragraph: the true edge is a build without the module or a
+         deployment without the verifier, and the viewer needs the fact, not the history.
+         The developer detail lives in docs/monetization.md. -->
+    <variable as="refusal" computed="true">
+      if (dsx.variable.payLane == 'blocked') { return 'In-app purchases are not available in this build.' }
+      if (dsx.variable.payLane == 'iap' && dsx.variable.serverReady == false) { return 'Purchases are not available yet on this deployment.' }
+      return ''
+    </variable>
+    <variable as="canBuy" computed="true">
+      if (dsx.variable.busy) { return false }
+      if (dsx.attribute.sku == null || dsx.attribute.sku == '') { return false }
+      if (dsx.attribute.price == null || dsx.attribute.price == '') { return false }
+      return dsx.variable.refusal == ''
+    </variable>
+    <variable as="ctaText" computed="true">
+      if (dsx.variable.busy == false) { return dsx.attribute.label }
+      if (dsx.variable.paying) { return 'Complete the payment…' }
+      if (dsx.variable.payLane == 'iap') { return 'Opening the store…' }
+      return 'Contacting Stripe…'
+    </variable>
+    <variable as="ctaOpacity" computed="true">return dsx.variable.canBuy ? 1 : 0.5</variable>
+    <variable as="ctaFx" computed="true">
+      return 'justify-content: center; opacity: ' + dsx.variable.ctaOpacity + '; transition: opacity 0.15s ease'
+    </variable>
+    <variable as="recoverLine" computed="true">
+      const why = dsx.variable.settleMsg == '' ? '' : ' The server said: ' + dsx.variable.settleMsg
+      if (dsx.variable.txn != '') { return 'The store confirmed your purchase, but applying it to your account did not go through. Nothing is lost: confirm below and it lands.' + why }
+      return 'Stripe confirmed your payment, but applying it to your account did not go through. Nothing is lost: confirm below and it lands.' + why
+    </variable>
+
+    <!-- THE EMIT SHELL (Components/parts/Analytics.dsx). Four lines, copied rather than
+         shared because a `<functions global="true">` body is the EXPRESSION tier (PLAN.md
+         §6.94); the POLICY is not copied. -->
+    <action as="track" inputs="name, props">
+      if (analyticsBlocked()) { return }
+      if (analyticsSink() != '') { dsx.module.posthog.capture({ event: name, properties: props }) }
+      else { dsx.log('funnel', name, props) }
+    </action>
+
+    <!-- ONE BUY. Which lane it takes is decided by `payLane`, never by a caller. -->
+    <action as="buy">
+      if (dsx.variable.busy) { return }
+      if (dsx.attribute.sku == null || dsx.attribute.sku == '') { return }
+      if (dsx.variable.refusal != '') {
+        dsx.variable.toast = dsx.variable.refusal
+        dsx.event('failed', { message: dsx.variable.refusal })
+        return
+      }
+      dsx.variable.busy = true
+      dsx.variable.toast = ''
+      dsx.variable.settleFailed = false
+      dsx.action.track({ name: 'purchase_started', props: { sku: dsx.attribute.sku, lane: dsx.variable.payLane, surface: dsx.attribute.surface } })
+      // `await` is a STATEMENT, never a ternary branch (AGENTS.md, PLAN.md 6.31)
+      if (dsx.variable.payLane == 'iap') { await dsx.action.buyNative() }
+      else { await dsx.action.buyStripe() }
+      dsx.variable.busy = false
+    </action>
+
+    <!-- ── THE NATIVE LANE ── Core/Store checkout through the RevenueCat provider. The
+         product id is the STORE identifier the catalogue row carries; the subject is the
+         RevenueCat app user id (see the header). -->
+    <action as="buyNative">
+      const sub = global.auth.sub
+      if (sub == null || sub == '') {
+        dsx.variable.toast = 'Your session is still starting — try again in a moment.'
+        dsx.event('failed', { message: dsx.variable.toast })
+        return
+      }
+      const pid = dsx.attribute.productId == null || dsx.attribute.productId == '' ? dsx.attribute.sku : dsx.attribute.productId
+      const r = await dsx.module.store.checkout({
+        provider: 'revenuecat', product: pid, externalId: sub, appAccountToken: sub,
+        kind: dsx.attribute.kind == 'coins' ? 'coins' : 'plan'
+      })
+      // A REJECTED module call arrives as { ok: false, code, message } or null. A user
+      // cancel rides that channel too (the module manifest says so) and is not a failure.
+      if (r == null) {
+        dsx.variable.toast = 'The store did not answer. Nothing was charged.'
+        dsx.event('failed', { message: dsx.variable.toast })
+        return
+      }
+      if (r.ok === false) {
+        const code = r.code != null ? r.code : (r.error != null ? r.error : '')
+        if (code == 'cancelled' || code == 'user_cancelled') {
+          dsx.variable.toast = 'Purchase cancelled. Nothing was charged.'
+          return
+        }
+        dsx.variable.toast = r.message != null ? r.message : 'The purchase could not be completed.'
+        dsx.event('failed', { message: dsx.variable.toast })
+        return
+      }
+      if (r.outcome == 'cancelled' || r.outcome == 'dismissed') {
+        dsx.variable.toast = 'Purchase cancelled. Nothing was charged.'
+        return
+      }
+      if (r.outcome == 'pending') {
+        dsx.variable.toast = 'The store is still confirming this purchase. It lands the moment the store callback arrives.'
+        return
+      }
+      if (r.outcome != 'purchased' && r.outcome != 'restored') {
+        dsx.variable.toast = 'The purchase could not be completed.'
+        dsx.event('failed', { message: dsx.variable.toast })
+        return
+      }
+      dsx.variable.txn = r.transaction == null || r.transaction.id == null ? '' : String(r.transaction.id)
+      await dsx.action.settleNative()
+    </action>
+
+    <!-- THE GRANT IS THE SERVER. POST /store/native names WHICH purchase to check; the server
+         asks RevenueCat and grants from its own price table. Idempotent on the store
+         transaction, so Confirm can be pressed any number of times. -->
+    <action as="settleNative">
+      const pid = dsx.attribute.productId == null || dsx.attribute.productId == '' ? dsx.attribute.sku : dsx.attribute.productId
+      const s = await nativeCall.send({ sku: pid, transaction: dsx.variable.txn, provider: 'revenuecat' })
+      if (s.ok) {
+        // THE MONEY EVENT IS THE GRANT, NOT THE TAP; a replay reports granted false and is
+        // deliberately not counted a second time
+        if (s.data.granted) { dsx.action.track({ name: 'purchase_completed', props: { lane: 'iap', surface: dsx.attribute.surface, coins: s.data.coins, days: s.data.days } }) }
+        dsx.variable.settleFailed = false
+        dsx.variable.txn = ''
+        dsx.variable.toast = ''
+        dsx.event('purchased', { kind: dsx.attribute.kind, coins: s.data.coins, days: s.data.days })
+        return
+      }
+      // THE CARD, NOT A TOAST — money is never a message that scrolls away. The server words
+      // ride inside it (recoverLine) so a refusal retrying cannot fix is legible.
+      dsx.variable.settleFailed = true
+      dsx.variable.settleMsg = s.data != null && s.data.message != null ? s.data.message : ''
+    </action>
+
+    <!-- ── THE WEB LANE ── the server-created PaymentIntent, one Stripe sheet, server settle -->
+    <action as="buyStripe">
+      const r = await checkoutCall.send({ sku: dsx.attribute.sku })
+      if (!r.ok) {
+        dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Checkout is unavailable right now.'
+        dsx.event('failed', { message: dsx.variable.toast })
+        return
+      }
+      dsx.variable.order = r.data.order
+      const opened = await dsx.module.stripe.session({
+        publishable_key: r.data.publishable_key,
+        payment_intent_client_secret: r.data.client_secret
+      })
+      if (opened == null || opened.ok === false) {
+        dsx.variable.toast = 'The payment sheet could not open on this platform.'
+        return
+      }
+      dsx.variable.paying = true
+      const paid = await dsx.module.stripe.payment({ session: dsx.module.stripe.context.session })
+      dsx.variable.paying = false
+      if (paid == null || paid.status !== 'succeeded') {
+        dsx.variable.toast = 'Payment was not completed. Nothing was charged.'
+        return
+      }
+      await dsx.action.settleStripe()
+    </action>
+
+    <action as="settleStripe">
+      const s = await settleCall.send({ order: dsx.variable.order })
+      if (s.ok) {
+        if (s.data.granted) { dsx.action.track({ name: 'purchase_completed', props: { lane: 'stripe', surface: dsx.attribute.surface, coins: s.data.coins, days: s.data.days } }) }
+        dsx.variable.settleFailed = false
+        dsx.variable.order = ''
+        dsx.variable.toast = ''
+        dsx.event('purchased', { kind: dsx.attribute.kind, coins: s.data.coins, days: s.data.days })
+        return
+      }
+      dsx.variable.settleFailed = true
+      dsx.variable.settleMsg = s.data != null && s.data.message != null ? s.data.message : ''
+    </action>
+
+    <!-- the recovery card's one verb: whichever lane left a purchase unsettled -->
+    <action as="retrySettle">
+      if (dsx.variable.busy) { return }
+      dsx.variable.busy = true
+      if (dsx.variable.txn != '') { await dsx.action.settleNative() }
+      else if (dsx.variable.order != '') { await dsx.action.settleStripe() }
+      dsx.variable.busy = false
+    </action>
+
+    <style as="wrap" spacing="10" alignItems="stretch"/>
+    <style as="ctaGold" background="#F5D33D" radius="14" minHeight="52" paddingH="16" spacing="6" alignItems="center"/>
+    <style as="ctaGoldTxt" fontSize="17" fontWeight="bold" color="#000000"/>
+    <style as="ctaBrand" background="#FF2C55" radius="14" minHeight="52" paddingH="16" spacing="6" alignItems="center"/>
+    <style as="ctaBrandTxt" fontSize="17" fontWeight="bold" color="#FFFFFF"/>
+    <style as="refusal" fontSize="12" color="#8E8E93" textAlign="center" lineSpacing="4"/>
+    <style as="retryCard" background="#1E1830" radius="14" paddingH="16" paddingV="16" spacing="10" alignItems="flex-start"/>
+    <style as="retryTitle" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
+    <style as="retryBody" fontSize="13" color="rgba(255,255,255,0.65)" lineSpacing="4"/>
+    <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
+    <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
+  </head>
+
+  <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
+       Theme.dsx), and a caller must not have to remember to register it first. -->
+  <Theme/>
+
+  <!-- THE CTA. An hstack with on:tap rather than a <button>, because a button carries ONE
+       label and this one is two words the string table has to reach separately: the verb
+       ("Unlock for") and the price, which is a number. -->
+  <hstack class="ctaGold" visible-if="dsx.variable.isGold" on:tap="dsx.action.buy()"
+          opacity="{{ dsx.variable.ctaOpacity }}" style="{{ dsx.variable.ctaFx }}"
+          a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.attribute.label }} {{ dsx.attribute.price }}">
+    <text value="{{ dsx.variable.ctaText }}" class="ctaGoldTxt"/>
+    <text value="{{ dsx.attribute.price }}" class="ctaGoldTxt" visible-if="dsx.variable.busy == false &amp;&amp; dsx.attribute.price != ''"/>
+  </hstack>
+  <hstack class="ctaBrand" visible-if="dsx.variable.isGold == false" on:tap="dsx.action.buy()"
+          opacity="{{ dsx.variable.ctaOpacity }}" style="{{ dsx.variable.ctaFx }}"
+          a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.attribute.label }} {{ dsx.attribute.price }}">
+    <text value="{{ dsx.variable.ctaText }}" class="ctaBrandTxt"/>
+    <text value="{{ dsx.attribute.price }}" class="ctaBrandTxt" visible-if="dsx.variable.busy == false &amp;&amp; dsx.attribute.price != ''"/>
+  </hstack>
+
+  <!-- the one-line refusal, only on the true edge (see `refusal`) -->
+  <text value="{{ dsx.variable.refusal }}" class="refusal" visible-if="dsx.variable.refusal != ''"/>
+
+  <!-- THE RECOVERY CARD: the store or Stripe confirmed, the grant has not landed -->
+  <vstack class="retryCard" visible-if="dsx.variable.settleFailed" style="border: 1px solid rgba(199,155,255,0.35)">
+    <text value="Payment received — one step left" class="retryTitle"/>
+    <text value="{{ dsx.variable.recoverLine }}" class="retryBody"/>
+    <button label="{{ dsx.variable.busy ? 'Confirming…' : 'Confirm purchase' }}" class="retryBtn" on:tap="dsx.action.retrySettle()"/>
+  </vstack>
+
+  <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
+    <text value="{{ dsx.variable.toast }}" class="toastLine" grow="width" style="flex: 1"/>
+    <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
+           a11yLabel="Dismiss message" a11yTrait="button"/>
+  </hstack>
+</vstack>
