@@ -243,3 +243,146 @@ Floating pill tab bar with a separate round search button; a hero carousel with 
 "continue watching" mini bar above the tabs; a paywall with live social proof ("Amelia just
 bought a Monthly VIP"), a 4.7★ rating line, a poster fan, and `Privacy policy · Terms of use ·
 Restore` footer links. If the team wants social proof or ratings on §6 later, this is the shape.
+
+## 9 · Rewards — the industry-standard page (founder's reference set, 2026-09-02, 20 shots from DramaBox "Reward coins / Member Points", iDrama "Rewards / VIP Points", NetShort VIP/Store)
+
+All numbers in pt, read off 1206×2622 iPhone captures (÷3). Ours keeps the ReelShort pink accent
+(`accent()` #FF2C55) wherever the references use their brand pink/teal/green gradients; gold
+(`crownGold()` / coin gold) for amounts and coins; **no native theming, custom UI on all three lanes**.
+
+### 9.0 · Frame
+- Route `/rewards` is a tab root (tab bar stays). Header row 44 tall under the safe top: back
+  chevron 20 at x 26 (pops); TWO TABS centred as a segmented text pair — "Reward coins" (17 bold,
+  ink) and "Member Points" (17, ink-3) 24 apart, the active tab underlined by a 26×2 bar (ink, radius
+  1) 6 below the text. Swiping between tabs is a `<pager>`; the underline follows the resting index.
+- A "Rules" pill hugs the RIGHT SCREEN EDGE at y 108 (below the header): 48×31, radius 16 on its
+  two left corners only, bg rgba(255,255,255,0.12), label 15 ink; tap → the Rules sheet (9.6).
+- Page bg #0E0E0E; content inset 16; section gap 28.
+
+### 9.1 · Balance hero (tab 1)
+- Left: the coin balance as a 40pt bold GOLD number at x 31, y 118 (baseline), "Balance" 15
+  ink-3 below (8 gap). Right: a decorative illustration (a 3D coin with a check + sparkles, generated
+  asset `public/assets/rewards-hero.png`, 2:1, ~230×160 at the right edge, 40% opacity gradient into
+  the page). The hero band is 105→183 (78 tall) and reads as part of the page, not a card.
+
+### 9.2 · Check-in card
+- Card 16 inset, radius 16, bg #1A1A1A, padding 16, at y 186; title "You've checked in for {n} day!"
+  17 regular ink with `{n}` in gold; 16 below: SEVEN CELLS in one row, each 44×82, radius 8, bg
+  #262626, gap 5 (fills 368): "+10" 15 bold ink (gold on the current cell), a 19pt coin glyph
+  (catalog icon `dollarsign.circle.fill` in gold; the claimed cell shows a check in ink-3), the label
+  "Today" / "Day 2"…"Day 7" 13 ink-3. Claimed cells dim to 40% ink; the current cell carries a
+  1pt accent outline. Amounts: 10·20·20·10·10·25·40 (server-owned; the UI reads them).
+- 16 below the cells: the CHECK-IN BUTTON, full card width, 47 tall, radius 8, bg accent, label
+  "Check in" 20 semibold white; disabled (already checked in today) → bg rgba(255,44,85,0.35),
+  label "Checked in ✓". Card bottom padding 16.
+- After a successful check-in → the SUCCESS MODAL (9.5).
+
+### 9.3 · "Earn Rewards" task list (tab 1)
+- Section title "Earn Rewards" 17 semibold at y 441 (28 below the card). Then ROW CARDS, one per
+  task, 74 tall, radius 12, bg #161616, 12 apart, padding 16:
+  · a 44 round icon tile (bg #2A2A2A) with a 19pt catalog glyph in WARM GOLD (#F6D27A);
+  · title 17 regular ink at x 83; subtitle 15 ink-3 with the amount in gold, e.g. "+ 60 Reward coins",
+    or a progress "(0/15)" 15 ink-3 after the title;
+  · trailing ACTION PILL 75×31, radius 8, bg accent, label 15 semibold white: Sign In · Claim · Link ·
+    Watch · Follow · Go · Invite. A done task shows the pill as rgba(255,44,85,0.2) with "Done" in accent.
+- The rows, top to bottom (every grant is SERVER-VERIFIED — no client-originated credit, per the
+  monetisation law; rows whose completion the server cannot verify grant NOTHING and say so):
+  1. Login with any account — "+ 60 Reward coins" — Sign In → the auth seam; granted by the server
+     when a device links an account (once per account).
+  2. Turn on push notifications — "+ 60 Reward coins" — Claim → `notify.permission()`; granted when
+     the server receives the device's push token (once per device).
+  3. Earn rewards (0/15) — "Watch a video to earn 20 coins" — Watch → the rewarded-ad lane
+     (Article 7 degradation named on the web, as today).
+  4. Watch for 5 mins — "+ 10 Reward coins" and Watch for 15 mins — "+ 20" — Go → `/discover`;
+     granted by the watch-mission ledger (server ticks).
+  5. Invite friends — "Earn up to 500 coins daily" — Invite → the share sheet with a referral link;
+     granted when the invitee's device completes its first server-verified watch minute.
+  6. Follow us on Facebook / YouTube / TikTok / Instagram — subtitle "Help us grow" — Follow → opens
+     the link. NO coins: a follow cannot be verified server-side, so the reference's "+20" is a
+     client-trusted grant we deliberately do not make (say so in the ledger, PLAN.md).
+  7. Share with friends — "Help us grow" — Go → the share sheet; no coins, same reason.
+- Footer: "This activity is not affiliated with Apple Inc." 15 ink-3 centred, 40 below the last row
+  (App Store 3.1.1 wording for reward promotions); the tab bar clearance below.
+- The existing Watch Mission card, ad card and Spin the wheel: fold the Watch Mission into rows 3–4
+  (keep the mission ring/state on the player); keep Spin the wheel as a card AFTER the task list
+  ("Spin the wheel" 17 semibold, the wheel as today) — it is a server-owned grant already.
+
+### 9.4 · "Member Points" (tab 2)
+- Hero: "Daily Rewards" 24 bold ink at x 16, y 118; right: a points pill "⚡ {points} ›" (18 semibold,
+  gem glyph in the accent) — points = the membership points balance (server, new field on the
+  wallet). The band behind the header carries a pink→purple gradient wash (accent at 30% → #6A2A7A
+  at 20% → transparent, 200 tall).
+- Card "Your Membership Day {n}" (17 semibold centred, radius 16, bg #1A1A1A, padding 16): a 5-node
+  TIMELINE (Day n-2 · Day n-1 · Today · Day n+1 · Day n+2): labels 15 (Today in accent), 22pt gem
+  glyphs on a 3pt track (#3A3A3A); claimed days = gem in accent, unclaimed past days = a grey "sad"
+  glyph with "Unclaimed" 13 ink-3, an accent ▾ 8 under Today. Non-members see the same card with
+  "Become a member to claim daily points" and a "See plans" pill (→ /membership).
+- Rows (same row-card recipe as 9.3): "Daily Draw" (+?? — a random 5–50 points, Claim, once a day),
+  "Watch & Earn" (+50, "Watch for 30 Minutes", Claim when the mission ledger says 30 min today).
+- "Recommendations / More ›" — a 3-poster row (poster 3:4 radius 8, title 15 ink below, 1 line).
+- "Enable Push Notifications" row (+30, "Get daily rewards and must-see content.", Open).
+- "Redeem Points" 24 bold; subtitle "This redemption extends your membership period only.
+  Auto-renewal stays the same." 15 ink-3 with a ⓘ 20 at the right; cards (radius 16, bg #1A1A1A,
+  padding 20): a 72 square tile (accent→#7A2A50 gradient, "+1" / "+5" 28 bold white over a small
+  gem), "1-Day Membership Extension" 20 ink 2 lines, "⚡ 500" 15 gold; trailing "Redeem" pill 108×40
+  radius 8 (bg #2A2A2A + ink-3 label when unaffordable; accent + white when affordable). Server
+  route `POST /rewards/redeem` extends `vipUntil` by the days and debits the points — idempotent per
+  day+card.
+- "Coming Soon" band: full-bleed gradient (#3A1030 → #0E0E0E), title 24 bold, a date "09/03" 15,
+  a 1pt track with an accent ▶ marker, then the coming-soon rail (poster 3:4 with a "Remind Me"
+  pill 113×35 radius 18, bg rgba(255,255,255,0.15), alarm glyph 16 + 15 semibold) — reuse the Home
+  "Coming soon" rail + its permission sheet (§2a/2b).
+
+### 9.5 · Success modal (after check-in / claim)
+- The page dims 60%; a centred card 314 wide, radius 20, bg #1A1A1A, padding 24, with a 87pt coin
+  illustration (`rewards-coin.png`, generated) overlapping the top edge by 44; "Success" 22 bold
+  centred; "Congratulations on getting {n} coins" 15 ink; 20 below: a full-width 47 CTA, radius 24,
+  gradient accent→#FF6A3D, label "Watch Ad to earn 30 coins" 17 semibold white with an "AD" glyph
+  (hidden on lanes without the ad module — Article 7: the card then ends with a "Done" pill).
+  Dismiss on scrim tap; a ⊗ 28 below the card. `<sheet>` mode card, `a11yLabel="Reward received"`.
+
+### 9.6 · Rules sheet
+- Bottom sheet (`detents="content"`, top radius 20, bg #1A1A1A): a chevron-down 24 at the left,
+  "Rules" 20 bold centred; the rules as a numbered list 17 ink, 1.35 leading, 16 inset:
+  1 check in once per day (a missed day restarts the cycle), 2 coins unlock episodes (history under
+  My Page → Transaction History), 3 the earliest-expiring bonus is spent first, then coins, 4 check-in
+  and daily tasks reset at 00:00 in the viewer's time zone, 5 the operator's right of final
+  interpretation. A full-width 47 "Got It" pill (accent) closes it.
+
+### 9.7 · Enable-notification modal (from rows 2 / 9.4)
+- Centred card 314 wide, radius 20: a 120-tall phone mock at the top (the app name + an "Allow
+  notifications" toggle ON, on a #2A2A2A plate), "Enable Notification" 20 semibold, three benefit
+  columns (glyph 44 + label 15: "New Shows" · "Bonus Rewards" · "Promos"), a full-width "Enable" 47
+  pill (accent) → `notify.permission()`; ⊗ below. Reuse §2b's permission copy and the same module.
+
+## 10 · Store / VIP / Membership polish (NetShort + iDrama references)
+- Membership cards (`/membership`, `/store`): the selected card wears a 1.5 gold border (#F6B63D) AND
+  a countdown badge "05:59:59" (13 semibold white on accent, radius 8 on the outer corner only)
+  pinned to its top-right when a limited offer is live (server field `offerEndsAt`; hidden otherwise);
+  card body: plan name 20 semibold gold, price 32 bold gold + "/week" 17 ink-3, "Auto renew, Cancel
+  anytime" (subscriptions) or "One charge, no auto-renewal" (passes) 15 ink-3, then a 2×2 BENEFITS
+  GRID (glyph 18 + label 15: Unlimited viewing · Ad-Free · 1080P quality · Download), 20 padding.
+- Coin packs: 2×2 cards radius 12, "🪙 2500" 24 bold + "+300" 17 ink-3, price 17 ink-3 below.
+- "Tips:" 17 semibold + numbered 15 ink-3 lines (recharge instructions: 1 free and paid content,
+  2 coins/bonus/membership unlock, 3 the pass covers everything while active, 4 benefits within 24h
+  per the store's order status, 5–6 the renewal and cancellation rules) — copy per lane: App Store on
+  iOS, Google Play on Android, "your card" on the web.
+- A PAYMENT ROW above the sticky CTA on native: "🍎 Apple" / "▶ Google Play" outlined pill (1pt
+  accent border, radius 12, 48 tall); web: "Card (Stripe)". Then the sticky CTA "Pay now" /
+  "Subscribe Now" 52 tall radius 26 accent, "Auto-renewal·Cancel anytime" 13 ink-3 under it (subs).
+- VIP page header: "Restore" pill top-right (15, rgba(255,255,255,0.12), radius 8) → restore
+  purchases (works anonymous); the member state line "Visitor · VIP expired on {date}" / "VIP until
+  {date}" 15 ink-3 under a 72 avatar tile.
+- "Good Bargain" corner badge (13 semibold white on an accent→#FF6A3D gradient, radius 8 on the outer
+  corner) on the best-value plan.
+- The "Surprise — Limited Time Offer" modal (a gold coupon card with the offer price, "Subscribe Now —
+  {intro} for 1st week, then {price} per week", legal lines) is OPTIONAL and server-driven
+  (`offer` on `/store/plans`); implement the surface, show it only when the server sends an offer.
+
+## 11 · Browse list rows (genre page reference)
+- `/browse/:genre`: header with the genre title centred; chips "Trending" (accent-tinted: bg
+  rgba(255,44,85,0.18), label accent) | "Latest" (ink-3) at y 120; then LIST ROWS 20 apart: poster
+  118×157 radius 8 with a play-count badge "▶ 67.4M" (13 semibold white, bottom-right, 8 inset) and
+  an optional "Hot" tag (accent, 13, top-right); to the right: title 20 semibold ink 2 lines,
+  synopsis 15 ink-3 3 lines clamped, meta row 15 ink-3 — "Betrayal, Doctor" left, "52 Episodes"
+  right. Keep the 3-column grid for `/browse` (all series); the genre page uses these rows.
