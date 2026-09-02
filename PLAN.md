@@ -3912,3 +3912,18 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      cover surface), matching what iOS already does; the template must not add a `safeTop`
      that iOS would then pay twice. Measured: the field's top at 80px (30dp) on Android
      against the status bar's 54dp; iOS at 62pt + 18.
+
+191. **A CLASSED `<button label=>` WORE TWO SURFACES ON iOS 26 — the class box and the OS
+     glass capsule** (found 2026-09-02 by the founder on the coming-soon rail's "Remind Me";
+     measured on the iPhone 17 Pro simulator against the browser and the Pixel emulator; fixed
+     upstream, dev dc987952).
+
+     Under `design: "custom"` the iOS button still took SwiftUI's `.borderless` style, which on
+     iOS 26 draws a Liquid Glass capsule behind the label; the class (`remindInline`:
+     background #2C2C2E, radius 8, height 32) painted the control's box OUTSIDE it, so the
+     phone showed a lighter inset plate inside the authored pill. The web paints the class
+     alone (`.dsx-button` is a flex box the class styles — no UA chrome under custom) and
+     Android's plain-box lane already did the same. The custom lane now uses `.plain`, so the
+     class is the only surface; the system lanes keep `.borderless`. The founder's reading —
+     "no padding wrap, CSS flexbox behaviour 1:1" — is the law here: the button's box is the
+     class's box, the label centred inside it.
