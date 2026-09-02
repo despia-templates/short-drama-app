@@ -35,6 +35,7 @@
   "Browse": "Duyệt phim",
   "Browse series": "Duyệt phim bộ",
   "Browse the catalogue": "Duyệt danh mục",
+  "Buy for": "Mua với giá",
   "By continuing you agree to our Terms of Use and Privacy Policy.": "Khi tiếp tục, bạn đồng ý với Điều khoản sử dụng và Chính sách quyền riêng tư của chúng tôi.",
   "Check in daily, spin the wheel, watch a short ad or finish tasks — every one of them pays in coins.": "Điểm danh mỗi ngày, quay vòng quay, xem một quảng cáo ngắn hoặc hoàn thành nhiệm vụ — mỗi việc đều trả bằng xu.",
   "Check your connection and try again.": "Kiểm tra kết nối của bạn rồi thử lại.",
@@ -88,6 +89,7 @@
   "Every episode. No coins.": "Mọi tập phim. Không tốn xu.",
   "Everything held against it is gone and you are signed out. The catalogue stays open — you can keep browsing as a guest, or create a new account whenever you like.": "Mọi thứ gắn với tài khoản đã biến mất và bạn đã đăng xuất. Danh mục vẫn mở — bạn có thể tiếp tục duyệt với tư cách khách, hoặc tạo tài khoản mới bất cứ lúc nào.",
   "Explore": "Khám phá",
+  "For You": "Cho bạn",
   "From": "Từ",
   "Get Coins": "Nạp xu",
   "Get coins": "Nạp xu",
@@ -182,6 +184,7 @@
   "Save": "Lưu",
   "Saved": "Đã lưu",
   "Search": "Tìm kiếm",
+  "Search dramas": "Tìm phim ngắn",
   "See VIP plans": "Xem gói VIP",
   "See everything VIP includes": "Xem tất cả những gì VIP có",
   "See plans": "Xem các gói",
@@ -288,7 +291,5 @@
   "·": "·",
   "—": "—",
   "▶ Continue Watching": "▶ Xem tiếp",
-  "For You": "Cho bạn",
-  "Search dramas": "Tìm phim ngắn",
-  "Buy for": "Mua với giá"
+  "▶︎ Continue Watching": "▶︎ Xem tiếp"
 }

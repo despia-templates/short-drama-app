@@ -174,7 +174,9 @@
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/RevenueCat",
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/LocalPush",
     "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Notify",
-    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/IdentityVault"
+    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/IdentityVault",
+    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Extensions/ActivityKit",
+    "../despia_dsx/despia-framework/ClosedSource/DSX/Modules/Core/Widgets"
   ],
   "_remind_note": "REMIND ME (docs/design/reference-ui-spec.md §2–§2b) is two modules. Core/Notify (scheme `notify`) owns the PERMISSION: `dsx.module.notify.permission()` is the one ladder on three renderers (the kernel's NotifyCore, corpus-pinned), and it is what the permission sheet's 'Allow notifications' asks. Core/LocalPush (scheme `localpush`) owns the SCHEDULE: `send({ seconds, id, title, message, url })` is a one-shot the OS fires at the premiere, after force-quit and reboot, on iOS and Android. The web facet of `send` is a page-side timer that dies with the tab — honest for a delay of minutes, a lie for a premiere in nine days — so Components/App.dsx does not arm it there and says so in the sheet; the server row (server/reminders.dsx) is what survives on every lane. Both packages reach the web build from this list; the native exports read `Modules/` and the lockfile (PLAN.md 6.115), so on a device `has('localpush')` is false until that fold lands and the sheet names the gap instead of pretending.",
   "_modules_note": "DECLARE-THEN-REACH. `modules` is the LINTER's allowlist of platform module schemes this app reaches and no configured `package` claims. `posthog` and `consent` are for Components/parts/Analytics.dsx: Core/PostHog is the framework's product-analytics verb and Core/Consent its gate. They used to be deliberately ABSENT from `packages`, because both shipped a complete web/index.js that no build could load — a browser chunk was emitted only for a manifest that restated `web.entry`, ten modules did, and 98 did not. That was PLAN.md §6.92 and it is fixed upstream: file presence is the gate now (`webLaneEntry`), so declaring them here emits real chunks and has('posthog') can finally answer true. The guards stay on every call regardless — a build that excludes them must still run.",
@@ -187,5 +189,6 @@
     "localpush",
     "notify",
     "identityvault"
-  ]
+  ],
+  "_surfaces_note": "THE SURFACES OUTSIDE THE APP. Core/Extensions/ActivityKit (scheme liveactivity) and Core/Widgets (scheme widget) are the framework's Live Activity and home-screen widget lanes; Components/parts/NowPlayingSurface.dsx publishes the 'Currently Watching' card through them (spec §7) and Components/surfaces/NowPlaying{Activity,Widget}.dsx are the snapshot documents they render — first-class .dsx files, lint-checked, shipped byte-exact by both native exports and named by NAME in the module calls. Neither module has a web lane (a browser owns no lock screen), so this list admits the calls to the linter and the browser build emits no chunk for them; the native exports synthesize the ActivityKitExtension + ImageWidgetExtension targets, the App Group entitlement and the Glance receiver from the same two manifests (PLAN.md 6.153). They are listed here beside the packages note's caveat: until the native exports read this list (6.115), a device build reaches them through a Modules/ mount."
 }

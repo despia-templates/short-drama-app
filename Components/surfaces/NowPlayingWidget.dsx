@@ -1,0 +1,77 @@
+<!-- NowPlayingWidget — the "Currently Watching" card on the HOME SCREEN (spec §7), for the
+     hours when nothing is playing: the last episode the viewer watched, and one tap back
+     into it. iOS home + lock-screen widget (Core/Widgets, the ImageWidget target) and the
+     Android Glance widget render THIS file; the Live Activity twin is NowPlayingActivity.dsx,
+     whose lockscreen slot is this same card so the two surfaces cannot drift.
+
+     THIS IS A SNAPSHOT DOCUMENT, not a screen (StackWidgets.md, live-surfaces-dsx.md): a
+     widget process runs no JSE and fetches nothing, so the dialect is the small one — stacks,
+     text, image, spacer, `{{ dsx.variable.<key> }}` holes only (no ternaries, no calls), and
+     every colour is a LITERAL. The literals are checked mirrors of Components/parts/Theme.dsx
+     (widgetCard #0E0E10 · ink3 #8E8E93 · sheetCard #1C1C1E · accentWidget #6EE7C5 · ink
+     #FFFFFF · stage #000000), the same rule every <style> block already lives under.
+
+     THE VARIABLES the app publishes (Components/parts/NowPlayingSurface.dsx, through
+     dsx.module.widget.layout({ layout: 'NowPlayingWidget', vars, images })):
+       show    the show id            idx   the 1-based episode index
+       title   the show title         ep    the "EP.n" label, pre-formatted
+       caption "Currently Watching"   cta   "▶︎ Continue Watching" — both LOCALIZED BY THE
+               APP (`localize()`), because a snapshot process has no string table: the
+               words arrive as vars, and the 13 locales this app ships reach the card
+       poster  the poster's FILE PATH on this device — the module fetched the https PNG twin
+               into the shared container (live-surfaces/images.json); a widget paints only
+               what is already on the device
+       mark    the app mark's file path, the same way
+     A hole the app left empty renders empty; the card renders regardless.
+
+     THE TAP is the ROOT's href (live-surfaces/links.json): a relative path joins the app's
+     own URL scheme — `/watch/<show>/<idx>` becomes `shortdrama://watch/<show>/<idx>` — and
+     the Router's inbound door lands it on the player, cold or warm. The whole card is the
+     link because a small widget honours nothing else.
+
+     ONE DOCUMENT, A LAYOUT PER FAMILY (StackWidgetDocument): the <widget> root's first visual
+     child is the card every family renders; a <small>/<medium>/<large>/<rectangular>/
+     <circular>/<inline> slot would override it for that family. The medium card is the card
+     here (the reference's own size), so no slot is declared; the <head> is declaration-only
+     and never rendered. Android's Glance has no families and renders the same child.
+
+     "▶︎" IS A TEXT GLYPH, DELIBERATELY (U+25B6 with the text-presentation selector U+FE0E — without it iOS draws the blue emoji tile, measured on the lock screen): the snapshot dialect has no unified-icon element (the
+     in-app renderer draws the shared catalog; a widget process has no catalog and an SF
+     symbol has no Android twin), so the one glyph the spec writes into the label is the one
+     character that renders identically on both lanes. Filed in PLAN.md §6 as the ask.
+
+     SIZING is by content, not by frame: the layout box carries padding/background/radius/
+     grow, and the column's height comes from its rows — poster 108 + 16pt padding = the
+     140pt a medium widget holds. The title keeps the spec's two lines. -->
+<widget>
+  <head>
+    <expects variable="show"/>     <!-- the show id -->
+    <expects variable="idx"/>      <!-- the 1-based episode index -->
+    <expects variable="title"/>    <!-- the show title -->
+    <expects variable="ep"/>       <!-- "EP.n", pre-formatted -->
+    <expects variable="caption"/>  <!-- "Currently Watching", localized by the app -->
+    <expects variable="cta"/>      <!-- "▶︎ Continue Watching", localized by the app -->
+    <expects variable="poster"/>   <!-- the poster's file path on this device (module-fetched) -->
+    <expects variable="mark"/>     <!-- the app mark's file path, the same way -->
+  </head>
+  <hstack bg="#0E0E10" radius="20" paddingh="16" paddingv="16" spacing="14" align="top" grow="width"
+            href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}">
+    <image src="{{ dsx.variable.poster }}" width="72" height="108" radius="8" fit="cover"/>
+    <vstack align="leading" spacing="0" grow="width">
+      <hstack align="top" spacing="8">
+        <vstack align="leading" spacing="3" grow="width">
+          <text size="13" color="#8E8E93" lines="1">{{ dsx.variable.caption }}</text>
+          <text size="20" weight="bold" color="#FFFFFF" lines="2">{{ dsx.variable.title }}</text>
+          <text size="13" color="#8E8E93" lines="1">{{ dsx.variable.ep }}</text>
+        </vstack>
+        <hstack bg="#1C1C1E" radius="8" padding="6">
+          <image src="{{ dsx.variable.mark }}" width="24" height="24" fit="contain"/>
+        </hstack>
+      </hstack>
+      <spacer/>
+      <hstack bg="#6EE7C5" radius="12" paddingv="12" paddingh="14" grow="width" align="center">
+        <text size="17" weight="bold" color="#000000" lines="1">{{ dsx.variable.cta }}</text>
+      </hstack>
+    </vstack>
+  </hstack>
+</widget>

@@ -1,0 +1,157 @@
+<!-- NowPlayingSurface — the "Currently Watching" card OUTSIDE the app (spec §7), published
+     from the player: an iOS Live Activity (Dynamic Island + Lock Screen banner) while an
+     episode is playing or paused mid-way, and the home-screen widget — iOS WidgetKit and
+     Android Glance — carrying the last watched episode once nothing is live. Both deep-link
+     `/watch/<show>/<idx>` back into the player.
+
+     ══ MOUNT IT ONCE, IN THE PLAYER, WITH THE FACTS BOUND ═══════════════════════════════
+     This part renders nothing (the Theme/DemoSeed 0×0 idiom) and reacts to its attributes;
+     the player mounts it beside <Analytics/> and binds what it already knows:
+
+       <NowPlayingSurface show="{{ dsx.variable.showId }}" idx="{{ dsx.variable.cur }}"
+                          title="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.title }}"
+                          poster="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.poster }}"
+                          active="{{ dsx.variable.epLocked == false }}"
+                          paused="{{ dsx.variable.paused }}"/>
+
+     `active` is the caller's word for "an episode is in progress": a locked episode (the
+     paywall, not a clip) is not, the end of the series is not. A change in (show, idx,
+     active, paused) is what publishes — never the clock, so the Live Activity's update
+     budget is spent on episode boundaries and pause/resume, not on every tick. Leaving the
+     player (this part unmounting) ends the activity; the widget keeps the last episode.
+
+     ══ CAPABILITY FIRST (the AdGate rule) ═══════════════════════════════════════════════
+     `has('liveactivity')` and `has('widget')` decide, never `os`. Both modules declare
+     platforms ios/android (Widgets) and ios (ActivityKit) in their manifests and ship no web
+     lane, so on the web this part is inert by construction — a browser owns no lock screen —
+     and a native build that excludes either module simply loses that surface, loudly named
+     in the kernel log by the module that is absent. Nothing here pretends.
+
+     ══ WHAT CROSSES TO THE SURFACE, AND HOW (the framework's live-surfaces contract) ═════
+     A widget / Live Activity process runs no JSE and fetches nothing (watch-runtime.md
+     §Snapshot nodes), so the document it renders — Components/surfaces/NowPlayingWidget.dsx
+     and NowPlayingActivity.dsx, lint-checked like every screen and shipped byte-exact by
+     both native exports — is named by NAME (`layout: 'NowPlayingActivity'`), the values ride
+     as `vars` (`{{ dsx.variable.title }}` holes), and every PICTURE the card paints rides as
+     `images: { name: 'https://…' }` — the module fetches each into the shared container
+     before the first frame and hands the layout the file path. Pinned in
+     OpenSource/Conformance/live-surfaces/ (links, images, type, layouts), Swift + Kotlin.
+
+     THE POSTER URL. The catalogue's poster is a root-relative SVG (`/posters/x.svg`) whose
+     PNG twin the origin serves at `.png` (scripts/rasterize-art.mjs; serve.mjs negotiates it
+     for the in-app <image>). A snapshot surface cannot decode SVG and the fetch is https-only,
+     so the URL is built here from `dsx.app.host` (App.json `host`, the native origin) and
+     the `.png` twin — the same origin the in-app <image> resolves against. No host (a build
+     whose App.json is unset) → a text-only card, honestly, and the kernel log names the
+     picture it could not fetch. The app mark is public/assets/mark.png the same way.
+
+     `stale: 1800` bounds the activity's freshness: half an hour without an update and the
+     OS marks the card stale; the OS itself ends any activity after eight hours. Ending on
+     completion is the caller's `active` flipping false, and `dismiss: 'immediate'` removes
+     the card at once so the home widget's card is the one that stays. -->
+<stack width="0" height="0" on:appear="dsx.action.publish()" on:disappear="dsx.action.leave()">
+  <head>
+    <attribute as="show" default="''"/>
+    <attribute as="idx" default="0"/>
+    <attribute as="title" default="''"/>
+    <attribute as="poster" default="''"/>
+    <attribute as="active" default="false"/>
+    <attribute as="paused" default="false"/>
+
+    <!-- true while a Live Activity this part started is running -->
+    <variable as="started">return false</variable>
+    <variable as="ready" computed="true">
+      const idx = Number(dsx.attribute.idx)
+      return dsx.attribute.show != null && dsx.attribute.show != '' && dsx.attribute.title != '' && idx >= 1
+    </variable>
+    <!-- the facts a publish depends on, as one string, so ONE watch sees every change that
+         matters and none that does not (the clock, the buffering flag). `ready` is in it
+         because the title lands with the show's api response AFTER the mount — the key
+         must move when it does, or a cold link into the player never publishes. -->
+    <variable as="key" computed="true">
+      const on = dsx.attribute.active == true || dsx.attribute.active == 'true'
+      const paused = dsx.attribute.paused == true || dsx.attribute.paused == 'true'
+      return (dsx.variable.ready ? 'ready' : 'waiting') + ':' + dsx.attribute.show + ':' + dsx.attribute.idx + ':' + (on ? 'on' : 'off') + ':' + (paused ? 'paused' : 'playing')
+    </variable>
+
+
+    <action as="publish">
+      // the one diagnostic line an adopter greps for: what this part saw, and which lanes exist
+      dsx.log('nowplaying.publish', { key: dsx.variable.key, widget: has('widget'), activity: has('liveactivity') })
+      if (!dsx.variable.ready) { return }
+      const on = dsx.attribute.active == true || dsx.attribute.active == 'true'
+      const paused = dsx.attribute.paused == true || dsx.attribute.paused == 'true'
+      const show = dsx.attribute.show
+      const idx = Number(dsx.attribute.idx)
+      const title = dsx.attribute.title
+      const ep = 'EP.' + idx
+      // `facts`, never `vars` — `vars` is the route-params plane on every renderer
+      // the words on the card, LOCALIZED HERE: a snapshot process has no string table, so the
+      // app resolves them through its own (13 locales) and the document interpolates them
+      const facts = { show: show, idx: idx, title: title, ep: ep, paused: paused ? 'true' : '',
+                      caption: localize('Currently Watching'), cta: localize('▶︎ Continue Watching') }
+      const poster = nowPlayingArt(dsx.attribute.poster)
+      const mark = nowPlayingArt('/assets/mark.png')
+      const images = {}
+      if (poster != '') { images.poster = poster }
+      if (mark != '') { images.mark = mark }
+      // ONE MODULE CALL PER ACTION, AT ITS TOP LEVEL. The runner awaits a module call only as
+      // a top-level statement of an action body: inside an if-block a bare `await` fires and
+      // forgets, and a bound `const r = await …` binds nothing (both measured on the iPhone 17
+      // Pro simulator, PLAN.md §6.158). So each surface gets its own action, guarded by an
+      // early return, and the module call is the last statement of it.
+      dsx.action.publishWidget({ facts: facts, images: images })
+      dsx.action.publishActivity({ facts: facts, images: images, on: on, title: title, ep: ep })
+    </action>
+
+    <!-- THE WIDGET always carries the last episode — playing, paused or done — so the home
+         screen has a way back in after the activity is gone. -->
+    <action as="publishWidget" inputs="facts, images">
+      if (!has('widget')) { return }
+      await dsx.module.widget.layout({ layout: 'NowPlayingWidget', vars: facts, images: images })
+    </action>
+
+    <!-- THE LIVE ACTIVITY follows the episode: started when one is in progress, updated on
+         every boundary and pause/resume, ended at once when it is not. -->
+    <action as="publishActivity" inputs="facts, images, on, title, ep">
+      if (!has('liveactivity')) { return }
+      if (!on) { dsx.action.endActivity(); return }
+      if (dsx.variable.started) { dsx.action.updateActivity({ facts: facts, images: images, title: title, ep: ep }); return }
+      const r = await dsx.module.liveactivity.start({ id: 'nowplaying', layout: 'NowPlayingActivity', name: title, status: ep, vars: facts, images: images, stale: 1800 })
+      // a refusal is honest (Live Activities off in Settings, the per-app ceiling) and named
+      // by the module in the kernel log; the widget above still carries the card
+      dsx.variable.started = r != null && r.ok !== false
+    </action>
+    <action as="updateActivity" inputs="facts, images, title, ep">
+      await dsx.module.liveactivity.update({ id: 'nowplaying', name: title, status: ep, vars: facts, images: images, stale: 1800 })
+    </action>
+    <action as="endActivity">
+      if (!dsx.variable.started) { return }
+      dsx.variable.started = false
+      await dsx.module.liveactivity.end({ id: 'nowplaying', success: true, dismiss: 'immediate' })
+    </action>
+
+    <!-- leaving the player: the episode is no longer in progress on screen, so the activity
+         ends at once; the widget keeps what was last published -->
+    <action as="leave">dsx.action.endActivity()</action>
+
+    <!-- the https PNG twin of a catalogue poster, against the native origin — '' when the
+         build has no host, and the card goes text-only rather than fetching cleartext. A
+         FUNCTION, not a sibling action: a sibling `dsx.action.x()` answers the module
+         envelope `{ ok, data }` (AGENTS.md), and a URL that arrived wrapped in one was
+         handed to the module as an object, which refused the whole publish in silence —
+         measured on the simulator before this block became pure. -->
+    <functions>
+      function nowPlayingArt(path) {
+        if (path == null || path == '') { return '' }
+        if (path.startsWith('https://')) { return path }
+        const host = dsx.app.host
+        if (host == null || host == '') { return '' }
+        const png = path.endsWith('.svg') ? path.slice(0, path.length - 4) + '.png' : path
+        return 'https://' + host + (png.startsWith('/') ? png : '/' + png)
+      }
+    </functions>
+
+    <watch value="dsx.variable.key" on:change="dsx.action.publish()"/>
+  </head>
+</stack>

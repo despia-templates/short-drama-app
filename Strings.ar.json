@@ -35,6 +35,7 @@
   "Browse": "تصفّح",
   "Browse series": "تصفّح المسلسلات",
   "Browse the catalogue": "تصفّح المكتبة",
+  "Buy for": "اشترِ مقابل",
   "By continuing you agree to our Terms of Use and Privacy Policy.": "بمتابعتك أنت توافق على شروط الاستخدام وسياسة الخصوصية.",
   "Check in daily, spin the wheel, watch a short ad or finish tasks — every one of them pays in coins.": "سجّل حضورك يوميًا، أدر العجلة، شاهد إعلانًا قصيرًا أو أنجز المهام — كل واحدة منها تدفع عملات.",
   "Check your connection and try again.": "تحقّق من اتصالك وحاول مرة أخرى.",
@@ -88,6 +89,7 @@
   "Every episode. No coins.": "كل الحلقات. بلا عملات.",
   "Everything held against it is gone and you are signed out. The catalogue stays open — you can keep browsing as a guest, or create a new account whenever you like.": "كل ما كان محفوظًا عليه اختفى وتم تسجيل خروجك. والمكتبة تبقى مفتوحة — يمكنك متابعة التصفّح كضيف، أو إنشاء حساب جديد متى شئت.",
   "Explore": "استكشف",
+  "For You": "لك",
   "From": "ابتداءً من",
   "Get Coins": "اشحن عملات",
   "Get coins": "اشحن",
@@ -182,6 +184,7 @@
   "Save": "حفظ",
   "Saved": "محفوظ",
   "Search": "بحث",
+  "Search dramas": "ابحث عن مسلسل",
   "See VIP plans": "شاهد باقات VIP",
   "See everything VIP includes": "اطّلع على كل ما يشمله VIP",
   "See plans": "الباقات",
@@ -288,7 +291,5 @@
   "·": "·",
   "—": "—",
   "▶ Continue Watching": "▶ متابعة المشاهدة",
-  "For You": "لك",
-  "Search dramas": "ابحث عن مسلسل",
-  "Buy for": "اشترِ مقابل"
+  "▶︎ Continue Watching": "▶︎ متابعة المشاهدة"
 }

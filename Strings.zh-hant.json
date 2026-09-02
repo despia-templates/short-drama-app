@@ -35,6 +35,7 @@
   "Browse": "瀏覽",
   "Browse series": "瀏覽劇集",
   "Browse the catalogue": "瀏覽片庫",
+  "Buy for": "購買，只需",
   "By continuing you agree to our Terms of Use and Privacy Policy.": "繼續使用即表示你同意我們的使用條款與隱私權政策。",
   "Check in daily, spin the wheel, watch a short ad or finish tasks — every one of them pays in coins.": "每天簽到、轉轉盤、看一支短廣告或完成任務 — 每一項都給金幣。",
   "Check your connection and try again.": "檢查一下網路連線，再試一次。",
@@ -88,6 +89,7 @@
   "Every episode. No coins.": "每一集都能看。不花金幣。",
   "Everything held against it is gone and you are signed out. The catalogue stays open — you can keep browsing as a guest, or create a new account whenever you like.": "掛在這個帳號上的東西都沒了，你也已經登出。片庫還是開著的 — 你可以用訪客身分繼續逛，或隨時開一個新帳號。",
   "Explore": "探索",
+  "For You": "為你推薦",
   "From": "最低",
   "Get Coins": "取得金幣",
   "Get coins": "取得金幣",
@@ -182,6 +184,7 @@
   "Save": "收藏",
   "Saved": "已收藏",
   "Search": "搜尋",
+  "Search dramas": "搜尋短劇",
   "See VIP plans": "查看 VIP 方案",
   "See everything VIP includes": "看看 VIP 有哪些內容",
   "See plans": "查看方案",
@@ -288,7 +291,5 @@
   "·": "·",
   "—": "—",
   "▶ Continue Watching": "▶ 繼續觀看",
-  "For You": "為你推薦",
-  "Search dramas": "搜尋短劇",
-  "Buy for": "購買，只需"
+  "▶︎ Continue Watching": "▶︎ 繼續觀看"
 }

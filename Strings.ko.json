@@ -35,6 +35,7 @@
   "Browse": "둘러보기",
   "Browse series": "시리즈 둘러보기",
   "Browse the catalogue": "작품 둘러보기",
+  "Buy for": "구매하기",
   "By continuing you agree to our Terms of Use and Privacy Policy.": "계속하면 이용약관과 개인정보처리방침에 동의하게 됩니다.",
   "Check in daily, spin the wheel, watch a short ad or finish tasks — every one of them pays in coins.": "매일 출석하고, 룰렛을 돌리고, 짧은 광고를 보고, 미션을 완료하세요 — 전부 코인으로 돌아옵니다.",
   "Check your connection and try again.": "연결 상태를 확인한 뒤 다시 시도해 주세요.",
@@ -88,6 +89,7 @@
   "Every episode. No coins.": "모든 에피소드. 코인 없이.",
   "Everything held against it is gone and you are signed out. The catalogue stays open — you can keep browsing as a guest, or create a new account whenever you like.": "계정에 있던 모든 것이 사라졌고 로그아웃되었습니다. 작품 목록은 그대로 열려 있습니다 — 게스트로 계속 둘러봐도 되고, 언제든 새 계정을 만들어도 됩니다.",
   "Explore": "탐색",
+  "For You": "추천",
   "From": "최저",
   "Get Coins": "코인 충전",
   "Get coins": "코인 충전",
@@ -182,6 +184,7 @@
   "Save": "저장",
   "Saved": "저장됨",
   "Search": "검색",
+  "Search dramas": "드라마 검색",
   "See VIP plans": "VIP 이용권 보기",
   "See everything VIP includes": "VIP 혜택 전체 보기",
   "See plans": "이용권 보기",
@@ -288,7 +291,5 @@
   "·": "·",
   "—": "—",
   "▶ Continue Watching": "▶ 이어보기",
-  "For You": "추천",
-  "Search dramas": "드라마 검색",
-  "Buy for": "구매하기"
+  "▶︎ Continue Watching": "▶︎ 이어서 보기"
 }

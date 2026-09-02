@@ -35,6 +35,7 @@
   "Browse": "探す",
   "Browse series": "シリーズを探す",
   "Browse the catalogue": "作品を探す",
+  "Buy for": "購入する",
   "By continuing you agree to our Terms of Use and Privacy Policy.": "続けると、利用規約とプライバシーポリシーに同意したことになります。",
   "Check in daily, spin the wheel, watch a short ad or finish tasks — every one of them pays in coins.": "毎日のチェックイン、ルーレット、短い広告、ミッションの達成 — どれもコインになります。",
   "Check your connection and try again.": "通信環境を確認して、もう一度お試しください。",
@@ -88,6 +89,7 @@
   "Every episode. No coins.": "全エピソード。コイン不要。",
   "Everything held against it is gone and you are signed out. The catalogue stays open — you can keep browsing as a guest, or create a new account whenever you like.": "アカウントに紐づいていたものはすべて消え、ログアウトしました。カタログはこれまでどおり開いています — ゲストのまま見続けても、いつでも新しいアカウントを作ってもかまいません。",
   "Explore": "探す",
+  "For You": "おすすめ",
   "From": "最低",
   "Get Coins": "チャージ",
   "Get coins": "チャージ",
@@ -182,6 +184,7 @@
   "Save": "保存",
   "Saved": "保存済み",
   "Search": "検索",
+  "Search dramas": "作品を検索",
   "See VIP plans": "プランを見る",
   "See everything VIP includes": "VIPの内容をすべて見る",
   "See plans": "プランを見る",
@@ -288,7 +291,5 @@
   "·": "·",
   "—": "—",
   "▶ Continue Watching": "▶ 続きを見る",
-  "For You": "おすすめ",
-  "Search dramas": "作品を検索",
-  "Buy for": "購入する"
+  "▶︎ Continue Watching": "▶︎ 続きを見る"
 }

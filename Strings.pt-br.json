@@ -35,6 +35,7 @@
   "Browse": "Explorar",
   "Browse series": "Explorar séries",
   "Browse the catalogue": "Explorar o catálogo",
+  "Buy for": "Comprar por",
   "By continuing you agree to our Terms of Use and Privacy Policy.": "Ao continuar, você concorda com nossos Termos de Uso e a Política de Privacidade.",
   "Check in daily, spin the wheel, watch a short ad or finish tasks — every one of them pays in coins.": "Faça o check-in diário, gire a roleta, assista a um anúncio curto ou conclua tarefas — tudo isso paga em moedas.",
   "Check your connection and try again.": "Verifique sua conexão e tente de novo.",
@@ -88,6 +89,7 @@
   "Every episode. No coins.": "Todos os episódios. Sem moedas.",
   "Everything held against it is gone and you are signed out. The catalogue stays open — you can keep browsing as a guest, or create a new account whenever you like.": "Tudo o que estava ligado a ela sumiu e sua sessão foi encerrada. O catálogo continua aberto — você pode seguir explorando como visitante ou criar uma conta nova quando quiser.",
   "Explore": "Explorar",
+  "For You": "Para você",
   "From": "A partir de",
   "Get Coins": "Obter moedas",
   "Get coins": "Obter moedas",
@@ -182,6 +184,7 @@
   "Save": "Salvar",
   "Saved": "Salvo",
   "Search": "Buscar",
+  "Search dramas": "Buscar séries",
   "See VIP plans": "Ver planos VIP",
   "See everything VIP includes": "Ver tudo o que o VIP inclui",
   "See plans": "Ver planos",
@@ -288,7 +291,5 @@
   "·": "·",
   "—": "—",
   "▶ Continue Watching": "▶ Continuar assistindo",
-  "For You": "Para você",
-  "Search dramas": "Buscar séries",
-  "Buy for": "Comprar por"
+  "▶︎ Continue Watching": "▶︎ Continuar assistindo"
 }

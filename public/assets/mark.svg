@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- the app's identity mark: the same red rounded square + play glyph the in-app
+       logoBox renders, so the tab, the install icon and the header agree -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF4D6E"/>
+      <stop offset="1" stop-color="#E5225A"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#g)"/>
+  <path d="M 200 148 L 388 256 L 200 364 Z" fill="#FFFFFF"/>
+</svg>

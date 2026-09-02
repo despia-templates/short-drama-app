@@ -35,6 +35,7 @@
   "Browse": "Göz At",
   "Browse series": "Dizilere göz at",
   "Browse the catalogue": "Kataloğa göz at",
+  "Buy for": "Satın al:",
   "By continuing you agree to our Terms of Use and Privacy Policy.": "Devam ederek Kullanım Koşulları'nı ve Gizlilik Politikası'nı kabul etmiş olursun.",
   "Check in daily, spin the wheel, watch a short ad or finish tasks — every one of them pays in coins.": "Her gün giriş yap, çarkı çevir, kısa bir reklam izle ya da görevleri tamamla — hepsi jeton kazandırır.",
   "Check your connection and try again.": "Bağlantını kontrol edip tekrar dene.",
@@ -88,6 +89,7 @@
   "Every episode. No coins.": "Her bölüm. Jeton yok.",
   "Everything held against it is gone and you are signed out. The catalogue stays open — you can keep browsing as a guest, or create a new account whenever you like.": "Hesaba bağlı her şey yok oldu ve oturumun kapatıldı. Katalog açık kalır — misafir olarak göz atmaya devam edebilir ya da istediğin zaman yeni bir hesap oluşturabilirsin.",
   "Explore": "Keşfet",
+  "For You": "Sana Özel",
   "From": "En düşük",
   "Get Coins": "Jeton Al",
   "Get coins": "Jeton al",
@@ -182,6 +184,7 @@
   "Save": "Kaydet",
   "Saved": "Kayıtlı",
   "Search": "Ara",
+  "Search dramas": "Dizi ara",
   "See VIP plans": "VIP paketleri",
   "See everything VIP includes": "VIP'in içerdiği her şeyi gör",
   "See plans": "Paketleri gör",
@@ -288,7 +291,5 @@
   "·": "·",
   "—": "—",
   "▶ Continue Watching": "▶ İzlemeye devam et",
-  "For You": "Sana Özel",
-  "Search dramas": "Dizi ara",
-  "Buy for": "Satın al:"
+  "▶︎ Continue Watching": "▶︎ İzlemeye devam et"
 }

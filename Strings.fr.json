@@ -35,6 +35,7 @@
   "Browse": "Parcourir",
   "Browse series": "Parcourir les séries",
   "Browse the catalogue": "Parcourir le catalogue",
+  "Buy for": "Acheter pour",
   "By continuing you agree to our Terms of Use and Privacy Policy.": "En continuant, tu acceptes nos Conditions d'utilisation et notre Politique de confidentialité.",
   "Check in daily, spin the wheel, watch a short ad or finish tasks — every one of them pays in coins.": "Fais ton check-in chaque jour, tourne la roue, regarde une courte pub ou termine des missions — tout ça rapporte des pièces.",
   "Check your connection and try again.": "Vérifie ta connexion et réessaie.",
@@ -56,7 +57,7 @@
   "Continue as the demo viewer": "Continuer en spectateur démo",
   "Create an account": "Créer un compte",
   "Create your account": "Crée ton compte",
-  "Currently Watching": "En cours de lecture",
+  "Currently Watching": "En cours",
   "Daily check-in": "Check-in quotidien",
   "Delete account": "Supprimer le compte",
   "Delete my account permanently": "Supprimer définitivement mon compte",
@@ -88,6 +89,7 @@
   "Every episode. No coins.": "Tous les épisodes. Zéro pièce.",
   "Everything held against it is gone and you are signed out. The catalogue stays open — you can keep browsing as a guest, or create a new account whenever you like.": "Tout ce qui y était rattaché a disparu et tu es déconnecté. Le catalogue reste ouvert — tu peux continuer à parcourir en invité, ou créer un nouveau compte quand tu veux.",
   "Explore": "Explorer",
+  "For You": "Pour toi",
   "From": "À partir de",
   "Get Coins": "Recharger",
   "Get coins": "Recharger",
@@ -182,6 +184,7 @@
   "Save": "Garder",
   "Saved": "Gardé",
   "Search": "Rechercher",
+  "Search dramas": "Rechercher une série",
   "See VIP plans": "Offres VIP",
   "See everything VIP includes": "Voir tout ce que le VIP inclut",
   "See plans": "Nos offres",
@@ -288,7 +291,5 @@
   "·": "·",
   "—": "—",
   "▶ Continue Watching": "▶ Reprendre la lecture",
-  "For You": "Pour toi",
-  "Search dramas": "Rechercher une série",
-  "Buy for": "Acheter pour"
+  "▶︎ Continue Watching": "▶︎ Continuer à regarder"
 }

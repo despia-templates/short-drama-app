@@ -1,0 +1,102 @@
+<!-- NowPlayingActivity — the "Currently Watching" LIVE ACTIVITY (spec §7): the card on the
+     Lock Screen and in the Dynamic Island while an episode is playing or paused mid-way,
+     deep-linking back into the player. Started, updated and ended by
+     Components/parts/NowPlayingSurface.dsx through Core/Extensions/ActivityKit
+     (dsx.module.liveactivity.start({ id, layout: 'NowPlayingActivity', vars, images, stale })).
+
+     ONE document, every presentation slot an ELEMENT (StackActivity.swift): <lockscreen> is
+     the banner, <island> carries the compact / minimal / expanded regions. The lockscreen
+     card is byte-parallel to Components/surfaces/NowPlayingWidget.dsx — the home widget that
+     takes over when this activity ends — so the two surfaces show one card. Snapshot
+     dialect only (no JSE, literal colours mirroring Theme.dsx: widgetCard #0E0E10 · ink3
+     #8E8E93 · sheetCard #1C1C1E · accentWidget #6EE7C5 · ink #FFFFFF · stage #000000);
+     the <head> documents the seed contract and the renderer ignores it, because in an
+     <activity> root only the slot elements are read.
+
+     THE GROUND IS OURS (the custom-UI law): the lockscreen root's bg/color become the system
+     container's tint and its action-glyph colour — the one knob Apple offers — so the card
+     is #0E0E10 on the Lock Screen and never the platform's material. THE TAP is the slot
+     root's href (widgetURL, every family) and the button's own href inside the expanded
+     island (a Link, where Apple allows one): both `/watch/<show>/<idx>`, resolved against
+     the app's registered scheme (live-surfaces/links.json).
+
+     "▶︎" (U+25B6 + U+FE0E, the text presentation) is a text glyph on purpose — the snapshot dialect has no unified-icon element (see
+     NowPlayingWidget.dsx and PLAN.md §6). -->
+<activity>
+  <head>
+    <expects variable="show"/>     <!-- the show id -->
+    <expects variable="idx"/>      <!-- the 1-based episode index -->
+    <expects variable="title"/>    <!-- the show title -->
+    <expects variable="ep"/>       <!-- "EP.n", pre-formatted -->
+    <expects variable="caption"/>  <!-- "Currently Watching", localized by the app -->
+    <expects variable="cta"/>      <!-- "▶︎ Continue Watching", localized by the app -->
+    <expects variable="poster"/>   <!-- the poster's file path on this device (module-fetched) -->
+    <expects variable="mark"/>     <!-- the app mark's file path, the same way -->
+  </head>
+
+  <!-- Lock screen / banner: the card, byte-parallel to NowPlayingWidget.dsx -->
+  <lockscreen>
+    <hstack bg="#0E0E10" color="#FFFFFF" radius="20" paddingh="16" paddingv="16" spacing="14" align="top" grow="width"
+            href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}">
+      <image src="{{ dsx.variable.poster }}" width="72" height="108" radius="8" fit="cover"/>
+      <vstack align="leading" spacing="0" grow="width">
+        <hstack align="top" spacing="8">
+          <vstack align="leading" spacing="3" grow="width">
+            <text size="13" color="#8E8E93" lines="1">{{ dsx.variable.caption }}</text>
+            <text size="20" weight="bold" color="#FFFFFF" lines="2">{{ dsx.variable.title }}</text>
+            <text size="13" color="#8E8E93" lines="1">{{ dsx.variable.ep }}</text>
+          </vstack>
+          <hstack bg="#1C1C1E" radius="8" padding="6">
+            <image src="{{ dsx.variable.mark }}" width="24" height="24" fit="contain"/>
+          </hstack>
+        </hstack>
+        <spacer/>
+        <hstack bg="#6EE7C5" radius="12" paddingv="12" paddingh="14" grow="width" align="center">
+          <text size="17" weight="bold" color="#000000" lines="1">{{ dsx.variable.cta }}</text>
+        </hstack>
+      </vstack>
+    </hstack>
+  </lockscreen>
+
+  <!-- The watch Smart Stack (watchOS 11 mirrors the activity): poster, title, episode. -->
+  <small>
+    <hstack spacing="8" paddingh="10" paddingv="8" align="center" href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}">
+      <image src="{{ dsx.variable.poster }}" width="28" height="42" radius="5" fit="cover"/>
+      <vstack align="leading" spacing="1" grow="width">
+        <text size="12" weight="semibold" color="#FFFFFF" lines="1">{{ dsx.variable.title }}</text>
+        <text size="10" color="#8E8E93" lines="1">{{ dsx.variable.ep }}</text>
+      </vstack>
+    </hstack>
+  </small>
+
+  <!-- Dynamic Island -->
+  <island>
+    <compact>
+      <leading><image src="{{ dsx.variable.poster }}" width="22" height="22" radius="6" fit="cover"
+                      href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}"/></leading>
+      <trailing><text size="13" weight="bold" color="#6EE7C5" lines="1"
+                      href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}">{{ dsx.variable.ep }}</text></trailing>
+    </compact>
+
+    <minimal><image src="{{ dsx.variable.poster }}" width="22" height="22" radius="6" fit="cover"
+                    href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}"/></minimal>
+
+    <expanded>
+      <leading><image src="{{ dsx.variable.poster }}" width="40" height="60" radius="6" fit="cover"
+                      href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}"/></leading>
+      <center>
+        <vstack align="leading" spacing="2" grow="width">
+          <text size="11" color="#8E8E93" lines="1">{{ dsx.variable.caption }}</text>
+          <text size="15" weight="bold" color="#FFFFFF" lines="2">{{ dsx.variable.title }}</text>
+          <text size="12" color="#8E8E93" lines="1">{{ dsx.variable.ep }}</text>
+        </vstack>
+      </center>
+      <bottom>
+        <hstack bg="#6EE7C5" radius="12" paddingv="10" paddingh="14" grow="width" align="center"
+                href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}">
+          <text size="15" weight="bold" color="#000000" lines="1">{{ dsx.variable.cta }}</text>
+        </hstack>
+      </bottom>
+    </expanded>
+  </island>
+</activity>
