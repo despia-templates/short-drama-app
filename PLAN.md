@@ -3898,3 +3898,17 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      invisible in the template today (no bare text carries a background in a hugging column;
      the player title grows), and both are pinned here so the next pass reads them as
      engine work, not template styling.
+
+190. **AN ANDROID COVER SHEET DRAWS UNDER THE STATUS BAR — iOS and the web offer the safe
+     region** (found 2026-09-02 on the search overlay, Pixel emulator against the iPhone 17 Pro
+     simulator and the browser; NOT fixed — filed for the Android engine).
+
+     `<sheet mode="cover">` (SearchOverlay.dsx) is a full-screen modal whose content pads
+     nothing but its own 18pt. On iOS the cover presentation starts below the status bar and
+     on the web there is no inset, so the search field sits where the spec puts it on both;
+     on Android the cover Dialog is edge-to-edge and the field paints under the clock. The
+     safe-area law (AGENTS.md) says the inset plane pays the insets, never a screen — so the
+     Android cover container should offer the safe region (`WindowInsets.statusBars` on the
+     cover surface), matching what iOS already does; the template must not add a `safeTop`
+     that iOS would then pay twice. Measured: the field's top at 80px (30dp) on Android
+     against the status bar's 54dp; iOS at 62pt + 18.
