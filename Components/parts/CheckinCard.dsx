@@ -11,7 +11,7 @@
 
      A `<grid>` sizes its DIRECT children (AGENTS.md), so the cell is the grid's direct child
      and the seven share the card's width at a 5pt gap. -->
-<vstack class="card">
+<vstack class="wrap">
   <head>
     <attribute as="days" default="[]"/>
     <attribute as="streak" default="0"/>
@@ -45,6 +45,7 @@
       dsx.event('checkin', {})
     </action>
 
+    <style as="wrap" spacing="0" alignItems="stretch"/>
     <style as="card" background="#1A1A1A" radius="16" paddingH="16" paddingV="16" spacing="16" alignItems="stretch"/>
     <style as="titleRow" spacing="4" alignItems="center"/>
     <style as="title" fontSize="17" color="#FFFFFF" lineLimit="1"/>
@@ -57,6 +58,11 @@
   </head>
 
   <Theme/>
+  <!-- ROOT SPACING 0, BRIDGED LOUDLY (PLAN.md §6.183): on iOS a file component whose root is a
+       SPACED vstack pays one spacing at its top — probe-measured on an iPhone 17 Pro, +16pt for a
+       spacing-16 root, +0 for the identical inline stack. The root here carries no spacing and the
+       body below carries the card's; delete this wrapper the day the engine entry closes. -->
+  <vstack class="card">
   <hstack class="titleRow" a11yGroup="true" a11yLabel="Checked in for {{ dsx.variable.n }} days">
     <text value="You have checked in for" class="title" style="white-space: nowrap"/>
     <text value="{{ dsx.variable.n }}" class="titleN"/>
@@ -85,4 +91,5 @@
     <text value="Check in" class="btnTxt" visible-if="dsx.variable.isBusy == false &amp;&amp; dsx.variable.isChecked == false"/>
     <image icon="checkmark" iconSize="18" color="{{ ink() }}" a11yHidden="true" visible-if="dsx.variable.isChecked"/>
   </hstack>
+  </vstack>
 </vstack>

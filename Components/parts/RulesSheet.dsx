@@ -14,7 +14,8 @@
   <head>
     <event as="close"/>
 
-    <style as="wrap" spacing="16" alignItems="stretch" paddingBottom="4"/>
+    <style as="wrap" spacing="0" alignItems="stretch"/>
+    <style as="body" spacing="16" alignItems="stretch" paddingBottom="4"/>
     <style as="headRow" alignItems="center" spacing="8"/>
     <style as="chev" width="44" height="44" alignItems="center" alignY="center"/>
     <style as="title" fontSize="20" fontWeight="bold" color="#FFFFFF" textAlign="center"/>
@@ -27,6 +28,11 @@
   </head>
 
   <Theme/>
+  <!-- ROOT SPACING 0, BRIDGED LOUDLY (PLAN.md §6.183): on iOS a file component whose root is a
+       SPACED vstack pays one spacing at its top — probe-measured on an iPhone 17 Pro, +16pt for a
+       spacing-16 root, +0 for the identical inline stack. The root here carries no spacing and the
+       body below carries the card's; delete this wrapper the day the engine entry closes. -->
+  <vstack class="body">
   <hstack class="headRow">
     <vstack class="chev" style="justify-content: center; flex: none" on:tap="dsx.event('close', {})" a11yTrait="button" a11yLabel="Close the rules">
       <!-- the catalog has no chevron.down: the physical right chevron turned a quarter points
@@ -65,4 +71,5 @@
           a11yGroup="true" a11yTrait="button" a11yLabel="Got it">
     <text value="Got It" class="gotItTxt"/>
   </hstack>
+  </vstack>
 </vstack>

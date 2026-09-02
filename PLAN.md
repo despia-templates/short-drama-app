@@ -3855,3 +3855,41 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      uses) instead of the reference's "earliest-expiring bonus" and "the viewer's time zone";
      (c) the page is a tab root (§8, §9.0) and draws no back chevron — the reference's Rewards
      is a pushed page, and a chevron that pops nothing is a control that does nothing.
+
+183. **A FILE COMPONENT WHOSE ROOT IS A SPACED VSTACK PAYS ONE SPACING AT ITS TOP ON iOS —
+     the instance head takes a stack slot** (found 2026-09-02 building the Rewards page against
+     the /tmp/wt-final kernel; measured on an iPhone 17 Pro simulator, iOS 26.5, probe-free
+     numbers off 1206×2622 captures ÷3).
+
+     The check-in card (`Components/parts/CheckinCard.dsx`, a component whose root was
+     `<vstack spacing="16" paddingV="16">`) rendered its title 37pt under the card's top edge on
+     the phone and 20pt on the web; the membership card the same; every row card (an HSTACK root)
+     matched the web to the point. A one-screen probe (six blocks, each `spacing="16"
+     paddingV="16"`, one 17pt text) isolated it:
+
+       A  inline vstack, `<Theme/>` first            text top +18   (16 padding + line box)
+       D  component, `<Theme/>` first                text top +34   (+16)
+       E  component, no `<Theme/>`                    text top +34   (+16)
+       F  component with a title row over a <grid>    text top +34   (+16)
+
+       G  component, `<head>` as the LAST child        text top +18   (+0)
+       H  component, spacing-0 root over a spaced body text top +18   (+0)
+
+     So it is not the registration-only mount (AGENTS.md's "takes no stack slot" holds for an
+     inline mount) and not the grid: it is the `<head>`. G is the proof — move the head to the
+     end of the root and the phantom leaves the top — so the native instance seats the head
+     in the layout column as a zero-size child and the column pays its spacing after it. The
+     canonical head order (head FIRST, linted) therefore puts the phantom above every spaced
+     component root in the app. An hstack root shows no horizontal phantom (the row tile sits
+     at 32pt on both lanes), which is the odd half of the finding and is recorded as measured
+     rather than explained.
+
+     BRIDGED IN THE TEMPLATE, LOUDLY: every part whose root was a spaced column now has a
+     `spacing="0"` root wrapping the spaced body (CheckinCard, MembershipTimeline, RulesSheet,
+     NotifyModal; AdGate's root, which paid the DEFAULT 8, is `spacing="0"`), each with a comment
+     naming this entry; `SignInCard.dsx` (root spacing 10) is the pre-existing instance and is
+     left for the engine fix. Measured after the bridge: the check-in title at +20 on both lanes.
+     H is the bridge measured working. Ask: the native component instance must not seat its
+     head in the layout column — the same law as the registration-only mount (dev@bff4c16d
+     family), one node further up.
+

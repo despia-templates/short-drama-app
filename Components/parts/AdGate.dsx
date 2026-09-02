@@ -85,7 +85,9 @@
                   there is no moderation inbox to send it to yet, because no report route is
                   declared server-side. Article 7 — the degradation is named where the
                   viewer reads it. -->
-<vstack alignItems="stretch">
+<!-- spacing 0 on the root: a spaced component root pays one spacing at its top on iOS (PLAN.md
+     §6.183) — the default 8 sat above the row card as an 8pt phantom -->
+<vstack alignItems="stretch" spacing="0">
   <head>
     <attribute as="left" default="0"/>          <!-- ad views remaining today (a server fact) -->
     <attribute as="today" default="0"/>

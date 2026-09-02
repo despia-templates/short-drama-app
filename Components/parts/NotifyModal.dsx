@@ -22,7 +22,8 @@
       return v === true || v === 'true'
     </variable>
 
-    <style as="wrap" spacing="16" alignItems="center" paddingBottom="4"/>
+    <style as="wrap" spacing="0" alignItems="stretch"/>
+    <style as="body" spacing="16" alignItems="center" paddingBottom="4"/>
     <!-- the phone mock: a 120-tall plate, radius 14, the app row inside it -->
     <style as="plate" background="#2A2A2A" radius="14" height="120" paddingH="16" alignItems="center" alignY="center"/>
     <style as="appRow" spacing="12" alignItems="center"/>
@@ -43,6 +44,11 @@
   </head>
 
   <Theme/>
+  <!-- ROOT SPACING 0, BRIDGED LOUDLY (PLAN.md §6.183): on iOS a file component whose root is a
+       SPACED vstack pays one spacing at its top — probe-measured on an iPhone 17 Pro, +16pt for a
+       spacing-16 root, +0 for the identical inline stack. The root here carries no spacing and the
+       body below carries the card's; delete this wrapper the day the engine entry closes. -->
+  <vstack class="body">
   <hstack class="plate" style="width: 100%; justify-content: center" a11yHidden="true">
     <hstack class="appRow" style="width: 100%">
       <vstack class="appMark" style="justify-content: center; flex: none">
@@ -91,5 +97,6 @@
     <vstack class="closeRing" style="justify-content: center; border: 1.5px solid #8E8E93">
       <image icon="xmark" iconSize="14" color="{{ ink3() }}" a11yHidden="true"/>
     </vstack>
+  </vstack>
   </vstack>
 </vstack>
