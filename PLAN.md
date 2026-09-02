@@ -4200,3 +4200,87 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      clear OS background and size its card to the content (the web's geometry — inset from
      the screen, content-tall, the close ring under the card), the same fix §6.188 asks for
      the bottom sheet.
+
+194. **FOUR iOS LAYOUT LAWS AND ONE SHEET LAW LANDED UPSTREAM, MEASURED ON ONE PROBE SCREEN; THE
+     REWARDS HERO SVG STAYS OPEN, BISECTED** (2026-09-02, iPhone 17 Pro simulator EngineE, iOS 26.5,
+     probe-free `[geo]` frames off `DSX_GEOMETRY_PROBE=1`; before = kernel dc987952, after =
+     e10e4d36 · 67ea7f26 · b3acbf37 on the framework worktree `/tmp/wt-E`, to be fast-forwarded
+     onto dev. Corpus: `Conformance/layout/component-boundary.json` (layoutSlot · mountConsumes ·
+     mountStyleAttrs, Swift + Kotlin + TS runners) and the new
+     `Conformance/style-semantics/padding-edges.json` (Swift + Kotlin); the Kotlin :core and
+     :render suites are green. The template's bridges are NOT removed in this pass — the real
+     screens (rewards, store, membership, vip) were not re-measured against the new kernel before
+     the program closed; the probe numbers below are the engine's, each bridge can go the day a
+     screen is re-measured.)
+
+     §185(a) PADDING SUMMING — fixed, e10e4d36 (+ the cascade rider in 67ea7f26). Probe: class
+     `paddingV="20"` + element `paddingTop="20"` → text 40pt under the box top before, 20 after;
+     class `paddingV` + `style="padding-top: 8px"` → 28 → 8; class `paddingTop="30"` + element
+     `paddingV="20"` → 50 → 20 (source order, as the web compiler folds it); `padding="10"` +
+     `paddingTop="24"` → 34/10 → 24/10. Both native lanes resolve one value per edge
+     (`StackPadding.swift` / `StackPadding.kt`); Android's chain was the same arithmetic,
+     unmeasured on a device (no free emulator), pinned by `StackPaddingConformanceTest`.
+     PlanCard's edge split (`paddingH` + `paddingBottom` on the class, the top on the element)
+     is now merely redundant.
+
+     §183 / §185(b) THE HEAD SLOT — fixed, 67ea7f26. Probe: a component root `<vstack
+     spacing="16" paddingV="16">` seated its text 32pt under the card's top before, 16 after (the
+     inline control 16 both times; a head holding `<api>` + `<watch>` the same 32 → 16; an hstack
+     root paid nothing either time). Mechanism, measured: the `<head>` sat in the stack as a
+     flow child AND each declaration's own attributes were styled onto its EmptyView — a probe
+     screen whose head declared `<style grow="true">` seated its scroller 389pt down the window
+     before (h0 at y 549.5) and at the top after (160.5). Declarations join the registrations
+     behind the stack and skip the style pipeline. The spacing-0 wrappers in PlanCard, BuyButton,
+     StoreTips, OfferModal, CheckinCard, MembershipTimeline, RulesSheet, NotifyModal and AdGate
+     are redundant now. Android pays nothing by construction (a declaration composes no node).
+
+     §186 `surface=` ON A MOUNT — fixed, 67ea7f26. Probe: `<PSurf surface="probe">` wore the
+     system material behind its root, sampled rgb(30,31,31) over black before; black after.
+     A declared attribute leaves the mount's style dict (`StackComponentBoundary.mountStyleAttrs`)
+     and reaches the template as `dsx.attribute.surface` as before — BuyButton's `funnel` rename
+     can go back to `surface`. An UNDECLARED style word on a mount still styles the mount, which
+     is the web's rule too (its bridged attributes). Android styles no mount at all (the mount's
+     modifier never reaches the instance root) — a named divergence the other way, not fixed.
+
+     §187 A MOUNT IN A ROW — fixed, 67ea7f26, and the mechanism is the COLUMN, not the boundary:
+     an inline `<vstack alignItems="stretch">` around the pill was as greedy as the mount (x 84,
+     302 wide of a 370 row beside a spacer; 318 under `space-between`), an hstack-rooted mount
+     hugged (77.7 at x 308.3) — a stretched column's children answer the row's share. A stack or
+     a mount in a row now hugs through its own pipeline (`fitSynthetic="width"`, CSS `flex: 0 1
+     auto`): 77.7 at x 308.3 on all five probe rows after. `width="fit"` on the pill mounts is
+     redundant. Android twin (`Modifier.width(IntrinsicSize.Max)` on the same children) landed
+     unmeasured — no free emulator.
+
+     §184 A HIDDEN TEXT IN A CENTRED COLUMN — fixed, 67ea7f26. Probe: 32pt from the card's top to
+     the first visible run before (the stretched column 16, a hidden container 16), 16 after; a
+     row with a hidden first run paid nothing either time. The fit frame was a Layout wrapped
+     around a view that was not there; it rides the run's own pipeline now, so a hidden run is
+     no view at all.
+
+     §192 `id=` ON A MOUNT — fixed, 67ea7f26, on iOS and Android, the web as the law: the mount
+     consumes `tag · key · slot · visible-if · scroll` (mount.ts CONSUMED) and hands everything
+     else on, so `id` is the element's identity AND `dsx.attribute.id`. Probe: the row rendered
+     `[]` (a 12pt run) before, `[direct-id]` (77pt) after. RewardRow/RedeemCard/PlanCard/CoverCard
+     may declare `id` again.
+
+     §193 THE CARD SHEET — HALF fixed, b3acbf37: the detent now counts the inset the floating
+     card pays, so the card is content-tall (frame 399pt after for the 4×70 + marker column,
+     every block 70 and the marker painted; 314 before, the fourth block cut to 38). OPEN: the OS
+     platter — the light material from y 351 to 864 beside the card on iOS 26 — is NOT removed
+     by `presentationSizing(.page)` (tried, measured, kept as the correct request); the fix is an
+     app-drawn presentation, the same as §188's.
+
+     THE REWARDS HERO (`/assets/rewards-hero.svg`) — OPEN, the engine untouched, bisected on the
+     device with the dev certificate trusted: `<image src=…svg>` on iOS decodes through ImageIO
+     (CoreSVG), not the DSX `<svg>` subset — `hourglass.svg` paints (145 sampled px), the hero
+     paints nothing (0 of 3528), `coin.png` paints. Variants served over https: as-is 0 · no
+     role/aria 0 · radialGradient replaced 0 · one `<defs>` 0 · arcs removed 0 · **`stop-opacity`
+     removed 28 px (it paints)** · a minimal radialGradient WITH stop-opacity 0 · a minimal
+     `<g transform>` + arc, no gradient, 0. So on iOS the decoder refuses `stop-opacity` and at
+     least one of `<g transform>`/the `A` arc, and radialGradient is not the sole cause. The DSX
+     `<svg>` element's own subset (inline probes) paints any `url(#gradient)` fill BLACK, ignores
+     `<g transform>` (the rect drew untransformed at the corner) and drops an `A` arc path;
+     Android's `<image>` goes through BitmapFactory, which decodes no SVG at all. The fix is one
+     law with two twins — route an `.svg` image source through a rasteriser that carries linear
+     and radial gradients (first-stop fallback, never a dropped image), `stop-opacity`, group
+     transforms and arcs — and it did not fit the hour.
