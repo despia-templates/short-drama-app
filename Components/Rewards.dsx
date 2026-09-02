@@ -297,7 +297,9 @@
       return shortDate(at)
     </variable>
     <!-- the floating card is 314 wide on the reference's 390 screen: the inset is derived,
-         so a wider window still centres a 314 card rather than stretching it -->
+         so a wider window still keeps a 314 card rather than stretching it. The card rests on
+         its inset above the bottom edge on every lane (PLAN.md §6.196) — the inset sets the
+         WIDTH; nothing here centres it vertically -->
     <variable as="cardInset" computed="true">
       const w = dsx.screen.width
       const inset = Math.round((w - 314) / 2)

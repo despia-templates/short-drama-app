@@ -4360,3 +4360,37 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      the fade's transition stays inline. Measured: computed opacity on `/rewards` 1 → 0.5, the
      iOS value. Pinned by `packages/dom/test/image-dom.test.ts` (the six inline-style assertions
      now follow the attribute, plus "a declared opacity survives the fade").
+
+196. **THE iOS CARD SHEET IS APP-DRAWN UNDER CUSTOM DESIGN — THE PLATTER IS GONE, THE FRAME IS
+     THE WEB'S; THE HYBRID CARD IS THE NAMED REMAINDER** (2026-09-02, iPhone 17 Pro simulator,
+     iOS 26.5, 402×874 beside Chromium; before = kernel 184470a9 (b3acbf37 included), after =
+     3ecffd06 on dev, cherry-picked from the agent worktree. Corpus:
+     `Conformance/design/custom-controls.json` `sheet/card` (inset 14 · insetMax 128 ·
+     maxHeightPct 90 · the anchor law) on the Swift table (`CustomDesignConformance`, 48 cases)
+     and a web test against the overlay rules; the template is untouched — the two card sheets
+     here are Rewards' success and notify modals; OfferModal is an overlay layer and never was a
+     sheet.) §193's open half closes: the OS platter under a `mode="card"` sheet is iOS 26's
+     floating-sheet material painted behind a `.clear` presentation background, unnamed by any
+     public seam on `UISheetPresentationController`, so under `design: custom` a card without a
+     `full` detent leaves the sheet host — a clear `fullScreenCover` in which the engine lays the
+     card out at the web's numbers (`Sheet.swift CustomCardSheet`). The web card is
+     BOTTOM-ANCHORED on its inset, never centred: `.dsx-sheet-panel[data-dsx-mode="card"]` rests
+     `max(inset, safe-area-inset-bottom)` above the edge, sides `inset`, content-tall to 90dvh —
+     measured on the notify modal at inset 44: 314×454 at (44, 376), bottom edge 830. Before, iOS
+     drew a light material across (8, 339)–(393, 865) — 178,705 sampled pixels of platform chrome
+     inside a custom app — with a 300-wide card inside it whose bottom sat at 788. After, the
+     engine's own frame log reads x 44, y 398.5, w 314, h 431.5: the web's x, width and bottom
+     edge to the pixel and zero platter pixels; the 22.5 of height is the content's (the web
+     wraps "Bonus Rewards", iOS does not — a text-layout item, not the sheet's), and a fixed
+     300pt probe lands at x 44 · y 482 · w 314 · h 348, the CSS twin exactly, centres 0.0pt
+     apart. Riders: the `inset=` clamp (0…128, default 14) now runs on iOS as on the web; the
+     slot pays the web card's 16 at the bottom, not the drawer's clearance; the dim is the lane's
+     scrim, the tap outside and the drag (the web's `sheetRelease` verdict) go through the level,
+     VoiceOver names the card from `title=`/`a11yLabel=` — built and compile-clean, not
+     device-driven this pass. NAMED, NOT FIXED: a card WITH a `full` detent (card→drawer) keeps
+     the system host and its floating-phase platter; Android's inset card is unmeasured and
+     unpinned; the record lane at 184470a9 cannot run in a spawned binary (`StackGeometryProbe`
+     used outside its `#if DEBUG`, and under `-DDEBUG` `JSETrace.short` aborts in the actions
+     section) — both pre-existing on the unpatched tip. `cardInset`'s "centres a 314 card"
+     comment in Rewards.dsx is right about the width and wrong about the vertical: the reference
+     card rests on its inset on every lane.
