@@ -2870,3 +2870,126 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      vault refuses on every simulator until the export carries `keychain-access-groups` through the
      linker sections; and a module's `dsx.module.<x>.context.*` facts read EMPTY on the web (the bus
      proxy is a function target the JSE dict walk skips) — bind `global.<x>.*` there until fixed.
+
+145. **THE PLAYER'S OPTION SHEETS NEEDED WHAT THE STREAM CARRIES, AND `<video>` COULD NOT SAY IT**
+     (found 2026-09-02 building the reference player, docs/design/reference-ui-spec.md §3a/§3d;
+     RESOLVED upstream the same day — dev@912ebda0 iOS · 05d8872b Android · 5ee05a9d the web HLS
+     lane · 5ef01167 the web facts, the long-press pair and the MIME rows · 5a7aa8c4 the index).
+     Before: `<video>` had `subtitles` (a bool — "the platform's preferred-language legible
+     option") and `speed`, and nothing else: no track list, no rendition ladder, no way to pick a
+     language or pin a height, no cue text. So "Subtitles · 日本語 ›" and "Video Quality ·
+     Auto(720p) ›" — two rows of the reference's More sheet — were unreachable by any markup, and
+     the previous player honestly shipped the Quality row as a disabled readout (§6.36).
+     After: `subtitle="<bcp47>|off"` picks a legible track BY TAG (exact, then primary language,
+     else nothing — never the platform default), `quality="auto|<height>"` CAPS the ladder
+     (largest rung at or under; the floor when nothing fits), and four published facts —
+     `tracks` [{lang,label}] · `variants` [{height,bitrate}] · `resolution` (the height rendering
+     now) · `cue` (the active cue's text, trimmed) — with the choice made by ONE renderer-neutral
+     core, `Conformance/media/playback-selection.json` (51 cases + 12 invariants; TS
+     `kernel/src/playback-core.ts`, Kotlin `:core PlaybackCore`, Swift `Engine/iOS/PlaybackCore.swift`,
+     three runners green). `cue` BOUND suppresses the platform's own subtitle drawing
+     (AVPlayerItemLegibleOutput `suppressesPlayerRendering`, ExoPlayer's SubtitleView GONE, the web
+     track at `hidden`) so the app draws the line in its own type at 58% of the stage — the
+     custom-UI law (spec §−1): the same pixels on three lanes.
+     THE WEB HAD NO HLS. An `.m3u8` src is the one container that carries both lists on every
+     lane; measured on Chromium, the element played the master NATIVELY (`canPlayType` answers
+     "maybe" on current builds) and exposed no text track and no ladder — both sheets read empty
+     with playback fine, the worst kind of silent. `dom/src/hls-lite.ts` is the framework's own
+     dependency-free MSE lane (VOD fMP4 ladders + WebVTT renditions, adaptive with a pin, query
+     inheritance so a tokenized grant rides the whole tree), taken wherever `MediaSource` exists;
+     only a browser with no MSE (iPhone Safari) keeps the native pipeline. `content-type.ts`
+     learned `.m3u8 / .m4s / .ts / .vtt` — an octet-stream playlist is "not a playlist" to
+     AVPlayer and ExoPlayer.
+     THE TEMPLATE SIDE: `scripts/gen-hls.mjs` (ffmpeg; 360p · 240p · 144p, honest to the 360p
+     masters, and ten WebVTT renditions in the §3d languages; a source with no audio gets a
+     video-only CODECS — measured, "Initialization segment misses expected aac track" when the
+     master promised AAC the silent clips never had), `scripts/serve.mjs` gates an HLS episode's
+     whole DIRECTORY as one grant and TOKENIZES every playlist it serves (child URIs inherit
+     `?ep&ticket` — no native player carries a query onto playlist children), and the seed points
+     every episode at the master. Measured on web (390×844, Chromium): More sheet rows 52pt with
+     `Playback Speed · 1.0x › · Subtitles · Off › · Video Quality · Auto(360p) › · Mini View (PIP
+     mode) 👑 · toggle · Report`; Subtitles sheet = Off ✓ + the ten endonyms; picking 日本語 →
+     the element's track reads `ja:hidden` with 2 cues and the app-drawn line "日本語 · Demo"
+     sits on the stage; Quality = Auto(360p) · 360p · 240p · 144p; a hold → `playbackRate` 2 +
+     the "2.0x ▶▶" overlay with the chrome at opacity 0, release → 1. Measured on the iPhone 17
+     Pro simulator: the same More sheet with `Auto(360p)` (the iOS lane publishes `resolution`),
+     the Subtitles level stacked over it with its title, × and "‹ More" row, and the ring's arc
+     filling from the server's answer. ONE iOS DIVERGENCE, filed to the lane: the labels came back
+     as Apple's localized names ("Japanese", "Chinese, Traditional") — `displayName` — where the
+     master says NAME="日本語"; the invariant now names the HLS NAME= (commonMetadata title) as the
+     word, displayName only when the asset names nothing. RIDER: the pager mounts one MSE session
+     per preloaded page (five masters fetched on entry) — the warm-asset contract, unchanged in
+     kind from the MP4 days; a lighter preload (master only until activation) is a follow-up.
+
+146. **THE LONG-PRESS LIFECYCLE EXISTED ON TWO LANES AND NOT THE THIRD** (found 2026-09-02;
+     fixed dev@5ef01167). Pressable.swift and StackPressable.kt run `on:longPress` (0.4 s) +
+     `on:longPressEnd` (lift or cancel after a recognized hold — Conformance/elements/pressable.json);
+     the web `mount.ts` had only the lowercase one-shot `on:longpress` at 500 ms with no end, so a
+     "hold for 2×, release to restore" that every phone releases would have held 2× forever in the
+     browser. Both spellings ride one recognizer now; the camel pair takes the corpus number, the
+     lowercase word keeps its 500 ms. THREE TEMPLATE RULES FROM THE SAME AFTERNOON, all measured:
+     (1) the stage gesture surface is a `<pressable>` as a zstack LAYER inside the pager page —
+     `position: absolute; inset: 0` resolved against the viewport (the button measured 390×844,
+     not the page) and is not a page overlay on any lane; a `width/height: 100%` grid child is;
+     (2) the chrome's bottom row is `pointer-events: none` with only its CONTROLS at `auto`: the
+     row was as tall as the rail plus its 170pt clearance, sat over the middle of the clip, and
+     swallowed every tap and hold meant for the stage (elementFromPoint at the clip's centre
+     answered the hstack, and the hold probe read rate 1 / overlay false until it was fixed);
+     (3) the bottom block is pure VERTICAL FLOW — rail row, then the meta 36pt under it, then the
+     seek bar — because a tall row cross-aligned `flex-end` drifted 200pt on iOS while the web
+     drew it right; and a childless `<stack>` with a height is a ZERO box on iOS (no tab rule, no
+     hairline, no equaliser bars — all three drew on web), so every rule is a `<vstack>` with its
+     size attributes and `grow="width"`. STILL OPEN on iOS, measured and not yet explained: the
+     seek bar sits at the window's bottom edge (as if `dsx.screen.safeBottom` read 0 under the
+     full-bleed root while `safeTop` read 62) and the bottom block lands ~25pt above its design.
+
+147. **A NESTED SHEET'S TITLE CHROME PAINTS THE LIGHT THEME'S INK ON THE APP'S DARK SHEET — ON
+     THE WEB** (an ENGINE LEAK under `design: "custom"`; found 2026-09-02; reported to the
+     custom-design audit, not worked around). A level-2 `<sheet title="Subtitles"
+     background="#141414">` draws its title as an `h2` with computed `color: rgb(23, 23, 27)` —
+     the light theme's label ink on the app's own near-black panel — so the reference's 20-bold
+     sheet title is INVISIBLE in the browser (scratchpad shot `web-subtitles.png`: a faint ghost
+     above the × control). iOS paints the same title WHITE, so the two lanes disagree, which is
+     the whole point of the law. The sheet chrome must take its ink from the sheet's own
+     `background` (or the app's ink token), exactly as the grabber and the close control already
+     do. A second, smaller leak from the same screenshots: iOS presents a `content` sheet as an
+     INSET card (~9pt side margins) where web and the reference are full-width with rounded top
+     corners. Meanwhile the "‹ More" row names the level for a sighted reader and the a11y name
+     is intact (§6.138).
+
+148. **THE COMMENT THREAD AND ITS APP STORE 1.2 SAFETY SET LOST THEIR ONLY SURFACE** (a hand-over,
+     2026-09-02). The reference player's rail is Save · Episodes · Share · More, and the founder
+     asked for it 1:1, so the comments item and the three-pane sheet (thread · report/block ·
+     safety and filters) left Components/Watch.dsx. `server/social.dsx` and its routes are
+     untouched — `npm run verify` still posts, filters, reports, blocks and deletes through them —
+     and the More sheet's Report row now files against the EPISODE (`reportEpisode`,
+     `/social/report/episode`, `kind: 'episode'`, one report per reporter per episode under the
+     existing partial unique index). The thread UI needs a home before ship: the show page is the
+     natural one (below the episode grid), and the old Watch.dsx at 020ae1d is the reference
+     implementation to lift (three panes in ONE sheet, optimistic hide, the receipt line). Two
+     smaller facts from the same pass: a "(Completed)" suffix on the last range chip is a
+     catalogue fact (`show.status`) no server sends today, so the chip prints the range alone;
+     and `setTimeout(fn, ms, key)` IS in the JSE builtin table (jse.md) — the AdGate comment
+     saying DSX has no timer primitive predates it, and the player's 1.5 s toast rides it.
+
+149. **THE ELEMENT CENSUS IS A GENERATED FILE THE GENERATOR CANNOT REPRODUCE** (found 2026-09-02).
+     `stack-elements.json` says "GENERATED by generate_editor_catalog.rb — DO NOT EDIT BY HAND",
+     and running that generator DROPPED `href`, `chrome`, `dismissEdge`, `lockOrientation` and the
+     four `shared*` universal attributes (added by hand since the last generation): the linter
+     then refused 44 attributes across this template's own parts. The six `<video>` rows were
+     added by hand (the only way the file accepts them today) and the file was overwritten once
+     more by a concurrent session before they were committed. THE ASK: the generator learns the
+     universal-attribute set from the same source the runtime reads, so a regeneration is safe —
+     until then every row addition is a hand edit, and the file is committed before anything else.
+
+150. **THE NATIVE EXPORT IS LICENCE-GATED FOR THIS TEMPLATE'S OWN PREMIUM PACKAGES, AND `despia
+     remove` CANNOT TAKE THE FREE PATH IT OFFERS** (found 2026-09-02; dev@772ddf58). `despia
+     export ios|android` refuses without `despia-entitlement.json` because the project bundles
+     stripe · posthog · store · revenuecat · identityvault, and offers "despia remove <them>" as
+     the free path — but this project declares its packages by PATH in dsx.config.json, not by
+     registry pin, and `despia remove` answers "stripe is not pinned — dsx.lock.json is empty".
+     The device proofs in this pass were built from a scratch copy whose dsx.config.json drops
+     the five paths by hand (the player's own surfaces use none of them; the auth seam still
+     reads /dev-session.json). THE ASK: either `despia remove` learns path-declared packages, or
+     the export takes a `--without <packages>` word for a verification build; and the template
+     documents which of its packages are premium so a clone knows before its first export.
