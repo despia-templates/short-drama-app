@@ -336,9 +336,11 @@
         <!-- A GUEST STILL SEES THE PRICES — hiding the shop from someone who has not signed
              in is the fastest way to lose them — but the screen says what buying needs, once,
              before they tap. The card is the same one every screen uses. -->
-        <SignInCard visible-if="dsx.variable.signedOut" style="margin-top: 12px"
+        <!-- purchases work for a device (a subject, not a login); linking keeps the coins on an
+             account so they follow the viewer to another device -->
+        <LinkPrompt style="margin-top: 12px"
                     icon="dollarsign.circle.fill"
-                    title="Purchases land on an account"
+                    title="Keep your coins on your account"
                     note="Browse the packs and plans freely. Signing in is what gives coins and VIP somewhere to live, so they are still yours on your next device."/>
 
         <!-- THE RECOVERY CARD. Stripe confirmed the charge, the settle call failed

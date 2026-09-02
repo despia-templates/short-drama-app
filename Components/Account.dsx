@@ -41,6 +41,11 @@
     <variable as="signedOut" computed="true">
       return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
     </variable>
+    <!-- ACCOUNT-ONLY affordances (the identity card, sign out, delete account) gate on this; a
+         device viewer sees the LINK invitation instead, and restore/legal work for both. A LINKED
+         device reads kind 'account' (it acts as the account), so its "sign out" is the unlink the
+         seam routes it to. docs/auth.md. -->
+    <variable as="isAccount" computed="true">return global.auth != null &amp;&amp; global.auth.kind == 'account'</variable>
     <variable as="uid" computed="true">
       if (dsx.variable.signedIn == false) { return '' }
       const s = global.auth.sub
@@ -149,7 +154,7 @@
       <text value="Account" class="h1"/>
 
       <!-- ── who ─────────────────────────────────────────────────────────────────── -->
-      <vstack class="card" visible-if="dsx.variable.signedIn">
+      <vstack class="card" visible-if="dsx.variable.isAccount">
         <hstack class="idRow">
           <vstack class="avatar" style="justify-content: center">
             <image icon="person.crop.circle" iconSize="26" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
@@ -164,8 +169,9 @@
         <text value="{{ dsx.variable.balanceLine }}" class="note" visible-if="dsx.variable.balanceLine != ''"/>
       </vstack>
 
-      <SignInCard visible-if="dsx.variable.signedOut"
-                  title="You are browsing as a guest"
+      <!-- device viewers get the link invitation (their data already works); a bare guest gets the
+           sign-in card. Account viewers get neither — their identity card is above. LinkPrompt self-manages. -->
+      <LinkPrompt title="Keep your account across devices"
                   note="An account is what makes coins, VIP, My List and your history follow you to another device. The catalogue is open either way."/>
 
       <!-- ── purchases ───────────────────────────────────────────────────────────── -->
@@ -187,8 +193,10 @@
       </vstack>
 
       <!-- ── leaving ─────────────────────────────────────────────────────────────── -->
-      <text value="THIS ACCOUNT" class="sectionCap" visible-if="dsx.variable.signedIn"/>
-      <vstack class="cardFlush" visible-if="dsx.variable.signedIn">
+      <!-- account-only: an unlinked device has nothing to sign out of or delete. A LINKED device
+           reads kind 'account', so it sees "sign out" (the seam unlinks it) and "delete account". -->
+      <text value="THIS ACCOUNT" class="sectionCap" visible-if="dsx.variable.isAccount"/>
+      <vstack class="cardFlush" visible-if="dsx.variable.isAccount">
         <hstack class="menuRow" style="border-bottom: 1px solid rgba(255,255,255,0.05)"
                 on:tap="dsx.module.route.push({ path: '/auth/signout' })"
                 a11yGroup="true" a11yTrait="button" a11yLabel="Sign out of this account">

@@ -238,9 +238,10 @@
              balance it has not read yet, which is honest for a signed-in viewer waiting on
              the network and misleading for someone with no account at all: the answer is not
              unknown, it is "there is nothing to read". -->
-        <SignInCard visible-if="dsx.variable.signedOut"
-                    icon="crown.fill"
-                    title="VIP belongs to an account"
+        <!-- a device can already hold VIP (purchases need a subject, not a login); linking keeps it
+             on an account so it follows the viewer to another device -->
+        <LinkPrompt icon="crown.fill"
+                    title="Keep VIP on your account"
                     note="Sign in and a pass follows you to every device you watch on. You can read the plans and the benefits either way."/>
         <hstack class="watchCard" visible-if="dsx.variable.signedOut == false">
           <vstack spacing="4" style="flex: 1">

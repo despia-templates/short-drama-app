@@ -576,6 +576,15 @@
         </hstack>
       </scroll>
 
+      <!-- WEB HOME LINK BANNER — the founder wants aggression here: a device viewer on the web (the
+           weakest durability plane) gets a persistent nudge to link an account. Native keeps the
+           per-screen card instead. LinkPrompt self-hides for an account viewer. -->
+      <vstack class="gridWrap" paddingTop="12" visible-if="dsx.variable.isDevice &amp;&amp; os == 'web'">
+        <LinkPrompt variant="banner" icon="bookmark.fill"
+                    title="Keep your list and coins on your account"
+                    note="Sign in to keep everything you save here on any device."/>
+      </vstack>
+
       <!-- LOADING: the real shape, so the page does not resize under the viewer -->
       <vstack visible-if="dsx.variable.phase == 'loading'" alignItems="stretch" spacing="16" class="gridWrap" paddingTop="24">
         <stack class="skelBlock" style="width: 160px; height: 22px" visible-if="dsx.variable.wide == false"/>
