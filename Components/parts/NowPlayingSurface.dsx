@@ -40,10 +40,12 @@
      THE POSTER URL. The catalogue's poster is a root-relative SVG (`/posters/x.svg`) whose
      PNG twin the origin serves at `.png` (scripts/rasterize-art.mjs; serve.mjs negotiates it
      for the in-app <image>). A snapshot surface cannot decode SVG and the fetch is https-only,
-     so the URL is built here from `dsx.app.host` (App.json `host`, the native origin) and
-     the `.png` twin — the same origin the in-app <image> resolves against. No host (a build
-     whose App.json is unset) → a text-only card, honestly, and the kernel log names the
-     picture it could not fetch. The app mark is public/assets/mark.png the same way.
+     so the URL is built here from `dsx.app.host` (App.json `host`, the native origin — a bare
+     domain or a full origin, both accepted exactly as the engine accepts them) and the `.png`
+     twin — the same origin the in-app <image> resolves against. No host (a build whose
+     App.json is unset) → a text-only card, honestly, and the kernel log names the picture it
+     could not fetch; an `http://` host → the module refuses each picture by name (https only).
+     The app mark is public/assets/mark.png the same way.
 
      `stale: 1800` bounds the activity's freshness: half an hour without an update and the
      OS marks the card stale; the OS itself ends any activity after eight hours. Ending on
@@ -148,7 +150,19 @@
         const host = dsx.app.host
         if (host == null || host == '') { return '' }
         const png = path.endsWith('.svg') ? path.slice(0, path.length - 4) + '.png' : path
-        return 'https://' + host + (png.startsWith('/') ? png : '/' + png)
+        const rel = png.startsWith('/') ? png : '/' + png
+        // `dsx.app.host` is App.json `host` VERBATIM. The manifest documents a bare domain
+        // (`myapp.com`, AppManifest.swift), and the engine's own request builder also accepts
+        // a full origin (`https://myapp.com`, originHost) — this template ships the latter. A
+        // scheme-ful value is used as the origin it is; only a bare domain takes `https://`.
+        // Measured on the iPhone 17 Pro simulator with host `http://localhost:8787`: the old
+        // `'https://' + host` built `https://http://localhost:8787/...`, whose host is the word
+        // "http", and every picture failed "a server with the specified hostname could not be
+        // found". An `http://` origin is handed through as it is so the module refuses it BY
+        // NAME in the kernel log (the fetch is https-only) instead of this part going silent.
+        const origin = host.endsWith('/') ? host.slice(0, host.length - 1) : host
+        if (origin.indexOf('://') >= 0) { return origin + rel }
+        return 'https://' + origin + rel
       }
     </functions>
 
