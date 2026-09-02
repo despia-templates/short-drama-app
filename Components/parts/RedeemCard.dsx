@@ -9,7 +9,9 @@
 <hstack class="card" on:tap="dsx.action.tap()" a11yGroup="true" a11yTrait="button"
         a11yLabel="{{ dsx.attribute.days }}-day membership extension for {{ dsx.attribute.points }} points{{ dsx.variable.can ? '' : ', not enough points' }}">
   <head>
-    <attribute as="id" default="''"/>
+    <!-- `card`, NOT `id`: an `id=` attribute never reaches a component on the native lanes
+         (the RewardRow note, PLAN.md §6.185) — the tap would send `{ id: '' }` -->
+    <attribute as="card" default="''"/>
     <attribute as="days" default="1"/>
     <attribute as="points" default="500"/>
     <attribute as="affordable" default="false"/>
@@ -32,7 +34,7 @@
 
     <action as="tap">
       if (dsx.variable.can == false) { return }
-      dsx.event('redeem', { id: dsx.attribute.id })
+      dsx.event('redeem', { id: dsx.attribute.card })
     </action>
 
     <!-- 16 padding and a 96 pill where the reference measures 20 and 108: "1-Day Membership

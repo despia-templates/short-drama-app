@@ -22,7 +22,13 @@
      empty `href` on a tappable element is a reload on the web, so they are their own file. -->
 <hstack class="row" on:tap="dsx.action.tap()" a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.variable.a11y }}">
   <head>
-    <attribute as="id" default="''"/>
+    <!-- `task`, NOT `id`: `id=` on a mount tag is the element's IDENTITY on the native lanes
+         (Stack.swift's mount pass skips it — "selector / identity, not attributes") and only
+         the web hands it to the component, so an attribute named `id` reads '' on iOS and every
+         tap raised `{ id: '' }` into the host — no branch matched, nothing happened, no error
+         (PLAN.md §6.185). The event payload key stays `id`; that is a dict key, not an
+         attribute, and the host reads it bare. -->
+    <attribute as="task" default="''"/>
     <attribute as="kind" default="''"/>         <!-- signin | push | ad | watch | invite | share | draw | watch30 | pushpts -->
     <attribute as="icon" default="'gift.fill'"/>
     <attribute as="amount" default="0"/>        <!-- the grant, in `unit` -->
@@ -78,18 +84,27 @@
     <action as="tap">
       if (dsx.variable.isDone) { return }
       if (dsx.variable.isBusy) { return }
-      dsx.event('act', { id: dsx.attribute.id })
+      dsx.event('act', { id: dsx.attribute.task })
     </action>
 
+    <!-- THE ROW IS 74 ON BOTH LANES BECAUSE ITS LINE BOXES ARE. The web sizes a text run at
+         1.5em (17 → 25.5, 15 → 22.5) where the native line height is the font's own (17 → ~20.3,
+         15 → ~18), so with the default boxes the web row measured 81 against 74 on iOS: the
+         column was 51 there and `minHeight` only bound natively. `lineSpacing` is the one
+         catalog word that reaches the web's BOX (`line-height: calc(1em + N)`, cssmap.ts) and is
+         extra space BETWEEN lines natively — a native single line is unchanged — so 3 seats the
+         title at 20 and the subtitle at 18 on the web, the same box iOS already draws, and the
+         column reads 41 on both: 41 + 30 rises to the 74 floor on both lanes. A two-line
+         subtitle reads 89 (web) against 90.3 (iOS). Measured 2026-09-02, 402×874 on each lane. -->
     <style as="row" background="#161616" radius="12" paddingH="16" paddingV="15" spacing="8" alignItems="center" minHeight="74"/>
     <style as="tile" width="44" height="44" radius="22" background="#2A2A2A" alignItems="center" alignY="center"/>
     <style as="col" spacing="3" alignItems="stretch"/>
     <style as="titleRow" spacing="6" alignItems="center"/>
-    <style as="title" fontSize="17" color="#FFFFFF" lineLimit="1"/>
-    <style as="count" fontSize="15" color="#8E8E93" lineLimit="1"/>
+    <style as="title" fontSize="17" color="#FFFFFF" lineLimit="1" lineSpacing="3"/>
+    <style as="count" fontSize="15" color="#8E8E93" lineLimit="1" lineSpacing="3"/>
     <style as="subRow" spacing="4" alignItems="flex-start"/>
-    <style as="sub" fontSize="15" color="#8E8E93" lineLimit="2" lineSpacing="2"/>
-    <style as="subGold" fontSize="15" color="#F6B63D" lineLimit="1"/>
+    <style as="sub" fontSize="15" color="#8E8E93" lineLimit="2" lineSpacing="3"/>
+    <style as="subGold" fontSize="15" color="#F6B63D" lineLimit="1" lineSpacing="3"/>
     <style as="pill" minWidth="75" height="31" radius="8" paddingH="10" alignItems="center" alignY="center"/>
     <style as="pillTxt" fontSize="15" fontWeight="semibold" lineLimit="1"/>
   </head>

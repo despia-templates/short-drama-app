@@ -21,8 +21,10 @@
     <style as="tile" width="44" height="44" radius="22" background="#2A2A2A" alignItems="center" alignY="center"/>
     <style as="col" spacing="3" alignItems="stretch"/>
     <style as="titleRow" spacing="4" alignItems="center"/>
-    <style as="title" fontSize="17" color="#FFFFFF" lineLimit="1"/>
-    <style as="sub" fontSize="15" color="#8E8E93" lineLimit="1"/>
+    <!-- lineSpacing 3 seats the web's line boxes at the native ones (20 / 18), so the row reads
+         74 on both lanes — the RewardRow note has the measurement -->
+    <style as="title" fontSize="17" color="#FFFFFF" lineLimit="1" lineSpacing="3"/>
+    <style as="sub" fontSize="15" color="#8E8E93" lineLimit="1" lineSpacing="3"/>
     <style as="pill" minWidth="75" height="31" radius="8" paddingH="10" background="#FF2C55" alignItems="center" alignY="center"/>
     <style as="pillTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
   </head>

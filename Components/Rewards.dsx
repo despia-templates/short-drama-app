@@ -583,11 +583,19 @@
     <style as="rulesTxt" fontSize="15" color="#FFFFFF" lineLimit="1"/>
     <style as="pageBody" spacing="0" paddingBottom="32" alignItems="stretch"/>
     <!-- ── tab 1 ── -->
-    <style as="hero" height="98" alignItems="flex-start"/>
-    <style as="heroCol" spacing="8" alignItems="flex-start" paddingLeading="15" paddingTop="6"/>
+    <!-- 9.1: the band is ~80 (105→183 on the reference), the number's top 13 under the band's
+         top and "Balance" 8 under its baseline. The 40pt line box is ~60 on the web (1.5em) and
+         seats the glyph ~16 down on its own, so the column carries no top padding and no
+         spacing, and the label is pulled 12 up with `offsetY` — a translate that reads the same
+         on three lanes and moves no sibling. (A smaller line box was NOT the tool: `lineSpacing`
+         reaches the web's box and not a native single line, so it would move the lanes apart.)
+         Measured before: card top 142 on the web, 204 on iOS (62 safe top), the label 80 under
+         the header on both; the spec wants the card at 127 and the label at 51. -->
+    <style as="hero" height="84" alignItems="flex-start"/>
+    <style as="heroCol" spacing="0" alignItems="flex-start" paddingLeading="15"/>
     <style as="balanceNum" fontSize="40" fontWeight="bold" color="#F7C948" lineLimit="1"/>
     <style as="balanceLbl" fontSize="15" color="#8E8E93"/>
-    <style as="heroArt" width="196" height="98" opacity="0.5"/>
+    <style as="heroArt" width="168" height="84" opacity="0.5"/>
     <style as="sectionTitle" fontSize="17" fontWeight="semibold" color="#FFFFFF" paddingTop="28" paddingBottom="12"/>
     <style as="rows" spacing="12" alignItems="stretch"/>
     <style as="footer" fontSize="15" color="#8E8E93" textAlign="center" paddingTop="40" lineSpacing="4"/>
@@ -688,12 +696,12 @@
                       a11yLabel="Balance: {{ dsx.variable.balance }} coins">
                 <vstack class="heroCol" style="justify-content: flex-start; flex: none">
                   <text value="{{ dsx.variable.balance }}" class="balanceNum"/>
-                  <text value="Balance" class="balanceLbl"/>
+                  <text value="Balance" class="balanceLbl" offsetY="-12"/>
                 </vstack>
                 <!-- the 2:1 illustration at the right edge, bleeding to the screen edge and
                      washed into the page; `flex: none` so the column keeps its own width -->
                 <image src="/assets/rewards-hero.svg" contentFit="contain" class="heroArt" a11yHidden="true"
-                       style="width: 196px; height: 98px; margin-right: -16px; opacity: 0.5; flex: none"/>
+                       style="width: 168px; height: 84px; margin-right: -16px; opacity: 0.5; flex: none"/>
               </hstack>
 
               <!-- 9.2 · the check-in card -->
@@ -705,7 +713,7 @@
               <text value="Earn Rewards" class="sectionTitle"/>
               <vstack class="rows">
                 <list bind="dsx.variable.rowsBefore" key="id" scroll="false" spacing="12">
-                  <RewardRow id="{{ item.id }}" kind="{{ item.kind }}" icon="{{ item.icon }}" amount="{{ item.amount }}"
+                  <RewardRow task="{{ item.id }}" kind="{{ item.kind }}" icon="{{ item.icon }}" amount="{{ item.amount }}"
                              pill="{{ item.pill }}" done="{{ item.done }}" busy="{{ dsx.variable.busy == item.id }}"
                              on:act="dsx.action.rowTap()"/>
                 </list>
@@ -722,7 +730,7 @@
                         on:failed="dsx.action.adFailed()"
                         on:reported="dsx.action.adReported()"/>
                 <list bind="dsx.variable.rowsAfter" key="id" scroll="false" spacing="12">
-                  <RewardRow id="{{ item.id }}" kind="{{ item.kind }}" icon="{{ item.icon }}" amount="{{ item.amount }}"
+                  <RewardRow task="{{ item.id }}" kind="{{ item.kind }}" icon="{{ item.icon }}" amount="{{ item.amount }}"
                              mins="{{ item.mins }}" daily="{{ item.daily }}" progress="{{ item.progress }}" target="{{ item.target }}"
                              counted="{{ item.counted }}" pill="{{ item.pill }}" done="{{ item.done }}" busy="{{ dsx.variable.busy == item.id }}"
                              on:act="dsx.action.rowTap()"/>
@@ -732,7 +740,7 @@
                   <FollowRow net="{{ item.id }}" name="{{ item.name }}" icon="{{ item.icon }}" href="{{ item.href }}"/>
                 </list>
                 <!-- row 7: share — the share sheet, no coins -->
-                <RewardRow id="share" kind="share" icon="square.and.arrow.up" pill="go" on:act="dsx.action.rowTap()"/>
+                <RewardRow task="share" kind="share" icon="square.and.arrow.up" pill="go" on:act="dsx.action.rowTap()"/>
               </vstack>
 
               <!-- Spin the wheel: a server-owned grant already, kept as a card after the list -->
@@ -800,10 +808,10 @@
                 <MembershipTimeline day="{{ dsx.variable.memberDay }}" nodes="{{ dsx.variable.timeline }}" vip="{{ dsx.variable.isVip }}"
                                     on:plans="dsx.action.openMembership()"/>
 
-                <RewardRow id="draw" kind="draw" icon="gift.fill" unit="points" low="{{ dsx.variable.drawMin }}" high="{{ dsx.variable.drawMax }}"
+                <RewardRow task="draw" kind="draw" icon="gift.fill" unit="points" low="{{ dsx.variable.drawMin }}" high="{{ dsx.variable.drawMax }}"
                            pill="{{ dsx.variable.isVip ? 'claim' : 'plans' }}" done="{{ dsx.variable.drawnToday }}"
                            busy="{{ dsx.variable.busy == 'draw' }}" on:act="dsx.action.rowTap()"/>
-                <RewardRow id="watch30" kind="watch30" icon="timer" unit="points"
+                <RewardRow task="watch30" kind="watch30" icon="timer" unit="points"
                            amount="{{ dsx.variable.watch30 == null ? 50 : dsx.variable.watch30.reward }}"
                            mins="{{ dsx.variable.watch30 == null ? 30 : dsx.variable.watch30.target }}"
                            progress="{{ dsx.variable.watch30 == null ? 0 : dsx.variable.watch30.progress }}"
@@ -827,7 +835,7 @@
                   </vstack>
                 </grid>
 
-                <RewardRow id="pushpts" kind="pushpts" icon="bell.fill" unit="points"
+                <RewardRow task="pushpts" kind="pushpts" icon="bell.fill" unit="points"
                            amount="{{ dsx.variable.pointsView == null ? 30 : dsx.variable.pointsView.pushPoints.reward }}"
                            pill="open" done="{{ dsx.variable.pushPtsDone }}" busy="{{ dsx.variable.busy == 'push' }}"
                            on:act="dsx.action.rowTap()"/>
@@ -840,7 +848,7 @@
                          a11yTrait="button" a11yLabel="How redemption works"/>
                 </hstack>
                 <list bind="dsx.variable.cards" key="id" scroll="false" spacing="12">
-                  <RedeemCard id="{{ item.id }}" days="{{ item.days }}" points="{{ item.points }}" affordable="{{ item.affordable }}"
+                  <RedeemCard card="{{ item.id }}" days="{{ item.days }}" points="{{ item.points }}" affordable="{{ item.affordable }}"
                               redeemed="{{ item.redeemedToday }}" busy="{{ dsx.variable.busy == 'redeem' }}" on:redeem="dsx.action.redeem()"/>
                 </list>
               </vstack>

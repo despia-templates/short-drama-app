@@ -3893,3 +3893,85 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      head in the layout column — the same law as the registration-only mount (dev@bff4c16d
      family), one node further up.
 
+184. **A HIDDEN TEXT RUN IN A CENTRED iOS COLUMN KEEPS ITS SLOT — a spaced vstack with
+     `alignItems="center"` pays its spacing around a `visible-if` false text, and a stretched
+     column drops it** (found 2026-09-02 finishing the Rewards page against the /tmp/wt-land
+     kernel at dc987952; iPhone 17 Pro simulator, iOS 26.5, probe-free numbers off 1206×2622
+     captures ÷3, the web at 402×874 beside it).
+
+     The membership card (`Components/parts/MembershipTimeline.dsx`, a `spacing="16"
+     alignItems="center"` column whose first child is the member title, `visible-if` false for
+     a guest) seated "Membership points" 38.3pt under the card's top on the phone and 21.5 on
+     the web; the card read 164.7 against 145.5. Three one-screen probes (throwaway parts in
+     the scratch copy, never the template) isolated it — every card `paddingV="16"
+     spacing="16"`, one 17pt text, the glyph's seat measured from its card's top:
+
+       inline column, STRETCH, a hidden text first          +22.3            (the control: 16 + the glyph in a 25.3 box)
+       inline column, STRETCH, a hidden zstack mid-column    +22.3 / +63.7    card 99 — nothing paid
+       inline column, CENTER,  a hidden text first           +38.3            card +16
+       component,     CENTER,  a hidden text first           +38.3            card +16 (the part's own shape)
+       component,     CENTER,  the hidden text SECOND        +22.3            card +16 — the slot moved under the title
+       component,     CENTER,  the hidden zstack removed     +38.3            card +16 — the container never paid
+       component,     CENTER,  the hidden text reading a literal `false` · a plain literal for the
+                               plural template · the attribute instead of the computed   +38.3 each
+       component,     STRETCH, a hidden text first           +22.3            card +0
+       component,     CENTER,  the title pair inside an hstack +22.3          card +0 (the bridge)
+
+     So it is not the component instance (§6.183 is closed by its wrapper and stays closed
+     here), not the plural tier, not the computed, and not `visible-if` as such: a hidden
+     CONTAINER costs nothing in either column and a hidden TEXT costs nothing in a stretched
+     one. The centred column is the unsteered hug that sizes text runs by content
+     (dev@1efaa35d), and on that path a `visible-if` false run is still seated as a zero-size
+     child the column pays its spacing around. The web drops the node (`display: none`), so
+     the 16pt exists on one lane only — and it is invisible from source, because the same
+     markup in a stretched card (CheckinCard, RewardRow's column) measures clean.
+
+     BRIDGED IN THE TEMPLATE, LOUDLY: MembershipTimeline's title pair rides in one hstack, and
+     its guest half (the line and the See-plans pill) is one container `visible-if` block, so
+     the centred card holds no hidden text run in either state; both carry a comment naming
+     this entry. Measured after the bridge: the title at +22.3 on both lanes, the card 148.7
+     against 145.5, tab 2's rows at Δ62 (the safe top) from the web's. Predicted and NOT
+     measured, left for the engine fix: ComingSoonRail's two sheet bodies (`soonBody`,
+     `permBody`, both centred at spacing 14) each hold a `remindNote` text hidden until a lane
+     reports — 14pt of nothing under the button on iOS until then. Ask: a `visible-if` false
+     text must leave a centred column exactly as it leaves a stretched one — no slot, no
+     spacing — the same law as the registration-only mount and §6.183, one child type further
+     along.
+
+185. **`id=` ON A COMPONENT MOUNT IS THE ELEMENT'S IDENTITY ON THE NATIVE LANES AND AN
+     ATTRIBUTE ON THE WEB — a part that declares `<attribute as="id">` reads '' on iOS, and
+     nothing says so** (found 2026-09-02 finishing the Rewards page against the /tmp/wt-land
+     kernel at dc987952; iPhone 17 Pro simulator, iOS 26.5, the browser at 402×874 beside it).
+
+     Every Earn Rewards row and every Redeem card was dead on the phone: the tap logged
+     (`[dsx.tap] hstack dsx.action.tap()`), no sheet presented, no route pushed, no toast — the
+     same rows opened the notification modal and pushed /membership on the web. The row is a
+     file component mounted `<RewardRow id="push" …>` with `<attribute as="id">`, raising
+     `dsx.event('act', { id: dsx.attribute.id })` into the host's `rowTap`, which switches on
+     the id. `id` is a UNIVERSAL attribute (StackReference: "stable id for imperative patches,
+     `ui.node("#id")`"), and Stack.swift's mount pass skips it — `if k == "tag" || k == "id" {
+     continue } // selector / identity, not attributes` — so `dsx.attribute.id` is '' on iOS,
+     the payload is `{ id: '' }`, and the host matches nothing. The web hands the same
+     attribute to the component, so one lane works and the other fails without a word.
+
+     One-screen probe (throwaway parts, scratch copy only): a row raising `act` with its
+     attribute and `ping` with nothing, mounted three ways —
+       direct mount, attribute named `id`     the row renders EMPTY (its label is the attribute); a tap
+                                              delivers `ping` and an `act` whose id is ''
+       direct mount, attribute named `rid`    the label renders, `act` carries "direct-rid"
+       <list> row template, attribute `rid`   the label renders, `act` carries the row's id
+     So the event plane is sound (§6.183's family is not involved); the ATTRIBUTE is the one
+     dropped, and only because of its name.
+
+     FIXED IN THE TEMPLATE (a rename, no workaround): RewardRow's attribute is `task`,
+     RedeemCard's is `card`, every mount in Rewards.dsx follows, and the event payload key
+     stays `id` (a dict key the host reads bare). Measured after: the push row opens the
+     notification modal on the phone as it does on the web. TWO MORE INSTANCES, named and
+     NOT changed here (other lanes' surfaces, each needing its own measurement):
+     `Components/parts/PlanCard.dsx` (`<PlanCard id="{{ item.id }}">` in Membership.dsx — "the
+     catalogue id, echoed back on pick", so a native plan pick echoes '') and
+     `Components/parts/CoverCard.dsx` (`<CoverCard id=…>` on Home and My List). Ask, two halves:
+     (1) `despia lint` must refuse `<attribute as="id">` — and every other universal attribute
+     name — in a component head, the way it refuses a local named `item` (#242); (2) the web
+     must drop `id=` from a mount's attribute set the way the native lanes do, so the two lanes
+     cannot disagree about what a component was handed.
