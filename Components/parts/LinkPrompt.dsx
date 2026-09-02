@@ -1,0 +1,90 @@
+<!-- LinkPrompt — the ONE card that turns a signed-out slot into a device-aware invitation.
+
+     THE 90% PATH CHANGED WHAT "SIGNED OUT" MEANS. With device identity (<AuthSeam>), a first-run
+     viewer is not signed out — they are a DEVICE, and their list, coins and history already work.
+     So the four old guest cards ("Your list lives on your account", "VIP belongs to an account",
+     "Purchases land on an account", "You are browsing as a guest") are no longer walls in front of
+     data; they are INVITATIONS to link that data to an account so it follows the viewer to another
+     device. This component is that invitation, and it reads the seam to decide which face to show:
+
+       kind == 'account'  → nothing. The viewer has an account; there is nothing to invite.
+       kind == 'device'   → the LINK card. Says WHERE the data lives right now (from the vault's
+                            durability plane) and offers to link an account to keep it anywhere.
+       otherwise (guest)  → the sign-in card, for the honest degradation where no device provider
+                            answered (offline, or none wired) and the data cannot load at all.
+
+     THE COPY IS THE TRUTH THE PLATFORM REPORTS, never a guess. `global.auth.plane` /
+     `global.auth.durability` come from `dsx.module.identityvault.durability()` — iCloud Keychain on
+     a configured iPhone, Google account backup on Android, this browser only on the web — so the
+     card can push harder exactly where the platform is weaker, with no `os` check.
+
+     CUSTOM UI, EVERY LANE (reference-ui-spec.md -1, the founder rule). This is DSX — a vstack, text
+     and one button — identical on web, iOS and Android. There is no native alert, no system dialog,
+     no platform toggle anywhere near "link your account". The palette is the app's own (Theme.dsx),
+     the same one <SignInCard> already draws, so a device card sits among the app's cards as one of
+     them. -->
+<vstack class="wrap" alignItems="stretch">
+  <head>
+    <attribute as="icon" default="'person.crop.circle'"/>
+    <attribute as="title" default="'Keep this on your account'"/>
+    <attribute as="note" default="''"/>            <!-- shown only in the GUEST (no-session) face -->
+    <attribute as="variant" default="'card'"/>       <!-- card | banner -->
+
+    <!-- read the seam once; account hides the whole thing, device shows the link face -->
+    <variable as="kind" computed="true">
+      if (global.auth == null) { return '' }
+      return global.auth.kind == null ? '' : global.auth.kind
+    </variable>
+    <variable as="isDevice" computed="true">return dsx.variable.kind == 'device'</variable>
+    <variable as="isAccount" computed="true">return dsx.variable.kind == 'account'</variable>
+    <!-- WHERE THE DATA LIVES, in the viewer's terms, keyed on the platform's own durability plane.
+         `keychain_*` is iOS, `blockstore_*`/`keystore_*` is Android, `indexeddb` is the web. -->
+    <variable as="whereLine" computed="true">
+      const p = global.auth == null || global.auth.plane == null ? 'none' : global.auth.plane
+      if (p == 'keychain_synced') { return 'Saved to this device and your iCloud Keychain, so it is already waiting on your next iPhone. Link an account to reach it on the web and on Android too.' }
+      if (p == 'keychain_device') { return 'Saved on this iPhone. Link an account and it follows you to every device you watch on — turn on iCloud Keychain to carry it to a new phone automatically.' }
+      if (p == 'blockstore_cloud') { return 'Saved to this device and your Google account backup, ready for your next Android phone. Link an account to reach it on the web and on iOS too.' }
+      if (p == 'blockstore_local') { return 'Saved on this device. Link an account and it follows you to every device you watch on.' }
+      if (p == 'keystore_prefs') { return 'Saved on this device. Link an account and it follows you to every device you watch on.' }
+      if (p == 'indexeddb') { return 'Saved in this browser only — clearing site data would lose it. Link an account to keep your list, coins and history anywhere you sign in.' }
+      return 'Link an account to keep your list, coins and history — on this device and any other.'
+    </variable>
+    <variable as="btnLabel" computed="true">return dsx.variable.isDevice ? 'Link an account' : 'Sign in'</variable>
+    <variable as="shown" computed="true">return dsx.variable.isAccount == false</variable>
+
+    <style as="wrap" spacing="0"/>
+    <style as="card" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="20" alignItems="center"/>
+    <style as="banner" background="#141419" radius="12" spacing="12" paddingH="14" paddingV="12" alignItems="center"/>
+    <style as="title" fontSize="15" fontWeight="semibold" color="#FFFFFF" textAlign="center"/>
+    <style as="bannerTitle" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="note" fontSize="13" color="rgba(255,255,255,0.55)" textAlign="center" lineSpacing="3"/>
+    <style as="bannerNote" fontSize="12" color="rgba(255,255,255,0.5)" lineSpacing="3"/>
+    <style as="signBtn" background="#FF2C55" radius="20" paddingH="24" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="bannerBtn" background="#FF2C55" radius="18" paddingH="18" paddingV="10" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+  </head>
+
+  <Theme/>
+
+  <!-- CARD — the full invitation, used on the personal screens and as the native device card -->
+  <vstack class="card" visible-if="dsx.variable.shown &amp;&amp; dsx.attribute.variant != 'banner'">
+    <image icon="{{ dsx.attribute.icon }}" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
+    <text value="{{ dsx.attribute.title }}" class="title"/>
+    <!-- device: the durability truth; guest: the caller's note -->
+    <text value="{{ dsx.variable.whereLine }}" class="note" visible-if="dsx.variable.isDevice"/>
+    <text value="{{ dsx.attribute.note }}" class="note" visible-if="dsx.variable.isDevice == false &amp;&amp; dsx.attribute.note != ''"/>
+    <button label="{{ dsx.variable.btnLabel }}" class="signBtn" on:tap="dsx.module.route.push({ path: '/auth/signin' })"
+            a11yLabel="{{ dsx.variable.isDevice ? 'Link an account to keep your data' : 'Sign in or create an account' }}"/>
+  </vstack>
+
+  <!-- BANNER — the slimmer horizontal form, for a persistent nudge on Home (web) -->
+  <hstack class="banner" visible-if="dsx.variable.shown &amp;&amp; dsx.attribute.variant == 'banner'">
+    <image icon="{{ dsx.attribute.icon }}" iconSize="20" color="{{ gold() }}" a11yHidden="true"/>
+    <vstack spacing="2" style="flex: 1; min-width: 0" alignItems="stretch">
+      <text value="{{ dsx.attribute.title }}" class="bannerTitle"/>
+      <text value="{{ dsx.variable.isDevice ? dsx.variable.whereLine : dsx.attribute.note }}" class="bannerNote"
+            style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+    </vstack>
+    <button label="{{ dsx.variable.btnLabel }}" class="bannerBtn" on:tap="dsx.module.route.push({ path: '/auth/signin' })"
+            a11yLabel="{{ dsx.variable.isDevice ? 'Link an account to keep your data' : 'Sign in or create an account' }}"/>
+  </hstack>
+</vstack>

@@ -1,0 +1,117 @@
+<!-- auth.dsx — DEVICE IDENTITY, the 90% path. The founder's rule: "My list should fully
+     work locally based on device auth. 90% of users will not create an account. We need
+     iCloud KV storage / persistent storage that remains with uninstall on iOS and Android,
+     and build a real auth system around that." And: restore purchases must work anonymous,
+     no login (§6.86). This document is the SERVER half of that.
+
+     ══ WHERE THE MINT ROUTES ACTUALLY LIVE, AND WHY IT IS NOT A CORNER CUT ═══════════════
+     docs/auth.md is one sentence: the backend VERIFIES tokens, it never ISSUES them. Locally
+     `scripts/dev-session.mjs` plays the identity provider; in production you swap that one
+     role for Clerk, Supabase Auth, or your own issuer. Device identity is that same seam
+     extended — it MINTS a session for a device that has no account — so its four write/mint
+     endpoints are PROVIDER endpoints, served by the local origin (`scripts/serve.mjs`)
+     beside `/dev-session.json` and the `/internal/admin/*` twins, and re-implemented by an
+     adopter in their own IdP or a thin token-exchange service exactly as the sign-in seam is.
+
+     THEY ARE NOT DECLARED ACTIONS HERE, AND THAT IS A FRAMEWORK FACT RATHER THAN A CHOICE.
+     A declared `<server>` action reaches the database through `repoFor(ctx)`, which is
+     ALWAYS user-scoped (repo.ts), and whose `create`/`update`/`delete` call `mustWrite()`,
+     which THROWS `forbidden` the moment the caller has no identity. `POST /auth/device/register`
+     is public by construction (the caller has no token yet — that is the whole point), so a
+     declared action on it could not write the row it exists to write: measured, the write is
+     refused before RLS is even consulted. And this table must be written with SERVICE scope
+     (no viewer may read another device's row), which a declared action never reaches —
+     `serviceRepo()` cannot be obtained from a HostContext, by design (repo.ts). So the
+     registration, exchange, link and unlink handlers are hand-written on the provider origin,
+     using `serviceRepo()` and `node:crypto` (the same primitives `dev-session.mjs` already
+     signs tokens with), and the MERGE is one SQL transaction rather than the declared lane's
+     bounded-and-resumable loop, because the provider HAS the transaction seam a declared
+     action lacks (§6.38). Filed as PLAN.md §6.128: the declared server lane has no way to
+     express a public route that writes with service authority, which is the same missing
+     word (§6.7 / §6.2) that keeps the `/internal/admin/*` twins in the provider too.
+
+     ══ THE THREAT MODEL (the founder's constraints, verbatim) ═══════════════════════════
+       · "No coin grant ever originates from the client." Device identity mints an IDENTITY,
+         never an entitlement — coins still move only through the server grant paths, and the
+         merge sums two wallets SERVER-SIDE, keyed on an idempotent ledger row.
+       · "A client-trusted grant of any kind will be farmed within a week of launch. Assume
+         the app is decompiled on day one." The secret is SERVER-generated (crypto-grade,
+         `randomBytes(32)`), returned ONCE at registration, and the server stores only
+         `sha256(secret)` — a decompiled client holds a secret that proves possession and
+         reveals nothing about anyone else, and the stored hash is worthless if the table
+         leaks.
+       · "Never hand the client a long-lived or unscoped token." The device credential is NOT
+         a token: it is exchanged for a SHORT-LIVED (1h) HS256 session on every cold start and
+         on any 401. The session carries `sub` (a UUID) and `kind`, and NEVER a `role` claim —
+         a device can never be the operator.
+
+     ══ THE TABLE ═══════════════════════════════════════════════════════════════════════
+     `ownership="service"` is the whole security posture in one word: the generated policy
+     names only `service_role`, and `anon`/`authenticated` are revoked, so NO viewer — signed
+     in or not — can read a device row through any client route. The provider reaches it with
+     `serviceRepo()`; nothing else can. The row id IS the deviceId — a `gen_random_uuid()` the
+     caller cannot guess (122 bits), the same capability-as-a-row-id shape the playticket uses.
+       · secret_hash        sha256 of the server-minted secret (hex). The secret itself is
+                            never stored.
+       · viewer_id          the device's own viewer subject (a UUID). Owns the device's rows
+                            until the device is linked to an account.
+       · linked_viewer_id   set by /auth/link. When present, the exchange mints a session for
+                            the ACCOUNT subject instead — the device becomes a second key to
+                            the same account, which is the "follows you to any device" story.
+       · platform / plane   from the client's `identityvault.durability()` — for the ledger
+                            and for support, never for authority.
+       · last_seen_at       rolled forward on every exchange. -->
+<server>
+  <head>
+    <entity as="device_identity" ownership="service">
+      <field as="secret_hash" type="text"/>
+      <field as="viewer_id" type="uuid"/>
+      <field as="linked_viewer_id" type="uuid"/>
+      <field as="platform" type="text"/>
+      <field as="plane" type="text"/>
+      <field as="last_seen_at" type="timestamptz"/>
+      <index on="viewer_id"/>
+      <index on="linked_viewer_id"/>
+    </entity>
+
+    <!-- THE ONE DECLARED ROUTE, and it is honest on every lane. The mint endpoints are the
+         provider's (see the header), so a declared action cannot describe their liveness
+         without lying on a lane where no provider runs. What IS true everywhere is the
+         CONTRACT — the paths, the session lifetime, and the durability planes the UI copy
+         reads — so this returns exactly that, as static facts. `<AuthSeam>` reads it for the
+         link-card copy and the endpoint paths, then discovers liveness by trying to register
+         (a 404 means no provider here, and the seam falls back to the dev-session flow). This
+         also gives this document a reachable api, which the server compiler requires. -->
+    <action as="deviceAuthStatus">
+      // The device-identity contract, TRUE on web, iOS and Android wherever a provider is
+      // wired. `available` is the contract, not a liveness probe: the seam confirms liveness
+      // by calling register, exactly as it confirms the dev-session by fetching it.
+      // (No apostrophes in this body: the lint balance check counts them as quotes.)
+      return {
+        available: true,
+        kind: 'device',
+        sessionTtl: 3600,
+        endpoints: {
+          register: '/auth/device/register',
+          exchange: '/auth/device',
+          link: '/auth/link',
+          unlink: '/auth/unlink'
+        },
+        // The durability vocabulary the IdentityVault fold publishes, so the link card can
+        // say WHERE the data lives without a platform check. `synced` is the only level at
+        // which an anonymous buyer who changes phone keeps what they paid for.
+        planes: {
+          synced: 'Saved to this device and your iCloud Keychain, so it follows you to a new phone.',
+          device: 'Saved on this device. Link an account to keep it if you reinstall or switch phones.',
+          session: 'Saved in this browser only. Link an account to keep it anywhere else.',
+          none: 'Not saved yet. Link an account to keep your list, coins and history.'
+        }
+      }
+    </action>
+  </head>
+
+  <!-- A public read of a constant contract — the same shape and ceiling as the storefront
+       catalogue. SSR may hit it; anonymous callers share a bucket per address
+       (scripts/serve.mjs supplies clientAddress). -->
+  <route method="GET" path="/auth/device/status" action="deviceAuthStatus" auth="none" rate="120/m"/>
+</server>
