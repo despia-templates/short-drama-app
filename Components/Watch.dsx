@@ -618,7 +618,8 @@
     <style as="missionBody" spacing="14" alignItems="center" paddingH="16" paddingTop="8" paddingBottom="12"/>
     <style as="missionTitle" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
     <style as="missionTxt" fontSize="15" color="#8E8E93" textAlign="center" lineSpacing="5"/>
-    <style as="missionBtn" radius="12" height="48" alignItems="center" fontSize="17" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="missionBtn" radius="12" height="48" alignItems="center"/>
+    <style as="missionBtnTxt" fontSize="17" fontWeight="semibold" color="#FFFFFF"/>
     <style as="missionFoot" fontSize="12" color="#8E8E93" textAlign="center" lineSpacing="4"/>
   </head>
 
@@ -1076,8 +1077,12 @@ Please unlock to watch." class="lockHead"/>
                tooltip="Minutes count only while an episode plays. Bonuses land at 5, 10, 20 and 30 minutes, up to 70 coins a day."/>
       </hstack>
       <text class="missionTxt" value="Earn bonus coins at 5, 10, 20 &amp; 30 mins! You can get up to 70 coins daily to unlock premium episodes."/>
-      <button label="Hide Timer" class="missionBtn" grow="width" on:tap="dsx.action.hideTimer()"
-              style="width: 100%; border: 1px solid rgba(255,255,255,0.12); background: transparent"/>
+      <!-- the outlined button is the app's own box, not a system button: a bare <button> hugs
+           its label natively and the outline drew around the word (measured on iOS) -->
+      <vstack class="missionBtn" grow="width" on:tap="dsx.action.hideTimer()" a11yTrait="button" a11yLabel="Hide Timer"
+              borderWidth="1" borderColor="rgba(255,255,255,0.12)" style="width: 100%; justify-content: center">
+        <text value="Hide Timer" class="missionBtnTxt"/>
+      </vstack>
       <text class="missionFoot" value="Timer hides automatically but reappears when you restart the app."/>
     </vstack>
   </sheet>
