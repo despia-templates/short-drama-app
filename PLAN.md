@@ -4315,6 +4315,35 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      new kernel (sheets), and every Android capture in this pass came off an emulator with
      ~575 MB free — a cold start took 30 s+, so a fast screenshot shows the splash, not a bug.
 
+     RIDER (b), RESOLVED (2026-09-02, Pixel emulator API 36 `DSX_API36_Phone_Final`, probe-free
+     `[geo]` frames, template main 90cce31 in a scratch copy with a ten-row `/zprobe` screen;
+     before = kernel 184470a9, after = 1dd94242 · 485338f8 on dev, cherry-picked from the agent worktree): THE
+     MECHANISM WAS THE STRETCHED COLUMN, NOT THE BOUNDARY AND NOT THE HIDDEN SIBLINGS. Compose's
+     Row measures a non-weighted child against the width still free; RestoreRow's root is
+     `<vstack alignItems="stretch">`, its pill child takes the synthetic `fillMaxWidth`, and a
+     column with a fill child answers the whole free width — so the mount took 327.2 dp beside
+     the 44 dp chevron, the weighted title measured 0×254.9 (one letter per line, row 270.9
+     tall) and on /vip the spacer got nothing (pill at x 68.2). An hstack-rooted copy and a bare
+     inline pill hugged both times; a copy with no hidden siblings collapsed exactly like the
+     original; the copy without `width="fit"` was identical to the copy with it. The withdrawn
+     branch (563ae7f6) had never reached these rows: `hugsInRow` refused any `width`, and
+     `width="fit"` on a mount is inert on Android (a mount's attributes never style its root,
+     §6.186) — the collapse survived the withdrawal because the branch was never in play. Two
+     engine commits: the :core decision reads `fit` as the hug word and `grow="height"` as a
+     cross-axis fill (corpus `flex-semantics.json hugsInRow`, 24 rows, Kotlin test), and the
+     :render `IntrinsicSize.Max` branch is back, measured — the node layouts do answer
+     `maxIntrinsicWidth`. After: Membership title 247.6×25.5 (241.1 beside "Restore"), pill 71.6
+     at 323.8 ("Sign in") / 78.1 at 317.3 ("Restore"), row 60.2; VIP pill trailing at 317.3; all
+     ten probe rows 60.2, signed out and in; Chrome at 402 px says title 68..300.4, pill
+     308.4..386 — the same geometry against the shell. Home, Discover and Show pixel-identical
+     before/after; Store, Rewards, My List, My Page differ only by signed-in content.
+     `width="fit"` on both pill mounts stays redundant-but-harmless on every lane; the
+     `grow="width" style="flex: 1; min-width: 0"` title needs no change. OPEN, named: the iOS
+     `hugsInRow` twin still refuses any width/grow (it does not need this door); a mount's
+     `width="fit"` in a COLUMN is still inert on Android; :core's `KeyframeConformanceTest` does
+     not compile at dev 184470a9 (another lane's in-flight motion work) and was set aside for
+     the run only.
+
 195. **THE WEB IMAGE FADE CLOBBERED EVERY DECLARED OPACITY — FIXED UPSTREAM 74826642** (2026-09-02,
      the full-route sweep after the finalize pass; web = Playwright 402×874 against the local
      origin, iOS = iPhone 17 Pro simulator on kernel b3acbf37). `<style as="heroArt" width="168"

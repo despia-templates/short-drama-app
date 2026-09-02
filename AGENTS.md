@@ -501,10 +501,11 @@ is the model). `npm run lint` and `npm run review` gate every merge.
   instance as a system surface on iOS — a 12% white, radius-14 fill behind its root — whatever
   the component declared (PLAN.md §6.186, measured behind every BuyButton). Name a component
   attribute anything else (`funnel`); the analytics property may keep the word.
-- **A MOUNT IN A ROW HUGS WITH `width="fit"` ON THE MOUNT TAG — iOS FIXED UPSTREAM 67ea7f26
-  (row stacks and mounts hug through their own pipeline); ANDROID STILL NEEDS IT: the Android
-  twin shipped unmeasured, was withdrawn (563ae7f6), and the signed-out header collapse is OPEN
-  (PLAN.md §6.194 rider) — keep `width="fit"` on every mount in a row until Android is measured.** A component mounted in an
+- **A MOUNT IN A ROW HUGS — FIXED UPSTREAM ON BOTH NATIVES (iOS 67ea7f26; Android 1dd94242 +
+  485338f8, measured on a Pixel emulator: a stretched column root used to take the whole free
+  width of a Row and starve the weighted title beside it, PLAN.md §6.194 rider b). `width="fit"`
+  on the mount tag is now redundant-but-harmless in a row; in a COLUMN it is still inert on
+  Android (a mount's attributes never style its root there, §6.186).** A component mounted in an
   `hstack` is greedy on iOS: it takes the free space a `<spacer/>` or `space-between` should
   and its content sits at the leading edge of that share (the Restore pill beside the back
   chevron); `grow="false"` does not cancel it, the hug primitive does (PLAN.md §6.187).
