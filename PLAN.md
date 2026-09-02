@@ -3563,3 +3563,88 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      `isCoreLibraryDesugaringEnabled` + `desugar_jdk_libs` in the export's app and kernel
      modules — and put an API 24 boot into the device gate so the floor is measured rather
      than declared. The probe moved to Pixel_10_Pro (API 37) to finish its own measurement.
+
+172. **EVERY TEXT WAS ~2% WIDER AND EVERY LINE BOX ~24% SHORTER ON THE PHONES THAN ON THE
+     WEB — the type plane had no custom column** (found 2026-09-02 on the Store subtitle;
+     measured on a 402×874 web viewport against an iPhone 17 Pro simulator, the registry
+     face InterVariable, App.json `design: "custom"`; fixed upstream, dev@6f6bc87c on the
+     `type-plane` branch of the framework worktree + dev@d530f1ca for the web half).
+
+     The probe (`/tprobe`: `<text value="Coins unlock individual episodes. Bonus" fontSize="N"
+     lineLimit="1"/>` at N = 12 / 13 / 14 / 15 / 17 / 20) measured, BEFORE, run widths of
+     web 223.8 / 242.4 / 261.1 / 278.3 / 312.3 / 361.9 against iOS 228 / 247 / 266 / 284 /
+     319 / 369 — a constant ≈2% — and line boxes of web 18 / 19.5 / 21 / 22.5 / 25.5 / 30
+     (1.5 × size) against the face's own ≈1.21 × size on iOS. So the Store's "Coins unlock
+     individual episodes. Bonus coins are spent first." fit one line on the web and wrapped
+     on iOS, the Auth sign-in subtitle and its nine-line card broke at different words, and
+     every vertical rhythm built from text differed.
+
+     THE CAUSE is the web sheet's `.dsx-text` rule: `letter-spacing: var(--dsx-type-body-
+     tracking)` (−0.009em) and `line-height: var(--dsx-type-body-leading)` (1.5) on EVERY
+     run, while neither native lane applied a tracking it was not handed (iOS `.tracking`
+     only when `tracking=` is authored; Android `authoredStyle` carried no letterSpacing)
+     and both pitched lines at the face. `Conformance/defaults/type.json` had no column for
+     it: its native columns are the PLATFORM design (Dynamic Type, the Material scale), and
+     under `design: "custom"` (custom-controls.json — the same pixels on every lane) nothing
+     said what a text run is.
+
+     THE FIX (engine, three lanes — the template changes nothing):
+     (1) `type.json` carries a `custom` column per role (points at the 16px root, a numeric
+     weight, tracking in em, leading a ratio), ratified FROM the web column: body is
+     15 / 400 / −0.009 / 1.5, title1 26 / 700 / −0.02 / 1.15, display 34 / 700 / −0.022 / 1.1 …
+     (2) Both cascades stamp the plane at their tail, after the platform suffixes, in the CSS
+     bridge's own keys so the text element and the paragraph runs read ONE dictionary:
+     `Stack.swift computeAttrs` → `CustomDesign.stampTypePlane` (the table beside the palette
+     and geometry the lane already carries); `StackNodeView.kt resolvedAttrs` →
+     `CustomDesign.stampTypePlane` over `:core TypeRamp.CUSTOM`. A bare run is the body rung
+     unless the element itself declares a size / weight / tracking / line metric (the
+     bridge's `letter-spacing` / `line-height` count); `type="<role>"` is the rung's literal
+     size, weight, tracking and leading, resolved away so the platform text style never
+     mounts under custom; an authored `fontSize=` still wins and the rung's tracking follows
+     it. `StackStyle.bodyPointSize` follows the lane (15 / 17), a run with no registry face
+     takes the body rung on the platform face, and `DSXLineBoxLayout` counts lines at the
+     pitch the content is drawn at (a box above the face over-counted from four lines up).
+     (3) The web: a server-rendered `<text type=>` never stamped `data-dsx-type` (only the
+     client factory did, and hydration does not re-run it), so every SSR page painted a typed
+     run as body — measured 15px/400 for title1's 26px/700. `render.ts` now stamps the corpus
+     words; `render.test.ts` pins it. Found because the natives needed a web reference.
+
+     THE SIZE RULE was measured, not assumed: a bare `.dsx-text` under `font-size: 20px` is
+     15 on the web in a flex column AND in an inline formatting context (`.dsx-text` declares
+     its size in rem and a declaration beats inheritance), so under custom the em a layout
+     parent stamped never sets a bare run's size — only its own declaration or the rung does.
+
+     AFTER (the same probe, iOS points vs web px): 12 → 224.00 / 223.78, 13 → 242.67 /
+     242.44, 14 → 261.33 / 261.08, 15 → 278.67 / 278.34 (bold 288.67 / 288.64), 17 →
+     312.33 / 312.31, 20 → 362.00 / 361.89 (bold 378.00 / 377.75); line boxes 18 / 19.67 /
+     21 / 22.33 / 25.33 / 30 against 18 / 19.5 / 21 / 22.5 / 25.5 / 30 (a third of a point is
+     the 3× pixel grid). The bare run 210.00 × 22.67 (web 209.80 × 22.5); `type=` title1
+     281.67 × 29.67 (281.50 × 29.89), headline 199.67 × 19.67 (199.55 × 19.5), label 216.33 ×
+     17.33 (216.03 × 17.55), caption 209.00 × 16.33 (208.70 × 16.19), display 288.00 × 37.33
+     (287.86 × 37.39); the DSX-CSS path `style="font-size: 20px"` 293.00 × 30 (292.73 × 30)
+     and, with `letter-spacing: 0; line-height: 1.2` authored, 284.67 × 24 (284.61 × 24);
+     `tracking="1" lineSpacing="4"` 317.33 × 24.33 (317.20 × 24); a four-line block in a 240
+     column 240 × 90 on both. The Store subtitle is one line on iOS; the Auth sign-in subtitle
+     and card wrap line for line with the web (`cmp/sheets-after/*.png`).
+
+     THE PINS: `defaults-corpus.test.ts` (every role's custom row is its web row in points,
+     body by value); `:core TypeRampConformanceTest.customColumnIsTheCorpusInDpEmAndRatio`;
+     `:render CustomTypePlaneTest` (the stamp on a bare, sizeless, typed, overridden,
+     authored, em-stamped and mistyped run); `ConformanceHosts.TypeRampConformance` on the
+     record lane (20 cases: the table both ways, the same stamp shapes, `bodyPointSize` 15
+     under custom / 17 under system).
+
+     LEFT DIVERGENT, NAMED: (a) Android was not measured on a device this pass (the machine
+     held two emulators for other agents at under 1 GB free); its stamp is the same map and
+     `styleText` already turns `lineRatio` into the CSS line box, but the rendered widths and
+     boxes remain to be read on a phone. (b) Under custom a bare run's size is a literal, so
+     iOS Dynamic Type no longer scales it (Android's sp still does); `dynamicType="true"`
+     opts a run back in — the two natives' declared-size a11y policies already differed.
+     (c) Not type, but seen on the probe and owned by the layout core: a text child of a
+     `<vstack>` without `alignItems` paints a full-width background on iOS where the web's
+     `.dsx-vstack { align-items: start }` hugs it, and a block inline context hugged its
+     first run and wrapped the second where the web kept one line. (d) The css-bridge
+     conformance rows for `line-height` are red at HEAD on both lanes (the paragraph-segment
+     commits emit `lineRatio` and iOS subtracts the face's height) — the coordinator owns
+     that corpus fix; the record lane was run past it with those four rows patched locally
+     and restored, and everything after them, this leg included, is green.
