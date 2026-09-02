@@ -3648,3 +3648,59 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      commits emit `lineRatio` and iOS subtracts the face's height) — the coordinator owns
      that corpus fix; the record lane was run past it with those four rows patched locally
      and restored, and everything after them, this leg included, is green.
+
+173. **A TEXT RUN'S SPACES COLLAPSED ON THE WEB AND NOT ON EITHER PHONE — the pre-line law
+     ran only when a value carried a newline** (found 2026-09-02 on the Browse meta line
+     `Comedy  ·  EP 19`; fixed upstream, c1b7a898 for the web sheet and 96c73423 for both
+     natives, the latter on the `/tmp/wt-me` worktree pending a fast-forward that the Taffy
+     session's uncommitted `Text.swift` / `StackNodeView.kt` currently refuses).
+
+     The web `.dsx-text` rule carries `white-space: pre-line` (runs of spaces collapse, a
+     newline breaks), so a double-spaced separator painted one space in the browser and two
+     on the phones: the Foundation `Text.swift` and the Compose text arm both called their
+     `preLine` collapse only when the value contained `\n`. Both call it on every value now.
+     Pins: `dom/test/theme.test.ts` asserts the sheet rule; `TextWhitespaceInstrumentedTest`
+     renders `<text value="Comedy  ·  EP 19"/>` on the emulator and asserts the collapsed
+     string is what BasicText receives (1/1 green on DSX_API36_Phone_Final); iOS measured
+     on the iPhone 17 Pro simulator, the meta line the browser's width. `text.json` notes
+     the law.
+
+174. **AN iOS DISTRIBUTION SPLIT THE FREE SPACE WITH THE AUTHOR'S `<spacer/>` — CSS gives
+     the spacer everything** (found 2026-09-02 on the player: the rail sat 89pt higher and
+     the meta block 49pt higher than on the web and Android; fixed upstream, dev@448afef8 +
+     the Android pin 200d3d6c).
+
+     `justify-content: space-between | space-around | space-evenly` reaches iOS as
+     interleaved SwiftUI `Spacer`s (HStack.swift / VStack.swift, §6.58a). A `<spacer/>` in
+     the same column is a peer of those spacers, so the free space was shared: the probe
+     column `red · spacer · green · blue` in a 300pt box put green at 200 (four spacers over
+     240) where the browser and the emulator put it at 260 (one spacer takes all of it, the
+     distribution has nothing left). CSS resolves flexible lengths FIRST and distributes only
+     the remainder; Compose's arrangement is handed the weighted spacer's measured size and
+     so never had the defect. `StackFlexGrow.flexibleOnMainAxis` (bare spacer, `grow=` on
+     the axis, raw `flex: 1`) now makes the interleave inert on both iOS stacks. Measured
+     after: green 260 / 140 / 252 in the three probe columns on the simulator, the web's
+     numbers to the point; the player's chrome column re-read on the same build (this
+     ledger's next pass carries the numbers). Pinned on Android by
+     `DistributionBesideFlexibleChildInstrumentedTest` (pixel-read, 1/1 green); iOS has no
+     layout executor, so the probe screenshot and this entry are its pin.
+
+     Two shipped surfaces depended on it: the player's `chromeLayer` (a space-between column
+     with a spacer above its bottom block) and any tab or toolbar row that mixes a spacer
+     with a distribution. The template changed nothing.
+
+175. **A CUSTOM-DESIGN CONTROL OUTLINE KEPT THE PAGE'S INK INSIDE A DARK SHEET — the More
+     sheet's grabber was invisible on the web** (found 2026-09-02 comparing the More sheet
+     across lanes: iOS drew the 36×4 grabber, the browser drew #171719 at 28% on #141414;
+     fixed upstream on the web, the framework main checkout, pending push).
+
+     `--dsx-control-outline` is `color-mix(in srgb, var(--dsx-label) 28%, transparent)`,
+     declared once on the custom root; a custom property computes where it is DECLARED, so
+     a `<sheet background="#141414">` whose panel pins `data-dsx-theme="dark"` inherited the
+     light ink's mix. The token block now also matches `[data-dsx-theme]` subtrees under the
+     custom root, so the mix is re-derived from the pinned label: measured srgb(0.957 0.957
+     0.961)/0.28 on the same sheet after the change, the panel's own scheme as on iOS.
+     custom-design conformance, both embed byte laws and the element-support ledger 31/31.
+     Also verified on the same pass: §6.170's `id` input reaches the phones — the Language
+     sheet's ✓ on "Device language" paints on the iPhone 17 Pro simulator with a kernel at
+     e6475d79, where the earlier build painted none.
