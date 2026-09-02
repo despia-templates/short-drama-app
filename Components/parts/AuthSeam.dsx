@@ -106,6 +106,7 @@
          it cannot show right now (a locked device, a missing keychain entitlement). Registering
          then would ORPHAN the device's data behind a new credential, so we do not — we wait. -->
     <variable as="vaultBlocked">return false</variable>
+    <variable as="deviceBusy">return false</variable>
 
     <!-- THE CONFIG PLANE. `dsx.const.*` is App.json's `consts`, overlaid by dsx.config.json
          `consts` — flat scalars, reactive, and typed-NULL when absent, which is exactly the
@@ -242,6 +243,15 @@
          exchanged for a short-lived session; nothing here is ever a coin grant or an entitlement. -->
 
     <action as="ensureDevice">
+      // ONE registration per boot: resolve() and a sign-out can both land here while the first
+      // exchange is still in flight, and two registrations mint two devices (measured on the
+      // web: two POST /auth/device/register per fresh session, the second overwriting the vault).
+      if (dsx.variable.deviceBusy == true) { return }
+      dsx.variable.deviceBusy = true
+      await dsx.action.ensureDeviceNow()
+      dsx.variable.deviceBusy = false
+    </action>
+    <action as="ensureDeviceNow">
       if (dsx.variable.deviceEnabled == false) {
         // no device provider wired on this deployment — the honest bare-guest state
         dsx.action.publishGuest()
