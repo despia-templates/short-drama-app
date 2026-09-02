@@ -3783,3 +3783,39 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      `title 0.0×200.0 at x 68.0, row 358×216`; GREEN with the fix inside the pinned bounds,
      the title 250–258 wide and one line tall, the slot 43–45 — 5/5 on the emulator). :core 4166 tests, :render 358, unchanged but for the
      new cases; the css-bridge `line-height` row stays red at this base as §6.172 recorded.
+
+178. **THE WATCH MISSION RING PAINTED A FULL ACCENT RING AT ZERO PROGRESS ON ANDROID — a
+     `return null` variable seeded the empty string** (found 2026-09-02 in the three-lane
+     sweep, Watch.dsx's 28pt ring at the top-right of the player: a complete pink circle
+     and "100 percent to the next bonus" on the phone, the empty 22% track on iOS and the
+     web; fixed upstream, 1ad0db14 on the /tmp/wt-and3 worktree beside 6.176/6.177).
+
+     The ring was innocent. On the same device a `<ProgressRing>` at a literal 0, 0.25 and
+     1, at a bound computed 0 and 0.25, and with the `rgba(255,255,255,0.22)` track painted
+     exactly as the web does, and `missionFrac` computed 0.04 → 0.12 as the clip ticked
+     whenever its inputs were numbers. The failing state was the screen's FIRST frames,
+     before a tick: `<variable as="missionLast">return null</variable>` is how the template
+     keeps the last tick's answer, and `missionView` prefers it (`if (missionLast != null)
+     return missionLast`). Android's declaration arm seeded that null as "" (`?: ""`) where
+     Stack.swift seeds NSNull (dev@0dfc6bc7) and the web compiles a null — so `missionLast
+     != null` was TRUE on the phone alone, the computed handed "" to the fraction,
+     `Number("".nextMilestoneSeconds)` was NaN, and the native JSE's `Math.min(1, NaN)` is
+     1 (Swift's law: `NaN < m` is false, the corpus pins it, and iOS answers the same — it
+     just never reached NaN). The logcat probe on the failing screen read `typeofM=string
+     keys=0 lastNull:0 lastNE:1 frac=1`; the same probe with the arm fixed reads a number.
+     The arm seeds the store's null sentinel now, the head-input fold harness's own seat.
+
+     Two riders, named. (a) `Math.min(1, NaN)` → 1 on BOTH natives (Kotlin's reduce and
+     Swift's `min`), NaN on the web; the JSE corpus is "Swift = reference" and the
+     component-fold corpus depends on it (`Pagination` clamps an absent page to 1 through
+     `Math.max`), so this pass did not change it — a JS-true `Math.min` would need the
+     corpus and that component moved together. (b) The template's own guard would be
+     sturdier as `Number(m.nextMilestoneSeconds) > 0` than `next <= 0`, which lets NaN
+     through on every lane; not changed here, the engine owned the divergence.
+
+     Pin: `VariableNullInitialInstrumentedTest` — `return null` and an empty body seed the
+     sentinel through the real arm, `== null` / `!= null` answer as on the web, and the
+     flagship's guard shape falls through to its data (red at the base, green with the fix);
+     MountedLifecycleConformanceTest's copy of the arm seeds the same. Measured after on
+     DSX_API36_Phone_Final: the ring paints the thin arc of the true fraction on the first
+     and the second mount (`and3-final-watch*.png`).
