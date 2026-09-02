@@ -186,11 +186,11 @@
       </vstack>
     </hstack>
     <zstack class="tabRail" grow="width" align="leading" style="width: 100%">
-      <stack class="tabUnderline" width="{{ dsx.variable.tabUnderW }}"
+      <vstack class="tabUnderline" width="{{ dsx.variable.tabUnderW }}"
              offsetX="{{ dsx.variable.tabUnderX }}" anim="easeOut" animDuration="0.2"/>
     </zstack>
   </vstack>
-  <stack height="1" background="rgba(255,255,255,0.12)" style="width: 100%"/>
+  <vstack height="1" grow="width" background="rgba(255,255,255,0.12)" style="width: 100%"/>
 
   <!-- ── EPISODES ── -->
   <vstack alignItems="stretch" spacing="0" visible-if="dsx.variable.pane == 'episodes'">
@@ -215,9 +215,9 @@
           <text value="{{ item.idx }}" class="cellNum" visible-if="item.idx != dsx.variable.curIdx"
                 color="{{ gridLocked ? ink2() : ink() }}"/>
           <hstack spacing="2" alignItems="flex-end" visible-if="item.idx == dsx.variable.curIdx" a11yHidden="true">
-            <stack class="eqBar" height="10"/>
-            <stack class="eqBar" height="16"/>
-            <stack class="eqBar" height="12"/>
+            <vstack class="eqBar" height="10"/>
+            <vstack class="eqBar" height="16"/>
+            <vstack class="eqBar" height="12"/>
           </hstack>
           <image icon="lock.fill" iconSize="10" color="{{ ink3() }}" visible-if="gridLocked" a11yHidden="true"
                  style="position: absolute; top: 3px; right: 4px"/>

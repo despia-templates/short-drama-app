@@ -789,7 +789,7 @@
               <text value="More" class="metaMore" a11yTrait="button" a11yLabel="More about this series"
                     on:tap="dsx.action.openPanel({ tab: 'details' })"/>
             </hstack>
-            <stack height="1" background="rgba(255,255,255,0.12)" style="width: 100%" paddingTop="4"/>
+            <vstack height="1" grow="width" background="rgba(255,255,255,0.12)" style="width: 100%" paddingTop="4"/>
             <hstack visible-if="dsx.variable.isVip == false" alignItems="flex-start" style="align-items: flex-start">
               <hstack class="unlockPill" on:tap="dsx.action.goMembership()" a11yGroup="true" a11yTrait="button"
                       a11yLabel="Unlock unlimited watching — membership plans">
@@ -971,7 +971,7 @@ Please unlock to watch." class="lockHead"/>
                   style="box-shadow: 0 2px 4px rgba(0,0,0,0.3)"/>
         </zstack>
       </hstack>
-      <stack height="1" background="rgba(255,255,255,0.12)" style="width: 100%"/>
+      <vstack height="1" grow="width" background="rgba(255,255,255,0.12)" style="width: 100%"/>
       <hstack class="menuRow" on:tap="dsx.variable.reportOpen = true" a11yGroup="true" a11yTrait="button" a11yLabel="Report this episode">
         <text value="Report" class="menuMuted"/>
       </hstack>
