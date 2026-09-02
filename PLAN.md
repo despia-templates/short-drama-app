@@ -3484,3 +3484,82 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      `dayPeriod`, which no native spells; `hourCycle` h11/h24, which only differ at noon and
      midnight and which Foundation's ICU does not substitute on request. The template changes
      nothing: `shortDate` was already the right spelling, and the framework now honours it.
+
+170. **A FORMULA INPUT NAMED `id` DID NOT EXIST ON iOS OR ANDROID — three lanes, three
+     readings of "every other attribute is an input"** (found 2026-09-02 on the Store's
+     coin packs; measured on an iPhone 17 Pro simulator and a Pixel 10 Pro emulator; fixed
+     upstream, dev@e6475d79).
+
+     The symptom: `Components/Store.dsx` paints the selected pack's 1.5pt `#FF2C55` ring
+     through `<formula as="packRing" id="item.id">return dsx.variable.selId == id ? …</formula>`
+     bound as `borderColor="{{ packRing }}"`. The web painted it; iOS and Android painted
+     nothing, on the first pack and after a tap. Membership's `<PlanCard>` paints the same
+     ring on all three lanes through a plain computed, which narrowed it to the formula path.
+
+     The probe (an `/fprobe` screen, twelve rows, both natives) cleared every plausible
+     hypothesis before naming the cause: a formula in a `<list>` row over a plain variable
+     flipped by a timer, over one flipped by an `<api on:success>`, over a computed, calling
+     a `<functions global>` from `<Theme/>` and from its own head, feeding `borderColor`,
+     `background` and a text `color`, outside any repeater — all correct on both natives.
+     Two rows differed: `<formula as="fXEcho" x="item.id">return x</formula>` echoed `a`,
+     `<formula as="fIdEcho" id="item.id">return id</formula>` echoed NOTHING, and the exact
+     Store shape read `rgba(0,0,0,0)` on every card.
+
+     THE CAUSE IS THE HEAD WALK, NOT THE EVALUATOR. The three JSE kernels resolve a formula
+     identically (inputs evaluated in the use-site scope, body over those locals). What
+     differed was what each renderer REGISTERED as the inputs: `Stack.swift` (hoist and
+     render), `StackNodeView.kt`, `DesktopRenderer.kt` and both fold harnesses removed `as`
+     AND `id` — an element-id reflex on a tag that renders nothing — while the web compiler's
+     `HEAD_INPUT_SKIP` removed `as`, `computed` and `value` and kept `id`. The reference says
+     one thing (StackReference: "each attr is a named input"; dsx-anatomy §6: "every other
+     attribute declares one INPUT"), and the satellite runtimes (TV, Watch, iMessage,
+     TvStore, WearStore) already filtered `as` alone. So `id` was bound nowhere natively, the
+     body's bare `id` resolved against an inputs scope that had no `id`, and the comparison
+     read null. The `<action as="pick" id="id">` half was MASKED on every lane: the runner
+     seeds an action's scope with the caller's row, so a row's own `id` stood in for the
+     dropped input — measured: the tap moved `sel` to `coins_1000` while no ring moved.
+
+     The mirror image was already on record: the Rating fold's `_note` explains that its
+     input is `score`, "never `value`", because the web dropped `value` and the natives
+     kept it. Twelve template declarations and five of the framework's own Studio apps
+     name an input `id`; the MarketingStudio and EditorTools actions name one `value`.
+
+     THE FIX (one reading, every lane): Swift `StackFormula.inputs(declaredBy:)`, Kotlin
+     `StackFormula.inputsOf`, TS `HEAD_INPUT_SKIP = {as}` — every `<formula>` / `<action>`
+     door on each lane goes through it (phone engines, desktop, the fold harnesses; the
+     Android "formula" arm became `registerHeadFormula` beside `registerHeadAction` so the
+     renderer's own door is callable by a test). Re-measured on both natives: `fIdEcho`
+     echoes `[a] [b]`, the Store's first pack wears the ring on iOS and Android.
+
+     THE PIN: `Conformance/components/head-inputs.json` over a corpus-owned document
+     (`documents/HeadInputs.dsx` — no Foundation head declares an input named `id`, `value`
+     or `computed`, which is exactly where the lanes disagreed): the Store shape at the
+     `borderColor` a user meets, one echo per contested name, an input shadowing a
+     same-named store variable, an absent input reading null; plus an `actions` leg whose
+     input is `'p-' + item.id` — an expression the row cannot stand in for. Executed by the
+     three fold runners (TS red at HEAD on `value`; Kotlin red at HEAD on `id`; the Swift
+     record lane) and by `:render HeadInputContractTest` through the renderer's door.
+
+     Nothing changes in the template: `packRing`, `packCardFx`, `railFx`, `cardFx`,
+     `langOn`, `reminded`, `posterHover`, `shelfHover`, `tierFx`, `tierRing` and both
+     `pick` actions were written to the documented contract and now read the same way on
+     three lanes.
+
+171. **THE ANDROID KERNEL DOES NOT START ON THE minSdk IT DECLARES** (found 2026-09-02
+     while probing §6.170; filed, not fixed — outside that pass).
+
+     `DSX_API24_Min_Final` exists to test the floor every export's `build.gradle.kts` declares
+     (`minSdk = 24`). The export at dev@16f9c9ae installs there and dies in
+     `Application.onCreate`: `NoClassDefFoundError: Failed resolution of: Ljava/time/Clock;`
+     at `despia.engine.DSXSource.<clinit>` (Source.kt:55, `Clock.systemUTC()`), reached from
+     `SourceBackend.install` → `DSXAndroidBoot.install` → `DespiaApp.onCreate`. `java.time`
+     is API 26+, and nothing in the export enables core-library desugaring; `Globals.kt`
+     (`java.time.Instant`) and `KernelLog.kt` (`java.time.LocalTime`) are the same class of
+     use. The `Clock` line dates from dev@f644771b (2026-07-29, "dsx.source publishes on
+     Android"), so API 24–25 devices have been a crash-on-launch since then, on a floor the
+     framework advertises.
+
+     THE ASK: either raise the declared floor to 26 everywhere it is declared, or enable
+     `isCoreLibraryDesugaringEnabled` + `desugar_jdk_libs` in the export's app and kernel
+     modules — and put an API 24 boot into the device gate so the floor is measured rather
+     than declared. The probe moved to Pixel_10_Pro (API 37) to finish its own measurement.
