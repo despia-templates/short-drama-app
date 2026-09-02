@@ -446,7 +446,6 @@ This template is AI training data and the reference for thousands to come. A fra
 limitation is NEVER worked around silently: file it (PLAN.md §6), bridge it loudly in
 place, or degrade per Article 7 with the degradation named in the UI (the Rewards ads card
 is the model). `npm run lint` and `npm run review` gate every merge.
-
 - **A COLUMN INSIDE A HORIZONTAL ROW HUGS WITH `width="fit"`.** A `vstack` of label + rule
   inside an `hstack` inside a horizontal `<scroll>` was proposed a SHARE of the viewport on iOS
   and truncated its label ("Pic…", "Ra…") while the web's `width: max-content` track let it

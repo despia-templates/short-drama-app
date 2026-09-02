@@ -322,9 +322,6 @@ check("an unauthenticated unlock is refused", unlock.status >= 400,
 // Both halves are asserted, and each negative is paired with the positive that proves the
 // path was reachable at all — "no locked episode carries a source" passes trivially against
 // an empty catalogue.
-console.log("\nentitlement");
-{
-  let lockedSeen = 0;
 // ── REMIND ME (server/reminders.dsx) ───────────────────────────────────────────────────
 // The durable half of the coming-soon reminder: one row per (viewer, show), set through
 // POST, read back through GET, gone after DELETE — and refused for a series that is already
@@ -355,6 +352,9 @@ console.log("\nreminders");
   check("a guest cannot set one", guest.status === 401, `answered ${guest.status}`);
 }
 
+console.log("\nentitlement");
+{
+  let lockedSeen = 0;
   let lockedWithSource = 0;
   let freeWithSource = 0;
   let sampleShow = null;
@@ -1365,6 +1365,98 @@ console.log("\nwatch mission");
       `${JSON.stringify(rest.body).slice(0, 160)} then ${JSON.stringify(after.body).slice(0, 120)}`);
     const total = await sql("select coalesce(sum(amount),0)::int as coins from dsx_ledger where owner_id = $1 and source = 'watch'", [viewerSub]);
     check("...and the ledger agrees: 70, from four rows", total?.rows[0].coins === 70, JSON.stringify(total?.rows[0]));
+  }
+}
+
+// ── 13 · DEVICE IDENTITY — the 90% path (server/auth.dsx; the provider is scripts/serve.mjs) ──
+// The founder's rule: most viewers never make an account, so a device holds one server-generated
+// credential and exchanges it for a short-lived session — favourites, history, the wallet and
+// restore all work with no login. None of this can be a declared action (a public write is refused
+// before RLS), so the mint/link handlers live in the provider origin and this section proves them
+// end to end: register, exchange, a device-scoped favourite, a wrong secret, the operator boundary,
+// the account link merge (favourites UNION, wallet SUMMED exactly once), anonymous restore, and the
+// register ceiling. Every write here goes through the running origin; only the DEVICE-WALLET FIXTURE
+// reaches past the API, the same harness licence the payment tests take (there is no client grant).
+console.log("\ndevice identity, the 90% path");
+{
+  const H = { "content-type": "application/json" };
+  const reg = await asJson(await POST("/auth/device/register", H, { platform: "verify", plane: "keychain_synced" }));
+  check("register mints a deviceId, a 64-hex secret and a session",
+    reg.status === 200 && typeof reg.body?.deviceId === "string" && reg.body?.secret?.length === 64
+    && typeof reg.body?.session === "string" && reg.body?.kind === "device",
+    JSON.stringify(reg.body).slice(0, 160));
+  const deviceId = reg.body?.deviceId, secret = reg.body?.secret, devSub = reg.body?.sub;
+  const devH = { authorization: `Bearer ${reg.body?.session}`, "content-type": "application/json" };
+
+  const show = (await GET("/catalog/home").then((r) => r.json())).latest[0].id;
+  await POST("/viewer/favorite", devH, { show });
+  const list = await asJson(await GET("/viewer/list", devH));
+  check("a device session favourites a show and it lists under the device sub",
+    list.status === 200 && (list.body?.items ?? []).some((i) => i.show === show), JSON.stringify(list.body).slice(0, 160));
+  if (pool !== null) {
+    const owned = await sql("select count(*)::int as n from dsx_favorite where owner_id = $1 and show = $2", [devSub, show]);
+    check("...and the row is owned by the device viewer, reachable by nobody else", owned.rows[0].n === 1, JSON.stringify(owned.rows[0]));
+  }
+
+  // NO ROLE ON A DEVICE SESSION. The framework's jwtSign refuses a `role` claim from a public route
+  // (tested upstream in crypto-seam.ts); what this template must prove is the CONSEQUENCE — a device
+  // session carries no service authority and an operator surface answers it the prober's 404.
+  const opReach = await asJson(await POST("/internal/admin/stats", devH, {}));
+  check("a device session cannot reach an operator surface (no role claim)",
+    opReach.status === 404 || opReach.status === 403 || opReach.status === 401, `answered ${opReach.status}`);
+
+  const ex = await asJson(await POST("/auth/device", H, { deviceId, secret }));
+  check("exchange returns a fresh session for the same device viewer",
+    ex.status === 200 && ex.body?.sub === devSub && ex.body?.kind === "device", JSON.stringify(ex.body).slice(0, 120));
+  const wrong = await asJson(await POST("/auth/device", H, { deviceId, secret: "0".repeat(64) }));
+  check("a wrong secret is refused 401 device_unknown", wrong.status === 401 && wrong.body?.reason === "device_unknown", JSON.stringify(wrong.body));
+  const unknown = await asJson(await POST("/auth/device", H, { deviceId: randomUUID(), secret: "0".repeat(64) }));
+  check("an unknown deviceId is refused with the SAME 401 (no existence oracle)",
+    unknown.status === 401 && unknown.body?.reason === "device_unknown", JSON.stringify(unknown.body));
+
+  // restore purchases answers a device session — the founder's requirement, anonymous by construction.
+  const rn = await asJson(await POST("/store/restore/native", devH, {}));
+  check("restore purchases answers a device session (no login), or names the missing key",
+    rn.status === 200 || (rn.status >= 400 && /REVENUECAT_KEY/.test(rn.body?.message ?? "")), `${rn.status} ${JSON.stringify(rn.body).slice(0, 100)}`);
+  const rnAnon = await asJson(await POST("/store/restore/native", anon, {}));
+  check("...and still refuses a caller with NO token at all", rnAnon.status === 401, `answered ${rnAnon.status}`);
+
+  // LINK with a minted ACCOUNT token: the favourite UNIONS and the wallet SUMS, exactly once.
+  const acctSub = randomUUID();
+  const acct = { authorization: `Bearer ${mint({ sub: acctSub })}`, "content-type": "application/json" };
+  if (pool !== null) { await sql("insert into dsx_wallet (owner_id, coins, bonus) values ($1, 250, 30) on conflict (owner_id) do nothing", [devSub]); }
+  const link = await asJson(await POST("/auth/link", acct, { deviceId, secret }));
+  check("link succeeds and reports done", link.status === 200 && link.body?.linked === true && link.body?.done === true, JSON.stringify(link.body).slice(0, 120));
+  const acctList = await asJson(await GET("/viewer/list", acct));
+  check("the device favourite merged into the account", (acctList.body?.items ?? []).some((i) => i.show === show), JSON.stringify(acctList.body?.items).slice(0, 120));
+  if (pool !== null) {
+    // pg returns int8 as a STRING through this test pool (serve.mjs installs a Number parser; this
+    // harness does not), so coerce before comparing.
+    const w = await sql("select coins, bonus from dsx_wallet where owner_id = $1", [acctSub]);
+    check("the device wallet SUMMED into the account (250 coins + 30 bonus)", Number(w.rows[0]?.coins) === 250 && Number(w.rows[0]?.bonus) === 30, JSON.stringify(w.rows[0]));
+    await POST("/auth/link", acct, { deviceId, secret });                                   // replay
+    const w2 = await sql("select coins, bonus from dsx_wallet where owner_id = $1", [acctSub]);
+    const marker = await sql("select count(*)::int as n from dsx_ledger where owner_id = $1 and source = 'merge'", [acctSub]);
+    check("re-linking folds NOTHING twice — one merge ledger row, the balance unchanged",
+      Number(w2.rows[0]?.coins) === 250 && Number(w2.rows[0]?.bonus) === 30 && marker.rows[0].n === 1, `${JSON.stringify(w2.rows[0])} marker=${marker.rows[0].n}`);
+  }
+  const exLinked = await asJson(await POST("/auth/device", H, { deviceId, secret }));
+  check("a LINKED device now exchanges to the account subject",
+    exLinked.body?.sub === acctSub && exLinked.body?.kind === "account" && exLinked.body?.linked === true, JSON.stringify(exLinked.body).slice(0, 120));
+
+  // REGISTER IS RATE-LIMITED. A unique forged IP gets its OWN bucket (clientAddress reads
+  // x-forwarded-for), so this is isolated across runs and cannot strand another run's registers.
+  const farmIp = `203.0.113.${1 + Math.floor(Math.random() * 250)}`;
+  const farmH = { "content-type": "application/json", "x-forwarded-for": farmIp };
+  let saw429 = false, tries = 0;
+  for (let i = 0; i < 66 && !saw429; i += 1) { tries += 1; if ((await POST("/auth/device/register", farmH, { platform: "verify" })).status === 429) saw429 = true; }
+  check("register is rate-limited per IP", saw429, `${tries} registers from one IP and never a 429 — the 60/h ceiling is not being counted`);
+
+  if (pool !== null) {
+    await sql("delete from dsx_device_identity where platform = 'verify'");
+    await sql("delete from dsx_favorite where owner_id = $1 or owner_id = $2", [acctSub, devSub]);
+    await sql("delete from dsx_ledger where owner_id = $1 or owner_id = $2", [acctSub, devSub]);
+    await sql("delete from dsx_wallet where owner_id = $1 or owner_id = $2", [acctSub, devSub]);
   }
 }
 

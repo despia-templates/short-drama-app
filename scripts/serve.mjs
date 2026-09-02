@@ -117,9 +117,9 @@ const opsHandlers = {
       original: args.original === true,
       coming_soon: args.comingSoon === true,
     };
-    if (typeof args.id === "string" && args.id !== "") {
     // a release date is only ever written when one was sent — a show that is out has none
     if (typeof args.releaseAt === "string" && args.releaseAt !== "") values.release_at = args.releaseAt;
+    if (typeof args.id === "string" && args.id !== "") {
       const row = await svc.update("show", args.id, values);
       if (row === null) throw { reason: "not_found", message: "no such show" };
       return { id: args.id, updated: true };
