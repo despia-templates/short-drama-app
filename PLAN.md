@@ -3187,3 +3187,29 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      Kotlin and the Swift record lane). (3) `web.boot`: 101 of 108 modules with a `web/index.js`
      never loaded because the "lazy default" described a loader that did not exist; a discovered
      web lane boots unless `boot: false`, chunks load in parallel and a failing chunk is named.
+
+158. **A `const x = await dsx.module.…()` INSIDE AN if-BLOCK BOUND NOTHING ON iOS, silently** (found
+     2026-09-02 tracing `Components/parts/NowPlayingSurface.dsx`; upstream ask filed, template
+     rule applied). Measured on the iPhone 17 Pro simulator with the same statement at two
+     depths: at the TOP of an `<action>` body `const w = await dsx.module.widget.layout({…})`
+     bound the module's envelope (`{ ok, data }`, logged); inside `if (has('widget')) { … }` the
+     identical line logged an EMPTY `w` and the module never ran. `JSEActions.swift` intercepts
+     the bound-await shape (`const x = await …` → evalAsync) only at the statement level it
+     walks first; a nested block's statements fall to `parseAssignment`, whose synchronous
+     `eval` does not know `await`, so the binding is nil and the call is skipped — the same
+     family as "`await` is a STATEMENT, never a ternary branch" (§6.31), one level down. THE
+     ASK: intercept the bound await in nested blocks (or lint it as an error, as the
+     expression-tier refusal does). TEMPLATE RULE until then, now in the part: a BOUND await
+     stays at the top level of the body — branches end early with bare `await …` statements
+     (which run inside blocks), and the one call whose result matters comes last.
+
+159. **THE WIDGET MODULE'S LEGACY PRE-FILTER SWALLOWED EVERY BUS CALL ON iOS** (found 2026-09-02;
+     fixed upstream on `dev` in this pass, `WidgetBridge.swift`). A `dsx.module.widget.layout`
+     call reaches the module's catch-all `dsx.action { }` as the dispatch carrier
+     `dsx-call://layout`; the legacy whole-scheme parser (`widget://https://…?refresh=`) stripped
+     `widget://`, saw a string containing `://`, and treated the ACTION NAME as an image URL —
+     measured: the call resolved `{ ok: true, url: "dsx-call://layout", refresh: null }`, the
+     widget's image URL was set to garbage, and the named `layout` action never ran. The Kotlin
+     twin already stripped the carrier ("the string-keyed dispatch carrier (Module.kt) — same
+     slot, same repair"); the Swift lane now does the same, and the named action answers.
+     The same class is worth a grep in every module that keeps a legacy catch-all.
