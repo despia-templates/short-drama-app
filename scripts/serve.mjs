@@ -19,6 +19,7 @@ import { createSiteHandler } from "@despia-native/server";
 // @despia-native/server actually resolved, never hardcoded), deliberately loud, and it
 // dies the day the export lands.
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import { randomBytes, createHash, createHmac, timingSafeEqual, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { entities, routes, handlers, spendBudgets, mcpTools } from "../server/generated/index.ts";
 // LOCAL LANE ONLY — the operator side-door, pending upstream role-scoped authority
@@ -176,9 +177,207 @@ const opsRoutes = Object.keys(opsHandlers).map((name) => ({
   reach: [],
 }));
 
+// ══════════════════════════════════════════════════════════════════════════════════════
+//  DEVICE IDENTITY — the provider half of the 90% path (the design is in server/auth.dsx).
+//
+//  These four endpoints MINT sessions, and minting is PROVIDER work: docs/auth.md is one
+//  sentence — the backend VERIFIES tokens, it never ISSUES them — so a session comes from the
+//  provider (this origin locally, your IdP in production), never from server/*.dsx. It also
+//  CANNOT live in a declared action even if we wanted it to: a declared body reaches the
+//  database only user-scoped (repo.ts), and its writes throw `forbidden` for a caller with no
+//  identity — which every public registration is by construction — and this store is written
+//  with SERVICE authority no viewer may reach. So the device store is written from here with
+//  `serviceRepo()`, exactly as the `/internal/admin/*` twins are, pending the same upstream word
+//  (§6.2/§6.7) that would move both into the declared lane — filed as PLAN.md §6.128. node:crypto
+//  signs the sessions with the SAME secret the host verifies (the dev-session.mjs primitives), so
+//  none of this is blocked on the declared-lane crypto verbs, and neither is `npm run verify`.
+//
+//  THE TRUST CHAIN (the founder's constraints): the secret is SERVER-generated (randomBytes(32)),
+//  returned ONCE, and only its sha256 is stored — a decompiled client holds a secret that proves
+//  possession and reveals nothing, and a leaked table is worthless hashes. The client never holds
+//  a long-lived server token: it exchanges the credential for a 1h HS256 session that carries a
+//  UUID `sub` and a `kind`, and NEVER a `role` — a device can never be the operator. No coin ever
+//  originates here: this mints an IDENTITY; the merge sums two wallets under an idempotent ledger
+//  lock (server-side, replay-safe), and every credit still comes from the server grant paths.
+const DSX_JWT_SECRET_AUTH = env("DSX_JWT_SECRET");
+const b64uAuth = (buf) => Buffer.from(buf).toString("base64url");
+const mintSession = (claims, ttlSeconds = 3600) => {
+  const header = b64uAuth(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const now = Math.floor(Date.now() / 1000);
+  const payload = b64uAuth(JSON.stringify({ iat: now, exp: now + ttlSeconds, ...claims }));
+  const sig = createHmac("sha256", DSX_JWT_SECRET_AUTH).update(`${header}.${payload}`).digest("base64url");
+  return `${header}.${payload}.${sig}`;
+};
+const sha256hex = (s) => createHash("sha256").update(String(s)).digest("hex");
+const AUTH_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// A fixed 64-hex dummy so an unknown deviceId costs the same compare as a wrong secret — the
+// exchange must never become a timing oracle for "does this deviceId exist".
+const AUTH_DUMMY_HASH = "0".repeat(64);
+const hashEq = (a, b) => {
+  const ba = Buffer.from(String(a), "utf8");
+  const bb = Buffer.from(String(b), "utf8");
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+};
+const authJson = (status, body) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+
+// THE LINK MERGE — one SQL transaction, because the provider HAS the transaction seam a declared
+// action lacks (§6.38), so the fold is atomic rather than a bounded-and-resumable loop. Every
+// UNION step is idempotent on its own unique index; the only non-idempotent part — summing the
+// two coin balances — is guarded by an exactly-once `merge` ledger row (dsx_ledger_merge_once),
+// so a concurrent or replayed link folds the balance exactly once. Runs as the pool's own role,
+// which bypasses RLS the same way serviceRepo() does — service authority, named.
+const mergeDeviceIntoAccount = async (deviceViewer, accountSub) => {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    // $1 = account, $2 = device, both uuid. Casts are explicit because a prepared statement
+    // cannot infer a uuid parameter the way a literal is coerced, and a query that references
+    // only one of the two placeholders would leave the other untyped (42P18).
+    const both = (text) => client.query(text, [accountSub, deviceViewer]);
+    const dev = (text) => client.query(text, [deviceViewer]);
+    await both(`update dsx_favorite f set owner_id=$1::uuid where f.owner_id=$2::uuid and not exists (select 1 from dsx_favorite g where g.owner_id=$1::uuid and g.show=f.show)`);
+    await dev(`delete from dsx_favorite where owner_id=$1::uuid`);
+    await both(`update dsx_unlock u set owner_id=$1::uuid where u.owner_id=$2::uuid and not exists (select 1 from dsx_unlock g where g.owner_id=$1::uuid and g.episode=u.episode)`);
+    await dev(`delete from dsx_unlock where owner_id=$1::uuid`);
+    await both(`update dsx_progress p set owner_id=$1::uuid where p.owner_id=$2::uuid and not exists (select 1 from dsx_progress g where g.owner_id=$1::uuid and g.episode=p.episode)`);
+    await both(`update dsx_progress a set position=d.position, idx=d.idx, day=d.day, created_at=d.created_at from dsx_progress d where a.owner_id=$1::uuid and d.owner_id=$2::uuid and a.episode=d.episode and d.created_at > a.created_at`);
+    await dev(`delete from dsx_progress where owner_id=$1::uuid`);
+    await both(`update dsx_order set owner_id=$1::uuid where owner_id=$2::uuid`);
+    await both(`update dsx_comment set owner_id=$1::uuid, author_id=$1::uuid where owner_id=$2::uuid`);
+    await both(`update dsx_report set owner_id=$1::uuid, reporter_id=$1::uuid where owner_id=$2::uuid`);
+    await both(`update dsx_block b set owner_id=$1::uuid where b.owner_id=$2::uuid and not exists (select 1 from dsx_block g where g.owner_id=$1::uuid and g.subject=b.subject)`);
+    await dev(`delete from dsx_block where owner_id=$1::uuid`);
+    await client.query(`insert into dsx_wallet (owner_id, coins, bonus) values ($1::uuid, 0, 0) on conflict (owner_id) do nothing`, [accountSub]);
+    const folded = await client.query(
+      `with dev as (select coins, bonus, vip_until from dsx_wallet where owner_id=$2::uuid),
+            marker as (
+              insert into dsx_ledger (owner_id, kind, amount, source, ref)
+              select $1::uuid, 'coin', coalesce(dev.coins,0)+coalesce(dev.bonus,0), 'merge', $2::text from dev
+              on conflict (owner_id, source, ref) where source='merge' do nothing
+              returning 1
+            )
+       update dsx_wallet a set
+          coins = a.coins + coalesce((select coins from dev),0),
+          bonus = a.bonus + coalesce((select bonus from dev),0),
+          vip_until = greatest(a.vip_until, (select vip_until from dev))
+        where a.owner_id=$1::uuid and exists (select 1 from marker)
+        returning a.coins, a.bonus`, [accountSub, deviceViewer]);
+    await client.query(`delete from dsx_wallet where owner_id=$1::uuid`, [deviceViewer]);
+    await client.query(`delete from dsx_ledger where owner_id=$1::uuid and source <> 'merge'`, [deviceViewer]);
+    for (const t of ["dsx_checkin", "dsx_spin", "dsx_taskclaim", "dsx_adview", "dsx_playticket"]) {
+      await client.query(`delete from ${t} where owner_id=$1::uuid`, [deviceViewer]);
+    }
+    await client.query("commit");
+    const w = folded.rows[0] ?? null;
+    return { folded: folded.rowCount > 0, coins: w ? w.coins : null, bonus: w ? w.bonus : null };
+  } catch (e) {
+    try { await client.query("rollback"); } catch { /* connection already gone */ }
+    throw e;
+  } finally {
+    client.release();
+  }
+};
+
+const authHandlers = {
+  // POST /auth/device/register — public. Mint a device viewer + secret, store sha256(secret),
+  // hand the credential back ONCE with a 1h session. `platform`/`plane` (from the client's
+  // identityvault.durability()) are stored for the ledger, never for authority.
+  register: async (_args, ctx) => {
+    const body = ctx.body ?? {};
+    const platform = typeof body.platform === "string" ? body.platform.slice(0, 40) : "";
+    const plane = typeof body.plane === "string" ? body.plane.slice(0, 40) : "";
+    const viewerId = randomUUID();
+    const secret = randomBytes(32).toString("hex");
+    const row = await svc.create("device_identity", {
+      viewer_id: viewerId, secret_hash: sha256hex(secret),
+      platform, plane, last_seen_at: new Date().toISOString(),
+    });
+    if (row === null || row === undefined) return authJson(503, { reason: "unavailable", message: "device registration failed" });
+    const session = mintSession({ sub: viewerId, kind: "device", dev: row.id });
+    return { deviceId: row.id, secret, session, expiresIn: 3600, kind: "device", sub: viewerId };
+  },
+
+  // POST /auth/device — public. Exchange {deviceId, secret} for a 1h session, timing-safe. A
+  // LINKED device mints a session for the ACCOUNT it points at, which is the "follows you to any
+  // device" story: the same credential, a different subject once the account owns it.
+  exchange: async (_args, ctx) => {
+    const body = ctx.body ?? {};
+    const deviceId = typeof body.deviceId === "string" ? body.deviceId : "";
+    const secret = typeof body.secret === "string" ? body.secret : "";
+    const row = AUTH_UUID_RE.test(deviceId) ? await svc.get("device_identity", deviceId) : null;
+    const stored = row && typeof row.secret_hash === "string" ? row.secret_hash : AUTH_DUMMY_HASH;
+    const candidate = secret === "" ? "" : sha256hex(secret);
+    const ok = row !== null && candidate !== "" && hashEq(candidate, stored);
+    if (!ok) return authJson(401, { reason: "device_unknown", message: "this device credential is not recognised" });
+    const linked = row.linked_viewer_id ? String(row.linked_viewer_id) : "";
+    const sub = linked !== "" ? linked : String(row.viewer_id);
+    const kind = linked !== "" ? "account" : "device";
+    await svc.update("device_identity", deviceId, { last_seen_at: new Date().toISOString() });
+    return { session: mintSession({ sub, kind, dev: deviceId }), expiresIn: 3600, kind, sub, deviceId, linked: linked !== "" };
+  },
+
+  // POST /auth/link — Bearer = the ACCOUNT session. Verify the device, point it at the account,
+  // and MERGE the device viewer's rows into the account. The host has already verified the token
+  // (auth="required"); a DEVICE token is refused here, because linking a device to a device is
+  // nonsense and would strand the merge on the wrong subject.
+  link: async (_args, ctx) => {
+    const identity = ctx.identity && typeof ctx.identity === "object" ? ctx.identity : null;
+    const accountSub = identity ? String(identity.sub ?? "") : "";
+    if (accountSub === "" || !AUTH_UUID_RE.test(accountSub)) return authJson(401, { reason: "unauthenticated", message: "an account session is required to link a device" });
+    const claims = identity && typeof identity.claims === "object" ? identity.claims : {};
+    if (claims.kind === "device") return authJson(400, { reason: "invalid", message: "link with an account session, not a device session" });
+    const body = ctx.body ?? {};
+    const deviceId = typeof body.deviceId === "string" ? body.deviceId : "";
+    const secret = typeof body.secret === "string" ? body.secret : "";
+    const row = AUTH_UUID_RE.test(deviceId) ? await svc.get("device_identity", deviceId) : null;
+    const stored = row && typeof row.secret_hash === "string" ? row.secret_hash : AUTH_DUMMY_HASH;
+    const candidate = secret === "" ? "" : sha256hex(secret);
+    if (row === null || candidate === "" || !hashEq(candidate, stored)) return authJson(401, { reason: "device_unknown", message: "this device credential is not recognised" });
+    if (row.linked_viewer_id && String(row.linked_viewer_id) !== accountSub) return authJson(409, { reason: "conflict", message: "this device is already linked to another account" });
+    const deviceViewer = String(row.viewer_id);
+    await svc.update("device_identity", deviceId, { linked_viewer_id: accountSub });
+    let merged;
+    try {
+      merged = await mergeDeviceIntoAccount(deviceViewer, accountSub);
+    } catch (e) {
+      console.error("[auth.link merge] failed:", e);
+      return authJson(503, { reason: "unavailable", message: "the device was linked but its data could not be merged — sign in again to retry" });
+    }
+    return { linked: true, done: true, account: accountSub, merged };
+  },
+
+  // POST /auth/unlink — Bearer = the account (or the linked device acting as it). Retire the
+  // device credential; the merged data stays on the account and the client registers a fresh
+  // device. Only the account a device is linked to may unlink it, and the answer is the same
+  // whether or not it was linked, so nothing leaks about a device the caller does not own.
+  unlink: async (_args, ctx) => {
+    const identity = ctx.identity && typeof ctx.identity === "object" ? ctx.identity : null;
+    const accountSub = identity ? String(identity.sub ?? "") : "";
+    if (accountSub === "") return authJson(401, { reason: "unauthenticated", message: "a session is required" });
+    const body = ctx.body ?? {};
+    const deviceId = typeof body.deviceId === "string" ? body.deviceId : "";
+    const row = AUTH_UUID_RE.test(deviceId) ? await svc.get("device_identity", deviceId) : null;
+    if (row !== null && String(row.linked_viewer_id ?? "") === accountSub) {
+      await svc.remove("device_identity", deviceId);
+    }
+    return { unlinked: true };
+  },
+};
+const authRoutes = [
+  // Rates are per bucket (a `sub` for an identified caller, an IP for anonymous — clientAddress
+  // below). register is once per fresh install; exchange fires on every cold start and 401, so it
+  // matches /wallet/state; link/unlink are deliberate, rare acts.
+  { key: "auth-device-register", chain: "authx", action: "register", method: "POST", path: "/auth/device/register", auth: "none", rate: "60/h" },
+  { key: "auth-device-exchange", chain: "authx", action: "exchange", method: "POST", path: "/auth/device", auth: "none", rate: "240/m" },
+  { key: "auth-device-link", chain: "authx", action: "link", method: "POST", path: "/auth/link", auth: "required", rate: "20/h" },
+  { key: "auth-device-unlink", chain: "authx", action: "unlink", method: "POST", path: "/auth/unlink", auth: "required", rate: "20/h" },
+];
+
 const host = createHost({
-  routes: [...routes, ...opsRoutes],
-  handlers: { ...handlers, opsx: opsHandlers },
+  routes: [...routes, ...opsRoutes, ...authRoutes],
+  handlers: { ...handlers, opsx: opsHandlers, authx: authHandlers },
   spend: spendBudgets,
   internalKey: env("DSX_INTERNAL_KEY"),
   // WITHOUT THIS, EVERY DECLARED `rate=` ON A PUBLIC ROUTE IS A GLOBAL LIMIT.

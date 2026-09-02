@@ -182,3 +182,25 @@ create policy dsx_report_owner_delete on dsx_report
 -- NULLs as distinct and every ad row has target NULL.
 create unique index if not exists dsx_report_owner_target_uniq
   on dsx_report (owner_id, kind, coalesce(target::text, subject));
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════════════
+-- DEVICE-ACCOUNT LINK MERGE — the exactly-once lock on a value transfer (server/auth.dsx).
+--
+-- /auth/link merges a device viewer's rows into an account: favourites and unlocks UNION,
+-- progress newest-wins, purchases and VIP re-parented, and — the only NON-idempotent part —
+-- the two coin balances SUMMED into the account wallet. Re-running the union steps is safe by
+-- construction (their own unique indexes + `where not exists` guards refuse a second row), but
+-- summing a balance twice invents coins. So the merge writes ONE ledger row, source `merge`,
+-- `ref` = the device viewer id, BEFORE it folds the balance, and this partial unique index is
+-- the lock: a second link of the same device to the same account is refused here and the sum
+-- is skipped. It is the same idiom as the payment grant lock two blocks up (dsx_ledger_grant_once),
+-- for the same reason — a value transfer needs an exactly-once record, and the ledger IS it.
+--
+-- PARTIAL, so it constrains only `merge` rows: every other ledger source has its own uniqueness
+-- (or legitimately repeats a ref across kinds) and must not be caught by this.
+-- Unlike the run-of-play grants, the merge is one SQL TRANSACTION in the provider (scripts/serve.mjs),
+-- which HAS the transaction seam a declared action lacks (§6.38) — so the fold is atomic and the
+-- lock is belt-and-braces against a concurrent double-link rather than the sole guard.
+create unique index if not exists dsx_ledger_merge_once
+  on dsx_ledger (owner_id, source, ref) where source = 'merge';
