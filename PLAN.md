@@ -2952,9 +2952,13 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      above the × control). iOS paints the same title WHITE, so the two lanes disagree, which is
      the whole point of the law. The sheet chrome must take its ink from the sheet's own
      `background` (or the app's ink token), exactly as the grabber and the close control already
-     do. A second, smaller leak from the same screenshots: iOS presents a `content` sheet as an
-     INSET card (~9pt side margins) where web and the reference are full-width with rounded top
-     corners. Meanwhile the "‹ More" row names the level for a sighted reader and the a11y name
+     do. ANDROID LEAKS THE OTHER WAY, measured on the Pixel 10 Pro emulator the same hour: the
+     nested sheet's title draws in a Material mid-grey (`onSurfaceVariant`, not the app's ink)
+     with the close control in a light-grey Material circle, and the sheet insets its content
+     NOTHING where web and iOS inset 16 — the episode panel pays that 16 through
+     `paddingH:android` meanwhile and says so in place. A second, smaller iOS leak from the same
+     screenshots: iOS presents a `content` sheet as an INSET card (~9pt side margins) where web
+     and the reference are full-width with rounded top corners. Meanwhile the "‹ More" row names the level for a sighted reader and the a11y name
      is intact (§6.138).
 
 148. **THE COMMENT THREAD AND ITS APP STORE 1.2 SAFETY SET LOST THEIR ONLY SURFACE** (a hand-over,
