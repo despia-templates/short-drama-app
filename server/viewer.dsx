@@ -98,7 +98,7 @@
          5.1.1(ix) is banking, healthcare, gambling, cannabis, air travel and crypto, and a
          drama app is in none of them.
 
-         EVERY owner-scoped entity in this backend is swept, not just this document's two —
+         EVERY owner-scoped entity in this backend is swept (twenty-three tables), not just this document's two —
          a viewer's data does not respect file boundaries, and a deletion that leaves the
          wallet behind is the "deactivate" the rule refuses. RLS scopes each read and delete
          to the caller, so this cannot reach another account even if the id were wrong.
@@ -157,7 +157,10 @@
       // So each call sweeps up to DELETES_PER_CALL rows and reports `done`. `done` is true only
       // when every table listed empty in the same pass, so the caller loops until it flips and
       // the account is provably empty rather than presumed so.
-      const DELETES_PER_CALL = 45
+      // 40, not 45: twenty-three tables are swept now (the rewards catalogue added seven and
+      // the two this sweep had silently missed, watchday and reminder), so 23 list calls plus
+      // 40 deletes is 63 of the 64 — the old 45 blew the budget on the last two tables.
+      const DELETES_PER_CALL = 40
       let budget = DELETES_PER_CALL
       let removed = 0
       let stuck = []
@@ -342,7 +345,113 @@
         }
       } else { done = false }
 
-      // ── the two ALL-READ tables. Same shape, one difference that decides whether this
+
+      if (budget > 0) {
+        const pg_watchday = await dsx.module.data.watchday.list({ limit: 100 })
+        if (pg_watchday.ok && pg_watchday.data.length > 0) {
+          done = false
+          let i_watchday = 0
+          while (i_watchday < pg_watchday.data.length && budget > 0) {
+            const g_watchday = await dsx.module.data.watchday.delete({ id: pg_watchday.data[i_watchday].id })
+            if (g_watchday.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['watchday']); i_watchday = pg_watchday.data.length }
+            budget = budget - 1
+            i_watchday = i_watchday + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_reminder = await dsx.module.data.reminder.list({ limit: 100 })
+        if (pg_reminder.ok && pg_reminder.data.length > 0) {
+          done = false
+          let i_reminder = 0
+          while (i_reminder < pg_reminder.data.length && budget > 0) {
+            const g_reminder = await dsx.module.data.reminder.delete({ id: pg_reminder.data[i_reminder].id })
+            if (g_reminder.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['reminder']); i_reminder = pg_reminder.data.length }
+            budget = budget - 1
+            i_reminder = i_reminder + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_pushtoken = await dsx.module.data.pushtoken.list({ limit: 100 })
+        if (pg_pushtoken.ok && pg_pushtoken.data.length > 0) {
+          done = false
+          let i_pushtoken = 0
+          while (i_pushtoken < pg_pushtoken.data.length && budget > 0) {
+            const g_pushtoken = await dsx.module.data.pushtoken.delete({ id: pg_pushtoken.data[i_pushtoken].id })
+            if (g_pushtoken.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['pushtoken']); i_pushtoken = pg_pushtoken.data.length }
+            budget = budget - 1
+            i_pushtoken = i_pushtoken + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_referral = await dsx.module.data.referral.list({ limit: 100 })
+        if (pg_referral.ok && pg_referral.data.length > 0) {
+          done = false
+          let i_referral = 0
+          while (i_referral < pg_referral.data.length && budget > 0) {
+            const g_referral = await dsx.module.data.referral.delete({ id: pg_referral.data[i_referral].id })
+            if (g_referral.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['referral']); i_referral = pg_referral.data.length }
+            budget = budget - 1
+            i_referral = i_referral + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_referralcredit = await dsx.module.data.referralcredit.list({ limit: 100 })
+        if (pg_referralcredit.ok && pg_referralcredit.data.length > 0) {
+          done = false
+          let i_referralcredit = 0
+          while (i_referralcredit < pg_referralcredit.data.length && budget > 0) {
+            const g_referralcredit = await dsx.module.data.referralcredit.delete({ id: pg_referralcredit.data[i_referralcredit].id })
+            if (g_referralcredit.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['referralcredit']); i_referralcredit = pg_referralcredit.data.length }
+            budget = budget - 1
+            i_referralcredit = i_referralcredit + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_memberday = await dsx.module.data.memberday.list({ limit: 100 })
+        if (pg_memberday.ok && pg_memberday.data.length > 0) {
+          done = false
+          let i_memberday = 0
+          while (i_memberday < pg_memberday.data.length && budget > 0) {
+            const g_memberday = await dsx.module.data.memberday.delete({ id: pg_memberday.data[i_memberday].id })
+            if (g_memberday.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['memberday']); i_memberday = pg_memberday.data.length }
+            budget = budget - 1
+            i_memberday = i_memberday + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0) {
+        const pg_redeem = await dsx.module.data.redeem.list({ limit: 100 })
+        if (pg_redeem.ok && pg_redeem.data.length > 0) {
+          done = false
+          let i_redeem = 0
+          while (i_redeem < pg_redeem.data.length && budget > 0) {
+            const g_redeem = await dsx.module.data.redeem.delete({ id: pg_redeem.data[i_redeem].id })
+            if (g_redeem.ok) { removed = removed + 1 }
+            else { stuck = stuck.concat(['redeem']); i_redeem = pg_redeem.data.length }
+            budget = budget - 1
+            i_redeem = i_redeem + 1
+          }
+        }
+      } else { done = false }
+      // ── the FOUR ALL-READ tables (comment, report, and the two referral tables the rewards
+      //    catalogue added). Same shape, one difference that decides whether this
       //    works at all: the list is FILTERED to the caller declared owner column, and the
       //    delete is judged on its returned DATA rather than on `ok` (see the header).
       const me = sub == null ? '' : String(sub)
@@ -376,7 +485,38 @@
         }
       } else { done = false }
 
-      // `scoped` is the honest half of the answer: with no subject to filter on, the two
+
+      if (budget > 0 && me !== '') {
+        const pg_invitecode = await dsx.module.data.invitecode.list({ filters: { owner: me }, limit: 100 })
+        if (pg_invitecode.ok && pg_invitecode.data.length > 0) {
+          done = false
+          let i_invitecode = 0
+          while (i_invitecode < pg_invitecode.data.length && budget > 0) {
+            const g_invitecode = await dsx.module.data.invitecode.delete({ id: pg_invitecode.data[i_invitecode].id })
+            if (g_invitecode.ok && g_invitecode.data != null) { removed = removed + 1 }
+            else { stuck = stuck.concat(['invitecode']); i_invitecode = pg_invitecode.data.length }
+            budget = budget - 1
+            i_invitecode = i_invitecode + 1
+          }
+        }
+      } else { done = false }
+
+      if (budget > 0 && me !== '') {
+        const pg_referralproof = await dsx.module.data.referralproof.list({ filters: { owner: me }, limit: 100 })
+        if (pg_referralproof.ok && pg_referralproof.data.length > 0) {
+          done = false
+          let i_referralproof = 0
+          while (i_referralproof < pg_referralproof.data.length && budget > 0) {
+            const g_referralproof = await dsx.module.data.referralproof.delete({ id: pg_referralproof.data[i_referralproof].id })
+            if (g_referralproof.ok && g_referralproof.data != null) { removed = removed + 1 }
+            else { stuck = stuck.concat(['referralproof']); i_referralproof = pg_referralproof.data.length }
+            budget = budget - 1
+            i_referralproof = i_referralproof + 1
+          }
+        }
+      } else { done = false }
+
+      // `scoped` is the honest half of the answer: with no subject to filter on, the four
       // all-read tables were not swept and this account is NOT provably empty.
       return { deleted: done, done: done, removed: removed, stuck: stuck, scoped: me !== '' }
     </action>

@@ -44,12 +44,21 @@
       <field as="coins" type="integer"/>
       <field as="bonus" type="integer"/>
       <field as="vip_until" type="timestamptz"/>
+      <!-- MEMBER POINTS (docs/design/reference-ui-spec.md 9.4): a third balance, earned by the
+           Daily Draw, the 30-minute mission and the push row (server/engage.dsx), spent only
+           on membership days through /rewards/redeem. Purchased by nobody, so App Store 3.1.1
+           expiry rules never touch it — and it never expires anyway. `member_since` is the
+           first day a member opened the Member Points tab (or redeemed into membership): the
+           anchor the timeline counts "Day n" from. Both additive; a row from before this pass
+           reads null, and every reader treats null as 0 / absent. -->
+      <field as="points" type="integer"/>
+      <field as="member_since" type="timestamptz"/>
     </entity>
 
     <entity as="ledger" ownership="owner">
-      <field as="kind" type="text"/>       <!-- coin | bonus -->
+      <field as="kind" type="text"/>       <!-- coin | bonus | points -->
       <field as="amount" type="integer"/>  <!-- signed -->
-      <field as="source" type="text"/>     <!-- checkin | task | spin | ad | pack | vip | unlock -->
+      <field as="source" type="text"/>     <!-- checkin | task | spin | ad | watch | pack | vip | unlock | merge | signin | push | invite | draw | pts_watch30 | pts_push | redeem -->
       <!-- `ref` is the thing the movement is ABOUT: an episode id for an unlock, a day for a
            check-in, and — since the settle rewrite — the ORDER ID for a pack/vip grant. That
            last one is load-bearing: policies.local.sql puts a partial unique index on
@@ -114,6 +123,7 @@
       const vip = w.vip_until != null && new Date(w.vip_until).getTime() > Date.now()
       return {
         coins: w.coins, bonus: w.bonus, vip: vip, vipUntil: w.vip_until,
+        points: w.points == null ? 0 : w.points, memberSince: w.member_since == null ? '' : w.member_since,
         unlocked: (unlocks.ok ? unlocks.data : []).map(u => u.episode),
         unlockedCapped: unlocks.ok && unlocks.data.length >= 100
       }

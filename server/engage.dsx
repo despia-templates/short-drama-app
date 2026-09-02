@@ -1,4 +1,7 @@
-<!-- engage.dsx — the rewards loop: daily check-in streak, spin the wheel, daily tasks.
+<!-- engage.dsx — the rewards loop: the daily check-in, the wheel, the task catalogue of
+     docs/design/reference-ui-spec.md §9.3 (sign-in · push · rewarded ad · the watch mission
+     rows · invite), the member-points lane of §9.4 (the Daily Draw, Watch & Earn, redeem)
+     and the watch-mission ledger they all read.
      Numbers follow docs/product/spec.md and are deliberately visible here: the curve,
      the prize table and the caps are server facts an admin surface can render, never
      client constants. Grants write the ledger + wallet fold directly: a sibling call would
@@ -61,10 +64,10 @@
       <field as="reward" type="integer"/>
       <field as="lane" type="text"/>   <!-- house | admob | metaads — which lane showed it -->
       <!-- `seq` is the 1..AD_CAP position of this impression WITHIN the day, and it exists
-           for exactly one reason: the cap is 10/day, so `unique (owner_id, day)` — the
+           for exactly one reason: the cap is per day, so `unique (owner_id, day)` — the
            obvious constraint, and the one the audit proposed — would be WRONG here. It
            would cap the lane at one ad a day and silently break the declared AD_CAP. The
-           right constraint is `unique (owner_id, day, seq)`: ten legitimate rows, and two
+           right constraint is `unique (owner_id, day, seq)`: fifteen legitimate rows, and two
            concurrent grants that both computed seq = n collide so only one is written. -->
       <field as="seq" type="integer"/>
       <index on="day"/>
@@ -95,13 +98,109 @@
          BOUNDED UNDER THE 64-CALL BUDGET: one read, one write, and per milestone crossed one
          ledger write + one wallet read + one wallet write. A tick credits at most 60 s and the
          milestones are 300 s apart, so at most one boundary is crossed per tick — worst case
-         six module calls. `done` is always true; there is nothing to resume. -->
+         six module calls, plus the referral proof below (three, once). `done` is always true;
+         there is nothing to resume. -->
     <entity as="watchday" ownership="owner">
       <field as="day" type="text"/>            <!-- YYYY-MM-DD (UTC), like every daily marker here -->
       <field as="seconds" type="integer"/>     <!-- wall-clock seconds credited today -->
       <field as="granted" type="integer"/>     <!-- coins paid today, the sum of the ledger rows -->
       <field as="reached" type="text"/>        <!-- comma-joined milestone minutes already paid, e.g. "5,10" -->
       <field as="last_at" type="timestamptz"/> <!-- the previous accepted heartbeat -->
+      <index on="day"/>
+    </entity>
+
+    <!-- ══ THE TASK CATALOGUE (docs/design/reference-ui-spec.md §9.3), and what "server-
+         verified" means for each row, because the founder's law is that a client-trusted
+         grant is farmed within a week of launch:
+           signin   granted by the PROVIDER when a device links an account — inside the link
+                    merge transaction (scripts/serve.mjs mergeDeviceIntoAccount), once per
+                    account under dsx_ledger_once_per_owner. No declared action grants it: a
+                    declared body cannot read the caller's `kind` claim, and a route the
+                    client could call with "I signed in" is exactly the grant the law forbids.
+           push     granted HERE when a push token registers (registerPush): the row is the
+                    proof, once per owner. A token is what a real push server needs, so the
+                    reward is tied to the thing that makes the feature work, never to the OS
+                    permission alone (App Store 5.1.2(i): a permission must not be the price).
+           ad       the existing rewarded callback, capped per day.
+           watch5/10 the mission ledger above pays them the moment the boundary is crossed;
+                    the rows only READ the ledger and show Go → the feed.
+           invite   a referral code per WALLET (the code is the wallet id's first eight hex
+                    characters, so it needs no random source and no second table to find it);
+                    the grant lands when the invitee's device records its first server-verified
+                    watch minute — the invitee's watchTick writes a PROOF row the inviter can
+                    read, and the inviter's claim sweeps proofs into credits, bounded and
+                    resumable under the 64-call budget.
+           follow / share  NO coins. A follow on Facebook or a share to a friend cannot be
+                    verified by this server, and the reference app's "+20" is precisely the
+                    client-trusted grant the law forbids. The rows exist, say "Help us grow",
+                    and grant nothing (PLAN.md §6.182 records the deliberate divergence).
+
+         ── THE REFERRAL TABLES, and why there are four ──────────────────────────────────
+         A declared action runs as ONE viewer under RLS and cannot write another viewer's
+         wallet, so the inviter must credit themselves from a fact the invitee wrote. Two of
+         the four are therefore ALL-READ (ownership="public-read", own-write through
+         policies.local.sql — the same missing upstream word as dsx_comment, PLAN.md §6.25):
+           invitecode      public   { code }            the inviter's row; an invitee resolves a
+                                                        code to a row (and its owner) by listing
+                                                        it. Unique on code and on owner.
+           referral        OWNER    { code, verified }  the invitee's own attachment, written at
+                                                        the invite link, read by its watchTick.
+           referralproof   public   { code }            written by the invitee's watchTick at the
+                                                        first verified minute — the row the
+                                                        inviter can see. Unique on owner.
+           referralcredit  OWNER    { invitee, day }    the inviter's exactly-once lock per
+                                                        invitee (unique owner+invitee), and the
+                                                        daily cap's counter.
+         WHAT THE ALL-READ ROWS EXPOSE: (owner uuid, code). Opaque identifiers, rate-limited
+         reads, no names, no balances — named here rather than discovered, and the ask upstream
+         is the one §6.25 already carries. -->
+    <entity as="pushtoken" ownership="owner">
+      <field as="token" type="text"/>
+      <field as="platform" type="text"/>
+    </entity>
+
+    <!-- `owner` is the declared twin of owner_id (the dsx_comment `author_id` idiom, filled
+         by Postgres from the verified subject in policies.local.sql): it is what lets an
+         account deletion enumerate one viewer rows in an all-read table (server/viewer.dsx). -->
+    <entity as="invitecode" ownership="public-read">
+      <field as="code" type="text"/>
+      <field as="owner" type="uuid"/>
+      <index on="code"/>
+      <index on="owner"/>
+    </entity>
+
+    <entity as="referral" ownership="owner">
+      <field as="code" type="text"/>
+      <field as="verified" type="boolean"/>
+    </entity>
+
+    <entity as="referralproof" ownership="public-read">
+      <field as="code" type="text"/>
+      <field as="owner" type="uuid"/>
+      <index on="code"/>
+      <index on="owner"/>
+    </entity>
+
+    <entity as="referralcredit" ownership="owner">
+      <field as="invitee" type="uuid"/>
+      <field as="day" type="text"/>
+      <index on="day"/>
+    </entity>
+
+    <!-- ══ MEMBER POINTS (spec §9.4) — a second balance on the wallet, earned by members
+         and redeemed for membership days. The Daily Draw marker doubles as the membership
+         timeline: a day with a row is "claimed", a past day without one is "Unclaimed". -->
+    <entity as="memberday" ownership="owner">
+      <field as="day" type="text"/>
+      <field as="points" type="integer"/>
+      <index on="day"/>
+    </entity>
+
+    <entity as="redeem" ownership="owner">
+      <field as="day" type="text"/>
+      <field as="card" type="text"/>
+      <field as="days" type="integer"/>
+      <field as="points" type="integer"/>
       <index on="day"/>
     </entity>
 
@@ -117,7 +216,7 @@
       let credited = 0
       if (day == null) {
         // THE MARKER IS THE LOCK — `unique (owner_id, day)` on dsx_watchday. The loser of a
-        // first-tick race re-reads the winner's row instead of opening a second day.
+        // first-tick race re-reads the winner row instead of opening a second day.
         const made = await dsx.module.data.watchday.create({ day: today, seconds: 0, granted: 0, reached: '', last_at: new Date(now).toISOString() })
         if (made.ok) { day = made.data } else {
           const again = await dsx.module.data.watchday.list({ filters: { day: today }, limit: 1 })
@@ -167,6 +266,20 @@
       if (paidNow > 0) {
         await dsx.module.data.watchday.update({ id: day.id, values: { granted: granted, reached: reached } })
       }
+      // THE REFERRAL PROOF — the first VERIFIED minute is the invitee-side event the invite
+      // grant hangs on (see the catalogue note). Read only inside the first six minutes of a
+      // day: a viewer with no referral row would otherwise pay one read per heartbeat for
+      // ever, and an invitee who has watched six minutes has either been proven or never
+      // attached. The proof row is all-read (the inviter lists it by code); the referral row
+      // is the invitee own marker so the proof is written once. Three calls, once.
+      if (seconds >= 60 && seconds < 360) {
+        const ref = await dsx.module.data.referral.list({ limit: 1 })
+        const mineRef = ref.ok && ref.data.length > 0 ? ref.data[0] : null
+        if (mineRef != null && mineRef.verified != true) {
+          const proof = await dsx.module.data.referralproof.create({ code: String(mineRef.code) })
+          if (proof.ok) { await dsx.module.data.referral.update({ id: mineRef.id, values: { verified: true } }) }
+        }
+      }
       let nextMilestoneSeconds = 0
       let j = 0
       while (j < MILESTONES.length) {
@@ -206,6 +319,10 @@
       }
     </action>
 
+    <!-- THE PAGE'S ONE READ. Every number the Rewards screen prints comes out of here — the
+         curve, the seven cells, the ad cap, the task rows and their progress, the invite
+         code — so an operator changes the economy without a build and the client can never
+         invent an entitlement. Thirteen module calls at most, well inside the 64 budget. -->
     <action as="rewardsState">
       const today = new Date().toISOString().slice(0, 10)
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
@@ -214,62 +331,94 @@
       const last = rows[0] || null
       const checkedToday = last !== null && last.day === today
       const streak = last === null ? 0 : (last.day === today || last.day === yesterday ? last.streak : 0)
-      const curve = [5, 10, 15, 20, 25, 30, 60]
+      // THE CURVE IS THE REFERENCE APP OWN (spec 9.2: 10 · 20 · 20 · 10 · 10 · 25 · 40) — a
+      // server fact the cells read, never a client constant
+      const curve = [10, 20, 20, 10, 10, 25, 40]
       const nextReward = curve[streak % 7]
+      // the cell that is TODAY: the next unclaimed position, or the one just claimed
+      const todayIdx = checkedToday ? (streak - 1) % 7 : streak % 7
+      const days = []
+      for (let i = 0; i < curve.length; i++) {
+        const state = i == todayIdx ? 'today' : (i < todayIdx ? 'done' : 'future')
+        days.push({ id: 'd' + i, i: i, n: i + 1, reward: curve[i], state: state, claimed: i < todayIdx || (i == todayIdx && checkedToday), today: i == todayIdx })
+      }
 
       const spins = await dsx.module.data.spin.list({ filters: { day: today }, limit: 5 })
       const spinsToday = spins.ok ? spins.data.length : 0
 
-      const claims = await dsx.module.data.taskclaim.list({ filters: { day: today }, limit: 20 })
-      const claimed = (claims.ok ? claims.data : []).map(c => c.task)
-      const watched = await dsx.module.data.progress.list({ filters: { day: today }, limit: 50 })
-      const watchedCount = watched.ok ? watched.data.length : 0
-      // `firstFavorite` reported `progress: 0` to every viewer, including one holding a full
-      // My List — the CLAIM guard read the real table (claimTask below) and the DISPLAY did
-      // not, so the task bar sat at 0/1 under a control that would have paid out. One
-      // bounded read, the same one the guard does; the target is 1, so limit 1 answers it.
-      const favs = await dsx.module.data.favorite.list({ limit: 1 })
-      const favCount = favs.ok ? favs.data.length : 0
-
-      const days = []
-      for (let i = 0; i < curve.length; i++) {
-        days.push({ id: 'd' + i, i: i, reward: curve[i] })
-      }
       const ads = await dsx.module.data.adview.list({ filters: { day: today }, limit: 40 })
       const adsToday = ads.ok ? ads.data.length : 0
-      const AD_CAP = 10
-      const AD_REWARD = 15
+      const AD_CAP = 15
+      const AD_REWARD = 20
 
-      // THE PRICE TABLE THAT USED TO BE HERE IS DELETED, and its absence is the fix. It was
-      // a THIRD copy of the storefront (server/store.dsx storeCatalog is the first,
-      // createCheckout re-typed it as the second) and it had already drifted three ways: its
-      // ids were `weekly`/`p500` where no checkout sku matches, it flagged monthly as `best`
-      // where the store flags yearly, and it repeated the same false auto-renew notes.
-      // Nothing read it — no component binds `vipTiers` or `coinPacks` (grep) — so it was
-      // pure drift surface, which is the audit blocker H2. THE RULE THIS LEAVES BEHIND: a
-      // rewards screen that wants to merchandise VIP reads /store/catalog, the same endpoint
-      // the storefront reads, and the same one createCheckout prices from through a sibling
-      // call. One table, one owner, one place to change a price.
-      // The precedent for the other shape is BULK_OFF in server/wallet.dsx: a SCALAR that
-      // two actions in one document both need, written twice because a server head has no
-      // shared-constant seam, with a comment on each saying so. A nine-row table is not that
-      // — it is a document that belongs to one action.
-      // ODDS, PUBLISHED. The wheel picks uniformly from `spinPrizes`, so every prize is
-      // 1/N. It is a server fact rather than a client assumption because the client must be
-      // able to SHOW it (App Store 3.1.1's loot-box disclosure applies the moment a
-      // randomised reward can be bought — this one cannot, see the header, and the odds are
-      // published regardless). `spinCost: 0` is the fact that keeps it out of that regime.
+      // the mission ledger, read for the two watch rows
+      const MILESTONES = [{ minutes: 5, coins: 10 }, { minutes: 10, coins: 15 }]
+      const wd = await dsx.module.data.watchday.list({ filters: { day: today }, limit: 1 })
+      const dayRow = wd.ok && wd.data.length > 0 ? wd.data[0] : null
+      const seconds = dayRow == null ? 0 : Number(dayRow.seconds)
+      const minutes = Math.floor(seconds / 60)
+      const reached = dayRow == null || dayRow.reached == null ? '' : String(dayRow.reached)
+
+      // the two once-ever grants, read off the ledger they were written to
+      const signinLed = await dsx.module.data.ledger.list({ filters: { source: 'signin' }, limit: 1 })
+      const signinDone = signinLed.ok && signinLed.data.length > 0
+      const pushLed = await dsx.module.data.ledger.list({ filters: { source: 'push' }, limit: 1 })
+      const pushDone = pushLed.ok && pushLed.data.length > 0
+
+      // THE INVITE CODE is the wallet id, first eight hex characters — a capability nobody
+      // can guess or enumerate is not required here (a code is meant to be shared), only one
+      // that is stable, unique per viewer and findable by its owner without knowing their own
+      // subject, which a declared body never learns. The public row exists so an invitee can
+      // resolve it; it is created on the first read and never changes.
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) {
+        const madeW = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (madeW.ok) { w = madeW.data } else {
+          const againW = await dsx.module.data.wallet.list({ limit: 1 })
+          w = againW.ok && againW.data.length > 0 ? againW.data[0] : null
+        }
+      }
+      const code = w == null ? '' : String(w.id).slice(0, 8).toUpperCase()
+      const INVITE_REWARD = 50
+      const INVITE_DAILY = 10
+      let pending = 0
+      let creditedToday = 0
+      if (code != '') {
+        const have = await dsx.module.data.invitecode.list({ filters: { code: code }, limit: 1 })
+        if (!have.ok || have.data.length == 0) { await dsx.module.data.invitecode.create({ code: code }) }
+        const proofs = await dsx.module.data.referralproof.list({ filters: { code: code }, limit: 100 })
+        const credits = await dsx.module.data.referralcredit.list({ limit: 100 })
+        const creditedIds = (credits.ok ? credits.data : []).map(c => String(c.invitee))
+        creditedToday = (credits.ok ? credits.data : []).filter(c => c.day == today).length
+        const ownerOfCode = have.ok && have.data.length > 0 ? String(have.data[0].owner_id) : ''
+        for (const p of (proofs.ok ? proofs.data : [])) {
+          if (String(p.owner_id) == ownerOfCode) { continue }
+          if (creditedIds.indexOf(String(p.owner_id)) >= 0) { continue }
+          pending = pending + 1
+        }
+      }
+
       const spinPrizes = [10, 15, 20, 25, 40, 60, 80, 100]
       const spinOdds = spinPrizes.map(p => ({ prize: p, chance: Math.round(10000 / spinPrizes.length) / 100 }))
+      // THE ROWS, in the order the reference draws them (spec 9.3). `kind` names the row
+      // recipe the client renders; every number is this document own. `claimed` means the
+      // grant has LANDED — the client never has a button that could make it land.
+      const tasks = [
+        { id: 'signin', kind: 'signin', reward: 60, progress: signinDone ? 1 : 0, target: 1, claimed: signinDone },
+        { id: 'push', kind: 'push', reward: 60, progress: pushDone ? 1 : 0, target: 1, claimed: pushDone },
+        { id: 'ad', kind: 'ad', reward: AD_REWARD, progress: adsToday, target: AD_CAP, claimed: adsToday >= AD_CAP },
+        { id: 'watch5', kind: 'watch', minutes: MILESTONES[0].minutes, reward: MILESTONES[0].coins, progress: Math.min(minutes, MILESTONES[0].minutes), target: MILESTONES[0].minutes, claimed: (',' + reached + ',').indexOf(',' + MILESTONES[0].minutes + ',') >= 0 },
+        { id: 'watch10', kind: 'watch', minutes: MILESTONES[1].minutes, reward: MILESTONES[1].coins, progress: Math.min(minutes, MILESTONES[1].minutes), target: MILESTONES[1].minutes, claimed: (',' + reached + ',').indexOf(',' + MILESTONES[1].minutes + ',') >= 0 },
+        { id: 'invite', kind: 'invite', reward: INVITE_REWARD, daily: INVITE_REWARD * INVITE_DAILY, progress: creditedToday, target: INVITE_DAILY, claimed: creditedToday >= INVITE_DAILY, pending: pending, code: code }
+      ]
       return {
         today: today, checkedToday: checkedToday, streak: streak, curve: curve, days: days, nextReward: nextReward,
         freeSpinLeft: spinsToday === 0,
         spinPrizes: spinPrizes, spinOdds: spinOdds, spinCost: 0,
         adsToday: adsToday, adCap: AD_CAP, adReward: AD_REWARD, adsLeft: Math.max(0, AD_CAP - adsToday),
-        tasks: [
-          { id: 'watch3', title: 'Watch 3 episodes today', reward: 15, progress: Math.min(watchedCount, 3), target: 3, claimed: claimed.includes('watch3') },
-          { id: 'firstFavorite', title: 'Add a show to My List', reward: 10, progress: favCount, target: 1, claimed: claimed.includes('firstFavorite') }
-        ]
+        inviteCode: code, invitePending: pending, inviteReward: INVITE_REWARD, inviteDaily: INVITE_DAILY,
+        tasks: tasks
       }
     </action>
 
@@ -282,7 +431,9 @@
       const rows = (checks.ok ? checks.data : []).sort((a, b) => (a.day < b.day ? 1 : -1))
       const last = rows[0] || null
       const streak = (last !== null && last.day === yesterday ? last.streak : 0) + 1
-      const curve = [5, 10, 15, 20, 25, 30, 60]
+      // the same curve rewardsState publishes — a server head has no shared-constant seam,
+      // so the number is written twice and this comment is the second copy saying so
+      const curve = [10, 20, 20, 10, 10, 25, 40]
       const reward = curve[(streak - 1) % 7]
       // THE MARKER IS THE LOCK — `unique (owner_id, day)` on dsx_checkin. The `dup` read
       // above is the friendly path; this is the authoritative one. A second concurrent
@@ -314,7 +465,7 @@
       const prizes = [10, 15, 20, 25, 40, 60, 80, 100]
       const prize = prizes[Math.floor(Math.random() * prizes.length)]
       // THE MARKER IS THE LOCK — `unique (owner_id, day)` on dsx_spin. The wheel is FREE
-      // (no coin is debited anywhere in this action, deliberately — see the header's
+      // (no coin is debited anywhere in this action, deliberately — see the header
       // loot-box note), so the only thing to protect is the once-a-day grant.
       const marked = await dsx.module.data.spin.create({ day: today, prize: prize })
       if (!marked.ok) { throw { reason: 'conflict', message: 'no free spin left today' } }
@@ -336,25 +487,16 @@
       return { prize: prize, prizes: prizes, cost: 0 }
     </action>
 
+    <!-- THE ONE TASK A TAP CAN CLAIM, and it claims a fact the INVITEE wrote. Every other row
+         in the catalogue lands its grant without a client call (see the entity note). The
+         sweep is BOUNDED AND RESUMABLE: at most twelve invitees a call (four reads plus three
+         writes each — 40 of the 64), a daily ceiling, and a `done` flag the client loops on. -->
     <action as="claimTask" inputs="task">
+      if (task !== 'invite') { throw { reason: 'invalid', message: 'unknown task' } }
       const today = new Date().toISOString().slice(0, 10)
-      const rewards = { watch3: 15, firstFavorite: 10 }
-      if (rewards[task] == null) { throw { reason: 'invalid', message: 'unknown task' } }
-      const dup = await dsx.module.data.taskclaim.list({ filters: { day: today, task: task }, limit: 1 })
-      if (dup.ok && dup.data.length > 0) { throw { reason: 'conflict', message: 'already claimed today' } }
-      if (task === 'watch3') {
-        const watched = await dsx.module.data.progress.list({ filters: { day: today }, limit: 50 })
-        if (!watched.ok || watched.data.length < 3) { throw { reason: 'conflict', message: 'watch 3 episodes first' } }
-      }
-      if (task === 'firstFavorite') {
-        const favs = await dsx.module.data.favorite.list({ limit: 1 })
-        if (!favs.ok || favs.data.length < 1) { throw { reason: 'conflict', message: 'add a favorite first' } }
-      }
-      // THE MARKER IS THE LOCK — `unique (owner_id, day, task)` on dsx_taskclaim.
-      const marked = await dsx.module.data.taskclaim.create({ day: today, task: task })
-      if (!marked.ok) { throw { reason: 'conflict', message: 'already claimed today' } }
-      const reward = rewards[task]
-
+      const INVITE_REWARD = 50
+      const INVITE_DAILY = 10
+      const PER_CALL = 12
       const mine = await dsx.module.data.wallet.list({ limit: 1 })
       let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
       if (w == null) {
@@ -365,12 +507,67 @@
         }
       }
       if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
-      const led = await dsx.module.data.ledger.create({ kind: 'bonus', amount: reward, source: 'task', ref: today + ':' + task })
-      if (!led.ok) { throw { reason: 'unavailable', message: 'the grant could not be recorded' } }
-      const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
-      if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
-      return { claimed: task, reward: reward }
+      const code = String(w.id).slice(0, 8).toUpperCase()
+      const have = await dsx.module.data.invitecode.list({ filters: { code: code }, limit: 1 })
+      const ownerOfCode = have.ok && have.data.length > 0 ? String(have.data[0].owner_id) : ''
+      const proofs = await dsx.module.data.referralproof.list({ filters: { code: code }, limit: 100 })
+      const credits = await dsx.module.data.referralcredit.list({ limit: 100 })
+      const creditedIds = (credits.ok ? credits.data : []).map(c => String(c.invitee))
+      let creditedToday = (credits.ok ? credits.data : []).filter(c => c.day == today).length
+      let bonus = Number(w.bonus)
+      let paid = 0
+      let count = 0
+      let left = 0
+      let capped = false
+      for (const p of (proofs.ok ? proofs.data : [])) {
+        const invitee = String(p.owner_id)
+        // a self-referral (the inviter opened their own link on a fresh device) grants nothing
+        if (invitee == ownerOfCode) { continue }
+        if (creditedIds.indexOf(invitee) >= 0) { continue }
+        if (creditedToday >= INVITE_DAILY) { capped = true; left = left + 1; continue }
+        if (count >= PER_CALL) { left = left + 1; continue }
+        // THE CREDIT ROW IS THE LOCK — `unique (owner_id, invitee)`: the same proof swept by
+        // two concurrent claims pays once
+        const lock = await dsx.module.data.referralcredit.create({ invitee: invitee, day: today })
+        if (!lock.ok) { continue }
+        const led = await dsx.module.data.ledger.create({ kind: 'bonus', amount: INVITE_REWARD, source: 'invite', ref: invitee })
+        if (!led.ok) { throw { reason: 'unavailable', message: 'the grant could not be recorded' } }
+        bonus = bonus + INVITE_REWARD
+        const moved = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: bonus } })
+        if (!moved.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
+        paid = paid + INVITE_REWARD
+        count = count + 1
+        creditedToday = creditedToday + 1
+      }
+      if (count == 0 && left == 0) { throw { reason: 'conflict', message: 'no new invitee has watched a minute yet' } }
+      if (count == 0 && capped) { throw { reason: 'conflict', message: 'the daily invite limit is reached — the rest lands tomorrow' } }
+      return { claimed: 'invite', reward: paid, credited: count, left: left, capped: capped, done: left == 0 }
     </action>
+
+    <!-- THE INVITEE SIDE. Called once by a device that landed on an invite link; the code has
+         to resolve, the device has to be NEW (no watch day yet — an invite is for a viewer
+         the app did not have), and one attachment per device. The grant itself lands on the
+         inviter later, from the proof this device writes at its first verified minute. -->
+    <action as="attachReferral" inputs="code">
+      const c = code == null ? '' : String(code).trim().toUpperCase()
+      if (c === '' || c.length > 16) { throw { reason: 'invalid', message: 'invite code is required' } }
+      const have = await dsx.module.data.invitecode.list({ filters: { code: c }, limit: 1 })
+      if (!have.ok || have.data.length === 0) { throw { reason: 'not_found', message: 'that invite link is not valid' } }
+      // a viewer who opens their OWN link: the code is their wallet id, so the wallet says so
+      // without this body ever learning its subject
+      const mineW = await dsx.module.data.wallet.list({ limit: 1 })
+      if (mineW.ok && mineW.data.length > 0 && String(mineW.data[0].id).slice(0, 8).toUpperCase() === c) {
+        throw { reason: 'invalid', message: 'that is your own invite link' }
+      }
+      const mineRef = await dsx.module.data.referral.list({ limit: 1 })
+      if (mineRef.ok && mineRef.data.length > 0) { return { attached: false, already: true, code: String(mineRef.data[0].code) } }
+      const watched = await dsx.module.data.watchday.list({ limit: 1 })
+      if (watched.ok && watched.data.length > 0) { throw { reason: 'conflict', message: 'invite links are for new viewers' } }
+      const made = await dsx.module.data.referral.create({ code: c, verified: false })
+      if (!made.ok) { return { attached: false, already: true, code: c } }
+      return { attached: true, already: false, code: c }
+    </action>
+
     <!-- The client reports WHICH lane showed the impression (see Components/parts/AdGate.dsx);
          the server decides everything that costs money. A mediation lane will one day arrive
          with a signed server-side-verification callback, and this is where that check lands —
@@ -383,16 +580,16 @@
         throw { reason: 'invalid', message: 'unknown ad lane' }
       }
       const today = new Date().toISOString().slice(0, 10)
-      const AD_CAP = 10
-      const AD_REWARD = 15
+      const AD_CAP = 15
+      const AD_REWARD = 20
       const seen = await dsx.module.data.adview.list({ filters: { day: today }, limit: 40 })
       const count = seen.ok ? seen.data.length : 0
       if (count >= AD_CAP) { throw { reason: 'conflict', message: 'daily ad limit reached — come back tomorrow' } }
-      // THE MARKER IS THE LOCK, and here the marker needs a SEQUENCE. The cap is ten a day,
+      // THE MARKER IS THE LOCK, and here the marker needs a SEQUENCE. The cap is fifteen a day,
       // so uniqueness cannot be (owner, day) — it has to be (owner, day, seq), with seq the
       // position this grant believes it is taking. Two concurrent grants both read count = n
       // and both try seq = n + 1; exactly one row lands and the other is refused, so the cap
-      // is a real cap instead of "ten, or twenty if you tap twice".
+      // is a real cap instead of "fifteen, or thirty if you tap twice".
       const seq = count + 1
       const marked = await dsx.module.data.adview.create({ day: today, reward: AD_REWARD, lane: shown, seq: seq })
       if (!marked.ok) { throw { reason: 'conflict', message: 'that reward was already counted — try again' } }
@@ -405,23 +602,240 @@
       if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
       return { reward: AD_REWARD, left: AD_CAP - seq, lane: shown }
     </action>
+
+    <!-- THE PUSH TOKEN, and the two grants that hang on it. The token is what a push server
+         needs to reach this install, so the row is the whole feature; the reward is tied to
+         the row landing, not to a permission prompt (App Store 5.1.2(i) forbids pricing a
+         system permission). It ROTATES and re-arrives on every launch (Core/Notify context
+         `token`), so the write is an upsert and both grants are exactly-once through the
+         ledger: `unique (owner_id, source) where source in (signin, push, pts_push)`. The
+         client never passes an amount. -->
+    <action as="registerPush" inputs="token, platform">
+      const t = token == null ? '' : String(token).trim()
+      if (t === '' || t.length > 2048) { throw { reason: 'invalid', message: 'a push token is required' } }
+      const p = platform == null ? '' : String(platform).slice(0, 24)
+      const PUSH_COINS = 60
+      const PUSH_POINTS = 30
+      const have = await dsx.module.data.pushtoken.list({ limit: 1 })
+      if (have.ok && have.data.length > 0) {
+        const moved = await dsx.module.data.pushtoken.update({ id: have.data[0].id, values: { token: t, platform: p } })
+        if (!moved.ok) { throw { reason: 'unavailable', message: 'the token could not be saved' } }
+      } else {
+        const made = await dsx.module.data.pushtoken.create({ token: t, platform: p })
+        if (!made.ok) {
+          // lost the unique (owner_id) race with the same install: the winner row is as good
+          const again = await dsx.module.data.pushtoken.list({ limit: 1 })
+          if (!again.ok || again.data.length === 0) { throw { reason: 'unavailable', message: 'the token could not be saved' } }
+        }
+      }
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) {
+        const madeW = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (madeW.ok) { w = madeW.data } else {
+          const againW = await dsx.module.data.wallet.list({ limit: 1 })
+          w = againW.ok && againW.data.length > 0 ? againW.data[0] : null
+        }
+      }
+      if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
+      let coins = 0
+      let points = 0
+      const led = await dsx.module.data.ledger.create({ kind: 'bonus', amount: PUSH_COINS, source: 'push', ref: 'device' })
+      if (led.ok) {
+        const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + PUSH_COINS } })
+        if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
+        w = paid.data
+        coins = PUSH_COINS
+      }
+      const ledP = await dsx.module.data.ledger.create({ kind: 'points', amount: PUSH_POINTS, source: 'pts_push', ref: 'device' })
+      if (ledP.ok) {
+        const havePts = w.points == null ? 0 : Number(w.points)
+        const paidP = await dsx.module.data.wallet.update({ id: w.id, values: { points: havePts + PUSH_POINTS } })
+        if (!paidP.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
+        points = PUSH_POINTS
+      }
+      return { registered: true, coins: coins, points: points }
+    </action>
+
+    <!-- ══ MEMBER POINTS (spec 9.4) ═══════════════════════════════════════════════════ -->
+
+    <!-- the tab one read: the balance, the membership day and its timeline, the draw, the
+         30-minute mission, the push row and the redeem cards — every number a server fact -->
+    <action as="pointsState">
+      const today = new Date().toISOString().slice(0, 10)
+      const now = Date.now()
+      const DRAW_MIN = 5
+      const DRAW_MAX = 50
+      const WATCH30_POINTS = 50
+      const WATCH30_MINUTES = 30
+      const PUSH_POINTS = 30
+      const CARDS = [{ id: 'ext1', days: 1, points: 500 }, { id: 'ext5', days: 5, points: 2000 }]
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) {
+        const madeW = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+        if (madeW.ok) { w = madeW.data } else {
+          const againW = await dsx.module.data.wallet.list({ limit: 1 })
+          w = againW.ok && againW.data.length > 0 ? againW.data[0] : null
+        }
+      }
+      if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
+      const vip = w.vip_until != null && new Date(w.vip_until).getTime() > now
+      // MEMBERSHIP DAY ONE is the first day a member opens this tab: the wallet remembers it
+      // so the timeline can count forward, and a lapsed pass clears it on the next read
+      let since = w.member_since == null ? '' : String(w.member_since)
+      if (vip && since == '') {
+        since = new Date(now).toISOString()
+        await dsx.module.data.wallet.update({ id: w.id, values: { member_since: since } })
+      }
+      if (vip == false && since != '') { since = '' }
+      const points = w.points == null ? 0 : Number(w.points)
+      const memberDay = since == '' ? 0 : Math.floor((now - new Date(since).getTime()) / 86400000) + 1
+
+      const drawn = await dsx.module.data.memberday.list({ limit: 30 })
+      const drawnDays = (drawn.ok ? drawn.data : []).map(d => String(d.day))
+      let drawPrize = 0
+      for (const d of (drawn.ok ? drawn.data : [])) { if (d.day == today) { drawPrize = Number(d.points) } }
+      const timeline = []
+      if (memberDay > 0) {
+        const start = memberDay > 2 ? memberDay - 2 : 1
+        const sinceMs = new Date(since).getTime()
+        for (let k = start; k < start + 5; k++) {
+          const dayKey = new Date(sinceMs + (k - 1) * 86400000).toISOString().slice(0, 10)
+          const claimed = drawnDays.indexOf(dayKey) >= 0
+          let state = 'future'
+          if (k == memberDay) { state = 'today' }
+          else if (k < memberDay) { state = claimed ? 'claimed' : 'unclaimed' }
+          timeline.push({ id: 'k' + k, n: k, state: state, claimed: claimed, today: k == memberDay })
+        }
+      }
+
+      const claims = await dsx.module.data.taskclaim.list({ filters: { day: today }, limit: 20 })
+      const claimed = (claims.ok ? claims.data : []).map(c => c.task)
+      const wd = await dsx.module.data.watchday.list({ filters: { day: today }, limit: 1 })
+      const dayRow = wd.ok && wd.data.length > 0 ? wd.data[0] : null
+      const minutes = dayRow == null ? 0 : Math.floor(Number(dayRow.seconds) / 60)
+      const pushLed = await dsx.module.data.ledger.list({ filters: { source: 'pts_push' }, limit: 1 })
+      const pushDone = pushLed.ok && pushLed.data.length > 0
+      const reds = await dsx.module.data.redeem.list({ filters: { day: today }, limit: 10 })
+      const redeemedToday = (reds.ok ? reds.data : []).map(r => String(r.card))
+      return {
+        points: points, vip: vip, vipUntil: w.vip_until, memberSince: since, memberDay: memberDay, timeline: timeline,
+        drawnToday: drawPrize > 0, drawPrize: drawPrize, drawMin: DRAW_MIN, drawMax: DRAW_MAX,
+        watch30: { reward: WATCH30_POINTS, minutes: minutes, target: WATCH30_MINUTES, progress: Math.min(minutes, WATCH30_MINUTES), claimed: claimed.indexOf('pts_watch30') >= 0, ready: minutes >= WATCH30_MINUTES },
+        pushPoints: { reward: PUSH_POINTS, claimed: pushDone },
+        cards: CARDS.map(c => ({ id: c.id, days: c.days, points: c.points, affordable: points >= c.points, redeemedToday: redeemedToday.indexOf(c.id) >= 0 }))
+      }
+    </action>
+
+    <!-- THE DAILY DRAW: a random 5–50 points, once a day, members only. The draw is FREE and
+         nothing sells one, which keeps it outside App Store 3.1.1 loot-box regime the same way
+         the wheel is (see the header). The memberday row is the lock AND the timeline. -->
+    <action as="dailyDraw">
+      const today = new Date().toISOString().slice(0, 10)
+      const now = Date.now()
+      const DRAW_MIN = 5
+      const DRAW_MAX = 50
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      const w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) { throw { reason: 'conflict', message: 'no wallet' } }
+      const vip = w.vip_until != null && new Date(w.vip_until).getTime() > now
+      if (vip == false) { throw { reason: 'forbidden', message: 'the Daily Draw is for members' } }
+      const prize = DRAW_MIN + Math.floor(Math.random() * (DRAW_MAX - DRAW_MIN + 1))
+      // THE MARKER IS THE LOCK — `unique (owner_id, day)` on dsx_memberday
+      const marked = await dsx.module.data.memberday.create({ day: today, points: prize })
+      if (!marked.ok) { throw { reason: 'conflict', message: 'already drawn today' } }
+      const led = await dsx.module.data.ledger.create({ kind: 'points', amount: prize, source: 'draw', ref: today })
+      if (!led.ok) { throw { reason: 'unavailable', message: 'the grant could not be recorded' } }
+      const have = w.points == null ? 0 : Number(w.points)
+      const values = { points: have + prize }
+      if (w.member_since == null) { values.member_since = new Date(now).toISOString() }
+      const paid = await dsx.module.data.wallet.update({ id: w.id, values: values })
+      if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
+      return { prize: prize, points: have + prize }
+    </action>
+
+    <!-- Watch & Earn: 50 points once the mission ledger says thirty minutes today. The claim
+         reads the same watchday row the coin milestones pay from; the marker is a taskclaim. -->
+    <action as="claimPoints" inputs="task">
+      if (task !== 'watch30') { throw { reason: 'invalid', message: 'unknown task' } }
+      const today = new Date().toISOString().slice(0, 10)
+      const WATCH30_POINTS = 50
+      const wd = await dsx.module.data.watchday.list({ filters: { day: today }, limit: 1 })
+      const dayRow = wd.ok && wd.data.length > 0 ? wd.data[0] : null
+      const seconds = dayRow == null ? 0 : Number(dayRow.seconds)
+      if (seconds < 1800) { throw { reason: 'conflict', message: 'watch 30 minutes first' } }
+      // THE MARKER IS THE LOCK — `unique (owner_id, day, task)` on dsx_taskclaim
+      const marked = await dsx.module.data.taskclaim.create({ day: today, task: 'pts_watch30' })
+      if (!marked.ok) { throw { reason: 'conflict', message: 'already claimed today' } }
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      const w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) { throw { reason: 'conflict', message: 'no wallet' } }
+      const led = await dsx.module.data.ledger.create({ kind: 'points', amount: WATCH30_POINTS, source: 'pts_watch30', ref: today })
+      if (!led.ok) { throw { reason: 'unavailable', message: 'the grant could not be recorded' } }
+      const have = w.points == null ? 0 : Number(w.points)
+      const paid = await dsx.module.data.wallet.update({ id: w.id, values: { points: have + WATCH30_POINTS } })
+      if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
+      return { claimed: 'watch30', reward: WATCH30_POINTS, points: have + WATCH30_POINTS }
+    </action>
+
+    <!-- REDEEM: points → membership days. Extends `vip_until` from whichever is later, now or
+         the current expiry — the same arithmetic settleOrder uses for a paid pass — debits the
+         points, and is IDEMPOTENT PER DAY AND CARD through the redeem marker: a double tap on
+         the same card the same day extends once. The card table is this document own; the
+         client sends an id and never an amount. -->
+    <action as="redeemPoints" inputs="card">
+      const today = new Date().toISOString().slice(0, 10)
+      const now = Date.now()
+      const CARDS = [{ id: 'ext1', days: 1, points: 500 }, { id: 'ext5', days: 5, points: 2000 }]
+      let picked = null
+      for (const c of CARDS) { if (c.id === card) { picked = c } }
+      if (picked == null) { throw { reason: 'invalid', message: 'unknown card' } }
+      const mine = await dsx.module.data.wallet.list({ limit: 1 })
+      const w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+      if (w == null) { throw { reason: 'conflict', message: 'no wallet' } }
+      const have = w.points == null ? 0 : Number(w.points)
+      if (have < picked.points) { throw { reason: 'conflict', message: 'not enough points' } }
+      // THE MARKER IS THE LOCK — `unique (owner_id, day, card)` on dsx_redeem
+      const marked = await dsx.module.data.redeem.create({ day: today, card: picked.id, days: picked.days, points: picked.points })
+      if (!marked.ok) { throw { reason: 'conflict', message: 'already redeemed today' } }
+      const led = await dsx.module.data.ledger.create({ kind: 'points', amount: 0 - picked.points, source: 'redeem', ref: today + ':' + picked.id })
+      if (!led.ok) { throw { reason: 'unavailable', message: 'the redemption could not be recorded' } }
+      const from = w.vip_until != null && new Date(w.vip_until).getTime() > now ? new Date(w.vip_until).getTime() : now
+      const until = new Date(from + picked.days * 86400000).toISOString()
+      const values = { points: have - picked.points, vip_until: until }
+      if (w.member_since == null) { values.member_since = new Date(now).toISOString() }
+      const paid = await dsx.module.data.wallet.update({ id: w.id, values: values })
+      if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
+      return { card: picked.id, days: picked.days, vipUntil: until, points: have - picked.points }
+    </action>
   </head>
 
-  <!-- RATE CEILINGS on the four grants. Each is already bounded per DAY by a unique
-       constraint, so the limit is not the entitlement gate — it is the cost gate: a grant
-       that is refused still costs a read, a write attempt and a rate-counter upsert, and a
-       client in a retry loop can run that thousands of times a minute against the
-       `data:writes` and `requests` ceilings. The numbers are "every legitimate retry, and
-       nothing like a loop":
-         · checkin/spin  10/h — genuinely once a day; ten covers a flaky network.
-         · task          20/h — two tasks exist, so ten retries each.
-         · ad            20/h — the cap is ten a day, so twenty admits a retry per grant.
-         · state        120/m — the Rewards screen refetches on mount (§6.30). -->
-  <route method="GET"  path="/rewards/state"   action="rewardsState" auth="required" rate="120/m"/>
-  <route method="POST" path="/rewards/checkin" action="checkinNow"   auth="required" rate="10/h"/>
-  <route method="POST" path="/rewards/spin"    action="spinWheel"    auth="required" rate="10/h"/>
-  <route method="POST" path="/rewards/task"    action="claimTask"    auth="required" rate="20/h"/>
-  <route method="POST" path="/rewards/ad"      action="grantAdReward" auth="required" rate="20/h"/>
+  <!-- RATE CEILINGS on the grants. Each is already bounded per DAY by a unique constraint,
+       so the limit is not the entitlement gate — it is the cost gate: a grant that is
+       refused still costs a read, a write attempt and a rate-counter upsert, and a client
+       in a retry loop can run that thousands of times a minute against the `data:writes`
+       and `requests` ceilings. The numbers are "every legitimate retry, and nothing like a
+       loop":
+         · checkin/spin/draw 10/h — genuinely once a day; ten covers a flaky network.
+         · task              30/h — the invite sweep is RESUMABLE (twelve invitees a call), so
+                                    the ceiling follows the sweep, not the intent (AGENTS.md).
+         · ad                30/h — the cap is fifteen a day, so thirty admits a retry per grant.
+         · push              20/h — the token re-arrives on every launch; twenty is many launches.
+         · redeem/points     20/h — two cards and one task, so ten retries each.
+         · referral          10/h — one attachment per device, ever.
+         · state/points     120/m — the Rewards screen refetches on mount (§6.30). -->
+  <route method="GET"  path="/rewards/state"       action="rewardsState"   auth="required" rate="120/m"/>
+  <route method="POST" path="/rewards/checkin"     action="checkinNow"     auth="required" rate="10/h"/>
+  <route method="POST" path="/rewards/spin"        action="spinWheel"      auth="required" rate="10/h"/>
+  <route method="POST" path="/rewards/task"        action="claimTask"      auth="required" rate="30/h"/>
+  <route method="POST" path="/rewards/ad"          action="grantAdReward"  auth="required" rate="30/h"/>
+  <route method="POST" path="/rewards/referral"    action="attachReferral" auth="required" rate="10/h"/>
+  <route method="POST" path="/viewer/push"         action="registerPush"   auth="required" rate="20/h"/>
+  <route method="GET"  path="/rewards/points"      action="pointsState"    auth="required" rate="120/m"/>
+  <route method="POST" path="/rewards/draw"        action="dailyDraw"      auth="required" rate="10/h"/>
+  <route method="POST" path="/rewards/points/task" action="claimPoints"    auth="required" rate="20/h"/>
+  <route method="POST" path="/rewards/redeem"      action="redeemPoints"   auth="required" rate="20/h"/>
   <!-- THE WATCH MISSION. The heartbeat is sized to a 30 s client cadence with room for a
        retry and a second device (6/m), and the read the ring opens on is as cheap as
        /rewards/state. Neither route takes a number from the client — see watchTick. -->

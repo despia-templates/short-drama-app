@@ -264,9 +264,28 @@ const mergeDeviceIntoAccount = async (deviceViewer, accountSub) => {
           vip_until = greatest(a.vip_until, (select vip_until from dev))
         where a.owner_id=$1::uuid and exists (select 1 from marker)
         returning a.coins, a.bonus`, [accountSub, deviceViewer]);
+    // THE SIGN-IN REWARD (docs/design/reference-ui-spec.md §9.3 row 1: "Login with any
+    // account — +60"), granted HERE and nowhere else: linking a device to an account is the
+    // one event this provider can verify, and a declared action can neither read the
+    // caller's `kind` claim nor be trusted with "I signed in". Once per ACCOUNT through the
+    // ledger's partial unique index (dsx_ledger_once_per_owner, source = 'signin'); the
+    // wallet moves only when the marker row actually landed, inside this same transaction.
+    const SIGNIN_COINS = 60;
+    await client.query(
+      `with marker as (
+         insert into dsx_ledger (owner_id, kind, amount, source, ref)
+         values ($1::uuid, 'bonus', $2::int, 'signin', 'link')
+         on conflict (owner_id, source) where source in ('signin', 'push', 'pts_push') do nothing
+         returning 1
+       )
+       update dsx_wallet a set bonus = a.bonus + $2::int
+        where a.owner_id=$1::uuid and exists (select 1 from marker)`, [accountSub, SIGNIN_COINS]);
     await client.query(`delete from dsx_wallet where owner_id=$1::uuid`, [deviceViewer]);
     await client.query(`delete from dsx_ledger where owner_id=$1::uuid and source <> 'merge'`, [deviceViewer]);
-    for (const t of ["dsx_checkin", "dsx_spin", "dsx_taskclaim", "dsx_adview", "dsx_playticket"]) {
+    // the device's own per-day markers and rewards rows retire with it (its ledger went above);
+    // the invite tables are NOT here on purpose — a proof the device wrote stays readable by
+    // its inviter, and a code the device owned is worthless once the wallet is gone
+    for (const t of ["dsx_checkin", "dsx_spin", "dsx_taskclaim", "dsx_adview", "dsx_playticket", "dsx_watchday", "dsx_memberday", "dsx_redeem", "dsx_pushtoken", "dsx_referralcredit"]) {
       await client.query(`delete from ${t} where owner_id=$1::uuid`, [deviceViewer]);
     }
     await client.query("commit");
