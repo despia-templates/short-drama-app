@@ -58,7 +58,7 @@ create policy dsx_comment_owner_delete on dsx_comment
 -- transaction seam — postgres.ts sets the caller identity per STATEMENT, and there is no
 -- way to wrap several (PLAN.md §6.38) — so two requests that arrive together both read
 -- "not yet" and both write. Measured consequence, per guard: two check-ins on one day, two
--- free spins, two claims of the same task, two ad grants inside the ten-a-day cap, two
+-- two claims of the same task, two ad grants inside the ten-a-day cap, two
 -- charges for one episode, two grants for one payment. Application code cannot fix this.
 -- Only the database can, and only with a unique index.
 --
@@ -80,9 +80,8 @@ create policy dsx_comment_owner_delete on dsx_comment
 -- Postgres feels like. Every ensure-wallet fold in the backend now re-reads on conflict.
 create unique index if not exists dsx_wallet_owner_uniq on dsx_wallet (owner_id);
 
--- one check-in per viewer per day; one free spin per viewer per day
+-- one check-in per viewer per day
 create unique index if not exists dsx_checkin_owner_day_uniq on dsx_checkin (owner_id, day);
-create unique index if not exists dsx_spin_owner_day_uniq    on dsx_spin (owner_id, day);
 
 -- one claim per viewer per task per day
 create unique index if not exists dsx_taskclaim_owner_day_task_uniq on dsx_taskclaim (owner_id, day, task);
@@ -134,7 +133,7 @@ create unique index if not exists dsx_order_intent_uniq
 -- ledger FIRST — a refused insert means someone already settled this order.
 -- `kind` is in the key because a coin pack legitimately writes TWO rows for one order: the
 -- purchased coins (kind='coin') and the pack's free bonus (kind='bonus').
--- PARTIAL, so it constrains only the two grant sources: 'unlock', 'checkin', 'spin', 'task'
+-- PARTIAL, so it constrains only the two grant sources: 'unlock', 'checkin', 'task'
 -- and 'ad' rows have their own uniqueness upstream (or, for unlock_series, legitimately
 -- repeat a ref across kinds) and must not be caught by this.
 create unique index if not exists dsx_ledger_grant_once

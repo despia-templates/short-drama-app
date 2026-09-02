@@ -24,7 +24,7 @@
 | `catalog.dsx` | `show` (title, synopsis, genres, poster, trailer, state: draft/scheduled/live, dripPolicy) · `episode` (show, index, asset, freeUntilIndex?, price?, state) · `asset` (r2Key, streamId, playbackBase, duration, status) |
 | `viewer.dsx` | `viewer` (identity-linked; locale, pushPrefs, vipUntil) · `progress` (viewer+episode, position, ownership=owner) · `favorite` · `download-grant` |
 | `wallet.dsx` | `wallet` (coins, bonusCoins) · `ledger` (append-only: source, amount, currency, expiry, ref) · `unlock` (viewer+episode, price paid) |
-| `engage.dsx` | `checkin` (viewer, day, streak) · `task` + `task-claim` · `spin` (prizeTable version, result) · `ad-receipt` (SSV transaction_id UNIQUE, adUnit, rewardItem, state) |
+| `engage.dsx` | `checkin` (viewer, day, streak) · `task` + `task-claim` · `ad-receipt` (SSV transaction_id UNIQUE, adUnit, rewardItem, state) |
 | `campaign.dsx` | `segment` · `push-campaign` (template, audience, schedule, state) · `offer` (firstRecharge, winback; window) |
 | `events.dsx` | `event` (append-only product analytics; **retention: 48h raw → rollup**, the emergency-recovery window rfcs/0003 §8) · `rollup` (daily aggregates the admin cards read) |
 
@@ -42,7 +42,6 @@ admin-write (**needs role-gated auth — upstream item PLAN.md §6.2**).
 <route method="POST" path="/wallet/iap"          action="revenuecatWebhook" auth="webhook"/> <!-- HMAC -->
 <route method="GET"  path="/rewards/state"       action="rewardsState" auth="required"/>
 <route method="POST" path="/rewards/checkin"     action="checkin"      auth="required"/>
-<route method="POST" path="/rewards/spin"        action="spin"         auth="required"/>
 <route method="POST" path="/rewards/task/:id"    action="claimTask"    auth="required"/>
 <route method="GET"  path="/ads/ssv"             action="admobSsv"     auth="none"/>   <!-- AdMob GET callback, signature-verified -->
 ```

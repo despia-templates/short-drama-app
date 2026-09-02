@@ -40,7 +40,7 @@
          step, each COMPLETED task's reward, the ad cap left times the ad reward for a
          non-member — and the sum lives in the global library (Theme.dsx rewardsClaimable),
          which the Rewards screen's own "+N to claim" pill calls too, so the bubble and the
-         page cannot disagree. The wheel is left out: its prize is drawn, not owed. -->
+         page cannot disagree. -->
     <variable as="claimable" computed="true">
       if (global.auth.ok != true) { return 0 }
       const w = global.cacheWallet

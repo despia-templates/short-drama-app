@@ -6,7 +6,7 @@ A ReelShort/DramaBox-class vertical drama app in pure DSX — 28 components and 
 documents, one source, native on iOS, Android, web and desktop. SSR web storefront
 (Popular / New / Ranking), a TikTok-style For-You feed, a full-screen vertical player with
 a **server-enforced coin paywall**, VIP, a rewards loop (check-in streaks, capped rewarded
-ads, the wheel, tasks), comments with the four UGC-safety controls the stores require, a
+ads, tasks), comments with the four UGC-safety controls the stores require, a
 notifications inbox, account deletion, and a **Manage View** operator surface — all over one
 declared backend (`server/*.dsx`: 17 entities with Postgres RLS, 45 routes, 6 MCP tools and
 one inbound webhook). The founding program docs live in [PLAN.md](PLAN.md) and `docs/`.
@@ -30,7 +30,7 @@ lists every one of them, and each is filed in PLAN.md §6.
 | **Watch** `/watch/:show/:idx` | Vertical pager over episodes, drag scrubber off one measured box, speed, subtitles and PiP as real `<video>` booleans, a right rail, the range-pill drawer, a **persistent two-column panel ≥1120**, the paywall sheet, comments with report / block / delete-own, and a safety-filter level |
 | **Store** `/store` | Server price table, Stripe PaymentIntent, an **idempotent settle with a recovery card**, restore |
 | **VIP** `/vip` | Masthead, benefits (every claim true), free-with-VIP rail, plans sheet, an honest restore row |
-| **Rewards** `/rewards` | The industry-standard page (spec §9): two swipeable tabs — **Reward coins** (balance hero, the seven-cell check-in card, the Earn Rewards rows: sign-in · push · rewarded ad · watch mission · invite · follow · share, the wheel) and **Member Points** (membership timeline, Daily Draw, Watch & Earn, recommendations, Redeem Points → membership days, the Coming Soon band). Every grant is **server-verified**: sign-in lands on account link, push on the token, the watch rows on the mission ledger, invites on the invitee's first verified minute; follow and share grant nothing and say so. Rewarded ads capped per day and **VIP-gated**, with the App Store 2.5.18 report-this-ad seam |
+| **Rewards** `/rewards` | The industry-standard page (spec §9): two swipeable tabs — **Reward coins** (balance hero, the seven-cell check-in card, the Earn Rewards rows: sign-in · push · rewarded ad · watch mission · invite · follow · share) and **Member Points** (membership timeline, Daily Draw, Watch & Earn, recommendations, Redeem Points → membership days, the Coming Soon band). Every grant is **server-verified**: sign-in lands on account link, push on the token, the watch rows on the mission ledger, invites on the invitee's first verified minute; follow and share grant nothing and say so. Rewarded ads capped per day and **VIP-gated**, with the App Store 2.5.18 report-this-ad seam |
 | **My List** `/list` | History rail with resume, favourites grid |
 | **Profile** `/profile` | Identity, wallet, transaction ledger, **a real language picker over fourteen shipped locales**, Manage, Account |
 | **Account** `/account`, `/auth/:pane` | Sign in / sign up / sign out, restore purchases, terms, privacy, support, **and account deletion that provably empties the account** |

@@ -41,7 +41,7 @@ const catalog = await get("/store/catalog");
 // construction — but their FIELD NAMES are the server's wire shape, held to source:
 // server/viewer.dsx continueWatching returns { items: [{ show, idx, episode, title,
 // poster, pct, eps }] } and favorites { items: [...] }; server/engage.dsx rewardsState
-// returns streak/checkedToday/days/curve/nextReward/freeSpinLeft/spinPrizes/adCap/
+// returns streak/checkedToday/days/curve/nextReward/adCap/
 // adsToday/adsLeft/adReward/tasks; the wallet fold returns coins/bonus/vip/vipUntil/
 // unlocked; the ledger and inbox read .rows. (First cut guessed `rows` for continue and
 // Home's rail silently never rendered — a field name is a contract, capture or copy it.)
@@ -56,7 +56,7 @@ const inbox = { rows: [
 ] };
 const rewards = {
   streak: 2, checkedToday: false, days: [5, 10, 15, 20, 25, 30, 60], curve: [5, 10, 15, 20, 25, 30, 60],
-  nextReward: 15, freeSpinLeft: true, spinPrizes: [10, 15, 20, 25, 40, 60, 80, 100],
+  nextReward: 15,
   adCap: 10, adsToday: 0, adsLeft: 10, adReward: 15,
   tasks: [
     { id: "t1", title: "Finish any episode", reward: 10, claimed: false },

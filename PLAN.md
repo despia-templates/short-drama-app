@@ -4394,3 +4394,19 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      section) — both pre-existing on the unpatched tip. `cardInset`'s "centres a 314 card"
      comment in Rewards.dsx is right about the width and wrong about the vertical: the reference
      card rests on its inset on every lane.
+
+197. **THE WHEEL IS GONE: NO REFERENCE APP SPINS ONE** (2026-09-02, the founder: "no spin the wheel,
+     literally no app does it — follow industry standards, remove all that is not"). The coins tab
+     carried a "Spin the wheel" card after the task list — a 132pt conic-gradient wheel, a free
+     once-a-day grant (`spinWheel`, `dsx_spin`, `/rewards/spin`, `freeSpinLeft`/`spinPrizes`/
+     `spinOdds` in the rewards state), its four strings in thirteen locales, a footer link on
+     Home, copy on the Store, the VIP ad gate and the account screen, a verify check and the
+     account-deletion sweep. None of the twenty reference shots has one, and the spec's own
+     §9.3 line that kept it ("a server-owned grant already") was the template's reasoning, not
+     the category's. Removed whole: the card, the state, the action, the entity and its local
+     unique index, the route, the strings (the four sentences that mentioned it are re-keyed and
+     re-translated in every locale), the docs. The Member Points tab's "Daily Draw" row STAYS:
+     it is in the DramaBox reference (§9.4, "+?? points, once a day"), it is a plain row with a
+     Claim pill, and its grant is a server fact (`/rewards/draw`, the memberday marker) — no wheel
+     UI anywhere. The rewards loop is now the check-in, the task catalogue and the rewarded ad,
+     none of them random.

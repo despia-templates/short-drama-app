@@ -398,7 +398,7 @@
             visible-if="dsx.variable.adFace" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
       <!-- THE MEMBER FACE. Not blank: a benefit someone paid for should be visible at the
            place it takes effect, and this is that place. -->
-      <text value="Your VIP pass switches the rewarded clip off. Check-in, the wheel and the tasks still pay." class="sub" visible-if="dsx.variable.isVip"
+      <text value="Your VIP pass switches the rewarded clip off. Check-in and the tasks still pay." class="sub" visible-if="dsx.variable.isVip"
             style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
       <!-- Article 7, named where the viewer reads it -->
       <text value="This creative will not play again this session; the report goes to the moderation queue." class="sub" visible-if="dsx.variable.optFace"

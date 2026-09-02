@@ -763,7 +763,6 @@ One source. Native on iOS, Android, web and desktop." class="footCopy"/>
             <text value="EARN" class="footHead"/>
             <text value="Rewards" class="footLink" href="/rewards"/>
             <text value="Daily check-in" class="footLink" href="/rewards"/>
-            <text value="Spin the wheel" class="footLink" href="/rewards"/>
           </vstack>
           <vstack class="footCol">
             <text value="ACCOUNT" class="footHead"/>

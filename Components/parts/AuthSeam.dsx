@@ -800,7 +800,7 @@
             <hstack class="killRow">
               <image icon="minus" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
               <text class="killTxt" style="flex: 1; min-width: 0"
-                    value="Watch progress, My List, check-ins, spins, task claims and ad views."/>
+                    value="Watch progress, My List, check-ins, task claims and ad views."/>
             </hstack>
             <hstack class="killRow">
               <image icon="minus" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>

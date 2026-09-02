@@ -4,7 +4,7 @@
 
        Reward coins   the balance hero · the seven-cell check-in card · the Earn Rewards row
                       cards in the reference's order (sign-in · push · the rewarded ad · the two
-                      watch-mission rows · invite · the follow rows · share) · Spin the wheel ·
+                      watch-mission rows · invite · the follow rows · share) ·
                       the Apple footer
        Member Points  the "Daily Rewards" hero with the points pill · the membership timeline ·
                       the Daily Draw and Watch & Earn rows · Recommendations · the push row ·
@@ -42,7 +42,6 @@
          same payload Home stashes, so a tab switch paints it before this refetch lands -->
     <api as="home" url="/catalog/home" ssr="false" on:success="global.cacheHome = home.data"/>
     <api as="checkinCall" url="/rewards/checkin" method="POST" auto="false" headers="global.auth.headers"/>
-    <api as="spinCall" url="/rewards/spin" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="claimCall" url="/rewards/task" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="pushCall" url="/viewer/push" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="drawCall" url="/rewards/draw" method="POST" auto="false" headers="global.auth.headers"/>
@@ -55,9 +54,6 @@
     <variable as="toast">return ''</variable>
     <variable as="toastDays">return 0</variable>      <!-- a redeem's toast is a plural template -->
     <variable as="busy">return ''</variable>          <!-- the row id in flight -->
-    <variable as="wheelTurn">return 0</variable>      <!-- accumulated rotation, degrees -->
-    <variable as="spinning">return false</variable>
-    <variable as="wheelResult">return ''</variable>   <!-- the hub label after a landing -->
     <variable as="successOpen">return false</variable>
     <variable as="successN">return 0</variable>
     <variable as="successUnit">return 'coins'</variable>
@@ -147,23 +143,6 @@
       if (dsx.variable.stateView == null) { return [] }
       if (dsx.variable.stateView.days == null) { return [] }
       return dsx.variable.stateView.days
-    </variable>
-    <variable as="canSpin" computed="true">
-      return dsx.variable.stateView != null &amp;&amp; dsx.variable.stateView.freeSpinLeft &amp;&amp; dsx.variable.spinning == false
-    </variable>
-    <variable as="spinRange" computed="true">
-      if (dsx.variable.stateView == null || dsx.variable.stateView.spinPrizes == null) { return '' }
-      const p = dsx.variable.stateView.spinPrizes
-      return p[0] + '–' + p[p.length - 1]
-    </variable>
-    <!-- the wheel's whole look is ONE computed string; the transition is ALWAYS declared so
-         the server's answer cannot snap the wheel mid-ride. wheelTurn only changes in `spin`. -->
-    <variable as="wheelFx" computed="true">
-      const a = accent()
-      const b = rewardsCell()
-      const c = gold()
-      const ring = 'conic-gradient(' + a + ' 0deg 45deg, ' + b + ' 45deg 90deg, ' + c + ' 90deg 135deg, ' + b + ' 135deg 180deg, ' + a + ' 180deg 225deg, ' + b + ' 225deg 270deg, ' + c + ' 270deg 315deg, ' + b + ' 315deg 360deg)'
-      return 'width: 132px; height: 132px; border-radius: 66px; background: ' + ring + '; transform: rotate(' + dsx.variable.wheelTurn + 'deg); transition: transform 2.4s cubic-bezier(0.16, 0.8, 0.18, 1)'
     </variable>
     <!-- ── the ad lane facts, read once for the row and for the success modal ── -->
     <variable as="adsLeft" computed="true">
@@ -331,29 +310,6 @@
         return
       }
       dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : localize('Check-in failed')
-    </action>
-
-    <!-- The wheel SPINS the moment it is asked (2.4s of eased rotation), the server answers
-         during the ride, and the hub shows the landing. NOT A LOOT BOX, and it must stay that
-         way: `spinWheel` (server/engage.dsx) refuses a second spin the same day and never
-         debits a wallet — nothing sells a spin. -->
-    <action as="spin">
-      if (dsx.variable.canSpin == false) { return }
-      dsx.variable.spinning = true
-      dsx.variable.wheelResult = ''
-      dsx.variable.wheelTurn = Number(dsx.variable.wheelTurn) + 1890
-      const r = await spinCall.send({})
-      if (r.ok) {
-        dsx.variable.wheelResult = '+' + r.data.prize
-        dsx.variable.successN = Number(r.data.prize)
-        dsx.variable.successUnit = 'coins'
-        dsx.variable.successOpen = true
-        state.refresh()
-        wallet.refresh()
-      } else {
-        dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : localize('No spin left today')
-      }
-      dsx.variable.spinning = false
     </action>
 
     <!-- ONE DISPATCH for every row tap. The event payload arrives FLAT, so the input names
@@ -608,10 +564,6 @@
     <style as="sectionTitle" fontSize="17" fontWeight="semibold" color="#FFFFFF" paddingTop="28" paddingBottom="12"/>
     <style as="rows" spacing="12" alignItems="stretch"/>
     <style as="footer" fontSize="15" color="#8E8E93" textAlign="center" paddingTop="40" lineSpacing="4"/>
-    <style as="spinCard" background="#1A1A1A" radius="16" paddingH="16" paddingV="16" spacing="14" alignItems="center"/>
-    <style as="wheelLabel" fontSize="15" fontWeight="bold" color="#FFFFFF" background="rgba(0,0,0,0.8)" paddingH="12" paddingV="6" radius="14"/>
-    <style as="spinBtn" height="47" radius="8" paddingH="24" alignItems="center" alignY="center"/>
-    <style as="spinTxt" fontSize="17" fontWeight="semibold" lineLimit="1"/>
     <!-- ── tab 2 ── -->
     <style as="ptsHero" height="200" alignItems="flex-start" gradient="rgba(255,44,85,0.30)|rgba(106,42,122,0.20)|rgba(14,14,14,0)" gradientDir="vertical"/>
     <style as="ptsHeadRow" alignItems="center" paddingTop="12"/>
@@ -682,7 +634,7 @@
             <vstack paddingTop="24" alignItems="stretch" visible-if="dsx.variable.phase == 'signedout'">
               <LinkPrompt icon="gift.fill"
                           title="Rewards belong to an account"
-                          note="Streaks, spins and coins need somewhere to land. Sign in and start earning — nothing here costs money."/>
+                          note="Streaks and coins need somewhere to land. Sign in and start earning — nothing here costs money."/>
             </vstack>
             <vstack paddingTop="16" spacing="14" alignItems="stretch" visible-if="dsx.variable.phase == 'loading'">
               <Skeleton height="78" radius="12"/>
@@ -752,28 +704,8 @@
                 <RewardRow task="share" kind="share" icon="square.and.arrow.up" pill="go" on:act="dsx.action.rowTap()"/>
               </vstack>
 
-              <!-- Spin the wheel: a server-owned grant already, kept as a card after the list -->
-              <text value="Spin the wheel" class="sectionTitle"/>
-              <vstack class="spinCard">
-                <zstack>
-                  <stack style="{{ dsx.variable.wheelFx }}"/>
-                  <!-- explicit z: the wheel carries a transform, and a transformed sibling
-                       paints ABOVE later plain siblings (AGENTS.md) -->
-                  <vstack zIndex="1" style="z-index: 1; width: 132px; height: 132px; align-items: center; justify-content: center">
-                    <text value="{{ dsx.variable.wheelResult != '' ? dsx.variable.wheelResult : dsx.variable.spinRange }}"
-                          class="wheelLabel"
-                          a11yLabel="{{ dsx.variable.wheelResult != '' ? 'You won ' + dsx.variable.wheelResult + ' bonus coins' : 'Prizes from ' + dsx.variable.spinRange + ' coins' }}"/>
-                  </vstack>
-                </zstack>
-                <hstack class="spinBtn" style="width: 100%; justify-content: center"
-                        background="{{ dsx.variable.canSpin ? accent() : 'rgba(255,44,85,0.35)' }}"
-                        on:tap="dsx.action.spin()" a11yGroup="true" a11yTrait="button"
-                        a11yLabel="{{ dsx.variable.canSpin ? 'Spin the wheel, one free spin today' : 'No spin left today' }}">
-                  <text value="Spinning…" class="spinTxt" color="{{ ink() }}" visible-if="dsx.variable.spinning"/>
-                  <text value="Spin — 1 free today" class="spinTxt" color="{{ ink() }}" visible-if="dsx.variable.spinning == false &amp;&amp; dsx.variable.canSpin"/>
-                  <text value="No spin left today" class="spinTxt" color="{{ ink() }}" visible-if="dsx.variable.spinning == false &amp;&amp; dsx.variable.canSpin == false"/>
-                </hstack>
-              </vstack>
+              <!-- NO WHEEL. The founder's rule (2026-09-02): no reference app spins one, so the coins
+                   tab ends with the task list — the industry standard, nothing invented after it. -->
 
               <!-- App Store 3.1.1 wording for a reward promotion -->
               <text value="This activity is not affiliated with Apple Inc." class="footer"/>

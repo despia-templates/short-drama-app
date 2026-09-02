@@ -303,9 +303,9 @@ All numbers in pt, read off 1206×2622 iPhone captures (÷3). Ours keeps the Ree
   7. Share with friends — "Help us grow" — Go → the share sheet; no coins, same reason.
 - Footer: "This activity is not affiliated with Apple Inc." 15 ink-3 centred, 40 below the last row
   (App Store 3.1.1 wording for reward promotions); the tab bar clearance below.
-- The existing Watch Mission card, ad card and Spin the wheel: fold the Watch Mission into rows 3–4
-  (keep the mission ring/state on the player); keep Spin the wheel as a card AFTER the task list
-  ("Spin the wheel" 17 semibold, the wheel as today) — it is a server-owned grant already.
+- The existing Watch Mission card and ad card: fold the Watch Mission into rows 3–4 (keep the
+  mission ring/state on the player). NO WHEEL — the founder's rule (2026-09-02): no reference
+  app spins one, so the coins tab ends with the task list and nothing is invented after it.
 
 ### 9.4 · "Member Points" (tab 2)
 - Hero: "Daily Rewards" 24 bold ink at x 16, y 118; right: a points pill "⚡ {points} ›" (18 semibold,

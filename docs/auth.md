@@ -393,7 +393,7 @@ that cannot work. The exact thing that closes it:
   if (confirm !== 'DELETE') { throw { reason: 'invalid', message: 'confirmation required' } }
   // every entity below is ownership="owner", so `list` is already caller-scoped and
   // `delete` can only reach the caller's own rows — RLS is the guard, not this code.
-  // wallet · ledger · unlock · order · progress · favorite · checkin · spin ·
+  // wallet · ledger · unlock · order · progress · favorite · checkin ·
   // taskclaim · adview · comment
   //   (comment is ownership="public-read" with an owner-write policy —
   //    server/policies.local.sql:34-36 — so filter by the caller explicitly.)
@@ -474,7 +474,7 @@ for PLAN.md §6 as the SSR-consts ask.
 ## 9 · The two authorities, and where they gate
 
 - **Viewer (no role):** owner-scoped CRUD through RLS (`wallet`, `unlock`, `ledger`,
-  `progress`, `favorite`, `checkin`, `spin`, `taskclaim`, `adview`, `comment` writes)
+  `progress`, `favorite`, `checkin`, `taskclaim`, `adview`, `comment` writes)
   plus the public reads. A viewer can never read another viewer's rows — that is
   Postgres RLS, not application code.
 - **Operator (the service role):** the declared admin actions (`server/admin.dsx`)

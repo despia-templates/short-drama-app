@@ -1,4 +1,4 @@
-<!-- engage.dsx — the rewards loop: the daily check-in, the wheel, the task catalogue of
+<!-- engage.dsx — the rewards loop: the daily check-in, the task catalogue of
      docs/design/reference-ui-spec.md §9.3 (sign-in · push · rewarded ad · the watch mission
      rows · invite), the member-points lane of §9.4 (the Daily Draw, Watch & Earn, redeem)
      and the watch-mission ledger they all read.
@@ -15,7 +15,7 @@
      Each grant below used to read "did I already do this today?" and then write. A
      declared action has no transaction seam (PLAN.md §6.38) and the emitter has no
      `unique` word for `<index>` (PLAN.md §6.83), so two requests that arrived together
-     both read "no" and both granted: two check-ins, two spins, two claims of the same
+     both read "no" and both granted: two check-ins, two claims of the same
      task, all on the same day. The read is kept — it produces the friendly message — but
      the AUTHORITY is now the unique index in server/policies.local.sql, and the pattern is
      the same in all four: WRITE THE MARKER FIRST, check `.ok`, and only grant coins if the
@@ -28,14 +28,11 @@
      it would expire money someone paid for. The column is gone from the entity, not merely
      unread. See the compliance note at the top of wallet.dsx.
 
-     ── THE SPIN IS FREE, AND THAT IS A COMPLIANCE RULE ──────────────────────────────────
-     `spinWheel` costs nothing: one free spin per day, granted, never purchased. That is
-     what keeps it outside App Store 3.1.1's loot-box rule — a randomised reward obtainable
-     with PURCHASED currency requires published odds before purchase and forces an 18+
-     rating in Brazil and 16+ in Australia. If a future "buy another spin" ever lands here,
-     that whole regime lands with it. The odds are published in `rewardsState` anyway
-     (`spinPrizes` plus `spinOdds`), because a viewer is entitled to know them whether or
-     not Apple compels it. -->
+     ── THERE IS NO WHEEL (founder, 2026-09-02) ─────────────────────────────────
+     No reference app spins one, so the loop is the check-in, the task catalogue and the
+     rewarded ad — every grant a server fact, none of them random. A randomised reward
+     paid in purchased currency would also be App Store 3.1.1 loot-box territory (published
+     odds, 18+ in Brazil, 16+ in Australia); the template never gets near it. -->
 
 <server>
   <head>
@@ -45,17 +42,12 @@
       <index on="day"/>
     </entity>
 
-    <entity as="spin" ownership="owner">
-      <field as="day" type="text"/>
-      <field as="prize" type="integer"/>
-    </entity>
-
     <entity as="taskclaim" ownership="owner">
       <field as="day" type="text"/>
       <field as="task" type="text"/>
     </entity>
 
-    <!-- Rewarded ads are the third earn lane beside check-in and the wheel. The CAP is a
+    <!-- Rewarded ads are the second earn lane beside the check-in. The CAP is a
          server fact (the category standard is a hard daily ceiling), and every grant is a
          checked ledger write — the client only ever ASKS. On web the lane is honestly
          disabled (no AdMob); the native apps verify the SSV callback before calling this. -->
@@ -343,9 +335,6 @@
         days.push({ id: 'd' + i, i: i, n: i + 1, reward: curve[i], state: state, claimed: i < todayIdx || (i == todayIdx && checkedToday), today: i == todayIdx })
       }
 
-      const spins = await dsx.module.data.spin.list({ filters: { day: today }, limit: 5 })
-      const spinsToday = spins.ok ? spins.data.length : 0
-
       const ads = await dsx.module.data.adview.list({ filters: { day: today }, limit: 40 })
       const adsToday = ads.ok ? ads.data.length : 0
       const AD_CAP = 15
@@ -399,8 +388,6 @@
         }
       }
 
-      const spinPrizes = [10, 15, 20, 25, 40, 60, 80, 100]
-      const spinOdds = spinPrizes.map(p => ({ prize: p, chance: Math.round(10000 / spinPrizes.length) / 100 }))
       // THE ROWS, in the order the reference draws them (spec 9.3). `kind` names the row
       // recipe the client renders; every number is this document own. `claimed` means the
       // grant has LANDED — the client never has a button that could make it land.
@@ -414,8 +401,6 @@
       ]
       return {
         today: today, checkedToday: checkedToday, streak: streak, curve: curve, days: days, nextReward: nextReward,
-        freeSpinLeft: spinsToday === 0,
-        spinPrizes: spinPrizes, spinOdds: spinOdds, spinCost: 0,
         adsToday: adsToday, adCap: AD_CAP, adReward: AD_REWARD, adsLeft: Math.max(0, AD_CAP - adsToday),
         inviteCode: code, invitePending: pending, inviteReward: INVITE_REWARD, inviteDaily: INVITE_DAILY,
         tasks: tasks
@@ -456,35 +441,6 @@
       const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + reward } })
       if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
       return { streak: streak, reward: reward }
-    </action>
-
-    <action as="spinWheel">
-      const today = new Date().toISOString().slice(0, 10)
-      const spins = await dsx.module.data.spin.list({ filters: { day: today }, limit: 5 })
-      if (spins.ok && spins.data.length > 0) { throw { reason: 'conflict', message: 'no free spin left today' } }
-      const prizes = [10, 15, 20, 25, 40, 60, 80, 100]
-      const prize = prizes[Math.floor(Math.random() * prizes.length)]
-      // THE MARKER IS THE LOCK — `unique (owner_id, day)` on dsx_spin. The wheel is FREE
-      // (no coin is debited anywhere in this action, deliberately — see the header
-      // loot-box note), so the only thing to protect is the once-a-day grant.
-      const marked = await dsx.module.data.spin.create({ day: today, prize: prize })
-      if (!marked.ok) { throw { reason: 'conflict', message: 'no free spin left today' } }
-
-      const mine = await dsx.module.data.wallet.list({ limit: 1 })
-      let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
-      if (w == null) {
-        const made = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
-        if (made.ok) { w = made.data } else {
-          const again = await dsx.module.data.wallet.list({ limit: 1 })
-          w = again.ok && again.data.length > 0 ? again.data[0] : null
-        }
-      }
-      if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
-      const led = await dsx.module.data.ledger.create({ kind: 'bonus', amount: prize, source: 'spin', ref: today })
-      if (!led.ok) { throw { reason: 'unavailable', message: 'the grant could not be recorded' } }
-      const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + prize } })
-      if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
-      return { prize: prize, prizes: prizes, cost: 0 }
     </action>
 
     <!-- THE ONE TASK A TAP CAN CLAIM, and it claims a fact the INVITEE wrote. Every other row
@@ -729,8 +685,8 @@
     </action>
 
     <!-- THE DAILY DRAW: a random 5–50 points, once a day, members only. The draw is FREE and
-         nothing sells one, which keeps it outside App Store 3.1.1 loot-box regime the same way
-         the wheel is (see the header). The memberday row is the lock AND the timeline. -->
+         nothing sells one, which keeps it outside the App Store 3.1.1 loot-box regime (see the
+         header). The memberday row is the lock AND the timeline. -->
     <action as="dailyDraw">
       const today = new Date().toISOString().slice(0, 10)
       const now = Date.now()
@@ -817,7 +773,7 @@
        in a retry loop can run that thousands of times a minute against the `data:writes`
        and `requests` ceilings. The numbers are "every legitimate retry, and nothing like a
        loop":
-         · checkin/spin/draw 10/h — genuinely once a day; ten covers a flaky network.
+         · checkin/draw 10/h — genuinely once a day; ten covers a flaky network.
          · task              30/h — the invite sweep is RESUMABLE (twelve invitees a call), so
                                     the ceiling follows the sweep, not the intent (AGENTS.md).
          · ad                30/h — the cap is fifteen a day, so thirty admits a retry per grant.
@@ -827,7 +783,6 @@
          · state/points     120/m — the Rewards screen refetches on mount (§6.30). -->
   <route method="GET"  path="/rewards/state"       action="rewardsState"   auth="required" rate="120/m"/>
   <route method="POST" path="/rewards/checkin"     action="checkinNow"     auth="required" rate="10/h"/>
-  <route method="POST" path="/rewards/spin"        action="spinWheel"      auth="required" rate="10/h"/>
   <route method="POST" path="/rewards/task"        action="claimTask"      auth="required" rate="30/h"/>
   <route method="POST" path="/rewards/ad"          action="grantAdReward"  auth="required" rate="30/h"/>
   <route method="POST" path="/rewards/referral"    action="attachReferral" auth="required" rate="10/h"/>

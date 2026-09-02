@@ -58,7 +58,7 @@
     <entity as="ledger" ownership="owner">
       <field as="kind" type="text"/>       <!-- coin | bonus | points -->
       <field as="amount" type="integer"/>  <!-- signed -->
-      <field as="source" type="text"/>     <!-- checkin | task | spin | ad | watch | pack | vip | unlock | merge | signin | push | invite | draw | pts_watch30 | pts_push | redeem -->
+      <field as="source" type="text"/>     <!-- checkin | task | ad | watch | pack | vip | unlock | merge | signin | push | invite | draw | pts_watch30 | pts_push | redeem -->
       <!-- `ref` is the thing the movement is ABOUT: an episode id for an unlock, a day for a
            check-in, and — since the settle rewrite — the ORDER ID for a pack/vip grant. That
            last one is load-bearing: policies.local.sql puts a partial unique index on

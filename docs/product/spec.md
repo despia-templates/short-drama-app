@@ -68,7 +68,7 @@ Unlock / Get-Coins capsules with ad counter, auto-unlock toggle, VIP slab) and s
 ### Rewards
 Check-in calendar (7-day escalation, day-30 milestone; restore-streak via ad, 1/month) ·
 task list (one-shot + daily; claim buttons) · rewarded-ad slots ("+8 coins", counter 0/10) ·
-spin wheel (free spin badge; prize table rendered from server config). Every grant animates
+Every grant animates
 into the wallet pill (bonus coins, 7-day expiry noted inline).
 
 ### My List — Continue Watching · Favorites · Downloads (per-show groups, storage meter,
@@ -88,7 +88,6 @@ sign-in), support, legal.
 | Bonus coins | earned currency; spend-first; expire 7d |
 | Rewarded ad | +8 bonus coins; 10/day cap; 3-ads-per-unlock counter |
 | Check-in | 5·10·15·20·25·30·60; day-30 = 200 |
-| Spin wheel | 1 free/day; prizes 10–100 bonus + 24h-VIP rare; odds server-declared |
 | VIP | weekly 7.99 · annual 129.99; whole catalogue, zero coin walls, ad-free |
 | Premiere drip | 5 eps/day at 20:00 local for launching shows |
 

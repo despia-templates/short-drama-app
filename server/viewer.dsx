@@ -285,20 +285,7 @@
         }
       } else { done = false }
 
-      if (budget > 0) {
-        const pg_spin = await dsx.module.data.spin.list({ limit: 100 })
-        if (pg_spin.ok && pg_spin.data.length > 0) {
-          done = false
-          let i_spin = 0
-          while (i_spin < pg_spin.data.length && budget > 0) {
-            const g_spin = await dsx.module.data.spin.delete({ id: pg_spin.data[i_spin].id })
-            if (g_spin.ok) { removed = removed + 1 }
-            else { stuck = stuck.concat(['spin']); i_spin = pg_spin.data.length }
-            budget = budget - 1
-            i_spin = i_spin + 1
-          }
-        }
-      } else { done = false }
+ else { done = false }
 
       if (budget > 0) {
         const pg_taskclaim = await dsx.module.data.taskclaim.list({ limit: 100 })

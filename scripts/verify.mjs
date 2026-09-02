@@ -62,7 +62,7 @@ const check = (name, cond, detail) => (cond ? ok(name) : bad(name, detail));
 // ── THE CALLERS ────────────────────────────────────────────────────────────────────────
 // A FRESH SUBJECT PER RUN, minted here rather than read from .dev-session.json. Three
 // reasons, all learned the hard way while writing these tests against the shared demo
-// viewer: the daily guards (check-in, spin) are once-per-DAY, so a second run the same day
+// viewer: the daily guards (check-in) are once-per-DAY, so a second run the same day
 // would assert against a viewer who had already used them; the unlock tests need an account
 // whose entitlements are known; and a gate must never mutate the identity a developer is
 // looking at in the browser. `sub` MUST be a UUID — owner RLS stores `owner_id uuid` and
@@ -496,9 +496,6 @@ console.log("\nconcurrency");
   check("the loser is told why", both.some((r) => r.status === 409 || r.body?.reason === "conflict"),
     `got ${JSON.stringify(both.map((r) => r.body?.reason))} — a refused grant must be a declared rejection the UI can render`);
 
-  const spins = await Promise.all([POST("/rewards/spin", viewer), POST("/rewards/spin", viewer)].map(async (p) => asJson(await p)));
-  check("two simultaneous spins grant exactly once", spins.filter((r) => r.status === 200).length === 1,
-    `${spins.filter((r) => r.status === 200).length} of 2 succeeded — unique (owner_id, day) on dsx_spin`);
 
   const favs = await Promise.all([POST("/viewer/favorite", viewer, { show: detail.show.id }), POST("/viewer/favorite", viewer, { show: detail.show.id })].map(async (p) => asJson(await p)));
   const rows = await sql("select count(*)::int as n from dsx_favorite where owner_id = $1 and show = $2", [viewerSub, detail.show.id]);
@@ -1631,7 +1628,6 @@ if (pool !== null) {
   await sql("delete from dsx_favorite where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_checkin where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_watchday where owner_id = $1", [viewerSub]);
-  await sql("delete from dsx_spin where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_order where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_wallet where owner_id = $1", [viewerSub]);
   await pool.end();

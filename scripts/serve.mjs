@@ -304,7 +304,7 @@ const mergeDeviceIntoAccount = async (deviceViewer, accountSub) => {
     // the device's own per-day markers and rewards rows retire with it (its ledger went above);
     // the invite tables are NOT here on purpose — a proof the device wrote stays readable by
     // its inviter, and a code the device owned is worthless once the wallet is gone
-    for (const t of ["dsx_checkin", "dsx_spin", "dsx_taskclaim", "dsx_adview", "dsx_playticket", "dsx_watchday", "dsx_memberday", "dsx_redeem", "dsx_pushtoken", "dsx_referralcredit"]) {
+    for (const t of ["dsx_checkin", "dsx_taskclaim", "dsx_adview", "dsx_playticket", "dsx_watchday", "dsx_memberday", "dsx_redeem", "dsx_pushtoken", "dsx_referralcredit"]) {
       await client.query(`delete from ${t} where owner_id=$1::uuid`, [deviceViewer]);
     }
     await client.query("commit");

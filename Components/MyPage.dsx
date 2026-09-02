@@ -103,7 +103,6 @@
     </formula>
     <formula as="rowLabel" src="item.source">
       if (src == 'checkin') { return 'Daily check-in' }
-      if (src == 'spin') { return 'Spin the wheel' }
       if (src == 'task') { return 'Task reward' }
       if (src == 'ad') { return 'Rewarded ad' }
       if (src == 'watch') { return 'Watch Mission' }
