@@ -28,7 +28,11 @@
      AGENTS.md). "(Completed)" after the last chip is a catalogue fact this template does not
      carry — every demo show is complete and none says so — so the chip prints the range
      alone rather than a word no server sent. -->
-<vstack alignItems="stretch" spacing="0">
+<!-- THE GUTTER, PER LANE: the web and iOS sheets inset their content 16 a side on their own
+     (measured — web 16, iOS ~16 inside its card), the Android sheet insets NOTHING (measured:
+     the first cell sat at x=0), so the 16 is paid here on Android only, with the documented
+     platform suffix, and the parity gap is on the ledger (PLAN.md §6.147). -->
+<vstack alignItems="stretch" spacing="0" paddingH:android="16">
   <head>
     <attribute as="show" default="null"/>          <!-- the show dict: title, titleArt, genre, tags, synopsis -->
     <attribute as="episodes" default="[]"/>        <!-- the episode rows: id, idx, free, price -->
