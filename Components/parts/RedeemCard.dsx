@@ -10,7 +10,7 @@
         a11yLabel="{{ dsx.attribute.days }}-day membership extension for {{ dsx.attribute.points }} points{{ dsx.variable.can ? '' : ', not enough points' }}">
   <head>
     <!-- `card`, NOT `id`: an `id=` attribute never reaches a component on the native lanes
-         (the RewardRow note, PLAN.md §6.185) — the tap would send `{ id: '' }` -->
+         (the RewardRow note, PLAN.md §6.192) — the tap would send `{ id: '' }` -->
     <attribute as="card" default="''"/>
     <attribute as="days" default="1"/>
     <attribute as="points" default="500"/>

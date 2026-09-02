@@ -26,7 +26,7 @@
          (Stack.swift's mount pass skips it — "selector / identity, not attributes") and only
          the web hands it to the component, so an attribute named `id` reads '' on iOS and every
          tap raised `{ id: '' }` into the host — no branch matched, nothing happened, no error
-         (PLAN.md §6.185). The event payload key stays `id`; that is a dict key, not an
+         (PLAN.md §6.192). The event payload key stays `id`; that is a dict key, not an
          attribute, and the host reads it bare. -->
     <attribute as="task" default="''"/>
     <attribute as="kind" default="''"/>         <!-- signin | push | ad | watch | invite | share | draw | watch30 | pushpts -->
