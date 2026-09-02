@@ -3439,3 +3439,48 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      `api.bindText` and never the seam, while `close=`'s own aria-label already goes through
      it. Corpus-pinnable in `Conformance/strings/cases.json`: one sheet, one translated
      title, one absent, asserting the miss is identity.
+
+169. **ONE `toLocaleDateString()` RENDERED THREE WAYS, BECAUSE BOTH NATIVES PICKED A STYLE WHERE
+     JAVASCRIPT HAS NONE** (found 2026-09-02 on the Notifications contact sheet, fixed upstream
+     the same day). `Components/parts/Theme.dsx` `shortDate` writes `new Date(iso).toLocaleDateString(loc)`,
+     and the same row read **`8/29/2026` on the web, `29 Aug 2026` on iOS, `Aug 29, 2026` on
+     Android**. The web delegates to the browser's `Intl`; iOS set `DateFormatter.dateStyle =
+     .medium` and Android `DateFormat.getDateInstance(MEDIUM)` — a platform style, which is not
+     what the method means.
+
+     **THE LAW (ECMA-402).** `toLocaleDateString / toLocaleTimeString / toLocaleString(locales,
+     options)` and `Intl.DateTimeFormat(locales, options).format(d)`: the locale argument picks the
+     tag and nothing else. No component option → the method's own numeric defaults (a date method
+     year+month+day = the ICU skeleton `yMd`: en-US `8/29/2026`, en-GB `29/08/2026`, de-DE
+     `29.8.2026`, ja-JP `2026/8/29`; a time method hour+minute+second = `jms`; `toLocaleString`
+     both, joined by the locale's short glue). Component options → an ICU skeleton (numeric = one
+     letter, 2-digit = two, short/long/narrow = 3/4/5) resolved by the locale's
+     DateTimePatternGenerator with `MATCH_HOUR_FIELD_LENGTH`. `dateStyle` / `timeStyle` — and only
+     those — select the locale's fixed styles. ToDateTimeOptions' required/defaults keep a date
+     method carrying a date even when the author asked for the hour alone.
+
+     **THE FIX (framework, three lanes).** iOS `JSELibrary.swift`: the three methods and
+     `Intl.DateTimeFormat.format` share one `formatDate` — `dateSkeleton` builds the skeleton,
+     `setLocalizedDateFormatFromTemplate` resolves it (Foundation resolves with ICU's
+     `MATCH_NO_OPTIONS`, so `widenHour` supplies the 2-digit hour ECMA-402 asks for), styles only
+     when the options name one, `timeZone` / `hour12` / `hourCycle` honoured. Android `:core`
+     `DateFormats.kt`: the same request builder, then a SEAM — `DSXAndroidBoot` installs
+     `android.icu`'s DateTimePatternGenerator (the engine V8 formats with) for the phone, and the
+     pure-JVM lane (unit tests, desktop) reaches JDK 19's CLDR door
+     `DateTimeFormatterBuilder.getLocalizedDateTimePattern` by reflection (absent on ART) and
+     applies ICU's width rule itself, because the JDK rejects `yyMMdd` and quietly narrows
+     `MMMM`/`EEEE`. Bytes are pinned as V8 prints them: Apple's and the JDK's ICU data carry CLDR
+     42's U+202F before AM/PM, V8 carries Chromium's revert, so both natives fold U+202F to U+0020
+     in these methods (Safari's own `Intl` still prints U+202F — that is the browser, not JSE).
+
+     **THE CORPUS.** `OpenSource/Conformance/jse/intl-001.json` — 46 rows, one instant
+     (`2026-08-29T15:07:09Z`), en-US / en-GB / de-DE / ja-JP, `timeZone: 'UTC'` wherever the day
+     or hour could roll, two local-zone rows at 10:30Z. Before: web 46/46 green (the reference),
+     iOS 38 red, Android 39 red. After: 46/46 on all three (Swift record lane byte-identical,
+     Kotlin `ConformanceTest` 414/414, web 827/827). Said plainly, not pinned: the long/full
+     date+time glue (`'at'` / `'um'`) and the medium glue for an abbreviated month with a time,
+     which V8, Apple's ICU and the JDK's CLDR vintages spell differently (Apple: `Aug 29, 2026 at
+     3:07 PM`, V8: `Aug 29, 2026, 3:07 PM`); `era` / `timeZoneName` / `fractionalSecondDigits` /
+     `dayPeriod`, which no native spells; `hourCycle` h11/h24, which only differ at noon and
+     midnight and which Foundation's ICU does not substitute on request. The template changes
+     nothing: `shortDate` was already the right spelling, and the framework now honours it.
