@@ -134,6 +134,19 @@ for (const row of existingShows) {
   retired += 1;
 }
 
+// THE DEMO VIEWER'S REWARDS STATE, through the viewer routes (never the database): one
+// check-in today, so the Rewards page opens on a claimed cell and a real streak rather than
+// seven empty cells. A 409 is the "already checked in" answer on a re-run and is fine.
+{
+  const VIEWER = session.viewer.token;
+  const res = await fetch(`${BASE}/rewards/checkin`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${VIEWER}`, "content-type": "application/json" },
+    body: "{}",
+  });
+  console.log(`[seed] demo viewer check-in → ${res.status}${res.status === 409 ? " (already today)" : ""}`);
+}
+
 const stats = await call("/internal/admin/stats", {});
 console.log(
   `[seed] ${created} created · ${updated} updated · ${retired} retired · ${episodesWritten} episode rows`,

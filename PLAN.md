@@ -3819,3 +3819,39 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      MountedLifecycleConformanceTest's copy of the arm seeds the same. Measured after on
      DSX_API36_Phone_Final: the ring paints the thin arc of the true fraction on the first
      and the second mount (`and3-final-watch*.png`).
+
+182. **THE FOLLOW AND SHARE ROWS OF THE INDUSTRY-STANDARD REWARDS PAGE GRANT NOTHING — a
+     product-law entry, filed where the spec asked for it** (docs/design/reference-ui-spec.md
+     §9.3 rows 6–7, 2026-09-02). The founder's reference set pays "+20" for "Follow us on
+     Facebook / YouTube / TikTok / Instagram" and for "Share with friends". Neither event can be
+     verified by this server: nothing tells a backend that a viewer pressed Follow on another
+     company's page, and a share sheet reports at most that it was opened. Paying either is a
+     client-originated grant — the exact shape the monetisation law forbids ("a client-trusted
+     grant of any kind will be farmed within a week of launch"). The rows ship in the
+     reference's position and recipe (`Components/parts/FollowRow.dsx`, the share row in
+     `Components/Rewards.dsx`), read "Help us grow", and grant nothing; the four follow rows
+     render only when App.json `consts.follow*Url` is set (empty by default — a placeholder
+     URL is a broken promise to a reviewer), the local dsx.config.json overlay points the demo
+     at the networks' front pages.
+
+     The same law decided the rest of the catalogue, and each row says how its grant is
+     verified (server/engage.dsx, the task-catalogue note): sign-in is written by the PROVIDER
+     inside the device-link merge (scripts/serve.mjs), because a declared action can neither
+     read the caller's `kind` claim nor be trusted with "I signed in"; push is paid when a
+     TOKEN lands (`POST /viewer/push`), never for the OS prompt (App Store 5.1.2(i)); the two
+     watch rows read the mission ledger; the invite grant hangs on the invitee's first
+     server-verified minute — the invitee's own watchTick writes an all-read proof row and
+     the inviter's claim sweeps proofs into credits, bounded and resumable. Two all-read
+     tables (`invitecode`, `referralproof`) exist only because a declared action cannot write
+     another viewer's wallet — the same missing ownership word as §6.25, and the ask stands.
+
+     Three further divergences from §9, each named in the report rather than absorbed:
+     (a) the two watch rows are "5 mins +10" and "10 mins +15", the ledger's real first two
+     milestones, where the reference draws "5 mins +10" and "15 mins +20" — §3c pins the
+     ladder at 5·10·20·30 (= 70/day) and the same copy is in thirteen locales, so a
+     15-minute row would advertise a grant the ledger never makes; (b) the Rules sheet's
+     third and fourth rules say what the backend does (bonus first, then purchased coins,
+     nothing expires — App Store 3.1.1 — and a reset at 00:00 UTC, the day key every marker
+     uses) instead of the reference's "earliest-expiring bonus" and "the viewer's time zone";
+     (c) the page is a tab root (§8, §9.0) and draws no back chevron — the reference's Rewards
+     is a pushed page, and a chevron that pops nothing is a control that does nothing.
