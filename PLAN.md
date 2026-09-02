@@ -3372,3 +3372,31 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      Stripe + Store + RevenueCat under a local `despia-entitlement.json` (`g-build-B.log` exit 0,
      40 MB apk) that boots with `stripe` in the registry (`g-out/B-sysout.logcat`). Still upstream
      and NOT this pass: the iOS pod pin `StripePaymentSheet 26.7.0` that trunk cannot resolve.
+
+167. **ON ANDROID A LAYER THAT CARRIES A `position: absolute` CHILD LOST ITS zIndex AGAINST ITS
+     SIBLINGS, AND ITS OWN SCRIM PAINTED OVER THAT CHILD** (found 2026-09-02 while re-measuring the
+     player under the ReelShort accent; engine fix in the Android renderer, dev — see the commit).
+     The locked stage is two sibling layers over the pager: `chromeLayer` (zIndex 2, declared
+     first: back, `EP.n`, the Watch Mission ring, the rail) and `lockedLayer` (zIndex 3, declared
+     after it: the scrim, the paywall, and the ✕ close spelled `position: absolute; top…; right:
+     14px; z-index: 1`). iOS and the web paint what the numbers say — the paywall over the chrome,
+     the ✕ on top. Android painted the ring OVER the ✕ and dimmed the ✕ under its own scrim, so
+     the close control sat inside the ring's 48pt hit target and a tap there opened the mission
+     sheet instead of leaving the wall. Isolated with a seven-row probe on the API 36 emulator:
+     plain siblings, `visible-if` on both, the anim + opacity + backdrop shape and the inline
+     attribute all ordered correctly — only a host WITH an absolute child inverted, with the
+     child hidden. Cause: the render lane detaches absolute children and paints them in a
+     wrapper Box over the host's box; the host's own styled chain carried `Modifier.zIndex`
+     INSIDE that wrapper, so the parent stack ordered the wrapper at 0 (any sibling declaring a
+     zIndex won), and inside the wrapper the host (3) outranked its layers (0). Fix: the wrapper
+     takes the host's zIndex, and each layer takes the host's zIndex plus its own `z-index`
+     (CSS: out-of-flow children paint after the fill and the flow, inside the stacking context
+     the host opens); ties keep document order. Rule 5 of `StackAbsolutePlane.kt` now says it.
+     Pinned by `AbsolutePlaneZOrderInstrumentedTest` (render lane, captures the pixels): red at
+     HEAD — the absolute child read pure `#2C7BFF`, the earlier sibling's box — and green with
+     the fix. Device after the fix: the probe's rows 6–7 paint scrim-over-blue with the white
+     child on top, and the player's ✕ reads `(236, 236, 236)` above the ring where it read
+     `(131, 131, 131)` under it. The template changes nothing — its markup was right on every
+     lane. What stays different on Android and is named already: the paywall's
+     `backdrop-filter: blur(22px)` is the material ladder's degradation (§6.64b), so the chrome
+     under the wall shows faintly through the 45% scrim there where iOS blurs it away.
