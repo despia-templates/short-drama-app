@@ -4314,3 +4314,20 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      Home, Rewards, Store, VIP body, Browse and the Coming Soon rail render on Android on the
      new kernel (sheets), and every Android capture in this pass came off an emulator with
      ~575 MB free — a cold start took 30 s+, so a fast screenshot shows the splash, not a bug.
+
+195. **THE WEB IMAGE FADE CLOBBERED EVERY DECLARED OPACITY — FIXED UPSTREAM 74826642** (2026-09-02,
+     the full-route sweep after the finalize pass; web = Playwright 402×874 against the local
+     origin, iOS = iPhone 17 Pro simulator on kernel b3acbf37). `<style as="heroArt" width="168"
+     height="84" opacity="0.5"/>` on Rewards' hero compiled to `opacity: 0.5` in the SSR sheet
+     (`[data-dsx-owner="Rewards"]:is(.heroArt)`), and the `<img>` carried an inline
+     `style="object-fit: contain; object-position: 50% 50%; opacity: 1"` written by the web
+     image adapter's load fade (`packages/dom/src/image.ts`, `startOpacity` and the load/error
+     listeners) — so the web painted the coins at full strength and iOS at 0.5, and no gate saw
+     it because the web is the reference and the reference was wrong. Every `<image>` on the web
+     had it: an author opacity on a class or on the element was overwritten the moment the
+     bytes landed. Fixed upstream: the loading state is the `data-dsx-loading` attribute plus one
+     sheet rule (`.dsx-image[data-dsx-loading="true"] { opacity: 0 !important }`), the adapter
+     never writes `opacity` (removed on load, error and a memory hit; set on a recycling clear),
+     the fade's transition stays inline. Measured: computed opacity on `/rewards` 1 → 0.5, the
+     iOS value. Pinned by `packages/dom/test/image-dom.test.ts` (the six inline-style assertions
+     now follow the attribute, plus "a declared opacity survives the fade").
