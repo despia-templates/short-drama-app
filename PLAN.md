@@ -2993,3 +2993,18 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      reads /dev-session.json). THE ASK: either `despia remove` learns path-declared packages, or
      the export takes a `--without <packages>` word for a verification build; and the template
      documents which of its packages are premium so a clone knows before its first export.
+
+151. **THE ANDROID PLAYER CRASHED ON ITS FIRST HLS MASTER: THE EXPORT SHIPPED EXOPLAYER WITHOUT ITS
+     HLS MODULE** (found 2026-09-02 on the Pixel 10 Pro emulator; fixed upstream the same hour —
+     Foundation's managed Gradle dependencies now name `androidx.media3:media3-exoplayer-hls`
+     beside `media3-exoplayer` and `media3-ui` at the pinned 1.9.0). `DefaultMediaSourceFactory`
+     loads `HlsMediaSource$Factory` by REFLECTION the moment a `<video>` opens an `.m3u8` src, and
+     throws `IllegalStateException(ClassNotFoundException)` when the artifact is absent — a hard
+     crash inside `MediaPlayback.apply()`, not a degradation, and one no static gate can see: the
+     Kotlin compiles, the conformance runner is pure JVM, and every progressive MP4 the template
+     shipped before this pass never touched the class. The rule it leaves: a native lane's media
+     CONTAINER support is a build-time dependency, so a fixture that changes the demo's container
+     (gen-hls.mjs did) owes a device run on every lane before it is called done; and an
+     `IllegalStateException` from a media factory is the platform saying "module missing", which
+     `on:error` should carry rather than the process dying — filed as the follow-up for
+     MediaElements.kt (catch the factory's reflection failure and report it as a media error).
