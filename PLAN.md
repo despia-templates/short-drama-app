@@ -3047,3 +3047,129 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      UIKit's); StoreKit / Play sheets, the keyboard and the date wheels are platform-owned. Every
      `design: "system"` app is byte-identical to before.
 
+
+153. **NEITHER NATIVE EXPORT COULD PUT A CARD OUTSIDE THE APP: no extension target, no Glance
+     receiver, no App Group, no node registry, no widget type** (found 2026-09-02 building the
+     "Currently Watching" surface of spec §7; fixed upstream on `dev` — 4378df81, export.ts
+     "SNAPSHOT SURFACES"). Both framework lanes existed — `Core/Extensions/ActivityKit`
+     (`dsx.module.liveactivity.layout/start/update/end`, a LOCAL start, not push-only: the
+     OneSignal package is only the backend update channel) rendering a DSX `<activity>` document
+     in its `ActivityKitExtension`, and `Core/Widgets` (`dsx.module.widget.layout`) rendering a
+     layout in `ImageWidgetExtension` on iOS and a Glance receiver on Android — and both were
+     synthesized ONLY by `prepare_modules(.rb/_android.rb)` for Runtime.app. `dsx export ios`
+     vendored the module lanes into one app target and no `.appex`, so `liveactivity.start`
+     resolved `started: true` and nothing ever painted; the Android export named `androidManifest`
+     and `gradle.resources` as "uncarried" and shipped no receiver, and the Widgets kotlin lane
+     imported a `despia.registry.NodeCapabilities` nothing generated. Now: the iOS export reads
+     each folded package's `extensionTargets` and builds the target — its sources, its `runtime`
+     tiers' engine files (dsx_graph.rb's BOM, mirrored), `extraSources`, `capabilities.json`, an
+     asset catalog, the app's fonts + registry, a generated Info.plist and an entitlements file
+     carrying `group.<bundleId>.container`; the app target gets the group, the manifests'
+     `NSSupportsLiveActivities`, an "Embed Foundation Extensions" phase, a dependency per target,
+     and an extension's `spmProducts` link on the package reference the fold declared; an
+     extension's `sharedSources` count as the module's own declarations in the fold's refusal
+     cascade (measured: without that line ActivityKit's app lane was REFUSED for naming the
+     attributes type its own extension declares). The Android export carries receivers, resources
+     and dependencies through the manifest fold (772ddf58) and generates
+     `NodeCapabilities.generated.kt` (fail-closed) plus the widget type resources (§6.154). SPM
+     products are linked into the extension when the manifest declares them; `ImageWidget.swift`
+     compiles behind `#if canImport(SVGView)` regardless. Measured: `xcodebuild` of the exported
+     project BUILD SUCCEEDED with both `.appex` bundles under `PlugIns/`, each carrying `Fonts/`,
+     `DSXFontRegistry.json` and `capabilities.json`, and the app boots with `liveactivity` and
+     `widget` among its registered modules.
+
+154. **THE SNAPSHOT DIALECT COULD NOT DRAW THE CARD: no picture, no link, no app face, no ground,
+     no widget document, no name** (found 2026-09-02; fixed upstream on `dev` — 05cde3a8 +
+     6198e2b3, pinned by the new corpus `OpenSource/Conformance/live-surfaces/` — links · images ·
+     type · layouts, 96 rows, executed by `LiveSurfacesConformance.swift` in the Apple-free
+     `swift_conformance_run_test.rb` lane, red on a mutated row before green, and by the Kotlin
+     twin `LiveSurfacesConformanceTest`, red on six rows before its resolveLayout existed). What
+     StackLive rendered before: `<image symbol=>` (SF Symbols only, nothing on Android), text in
+     the platform face, no `href` anywhere, a `bg` on the root behind the platform's own container
+     material, and `layout` as a raw markup string pasted into a call. Now, on both lanes: (1)
+     `href` on any node — a relative path joins the app's OWN URL scheme (`/watch/x/1` →
+     `shortdrama://watch/x/1`, the inverse of `router/inbound.json`; an iOS extension reads the
+     scheme off the containing app's Info.plist, Android reads the `scheme` the export stamps into
+     App.json); the ROOT's href is the whole card's tap (`widgetURL`), a nested href a `Link`
+     where the family allows one. (2) `<image src= width= height= fit=>` renders a file already on
+     the device, and the module's new `images: { name: "https://…" }` argument fetches each
+     picture app-side (https only, ≤512px, into `dsx.snapshot/<surface>/<name>` in the shared
+     container) before the first frame and hands the layout the path as `dsx.variable.<name>` —
+     a widget process fetches nothing, so this is the only honest shape. (3) `weight` folds words
+     and the numeric 100…900 ramp to one class, and the text is set in the registry's `default`
+     face: the export ships the registry + faces into every extension and `StackLiveType` drives
+     a variable face's `wght`; on Android a Glance text can only name a system family
+     (`TextStyle.fontFamily` becomes a `TypefaceSpan(String)` in the launcher process —
+     decompiled from glance-appwidget 1.1.1) AND `TextView.setTextAppearance(int)` is not
+     remotable on API 36 (the launcher logs `can't use method with RemoteViews`), so the face
+     rides app-shipped per-class layouts (`res/layout/despia_live_text_<class>.xml` over
+     `res/font/inter.xml` + `DespiaLiveType_<class>` styles) the Glance backend inflates —
+     measured on the tablet emulator: the card in Inter on #0E0E10 under both device themes. (4)
+     the lockscreen / layout root's `bg` and `color` become the platform container's tint and
+     action-glyph colour (`activityBackgroundTint`, `containerBackground`, the Glance root box) —
+     the custom-UI law's one legal knob on each surface. (5) `<widget>` is a document root, the
+     `<activity>` grammar's twin (`StackWidgetDocument`): the first visual child is every
+     family's layout, `<small>/<medium>/<large>/<rectangular>/<circular>/<inline>` override per
+     family. (6) `layout` names a BUNDLED `.dsx` document — `Components/surfaces/NowPlaying*.dsx`
+     here, lint-checked and shipped byte-exact by both exports — so a template never pastes
+     markup into a call; `stale` seconds bound a Live Activity's freshness and `dismiss:
+     'immediate'` removes the card the moment an episode ends. The linter learned the dialect
+     too: a document rooted in `<activity>` / `<widget>` is censused against `facts.json`'s
+     snapshot tables (an attribute the surface drops in silence is an ERROR — the app's `style=`
+     habit was the first one caught), pinned by `Conformance/lint/cases/web/snapshot-dialect`.
+     TEMPLATE RULE: a snapshot document carries literal colours as checked mirrors of Theme.dsx
+     (no JSE runs there) and no `<head>` inside a bare layout (every child of a bare layout
+     renders); the surface is published from ONE part, `Components/parts/NowPlayingSurface.dsx`,
+     on episode boundaries and pause/resume only.
+
+155. **`href` WAS MISSING FROM THE ELEMENT CENSUS, so every card, row and plain-text link in this
+     app was a lint ERROR under the dev CLI** (found 2026-09-02 when `dsx export` refused the
+     project with 44 errors in 34 files: `<vstack> href=: not an attribute this element honours
+     — did you mean ref=?`; fixed upstream in 4378df81). The runtime honours `href` on every
+     element (Stack.swift's tap plane, the web's WIRING_ATTRS) and AGENTS.md teaches it — "href
+     containers are for cards/links whose text stays plain" — but `stack-elements.json`'s
+     `universalAttributes` never listed it, and the R9 census only knew the `button`'s. Added to
+     `generate_editor_catalog.rb` UNIVERSAL_ATTRIBUTES and the committed catalog (the generator's
+     full regeneration was NOT taken: it rewrites 2,400 lines of the committed file, which has
+     drifted from it — a separate ask). Note for the next pass: the Ruby lint gate
+     (`lint_conformance.rb`) already reports 10 drifts against the TS twin at HEAD, before any
+     of this — its `unknown-and-placement` fixture gets zero findings — so the Ruby column of the
+     lint corpus is not judging anything right now.
+
+156. **WHAT THE SNAPSHOT DIALECT STILL CANNOT SAY, and what Android does not have** (filed
+     2026-09-02, open). (a) No unified-icon element: the in-app catalog (`sf-map.json`, the
+     Boxicons paths native draws under `icons: "unified"`) is the app renderer's; a widget
+     process has no catalog and `<image symbol=>` is an SF symbol with no Android twin — so the
+     one glyph spec §7 puts in the button ("▶ Continue Watching") is a text character today, the
+     only spelling that renders identically on both lanes. THE ASK: `<image icon="play">`
+     resolved through the same catalog, drawn as a path on both snapshot backends. (b) No Live
+     Activity lane on Android: the platform twin (Android 16 Live Updates —
+     `Notification.ProgressStyle` + `setRequestPromotedOngoing`) is a separate package on the
+     framework's ledger (`Core/Extensions/LiveUpdates`); until it lands the Glance widget is the
+     Android surface of this feature and the Live Activity is iOS-only, said in
+     `NowPlayingSurface.dsx`. (c) The Android export generates the `DespiaLiveType_<class>`
+     styles and the face (`androidLiveTypeResources`) but not yet the per-class layouts and the
+     `res/font/inter.xml` family the measured seam needs (§6.154 (3)) — hand-placed for the
+     device proof, the export's generation is the follow-up commit. (d) `dsx.config.json
+     packages` fold into the native exports (772ddf58) — but a project bundling premium packages
+     needs `despia-entitlement.json` before an export runs at all, so the device proof for this
+     pass was exported from a scratch copy without them (§6.150).
+
+157. **A PART'S BOUND ATTRIBUTES WERE INVISIBLE TO ITS OWN LOGIC TIER ON iOS: a `<watch>`, a
+     computed or an `<action>` reading `dsx.attribute.x` got the declared DEFAULT** (found
+     2026-09-02 wiring `Components/parts/NowPlayingSurface.dsx`; fixed upstream on `dev` in
+     05cde3a8, `Stack.swift` StackComponentInstanceHost; the Android twin lands with the Kotlin
+     lane's commit — `StackNodeView.kt` seeds at instance birth and re-seeds in a LaunchedEffect,
+     pinned by `ComponentAttributeSeedTest`). Measured on the iPhone 17 Pro simulator with two
+     probes side by side: the player's own action logged `cur: 1, showId: <id>, title: …,
+     locked: false` while the part mounted with `idx="{{ dsx.variable.cur }}"` logged `rawIdx: 1`
+     from its `on:appear` and `rawIdx: 0` — `default="0"` — from the very next watch. The
+     mechanism: a mount's attributes ride the RENDER scope (`item:`), so markup interpolations
+     read them live, but JSE's `attribute.*` lookup falls from `item` to the store's
+     `dsx.attribute` dict and then to the defaults — and the iOS instance store never seeded that
+     dict (the web seeds it and re-seeds it per attribute effect in `mount.ts`; Android seeded a
+     FRAME's in `RouterHost.kt` and not a component instance's). The instance store now carries
+     `dsx.attribute` from birth and is re-seeded after every consumer re-render that changed a
+     value, so the three tiers read one truth. TEMPLATE RULE, unchanged: a part reacts to its
+     attributes through a `<watch>` over ONE computed key — that idiom was right; the engine was
+     not.
