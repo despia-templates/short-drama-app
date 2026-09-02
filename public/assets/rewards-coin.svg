@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" role="img" aria-label="Coins received">
+  
+  <defs>
+    <linearGradient id="sc-face" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#FFF1B8"/><stop offset="0.42" stop-color="#F5C518"/><stop offset="1" stop-color="#D19A0C"/>
+    </linearGradient>
+    <linearGradient id="sc-edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B8830A"/><stop offset="1" stop-color="#7A5406"/>
+    </linearGradient>
+    <linearGradient id="sc-inner" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#E9B31A"/><stop offset="1" stop-color="#F7D45A"/>
+    </linearGradient>
+    <radialGradient id="sc-glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F5C518" stop-opacity="0.45"/><stop offset="1" stop-color="#F5C518" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="100" cy="104" rx="99.0" ry="79.2" fill="url(#sc-glow)"/>
+  <g transform="translate(100 104) rotate(0)">
+    <ellipse cx="0" cy="7.9" rx="66" ry="60.7" fill="url(#sc-edge)"/>
+    <ellipse cx="0" cy="0" rx="66" ry="60.7" fill="url(#sc-face)"/>
+    <ellipse cx="0" cy="0" rx="48.8" ry="44.9" fill="url(#sc-inner)"/>
+    <ellipse cx="0" cy="0" rx="48.8" ry="44.9" fill="none" stroke="#FFF1B8" stroke-width="2.6" opacity="0.7"/>
+    <path d="M -22.4 1.3 L -6.6 17.2 L 25.1 -15.8"
+          fill="none" stroke="#FFFFFF" stroke-width="8.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M -22.4 1.3 L -6.6 17.2 L 25.1 -15.8"
+          fill="none" stroke="#B8830A" stroke-width="8.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.28" transform="translate(0 3.3)"/>
+    <path d="M -40.9 -27.7 A 66 60.7 0 0 1 6.6 -59.4"
+          fill="none" stroke="#FFFFFF" stroke-width="3.3" stroke-linecap="round" opacity="0.55"/>
+  </g>
+  <path d="M 30 33 Q 30 44 41 44 Q 30 44 30 55 Q 30 44 19 44 Q 30 44 30 33 Z" fill="#FFE9A8" opacity="0.9"/>
+  <path d="M 176 51 Q 176 60 185 60 Q 176 60 176 69 Q 176 60 167 60 Q 176 60 176 51 Z" fill="#FFFFFF" opacity="0.75"/>
+  <path d="M 162 162 Q 162 170 170 170 Q 162 170 162 178 Q 162 170 154 170 Q 162 170 162 162 Z" fill="#FF2C55" opacity="0.7"/>
+  <path d="M 40 151 Q 40 158 47 158 Q 40 158 40 165 Q 40 158 33 158 Q 40 158 40 151 Z" fill="#FFE9A8" opacity="0.7"/>
+</svg>

@@ -301,6 +301,70 @@ const bell = () => {
 `;
 };
 
+// ── THE REWARDS PAGE ART (docs/design/reference-ui-spec.md §9.1, §9.5) — two ASSETS ─────
+// The balance hero is "a 3D coin with a check + sparkles" at 2:1, ~230×160 on the phone,
+// washed 40% into the page; the success modal's coin is an 87pt medallion overlapping the
+// card's top edge. Both are drawn objects in the app's own gold (the crown's ramp) with the
+// accent as the one warm counterpoint — never an emoji, never an icon-font glyph blown up
+// (AGENTS.md). Transparent grounds: the page and the card show through. Deterministic.
+const coinDisc = (cx, cy, r, idPrefix, tilt) => `
+  <defs>
+    <linearGradient id="${idPrefix}-face" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#FFF1B8"/><stop offset="0.42" stop-color="#F5C518"/><stop offset="1" stop-color="#D19A0C"/>
+    </linearGradient>
+    <linearGradient id="${idPrefix}-edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B8830A"/><stop offset="1" stop-color="#7A5406"/>
+    </linearGradient>
+    <linearGradient id="${idPrefix}-inner" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#E9B31A"/><stop offset="1" stop-color="#F7D45A"/>
+    </linearGradient>
+    <radialGradient id="${idPrefix}-glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F5C518" stop-opacity="0.45"/><stop offset="1" stop-color="#F5C518" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="${cx}" cy="${cy}" rx="${(r * 1.5).toFixed(1)}" ry="${(r * 1.2).toFixed(1)}" fill="url(#${idPrefix}-glow)"/>
+  <g transform="translate(${cx} ${cy}) rotate(${tilt})">
+    <ellipse cx="0" cy="${(r * 0.12).toFixed(1)}" rx="${r}" ry="${(r * 0.92).toFixed(1)}" fill="url(#${idPrefix}-edge)"/>
+    <ellipse cx="0" cy="0" rx="${r}" ry="${(r * 0.92).toFixed(1)}" fill="url(#${idPrefix}-face)"/>
+    <ellipse cx="0" cy="0" rx="${(r * 0.74).toFixed(1)}" ry="${(r * 0.68).toFixed(1)}" fill="url(#${idPrefix}-inner)"/>
+    <ellipse cx="0" cy="0" rx="${(r * 0.74).toFixed(1)}" ry="${(r * 0.68).toFixed(1)}" fill="none" stroke="#FFF1B8" stroke-width="${(r * 0.04).toFixed(1)}" opacity="0.7"/>
+    <path d="M ${(-r * 0.34).toFixed(1)} ${(r * 0.02).toFixed(1)} L ${(-r * 0.1).toFixed(1)} ${(r * 0.26).toFixed(1)} L ${(r * 0.38).toFixed(1)} ${(-r * 0.24).toFixed(1)}"
+          fill="none" stroke="#FFFFFF" stroke-width="${(r * 0.13).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M ${(-r * 0.34).toFixed(1)} ${(r * 0.02).toFixed(1)} L ${(-r * 0.1).toFixed(1)} ${(r * 0.26).toFixed(1)} L ${(r * 0.38).toFixed(1)} ${(-r * 0.24).toFixed(1)}"
+          fill="none" stroke="#B8830A" stroke-width="${(r * 0.13).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" opacity="0.28" transform="translate(0 ${(r * 0.05).toFixed(1)})"/>
+    <path d="M ${(-r * 0.62).toFixed(1)} ${(-r * 0.42).toFixed(1)} A ${r} ${(r * 0.92).toFixed(1)} 0 0 1 ${(r * 0.1).toFixed(1)} ${(-r * 0.9).toFixed(1)}"
+          fill="none" stroke="#FFFFFF" stroke-width="${(r * 0.05).toFixed(1)}" stroke-linecap="round" opacity="0.55"/>
+  </g>`;
+const sparkle = (x, y, s, fill, o) =>
+  `<path d="M ${x} ${y - s} Q ${x} ${y} ${x + s} ${y} Q ${x} ${y} ${x} ${y + s} Q ${x} ${y} ${x - s} ${y} Q ${x} ${y} ${x} ${y - s} Z" fill="${fill}" opacity="${o}"/>`;
+
+const rewardsHero = () => {
+  const W = 460, H = 230;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Reward coins">
+  ${coinDisc(212, 128, 54, "hb", -14)}
+  ${coinDisc(322, 108, 78, "ha", 8)}
+  ${sparkle(118, 70, 14, "#FFE9A8", 0.9)}
+  ${sparkle(152, 178, 9, "#FFFFFF", 0.7)}
+  ${sparkle(410, 52, 12, "#FFE9A8", 0.85)}
+  ${sparkle(428, 168, 8, "#FF2C55", 0.75)}
+  ${sparkle(258, 30, 7, "#FFFFFF", 0.6)}
+  ${sparkle(372, 205, 10, "#FFE9A8", 0.7)}
+</svg>
+`;
+};
+
+const rewardsCoin = () => {
+  const W = 200, H = 200;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Coins received">
+  ${coinDisc(100, 104, 66, "sc", 0)}
+  ${sparkle(30, 44, 11, "#FFE9A8", 0.9)}
+  ${sparkle(176, 60, 9, "#FFFFFF", 0.75)}
+  ${sparkle(162, 170, 8, "#FF2C55", 0.7)}
+  ${sparkle(40, 158, 7, "#FFE9A8", 0.7)}
+</svg>
+`;
+};
+
 let n = 0;
 for (const show of SHOWS) {
   writeFileSync(resolve(OUT, `${show.slug}-poster.svg`), poster(show));
@@ -312,4 +376,6 @@ for (const show of SHOWS) {
 }
 mkdirSync(resolve("public/assets"), { recursive: true });
 writeFileSync(resolve("public/assets/bell.svg"), bell());
-console.log(`[art] ${n} files → public/posters (${SHOWS.length} shows) + public/assets/bell.svg`);
+writeFileSync(resolve("public/assets/rewards-hero.svg"), rewardsHero());
+writeFileSync(resolve("public/assets/rewards-coin.svg"), rewardsCoin());
+console.log(`[art] ${n} files → public/posters (${SHOWS.length} shows) + public/assets/{bell,rewards-hero,rewards-coin}.svg`);

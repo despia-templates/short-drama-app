@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="460" height="230" viewBox="0 0 460 230" role="img" aria-label="Reward coins">
+  
+  <defs>
+    <linearGradient id="hb-face" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#FFF1B8"/><stop offset="0.42" stop-color="#F5C518"/><stop offset="1" stop-color="#D19A0C"/>
+    </linearGradient>
+    <linearGradient id="hb-edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B8830A"/><stop offset="1" stop-color="#7A5406"/>
+    </linearGradient>
+    <linearGradient id="hb-inner" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#E9B31A"/><stop offset="1" stop-color="#F7D45A"/>
+    </linearGradient>
+    <radialGradient id="hb-glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F5C518" stop-opacity="0.45"/><stop offset="1" stop-color="#F5C518" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="212" cy="128" rx="81.0" ry="64.8" fill="url(#hb-glow)"/>
+  <g transform="translate(212 128) rotate(-14)">
+    <ellipse cx="0" cy="6.5" rx="54" ry="49.7" fill="url(#hb-edge)"/>
+    <ellipse cx="0" cy="0" rx="54" ry="49.7" fill="url(#hb-face)"/>
+    <ellipse cx="0" cy="0" rx="40.0" ry="36.7" fill="url(#hb-inner)"/>
+    <ellipse cx="0" cy="0" rx="40.0" ry="36.7" fill="none" stroke="#FFF1B8" stroke-width="2.2" opacity="0.7"/>
+    <path d="M -18.4 1.1 L -5.4 14.0 L 20.5 -13.0"
+          fill="none" stroke="#FFFFFF" stroke-width="7.0" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M -18.4 1.1 L -5.4 14.0 L 20.5 -13.0"
+          fill="none" stroke="#B8830A" stroke-width="7.0" stroke-linecap="round" stroke-linejoin="round" opacity="0.28" transform="translate(0 2.7)"/>
+    <path d="M -33.5 -22.7 A 54 49.7 0 0 1 5.4 -48.6"
+          fill="none" stroke="#FFFFFF" stroke-width="2.7" stroke-linecap="round" opacity="0.55"/>
+  </g>
+  
+  <defs>
+    <linearGradient id="ha-face" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#FFF1B8"/><stop offset="0.42" stop-color="#F5C518"/><stop offset="1" stop-color="#D19A0C"/>
+    </linearGradient>
+    <linearGradient id="ha-edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B8830A"/><stop offset="1" stop-color="#7A5406"/>
+    </linearGradient>
+    <linearGradient id="ha-inner" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#E9B31A"/><stop offset="1" stop-color="#F7D45A"/>
+    </linearGradient>
+    <radialGradient id="ha-glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F5C518" stop-opacity="0.45"/><stop offset="1" stop-color="#F5C518" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="322" cy="108" rx="117.0" ry="93.6" fill="url(#ha-glow)"/>
+  <g transform="translate(322 108) rotate(8)">
+    <ellipse cx="0" cy="9.4" rx="78" ry="71.8" fill="url(#ha-edge)"/>
+    <ellipse cx="0" cy="0" rx="78" ry="71.8" fill="url(#ha-face)"/>
+    <ellipse cx="0" cy="0" rx="57.7" ry="53.0" fill="url(#ha-inner)"/>
+    <ellipse cx="0" cy="0" rx="57.7" ry="53.0" fill="none" stroke="#FFF1B8" stroke-width="3.1" opacity="0.7"/>
+    <path d="M -26.5 1.6 L -7.8 20.3 L 29.6 -18.7"
+          fill="none" stroke="#FFFFFF" stroke-width="10.1" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M -26.5 1.6 L -7.8 20.3 L 29.6 -18.7"
+          fill="none" stroke="#B8830A" stroke-width="10.1" stroke-linecap="round" stroke-linejoin="round" opacity="0.28" transform="translate(0 3.9)"/>
+    <path d="M -48.4 -32.8 A 78 71.8 0 0 1 7.8 -70.2"
+          fill="none" stroke="#FFFFFF" stroke-width="3.9" stroke-linecap="round" opacity="0.55"/>
+  </g>
+  <path d="M 118 56 Q 118 70 132 70 Q 118 70 118 84 Q 118 70 104 70 Q 118 70 118 56 Z" fill="#FFE9A8" opacity="0.9"/>
+  <path d="M 152 169 Q 152 178 161 178 Q 152 178 152 187 Q 152 178 143 178 Q 152 178 152 169 Z" fill="#FFFFFF" opacity="0.7"/>
+  <path d="M 410 40 Q 410 52 422 52 Q 410 52 410 64 Q 410 52 398 52 Q 410 52 410 40 Z" fill="#FFE9A8" opacity="0.85"/>
+  <path d="M 428 160 Q 428 168 436 168 Q 428 168 428 176 Q 428 168 420 168 Q 428 168 428 160 Z" fill="#FF2C55" opacity="0.75"/>
+  <path d="M 258 23 Q 258 30 265 30 Q 258 30 258 37 Q 258 30 251 30 Q 258 30 258 23 Z" fill="#FFFFFF" opacity="0.6"/>
+  <path d="M 372 195 Q 372 205 382 205 Q 372 205 372 215 Q 372 205 362 205 Q 372 205 372 195 Z" fill="#FFE9A8" opacity="0.7"/>
+</svg>
