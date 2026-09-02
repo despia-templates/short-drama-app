@@ -3975,3 +3975,33 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      name — in a component head, the way it refuses a local named `item` (#242); (2) the web
      must drop `id=` from a mount's attribute set the way the native lanes do, so the two lanes
      cannot disagree about what a component was handed.
+
+186. **AN iOS `mode="card"` SHEET WEARS THE OS'S LIGHT MATERIAL AND CLIPS ITS CARD — the
+     card's frame is shorter than its content and bottom-anchored 84pt above the screen's
+     edge, while a plain content sheet fits the same column** (found 2026-09-02 on the Rewards
+     page's success and enable-notification modals against the /tmp/wt-land kernel at
+     dc987952; iPhone 17 Pro simulator, iOS 26.5, the browser at 402×874 beside it; NOT
+     fixed — filed for the engine beside §6.188).
+
+     Measured on the page: the web success card is 314×275 at x 44 with the CTA and the close
+     ring inside it; iOS draws 301×178 at x 50 and cuts the CTA at the card's bottom edge
+     (790). The web notification card is 314×454; iOS 301×326, the Enable pill cut at 791 and
+     the close ring gone. Behind the dark card the OS paints a light floating panel (the
+     system sheet material under the simulator's light appearance) from ~433 to 862 —
+     platform chrome inside a custom-design app, the leak docs/design/reference-ui-spec.md
+     §−1 names an engine defect. One-screen probe (throwaway, scratch copy only): one 372pt
+     column (16 + 4×70 + 4×10 + a 20pt accent marker + 16) in a card sheet and in a plain
+     `detents="content"` sheet —
+       card sheet   frame 301×314 at y 476; the fourth block cut to 38, the marker absent
+       plain sheet  panel 386×432 at y 434 (§6.188's floating chrome); every block 70, the marker at 787
+     So the plain sheet's content detent answers the column and the card's does not: the card
+     is inset 44 (the template's `inset`) inside a panel the OS sized and clamped, keeps its
+     bottom 84 above the screen's edge in every capture (790.3 · 790.7 · 790.3), and clips the
+     overflow instead of growing, scrolling, or dropping the inset.
+
+     NOT bridged in the template: the reference's modals are centred cards on every lane
+     (§9.5, §9.7), the web card is right, and a bottom sheet would trade a one-lane engine
+     gap for a three-lane divergence. Ask: under custom design the card sheet must paint a
+     clear OS background and size its card to the content (the web's geometry — inset from
+     the screen, content-tall, the close ring under the card), the same fix §6.188 asks for
+     the bottom sheet.
