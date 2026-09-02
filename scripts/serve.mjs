@@ -822,6 +822,11 @@ const server = createServer((req, res) => {
           return;
         } catch {
           console.warn(`[serve] no PNG twin for ${path} — run \`node scripts/rasterize-art.mjs\`; serving SVG (blank on native)`);
+          // The fallback must not be REMEMBERED: a native URLCache keeps the SVG answer under
+          // the site's static headers, so a device that asked once before the twin existed
+          // stayed blank through a rebuild and an upgrade install (measured on an iPhone 17 Pro
+          // simulator; only an uninstall cleared it). A no-store SVG is re-asked next launch.
+          res.setHeader("cache-control", "no-store");
         }
       }
       const served = await site(webReq);
