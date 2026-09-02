@@ -11,16 +11,12 @@
      that opens the sheet. No screen plumbs `present` state through to a child, and every
      trigger in the app raises the identical surface.
 
-     ONE VIP CHECKOUT, HERE. The sequence (server PaymentIntent → one `dsx.module.stripe`
-     session → server-side settle) is money code, so it exists once: this component is
-     mounted by Profile and VIP as a sheet AND by Store as its inline VIP section
-     (`mode="inline"`), so all three buy through the same lines. A settle that Stripe
-     confirmed but the network lost keeps its order id on screen with an idempotent
-     Confirm — the recovery card travels with the flow it belongs to.
-
-     AND IT IS THE WEB LANE. Stripe inside a native build is an App Store 3.1.1 violation
-     for exactly the products this sheet sells; `payLane` in the head decides that before
-     any money moves, and carries the whole argument. -->
+     THE MONEY IS ONE CONTROL. Tapping a tier SELECTS it; the one purchase control in the app,
+     <BuyButton> (Components/parts/BuyButton.dsx), buys the selection — Core/Store through the
+     RevenueCat provider on a device, Stripe on the web — and the server grants on both lanes.
+     This sheet holds no checkout, no settle and no refusal of its own any more; the Membership
+     page (Components/Membership.dsx) is the plan surface the crowns open, and this sheet is
+     the same catalogue over the screen that raised the question. -->
 <!-- WHAT IT SELLS IS A DATED PASS, not a subscription. Nothing on this backend renews and
      nothing can be cancelled, so no copy here says otherwise — the tier notes come from the
      server and say "One charge for N days. No auto-renewal." in as many words.
@@ -34,29 +30,13 @@
     <attribute as="headers" default="global.auth.headers"/>
     <attribute as="vip" default="false"/>         <!-- is the viewer already a member -->
     <attribute as="vipUntil" default="''"/>
-    <!-- A host that already prints the purchasing refusal above its own grids (Store does,
-         for the coin packs as well) passes hostRefuses="{{ true }}" so the inline lane does
-         not say it a second time under the VIP heading. A markup attribute arrives as a
-         STRING, so the consumer accepts both spellings (hostSaysWhy below). -->
-    <attribute as="hostRefuses" default="false"/>
-
     <event as="purchased" payload="days"/>
     <event as="failed" payload="message"/>
 
-    <api as="catalog" url="/store/catalog" auto="false"/>
-    <api as="checkoutCall" url="/store/checkout" method="POST" auto="false" headers="dsx.attribute.headers"/>
-    <api as="settleCall" url="/store/settle" method="POST" auto="false" headers="dsx.attribute.headers"/>
-    <!-- the NATIVE lane's settle: the store module took the money, this is what turns it
-         into entitlement. Server-verified like every other grant (server/store.dsx
-         settleNative) — the client is never the authority on either lane. -->
-    <api as="nativeCall" url="/store/native" method="POST" auto="false" headers="dsx.attribute.headers"/>
+    <api as="catalog" url="/store/catalog" auto="false" on:success="global.cacheCatalog = catalog.data"/>
 
     <variable as="open">return false</variable>
-    <variable as="buying">return ''</variable>
-    <variable as="paying">return false</variable>
-    <variable as="order">return ''</variable>
-    <variable as="settleFailed">return false</variable>
-    <variable as="settleMsg">return ''</variable>
+    <variable as="sel">return ''</variable>       <!-- the tapped tier; empty = the first row -->
     <variable as="toast">return ''</variable>
     <variable as="hovId">return ''</variable>
     <!-- ── THE DETAIL LEVEL: A SHEET OVER THE PLANS SHEET ──────────────────────────────
@@ -80,58 +60,38 @@
     <variable as="detail">return false</variable>
 
     <variable as="isInline" computed="true">return dsx.attribute.mode == 'inline'</variable>
-    <variable as="hostSaysWhy" computed="true">return dsx.attribute.hostRefuses == true || dsx.attribute.hostRefuses == 'true'</variable>
+    <variable as="tiers" computed="true">
+      if (catalog.data == null || catalog.data.vip == null) { return [] }
+      return catalog.data.vip
+    </variable>
+    <variable as="selId" computed="true">
+      if (dsx.variable.sel != '') { return dsx.variable.sel }
+      const t = dsx.variable.tiers
+      if (t.length == 0) { return '' }
+      return t[0].id
+    </variable>
+    <variable as="selTier" computed="true">
+      for (const t of dsx.variable.tiers) { if (t.id == dsx.variable.selId) { return t } }
+      return null
+    </variable>
+    <variable as="selPrice" computed="true">
+      const t = dsx.variable.selTier
+      return t == null ? '' : t.price
+    </variable>
+    <variable as="selProductId" computed="true">
+      const t = dsx.variable.selTier
+      if (t == null) { return '' }
+      return t.productId == null ? t.id : t.productId
+    </variable>
+    <!-- the verb goes through localize() so the string table reaches a component attribute -->
+    <variable as="ctaLabel" computed="true">
+      if (dsx.attribute.vip == true || dsx.attribute.vip == 'true') { return localize('Add days for') }
+      return localize('Unlock for')
+    </variable>
     <variable as="phase" computed="true">
       if (catalog.error != null) { return 'error' }
       if (catalog.data == null) { return 'loading' }
       return 'content'
-    </variable>
-    <!-- ══ THE PURCHASE LANE, AND WHY IT HAS ONLY ONE ═══════════════════════════════════
-         App Store Review 3.1.1, verbatim: "If you want to unlock features or functionality
-         within your app, (by way of example: subscriptions, in-game currencies, game levels,
-         access to premium content, or unlocking a full version), you must use in-app
-         purchase." A VIP pass is premium-content access and coins are an in-game currency —
-         both are named by that parenthetical, so opening a Stripe payment sheet for either
-         one inside an iOS build is a rejection. Two carve-outs get cited and neither applies:
-         a READER APP may not offer in-app purchase at all and may only give access to content
-         bought elsewhere, which is not a storefront; and the US anti-steering carve-out
-         permits a LINK OUT to your own website, never a non-Apple payment sheet inside the
-         app. Google Play Payments reaches the same conclusion for the same products.
-
-         So Stripe is the WEB lane, and a native build takes the platform store — that is the
-         whole rule, and it is why this pick reads `os == 'web'` and refuses everything else
-         rather than falling through to the card sheet it used to.
-
-         WHERE THE CAPABILITY PICK WENT. The house form is `has('scheme')` first and `os`
-         second (AGENTS.md, the <AdGate> precedent) — a build that HAS the module should take
-         it wherever it is running. That line belongs here and is not here, because the module
-         cannot be in a build at all today: see `payNote`, which does the `has('store')` probe
-         so the refusal can tell an adopter which half they are missing. The day Core/Store
-         compiles, this becomes `if (has('store')) { return 'iap' }` above the web test, and
-         the backend it needs is already built (server/store.dsx: POST /store/native, the
-         RevenueCat <webhook>, and one shared granter behind both). -->
-    <variable as="payLane" computed="true">
-      if (os == 'web') { return 'stripe' }
-      return 'blocked'
-    </variable>
-    <!-- THE REFUSAL, in the viewer's words, naming WHICH half is missing — because the two
-         halves are fixed by two different people. A desktop build (macos/windows/linux)
-         lands here too: the Mac App Store wants in-app purchase and a direct download does
-         not, and `os` alone cannot tell them apart, so this errs toward the store rule, which
-         is the safe direction to be wrong in. -->
-    <variable as="payNote" computed="true">
-      if (dsx.variable.payLane != 'blocked') { return '' }
-      const cat = catalog.data
-      const ready = cat != null &amp;&amp; cat.native != null &amp;&amp; cat.native.ready == true
-      if (has('store')) {
-        if (ready == false &amp;&amp; cat != null &amp;&amp; cat.native != null &amp;&amp; cat.native.reason != '') { return cat.native.reason }
-        return 'The in-app-purchase module is in this build, but the app cannot open a purchase with it yet: the one client call this needs is held by an upstream defect (Core/Store ships Components/core/PaywallVIP.dsx, which mounts a component nothing defines, so configuring the package aborts the build). Nothing is charged until it can be granted.'
-      }
-      return 'Purchases are off in this build, on purpose. App Store rule 3.1.1 makes coins and passes in-app-purchase products, so selling them through a card sheet inside the app would be a rejection — and the in-app-purchase module cannot be added yet (configuring Core/Store aborts the build inside the module itself). The web storefront is unaffected.'
-    </variable>
-    <variable as="recoverLine" computed="true">
-      const why = dsx.variable.settleMsg == '' ? '' : ' The server said: ' + dsx.variable.settleMsg
-      return 'Stripe confirmed your payment, but applying it did not go through. Nothing is lost: confirm below and it lands. Order ' + dsx.variable.order + '.' + why
     </variable>
     <!-- WHAT A PLAN IS, SAID WHERE THE PRICE IS. This line used to read "Cancel anytime",
          which described a subscription this backend has never had: `createCheckout` opens a
@@ -157,30 +117,17 @@
       return vipTermLine(c == null ? null : c.vip)
     </variable>
 
-    <formula as="tierFx" id="item.id" best="item.best">
+    <!-- the SELECTED tier wears the select-green ring (the same ring the Membership page's
+         cards wear); hover lifts on a pointer device -->
+    <formula as="tierFx" id="item.id">
       const lift = dsx.variable.hovId == id ? 'translateY(-2px)' : 'none'
-      // a card that cannot be bought must not look buyable: the blocked lane dims the whole
-      // grid, and the notice above it says why (payNote)
-      const dim = dsx.variable.payLane == 'blocked' ? 0.45 : (dsx.variable.buying == id ? 0.55 : 1)
-      const ring = best ? brand() : 'rgba(0,0,0,0)'
+      const ring = dsx.variable.selId == id ? selectGreen() : 'rgba(0,0,0,0)'
       const glow = dsx.variable.hovId == id ? '0 10px 30px rgba(230,190,110,0.25)' : 'none'
-      return 'background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid ' + ring + '; opacity: ' + dim + '; transform: ' + lift + '; box-shadow: ' + glow + '; transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease'
+      return 'background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid ' + ring + '; transform: ' + lift + '; box-shadow: ' + glow + '; transition: transform 0.18s ease, box-shadow 0.18s ease'
     </formula>
-    <formula as="tierBusy" id="item.id">
-      if (dsx.variable.buying != id) { return '' }
-      return dsx.variable.paying ? 'Complete the payment…' : 'Contacting Stripe…'
+    <formula as="tierRing" id="item.id">
+      return dsx.variable.selId == id ? selectGreen() : 'rgba(0,0,0,0)'
     </formula>
-
-    <!-- THE EMIT SHELL (Components/parts/Analytics.dsx). Four lines, and they are copied
-         rather than shared because a `<functions global="true">` body is the EXPRESSION
-         tier: dsx.log, dsx.module.* and a global write are all silent no-ops there, measured
-         (PLAN.md §6.94). The POLICY is not copied — analyticsBlocked and analyticsSink are
-         pure expressions and live in that one file. -->
-    <action as="track" inputs="name, props">
-      if (analyticsBlocked()) { return }
-      if (analyticsSink() != '') { dsx.module.posthog.capture({ event: name, properties: props }) }
-      else { dsx.log('funnel', name, props) }
-    </action>
 
     <action as="openPlans">
       dsx.variable.toast = ''
@@ -216,103 +163,18 @@
       dsx.module.route.reset({ path: '/vip' })
     </action>
 
-    <action as="buy" sku="item.id">
-      if (dsx.variable.buying != '') { return }
-      // NO SIGN-IN WALL IN FRONT OF THE MONEY. This used to push /auth/signin before a guest
-      // could buy anything, and that is backwards for this product: most viewers who pay
-      // have never made an account, and a login screen between a decided buyer and a payment
-      // sheet is the single most expensive interruption a storefront can have. A purchase
-      // needs a SUBJECT, not a signed-in human — an anonymous session is a subject, and the
-      // backend routes ask for exactly that (`auth="required"` verifies a token, it does not
-      // ask who is holding it). So the tap goes straight to the payment lane, and if the
-      // session plane has nothing to attach the purchase to, the SERVER says so and the
-      // refusal is printed verbatim — the sign-in card already on the screen is then an
-      // offer, not a gate. The upsell belongs AFTER the money lands ("sign in so you do not
-      // lose access"), and that is <AuthSeam> work, handed off.
-      // App Store 3.1.2 still wants a current subscriber to be able to sign in on a
-      // subscription surface — that is <RestoreRow> and the sign-in card, both below.
-      // THE LANE REFUSES BEFORE IT CHARGES. See `payLane` for the rule and `payNote` for the
-      // words; the point is that nothing here silently falls back to a card sheet on a
-      // platform where that is a store violation.
-      // ── THE NATIVE PURCHASE, AND THE ONE LINE THAT CANNOT BE WRITTEN YET ──────────────
-      // What belongs here is a single call to the store module —
-      //   store.checkout({ product: sku, externalId: the viewer subject })
-      // — and then POST /store/native with the transaction it resolves. The server half is
-      // already built and waiting (server/store.dsx: settleNative, the RevenueCat receiver,
-      // and one shared granter behind both).
-      // It is not written because the module cannot be put in a build. Adding Core/Store to
-      // the packages list was tried on 2026-09-01 and ABORTS THE COMPILE inside the module
-      // itself: Components/core/PaywallVIP.dsx line 18 mounts a component nothing in the
-      // module tree defines. And with no package claiming the scheme, `despia lint --strict`
-      // refuses a call to it outright — which is the correct refusal, because a module
-      // reference nothing claims is how a build ships a call that can only fail on a device.
-      // (Spelling note: the identifiers above are deliberately written WITHOUT their engine
-      // prefix. The linter reads names out of comments in an action body exactly as it reads
-      // them out of code, so naming the module here the way you would call it turns this
-      // paragraph into two warnings against a strict gate.)
-      // So the branch below is the whole native lane today: it refuses, in the viewer own
-      // words, rather than quietly opening a card sheet on a phone.
-      if (dsx.variable.payLane == 'blocked') {
-        dsx.variable.toast = dsx.variable.payNote
-        dsx.event('failed', { message: dsx.variable.toast })
-        return
-      }
-      dsx.variable.buying = sku
-      dsx.variable.toast = ''
-      dsx.variable.settleFailed = false
-      dsx.action.track({ name: 'purchase_started', props: { sku: sku, lane: 'stripe', surface: 'plans' } })
-      const r = await checkoutCall.send({ sku: sku })
-      if (!r.ok) {
-        dsx.variable.buying = ''
-        dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Checkout is unavailable right now.'
-        dsx.event('failed', { message: dsx.variable.toast })
-        return
-      }
-      dsx.variable.order = r.data.order
-      const opened = await dsx.module.stripe.session({
-        publishable_key: r.data.publishable_key,
-        payment_intent_client_secret: r.data.client_secret
-      })
-      if (opened == null || opened.ok === false) {
-        dsx.variable.buying = ''
-        dsx.variable.toast = 'The payment sheet could not open on this platform.'
-        return
-      }
-      dsx.variable.paying = true
-      const paid = await dsx.module.stripe.payment({ session: dsx.module.stripe.context.session })
-      dsx.variable.paying = false
-      if (paid == null || paid.status !== 'succeeded') {
-        dsx.variable.buying = ''
-        dsx.variable.toast = 'Payment was not completed. Nothing was charged.'
-        return
-      }
-      await dsx.action.settle()
-      dsx.variable.buying = ''
+    <action as="pick" id="id">
+      dsx.variable.sel = id
     </action>
-
-
-    <!-- ONE SETTLE FOR BOTH LANES, because both fail in the same place: the money is taken
-         and the grant has not landed. Each is idempotent server-side — the ledger row keyed
-         on the order id (Stripe) or the store transaction (native) is the exactly-once lock
-         — which is exactly what lets the recovery card exist: retrying is always safe. -->
-    <action as="settle">
-      const s = await settleCall.send({ order: dsx.variable.order })
-      if (s.ok) {
-        // the settle is the purchase (see Components/Store.dsx); a replay reports
-        // granted false and is deliberately not counted a second time
-        if (s.data.granted) { dsx.action.track({ name: 'purchase_completed', props: { lane: 'stripe', surface: 'plans', days: s.data.days } }) }
-        dsx.variable.settleFailed = false
-        dsx.variable.order = ''
-        dsx.variable.open = false
-        dsx.event('purchased', { days: s.data.days })
-      } else {
-        // THE CARD, NOT A TOAST — money is never a message that scrolls away. The server
-        // reason rides INSIDE the card (recoverLine) so a refusal that retrying cannot fix
-        // is at least legible, instead of a bare Confirm button the viewer taps forever.
-        dsx.variable.settleFailed = true
-        dsx.variable.settleMsg = s.data != null &amp;&amp; s.data.message != null ? s.data.message : ''
-        dsx.variable.toast = ''
-      }
+    <!-- the grant landed (server-side, on either lane): tell the host and close over its screen -->
+    <action as="purchased" kind="kind" days="days">
+      dsx.variable.toast = ''
+      dsx.variable.open = false
+      dsx.event('purchased', { days: days })
+    </action>
+    <action as="failed" message="message">
+      dsx.variable.toast = message
+      dsx.event('failed', { message: message })
     </action>
 
     <style as="trigger" alignItems="stretch"/>
@@ -329,17 +191,9 @@
     <style as="tierBadge" background="#FF2C55" radius="4" paddingH="8" paddingV="4" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
     <style as="perk" spacing="6" alignItems="center"/>
     <style as="perkText" fontSize="12" fontWeight="medium" color="#2A1D04"/>
-    <style as="busyLine" fontSize="12" fontWeight="semibold" color="#2A1D04"/>
 
     <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
     <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
-    <style as="retryCard" background="#1E1830" radius="14" paddingH="16" paddingV="16" spacing="10" alignItems="flex-start"/>
-    <!-- the LANE notice: same rhythm as the recovery card, deliberately not the same colour —
-         nothing has gone wrong here, the build is simply not allowed to sell this way -->
-    <style as="laneCard" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="8" alignItems="flex-start"/>
-    <style as="laneTitle" fontSize="14" fontWeight="bold" color="#FFFFFF"/>
-    <style as="retryTitle" fontSize="15" fontWeight="bold" color="#FFFFFF"/>
-    <style as="retryBody" fontSize="13" color="rgba(255,255,255,0.65)" lineSpacing="4"/>
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
     <style as="benefitsLink" fontSize="13" fontWeight="semibold" color="#F6B63D" textAlign="center" paddingV="6"/>
     <style as="errCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="20" alignItems="center"/>
@@ -387,25 +241,12 @@
       <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
              a11yLabel="Dismiss message" a11yTrait="button"/>
     </hstack>
-    <!-- THE REFUSAL, WHERE THE PRICE IS. App Store 3.1.1 makes coins and passes in-app-
-         purchase products, so a native build with no IAP module may not sell them at all —
-         and this template says that on the purchase surface rather than quietly opening a
-         card sheet. The seam is two lines of dsx.config.json plus one backend secret; the
-         note names both (Article 7: the degradation is named where the viewer reads it). -->
-    <vstack class="laneCard" visible-if="dsx.variable.payLane == 'blocked' &amp;&amp; !dsx.variable.hostSaysWhy">
-      <text value="Purchasing is off in this build" class="laneTitle"/>
-      <text value="{{ dsx.variable.payNote }}" class="retryBody"/>
-    </vstack>
-    <vstack class="retryCard" visible-if="dsx.variable.settleFailed" style="border: 1px solid rgba(199,155,255,0.35)">
-      <text value="Payment received — one step left" class="retryTitle"/>
-      <text value="{{ dsx.variable.recoverLine }}" class="retryBody"/>
-      <button label="Confirm payment" class="retryBtn" on:tap="dsx.action.settle()"/>
-    </vstack>
     <grid bind="catalog.data.vip" key="id" columns="{{ dsx.attribute.mode == 'inline' && dsx.screen.width >= 768 ? 3 : 1 }}" spacing="14" scroll="false"
           visible-if="dsx.variable.phase == 'content'">
-      <vstack class="tier" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
+      <vstack class="tier" on:tap="dsx.action.pick()" a11yGroup="true" a11yTrait="button"
               on:hoverStart="dsx.variable.hovId = item.id" on:hoverEnd="dsx.variable.hovId = ''"
-              a11yLabel="Buy {{ item.label }} for {{ item.price }}" style="{{ tierFx }}">
+              borderWidth="2" borderColor="{{ tierRing }}"
+              a11yLabel="Select {{ item.label }}, {{ item.price }}" style="{{ tierFx }}">
         <hstack spacing="8" alignItems="center" style="width: 100%">
           <text value="{{ item.label }}" class="tierName"/>
           <spacer/>
@@ -426,9 +267,11 @@
                grants — unlockEpisode prices at 0 while vip_until is in the future. -->
           <text value="Every episode at 0 coins, no ads" class="perkText"/>
         </hstack>
-        <text value="{{ tierBusy }}" class="busyLine" visible-if="tierBusy != ''"/>
       </vstack>
     </grid>
+    <BuyButton visible-if="dsx.variable.phase == 'content'" sku="{{ dsx.variable.selId }}" productId="{{ dsx.variable.selProductId }}"
+               kind="vip" label="{{ dsx.variable.ctaLabel }}" price="{{ dsx.variable.selPrice }}" variant="gold" surface="plans"
+               on:purchased="dsx.action.purchased()" on:failed="dsx.action.failed()"/>
   </vstack>
 
   <!-- SHEET: content-height, so the plans sit over the screen that asked for them.
@@ -455,21 +298,6 @@
                a11yLabel="Dismiss message" a11yTrait="button"/>
       </hstack>
 
-      <!-- THE REFUSAL, WHERE THE PRICE IS. App Store 3.1.1 makes coins and passes in-app-
-           purchase products, so a native build with no IAP module may not sell them at all —
-           and this template says that on the purchase surface rather than quietly opening a
-           card sheet. The seam is two lines of dsx.config.json plus one backend secret; the
-           note names both (Article 7: the degradation is named where the viewer reads it). -->
-      <vstack class="laneCard" visible-if="dsx.variable.payLane == 'blocked'">
-        <text value="Purchasing is off in this build" class="laneTitle"/>
-        <text value="{{ dsx.variable.payNote }}" class="retryBody"/>
-      </vstack>
-      <vstack class="retryCard" visible-if="dsx.variable.settleFailed" style="border: 1px solid rgba(199,155,255,0.35)">
-        <text value="Payment received — one step left" class="retryTitle"/>
-        <text value="{{ dsx.variable.recoverLine }}" class="retryBody"/>
-        <button label="Confirm payment" class="retryBtn" on:tap="dsx.action.settle()"/>
-      </vstack>
-
       <vstack spacing="12" alignItems="stretch" visible-if="dsx.variable.phase == 'loading'">
         <Skeleton height="120" radius="14"/>
         <Skeleton height="120" radius="14"/>
@@ -481,8 +309,9 @@
       </vstack>
 
       <list bind="catalog.data.vip" key="id" scroll="false" spacing="12" visible-if="dsx.variable.phase == 'content'">
-        <vstack class="tier" on:tap="dsx.action.buy()" a11yGroup="true" a11yTrait="button"
-                a11yLabel="Buy {{ item.label }} for {{ item.price }}" style="{{ tierFx }}">
+        <vstack class="tier" on:tap="dsx.action.pick()" a11yGroup="true" a11yTrait="button"
+                borderWidth="2" borderColor="{{ tierRing }}"
+                a11yLabel="Select {{ item.label }}, {{ item.price }}" style="{{ tierFx }}">
           <hstack spacing="8" alignItems="center" style="width: 100%">
             <text value="{{ item.label }}" class="tierName"/>
             <spacer/>
@@ -494,9 +323,13 @@
             <image icon="checkmark" iconSize="11" color="#2A1D04" a11yHidden="true"/>
             <text value="Unlimited viewing" class="perkText"/>
           </hstack>
-          <text value="{{ tierBusy }}" class="busyLine" visible-if="tierBusy != ''"/>
         </vstack>
       </list>
+
+      <!-- THE PURCHASE: one control, both lanes, the server grants (BuyButton.dsx) -->
+      <BuyButton visible-if="dsx.variable.phase == 'content'" sku="{{ dsx.variable.selId }}" productId="{{ dsx.variable.selProductId }}"
+                 kind="vip" label="{{ dsx.variable.ctaLabel }}" price="{{ dsx.variable.selPrice }}" variant="gold" surface="plans"
+                 on:purchased="dsx.action.purchased()" on:failed="dsx.action.failed()"/>
 
       <!-- SIGN IN OR RESTORE, on the surface that sells the subscription — App Store 3.1.2
            asks for exactly this pair, and both are real: the tier tap raises the sign-in
