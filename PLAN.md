@@ -3248,3 +3248,37 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      automate on the simulator); it renders through the same StackLive document the activity
      does. Android's widget proof is the Kotlin lane's (5e4ec332): the card in Inter on #0E0E10
      under both device themes, the tap resetting the Router to `/watch/alpha/1`.
+
+161. **A NULL RIGHT-HAND SIDE STORED THE EMPTY STRING ON BOTH PHONES, SO `x == null` READ FALSE
+     RIGHT AFTER `x = null`** (found 2026-09-02, closing the session; fixed dev@b9bbaec9, all
+     three lanes, pinned by four rows in `Conformance/actions/actions.json`). The brief's first
+     idiom — absence checks are `x == null` — assumed the three runners store an absence the
+     same way, and they did not. Measured against the web lane (the reference; its actions
+     executor passed the new rows before any runner changed): after `dsx.variable.n = null`
+     the web drops the key, `n == null` is true and `n ?? '-'` is `-`. Android stored `""`
+     (JseRunner.write, the `?: ""` that 50cd79f8 moved from the call site into the fold) — so
+     `n == null` read FALSE on a phone after an assignment a web build answered true, and a
+     declared local assigned null read `""` too (`let q = 1; q = null; q == null` → false).
+     iOS stored `""` on a declared local the same way, and on the surface / global / route
+     branches handed the nil `Any?` to a store that takes `Any`, which boxes `Optional.none`
+     as a VALUE: on the iPhone 17 Pro simulator `n ?? '-'` answered `Optional(nil)`. Both
+     native runners now write the raw null to a store (the stores hold it, JSE reads it as
+     missing) and the NSNull sentinel into a declared local (the web's own
+     `scope[name] = value ?? NSNull`); the cookie branch alone keeps the raw optional, because
+     null DELETES a cookie (`Conformance/cookies/writes.json`). Red → green: Kotlin
+     ActionConformanceTest 3 failures → 95/95 and JseRunnerTest 100/100 (the test that pinned
+     `""` is now `assignmentOfNilExpressionStoresAbsence`); Swift record lane on the simulator
+     `nOrDash → Optional(nil)` → 95 actions cases verified. What the template does with it:
+     nothing changes in the markup — `x == null` now means one thing on three renderers, and
+     every guard written to the brief's idiom is finally true on the phones. The brief's other
+     null note stands untouched: TRUTHINESS of a stored NSNull (`!x`) is still not the place
+     to test absence; `== null` is.
+
+162. **A REPEATER BOUND TO AN ARRAY OF SCALARS NOW RENDERS ONE ROW PER ELEMENT ON ALL THREE
+     LANES, WITH THE ELEMENT AT `item.value`** (Android dev@28ad2185, iOS dev@2bf808e3, pinned
+     2026-09-02 in `Conformance/layout/repeaters.json` with a :render executor, dev@222dfe0a).
+     `{{ item }}` is still the row SCOPE (a dict), so the brief's `[{ term: 'x' }]` idiom
+     stays the right way to bind a list of words. The one divergence the row names and does
+     not pin: a scalar row's KEY under `key="index"` — the web keys it by its string value,
+     Android by position — so a scalar-bound list that reorders will animate differently
+     until that is settled upstream. Nothing in `Components/` binds a scalar array today.
