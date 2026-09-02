@@ -107,6 +107,12 @@ create unique index if not exists dsx_progress_owner_episode_uniq on dsx_progres
 -- deleted one and the other kept it filled.
 create unique index if not exists dsx_favorite_owner_show_uniq on dsx_favorite (owner_id, show);
 
+-- ONE REMINDER PER (viewer, show). Remind Me is a tap on a rail card and again inside the
+-- coming-soon sheet, and both can be in flight together; two creates that both passed the
+-- "do I have one?" read would leave two rows, so the clear path deletes one and the bell
+-- stays lit. The constraint makes the second create fail and setReminder re-reads the winner.
+create unique index if not exists dsx_reminder_owner_show_uniq on dsx_reminder (owner_id, show);
+
 -- one playback ticket per viewer per episode — this is what keeps the ticket table the size
 -- of the unlock table instead of growing once per play. playSource refreshes the row's
 -- expiry rather than inserting a second.

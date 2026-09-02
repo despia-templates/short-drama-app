@@ -38,6 +38,10 @@ const METRICS = {
   chef:       { views: 512_000,   rating: "8.6" },
   amnesia:    { views: 388_000,   rating: "8.9" },
   vault:      { views: 274_000,   rating: "9.1" },
+  // coming soon: a trailer view count, and no rating — nobody has watched an episode yet
+  crown:      { views: 96_000,    rating: "" },
+  harbor:     { views: 61_000,    rating: "" },
+  iceceo:     { views: 44_000,    rating: "" },
 };
 
 export const metricsFor = (slug) => METRICS[slug] ?? { views: 120_000, rating: "8.5" };
@@ -62,9 +66,48 @@ const TAGS = {
   chef:       ["Second-chance Love", "Slow Burn", "Family", "Small Town", "Uplifting"],
   vault:      ["Suspense", "Mystery", "Hidden Identity", "Twisted", "Strong Female Lead"],
   campus:     ["Campus", "Humor", "Enemies to Lovers", "Slow Burn", "First Love"],
+  crown:      ["Royalty", "Hidden Identity", "Enemies to Lovers", "Sweet Love", "Contract Marriage"],
+  harbor:     ["Suspense", "Mystery", "Small Town", "Betrayal", "Strong Female Lead"],
+  iceceo:     ["CEO", "Workplace", "Slow Burn", "Enemies to Lovers", "Billionaire"],
 };
 
 export const tagsFor = (slug) => TAGS[slug] ?? [];
+
+// FLAGS — the three badges the reference home wears (docs/design/reference-ui-spec.md §1),
+// as catalogue DATA rather than a guess made at paint time. `hot` is the HOT badge, `isNew`
+// the NEW badge and a row in the New Titles list, `original` the ORIGINAL mark — OUR mark
+// and the word, the twin of the reference's own production badge. A show is HOT because the
+// operator says so (the Manage surface writes the same three booleans), never because a
+// rank happened to fall a certain way this render; the seed says so here.
+const FLAGS = {
+  bride:      { hot: true,  isNew: false, original: true },
+  alpha:      { hot: true,  isNew: false, original: true },
+  heiress:    { hot: true,  isNew: false, original: false },
+  midnight:   { hot: true,  isNew: false, original: true },
+  divorce:    { hot: true,  isNew: false, original: false },
+  campus:     { hot: false, isNew: true,  original: false },
+  "ceo-nanny":{ hot: false, isNew: true,  original: true },
+  twins:      { hot: false, isNew: false, original: false },
+  moonlit:    { hot: false, isNew: false, original: true },
+  mafia:      { hot: false, isNew: false, original: false },
+  heir:       { hot: false, isNew: true,  original: false },
+  chef:       { hot: false, isNew: false, original: false },
+  amnesia:    { hot: false, isNew: true,  original: true },
+  vault:      { hot: false, isNew: true,  original: false },
+  crown:      { hot: false, isNew: false, original: true },
+  harbor:     { hot: false, isNew: false, original: false },
+  iceceo:     { hot: false, isNew: false, original: true },
+};
+
+export const flagsFor = (slug) => FLAGS[slug] ?? { hot: false, isNew: false, original: false };
+
+// COMING SOON — the reference home's "New" tab opens on a rail of titles that are not out
+// yet, each with a Remind Me. `comingSoon` keeps a show out of every watchable rail and out of
+// Browse, Search and the Discover reel; its episodes are seeded as DRAFTS (real rows, so the
+// day it goes live is one `publish`, not a re-seed). `releaseIn` is DAYS FROM SEED TIME — a
+// demo catalogue has no calendar, and a date typed into this file would be in the past the
+// week after it was written. seed.mjs turns it into `releaseAt`, an ISO timestamp the app
+// counts down to and the local notification is scheduled against.
 
 export const SHOWS = [
   {
@@ -164,6 +207,31 @@ export const SHOWS = [
     synopsis:
       "One dorm mix-up, one fake relationship, and one very real scholarship on the line. The rules were simple until somebody forgot they were pretending.",
     palette: { deep: "#0F1B33", mid: "#3C74D6", glow: "#9CC2FF", accent: "#1A3468", figure: "#060C18", spark: "#E0EBFF" },
+  },
+  // ── coming soon (see COMING SOON above) ──────────────────────────────────────────────
+  {
+    slug: "crown", title: "The Runaway Bride of the Crown Prince", genre: "Romance",
+    kicker: "ORIGINAL", featured: false, episodes: 24, freeUntil: 3, price: 60, media: "bride",
+    comingSoon: true, releaseIn: 3,
+    synopsis:
+      "A palace wedding, a stolen carriage and a princess who would rather scrub floors in the capital than marry the man who ordered her family into exile. He is coming to find her. He does not know she is the maid pouring his tea.",
+    palette: { deep: "#2A1104", mid: "#B0611A", glow: "#FFCB7A", accent: "#5A2A08", figure: "#150802", spark: "#FFEAC4" },
+  },
+  {
+    slug: "harbor", title: "Silver Harbor Storm", genre: "Suspense",
+    kicker: "", featured: false, episodes: 26, freeUntil: 3, price: 65, media: "alpha",
+    comingSoon: true, releaseIn: 9,
+    synopsis:
+      "Twelve years after a girl vanished from the pier, a lighthouse keeper's daughter finds a locket in the tide with her own face inside it. Everyone in town remembers that night. Nobody agrees on what happened.",
+    palette: { deep: "#08131C", mid: "#1F5A78", glow: "#8FD3F2", accent: "#0E2F42", figure: "#04090E", spark: "#DCF2FC" },
+  },
+  {
+    slug: "iceceo", title: "Ice Queen CEO, Warm Heart", genre: "Romance",
+    kicker: "ORIGINAL", featured: false, episodes: 22, freeUntil: 4, price: 55, media: "heiress",
+    comingSoon: true, releaseIn: 16,
+    synopsis:
+      "The coldest CEO in the city hires a personal assistant on one condition: no small talk, no smiling, no questions. He lasts a day on all three. She lasts a week before she starts to answer.",
+    palette: { deep: "#0B1A24", mid: "#2E7C8C", glow: "#9AE8F0", accent: "#123A46", figure: "#050D12", spark: "#DEF8FA" },
   },
 ];
 

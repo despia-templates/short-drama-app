@@ -386,7 +386,16 @@
       const items = []
       for (const f of (favs.ok ? favs.data : [])) {
         const s = await dsx.module.data.show.get({ id: f.show })
-        if (s.ok) { items.push({ show: f.show, title: s.data.title, poster: s.data.poster, genre: s.data.genre }) }
+        // the reference cell's fields ride along (docs/design/reference-ui-spec.md §5 draws
+        // My List with the §1 cell): the 2:3 cover, the three badges and the play count
+        if (s.ok) {
+          items.push({
+            show: f.show, title: s.data.title, poster: s.data.poster, genre: s.data.genre,
+            cover: s.data.cover == null || s.data.cover === '' ? s.data.poster : s.data.cover,
+            hot: s.data.hot === true, isNew: s.data.is_new === true, original: s.data.original === true,
+            views: s.data.views == null ? 0 : s.data.views
+          })
+        }
       }
       return { items: items }
     </action>

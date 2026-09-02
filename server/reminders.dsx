@@ -1,0 +1,75 @@
+<!-- reminders.dsx — a viewer's "Remind Me" on a coming-soon series (docs/design/
+     reference-ui-spec.md §2, §2a, §2b).
+
+     WHY A SERVER ROW AT ALL, when the notification itself is scheduled on the device.
+     The local notification (Core/LocalPush) lives in the OS scheduler of ONE install: a
+     reinstall, a new phone or the web lane — which cannot schedule days ahead at all — loses
+     it. The row is the durable half: it survives all three under the viewer's identity, it
+     is what the home rail reads back to light a card "Reminder set", and it is what a push
+     server would fan out from the day one exists. The client does both, and says which half
+     it managed (Components/App.dsx remind* actions).
+
+     ownership="owner": Postgres RLS scopes every read and write to the caller, so `list` with
+     no filter is already "mine". The route is auth="required" — a guest has no identity to
+     hang a reminder on, and the client says so instead of pretending. -->
+<server>
+  <head>
+    <entity as="reminder" ownership="owner">
+      <field as="show" type="uuid"/>
+      <field as="release_at" type="timestamptz"/>   <!-- copied from the show, so the list needs no join -->
+      <index on="show"/>
+    </entity>
+
+    <!-- IDEMPOTENT SET. A second tap (or the sheet and the rail card racing) must leave one
+         row: `unique (owner_id, show)` in policies.local.sql is the lock, and the loser
+         re-reads the winner, the same shape every read-then-write guard in this backend has
+         (there is no transaction seam in a declared action — PLAN.md 6.38). -->
+    <action as="setReminder" inputs="show">
+      if (show == null || show === '') { throw { reason: 'invalid', message: 'show is required' } }
+      const s = await dsx.module.data.show.get({ id: show })
+      if (!s.ok || s.data == null || s.data.state !== 'live') { throw { reason: 'not_found', message: 'no such series' } }
+      // only a series that is not out yet takes a reminder — for one that is, the answer is
+      // the play button, and a reminder for it would fire for nothing
+      if (s.data.coming_soon !== true) { throw { reason: 'invalid', message: 'This series is already out.' } }
+      const at = s.data.release_at == null ? '' : s.data.release_at
+      const mine = await dsx.module.data.reminder.list({ filters: { show: show }, limit: 1 })
+      if (mine.ok && mine.data.length > 0) {
+        if (at !== '') { await dsx.module.data.reminder.update({ id: mine.data[0].id, values: { release_at: at } }) }
+        return { show: show, releaseAt: at, created: false }
+      }
+      let made = null
+      if (at === '') { made = await dsx.module.data.reminder.create({ show: show }) }
+      else { made = await dsx.module.data.reminder.create({ show: show, release_at: at }) }
+      if (made.ok) { return { show: show, releaseAt: at, created: true } }
+      const again = await dsx.module.data.reminder.list({ filters: { show: show }, limit: 1 })
+      if (!again.ok || again.data.length === 0) { throw { reason: 'unavailable', message: 'The reminder could not be saved.' } }
+      return { show: show, releaseAt: at, created: false }
+    </action>
+
+    <!-- bounded: a viewer has at most one row per show by constraint, but a database that
+         predates the constraint could hold two, and both must go -->
+    <action as="clearReminder" inputs="show">
+      if (show == null || show === '') { throw { reason: 'invalid', message: 'show is required' } }
+      const mine = await dsx.module.data.reminder.list({ filters: { show: show }, limit: 10 })
+      let cleared = 0
+      for (const r of (mine.ok ? mine.data : [])) {
+        const gone = await dsx.module.data.reminder.delete({ id: r.id })
+        if (gone.ok) { cleared = cleared + 1 }
+      }
+      return { show: show, cleared: cleared }
+    </action>
+
+    <action as="myReminders">
+      const rows = await dsx.module.data.reminder.list({ limit: 100 })
+      const items = (rows.ok ? rows.data : []).map(r => ({
+        show: r.show, releaseAt: r.release_at == null ? '' : r.release_at
+      }))
+      return { items: items }
+    </action>
+  </head>
+
+  <!-- 60/m: cheap owner reads and writes behind a tap; a burst past that is a loop -->
+  <route method="GET"    path="/viewer/reminders"       action="myReminders"   auth="required" rate="60/m"/>
+  <route method="POST"   path="/viewer/reminders/:show" action="setReminder"   auth="required" rate="60/m"/>
+  <route method="DELETE" path="/viewer/reminders/:show" action="clearReminder" auth="required" rate="60/m"/>
+</server>

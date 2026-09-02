@@ -66,13 +66,15 @@
       return { rows: rows }
     </action>
 
-    <action as="adminUpsertShow" inputs="id, title, synopsis, genre, poster, hero, heroTall, state, freeUntil, featured, views, rating, tags">
+    <action as="adminUpsertShow" inputs="id, title, synopsis, genre, poster, cover, titleArt, hero, heroTall, state, freeUntil, featured, views, rating, tags, hot, isNew, original, comingSoon, releaseAt">
       if (title == null || title === '') { throw { reason: 'invalid', message: 'title is required' } }
       const values = {
         title: title,
         synopsis: synopsis == null ? '' : synopsis,
         genre: genre == null || genre === '' ? 'Drama' : genre,
         poster: poster == null ? '' : poster,
+        cover: cover == null ? '' : cover,
+        title_art: titleArt == null ? '' : titleArt,
         hero: hero == null ? '' : hero,
         hero_tall: heroTall == null ? '' : heroTall,
         state: state == null || state === '' ? 'draft' : state,
@@ -80,8 +82,16 @@
         featured: featured === true,
         views: views == null ? 0 : views,
         rating: rating == null ? '' : rating,
-        tags: tags == null ? '' : tags
+        tags: tags == null ? '' : tags,
+        // the reference home badges and the coming-soon pair are OPERATOR facts: a show is
+        // HOT or NEW or ORIGINAL because this action was told so, never because of a rank
+        hot: hot === true,
+        is_new: isNew === true,
+        original: original === true,
+        coming_soon: comingSoon === true
       }
+      // never `field: null` in a data.create — the key is written only when a date was sent
+      if (releaseAt != null && releaseAt !== '') { values.release_at = releaseAt }
       if (id) {
         const done = await dsx.module.data.show.update({ id: id, values: values })
         if (!done.ok) { throw { reason: 'forbidden', message: 'operator authority required' } }

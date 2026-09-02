@@ -106,7 +106,19 @@ const opsHandlers = {
       // tags arrive as an array and are stored comma-joined (see the entity's note)
       tags: Array.isArray(args.tags) ? args.tags.join(",") : String(args.tags ?? ""),
     };
+      // the reference home's fields (docs/design/reference-ui-spec.md §1–§2): the 2:3 cover,
+      // the title art, the three badge flags and the coming-soon pair. Mirrored from
+      // server/admin.dsx adminUpsertShow field for field — `npm run verify` reads them back
+      // off /catalog/home, so a column dropped here goes red rather than reporting false
+      cover: String(args.cover ?? ""),
+      title_art: String(args.titleArt ?? ""),
+      hot: args.hot === true,
+      is_new: args.isNew === true,
+      original: args.original === true,
+      coming_soon: args.comingSoon === true,
     if (typeof args.id === "string" && args.id !== "") {
+    // a release date is only ever written when one was sent — a show that is out has none
+    if (typeof args.releaseAt === "string" && args.releaseAt !== "") values.release_at = args.releaseAt;
       const row = await svc.update("show", args.id, values);
       if (row === null) throw { reason: "not_found", message: "no such show" };
       return { id: args.id, updated: true };

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600" role="img" aria-label="The Runaway Bride of the Crown Prince">
+  <defs><linearGradient id="sky" x1="0.08" y1="0" x2="0.92" y2="1">
+      <stop offset="0" stop-color="#2A1104"/><stop offset="0.52" stop-color="#B0611A"/><stop offset="1" stop-color="#2A1104"/>
+    </linearGradient>
+    <radialGradient id="rim" cx="0.5" cy="0.24" r="0.72">
+      <stop offset="0" stop-color="#FFCB7A" stop-opacity="0.62"/>
+      <stop offset="0.55" stop-color="#FFCB7A" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FFCB7A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.46" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="0.58" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.44" r="0.78">
+      <stop offset="0.45" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.62"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="35" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.16"/></feComponentTransfer>
+    </filter><filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <linearGradient id="band" x1="0" y1="0.36" x2="0" y2="0.78">
+      <stop offset="0" stop-color="#05030A" stop-opacity="0"/>
+      <stop offset="0.4" stop-color="#05030A" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#05030A" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#sky)"/>
+    <g filter="url(#soft)" opacity="0.9">
+      <ellipse cx="256.0" cy="140.0" rx="120.0" ry="104.0" fill="#FFCB7A" opacity="0.30"/>
+      <ellipse cx="112.0" cy="268.0" rx="96.0" ry="84.0" fill="#5A2A08" opacity="0.24"/>
+    </g>
+    <rect width="400" height="600" fill="url(#rim)"/>
+    <g opacity="0.85" fill="#150802">
+      <ellipse cx="154.0" cy="202.0" rx="28.0" ry="32.5"/>
+      <path d="M 67.2 628.0
+               C 67.2 266.1
+                 114.2 236.7
+                 154.0 236.7
+               C 193.8 236.7
+                 240.8 266.1
+                 240.8 628.0
+               Z"/>
+    </g>
+    <g opacity="0.92" fill="#150802">
+      <ellipse cx="250.0" cy="184.8" rx="31.4" ry="36.4"/>
+      <path d="M 152.8 631.4
+               C 152.8 256.6
+                 205.5 223.7
+                 250.0 223.7
+               C 294.5 223.7
+                 347.2 256.6
+                 347.2 631.4
+               Z"/>
+    </g>
+    <rect width="400" height="600" fill="url(#sweep)"/>
+    <circle cx="61.8" cy="410.7" r="1.8" fill="#FFEAC4" opacity="0.46"/><circle cx="338.9" cy="465.4" r="1.1" fill="#FFEAC4" opacity="0.18"/><circle cx="95.0" cy="220.1" r="1.6" fill="#FFEAC4" opacity="0.30"/><circle cx="232.6" cy="399.7" r="2.1" fill="#FFEAC4" opacity="0.28"/><circle cx="352.0" cy="282.3" r="1.9" fill="#FFEAC4" opacity="0.51"/><circle cx="112.3" cy="67.2" r="1.7" fill="#FFEAC4" opacity="0.48"/><circle cx="309.7" cy="392.2" r="2.2" fill="#FFEAC4" opacity="0.31"/><circle cx="256.5" cy="295.0" r="1.6" fill="#FFEAC4" opacity="0.18"/><circle cx="89.1" cy="437.4" r="2.1" fill="#FFEAC4" opacity="0.37"/><circle cx="255.6" cy="270.3" r="0.8" fill="#FFEAC4" opacity="0.55"/><circle cx="192.6" cy="443.9" r="2.0" fill="#FFEAC4" opacity="0.68"/><circle cx="232.8" cy="247.3" r="1.1" fill="#FFEAC4" opacity="0.43"/><circle cx="107.2" cy="366.2" r="1.5" fill="#FFEAC4" opacity="0.31"/><circle cx="201.4" cy="387.3" r="1.1" fill="#FFEAC4" opacity="0.28"/><circle cx="319.3" cy="202.9" r="1.7" fill="#FFEAC4" opacity="0.27"/><circle cx="409.7" cy="354.9" r="1.5" fill="#FFEAC4" opacity="0.36"/><circle cx="16.0" cy="401.8" r="0.7" fill="#FFEAC4" opacity="0.45"/><circle cx="44.2" cy="45.6" r="0.9" fill="#FFEAC4" opacity="0.25"/><circle cx="261.2" cy="33.8" r="1.0" fill="#FFEAC4" opacity="0.55"/><circle cx="41.7" cy="62.3" r="0.8" fill="#FFEAC4" opacity="0.42"/><circle cx="419.9" cy="0.1" r="2.3" fill="#FFEAC4" opacity="0.47"/><circle cx="124.3" cy="393.9" r="1.3" fill="#FFEAC4" opacity="0.65"/><circle cx="130.5" cy="465.4" r="2.0" fill="#FFEAC4" opacity="0.44"/><circle cx="399.6" cy="356.3" r="2.2" fill="#FFEAC4" opacity="0.19"/><circle cx="15.2" cy="63.7" r="2.0" fill="#FFEAC4" opacity="0.32"/><circle cx="218.9" cy="424.3" r="2.5" fill="#FFEAC4" opacity="0.25"/>
+    <rect width="400" height="600" fill="url(#vig)"/>
+    <rect width="400" height="600" filter="url(#grain)" opacity="0.5"/>
+  <rect width="400" height="600" fill="url(#band)"/>
+  <text x="200" y="310" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="34" font-weight="700" fill="#FFFFFF" style="paint-order: stroke; stroke: rgba(0,0,0,0.35); stroke-width: 6px; stroke-linejoin: round"><tspan x="200" dy="0">The Runaway</tspan><tspan x="200" dy="37.4">Bride of the</tspan><tspan x="200" dy="37.4">Crown Prince</tspan></text>
+</svg>

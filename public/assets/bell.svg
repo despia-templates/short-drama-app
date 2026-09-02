@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Notification bell">
+  <defs>
+    <linearGradient id="gold" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#FFE38A"/><stop offset="0.55" stop-color="#F5C518"/><stop offset="1" stop-color="#C98F0A"/>
+    </linearGradient>
+    <radialGradient id="bellglow" cx="0.5" cy="0.55" r="0.6">
+      <stop offset="0" stop-color="#F5C518" stop-opacity="0.35"/><stop offset="1" stop-color="#F5C518" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="70" r="58" fill="url(#bellglow)"/>
+  <path d="M64 18c3.6 0 6.4 2.8 6.4 6.3v2.3c14.2 3 24 15.4 24 30.4v17.2l9.6 12.6c1.9 2.5.1 6.2-3 6.2H26.9c-3.1 0-4.9-3.7-3-6.2l9.6-12.6V57c0-15 9.8-27.4 24-30.4v-2.3c0-3.5 2.8-6.3 6.5-6.3z" fill="url(#gold)"/>
+  <path d="M42 57c0-11 8.2-20.6 19-22.6" stroke="#FFF4C2" stroke-width="3.5" stroke-linecap="round" fill="none" opacity="0.85"/>
+  <path d="M52 100h24c0 6.6-5.4 12-12 12s-12-5.4-12-12z" fill="#C98F0A"/>
+  <circle cx="94" cy="34" r="13" fill="#4ADFB4"/>
+  <circle cx="94" cy="34" r="13" fill="none" stroke="#0B1D18" stroke-width="3" opacity="0.6"/>
+</svg>

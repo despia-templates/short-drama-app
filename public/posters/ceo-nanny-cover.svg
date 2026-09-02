@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600" role="img" aria-label="The CEO&#39;s Accidental Nanny">
+  <defs><linearGradient id="sky" x1="0.08" y1="0" x2="0.92" y2="1">
+      <stop offset="0" stop-color="#241033"/><stop offset="0.52" stop-color="#9A3FB4"/><stop offset="1" stop-color="#241033"/>
+    </linearGradient>
+    <radialGradient id="rim" cx="0.5" cy="0.24" r="0.72">
+      <stop offset="0" stop-color="#E3A0FF" stop-opacity="0.62"/>
+      <stop offset="0.55" stop-color="#E3A0FF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#E3A0FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.46" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="0.58" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.44" r="0.78">
+      <stop offset="0.45" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.62"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="43" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.16"/></feComponentTransfer>
+    </filter><filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <linearGradient id="band" x1="0" y1="0.36" x2="0" y2="0.78">
+      <stop offset="0" stop-color="#05030A" stop-opacity="0"/>
+      <stop offset="0.4" stop-color="#05030A" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#05030A" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#sky)"/>
+    <g filter="url(#soft)" opacity="0.9">
+      <ellipse cx="256.0" cy="140.0" rx="120.0" ry="104.0" fill="#E3A0FF" opacity="0.30"/>
+      <ellipse cx="112.0" cy="268.0" rx="96.0" ry="84.0" fill="#4A1560" opacity="0.24"/>
+    </g>
+    <rect width="400" height="600" fill="url(#rim)"/>
+    <g opacity="0.85" fill="#100518">
+      <ellipse cx="154.0" cy="202.0" rx="28.0" ry="32.5"/>
+      <path d="M 67.2 628.0
+               C 67.2 266.1
+                 114.2 236.7
+                 154.0 236.7
+               C 193.8 236.7
+                 240.8 266.1
+                 240.8 628.0
+               Z"/>
+    </g>
+    <g opacity="0.92" fill="#100518">
+      <ellipse cx="250.0" cy="184.8" rx="31.4" ry="36.4"/>
+      <path d="M 152.8 631.4
+               C 152.8 256.6
+                 205.5 223.7
+                 250.0 223.7
+               C 294.5 223.7
+                 347.2 256.6
+                 347.2 631.4
+               Z"/>
+    </g>
+    <rect width="400" height="600" fill="url(#sweep)"/>
+    <circle cx="282.2" cy="452.7" r="1.4" fill="#F6E3FF" opacity="0.23"/><circle cx="124.9" cy="262.5" r="2.1" fill="#F6E3FF" opacity="0.67"/><circle cx="40.0" cy="272.8" r="1.8" fill="#F6E3FF" opacity="0.25"/><circle cx="187.6" cy="132.7" r="1.0" fill="#F6E3FF" opacity="0.21"/><circle cx="124.6" cy="414.2" r="2.0" fill="#F6E3FF" opacity="0.46"/><circle cx="219.7" cy="128.5" r="2.1" fill="#F6E3FF" opacity="0.61"/><circle cx="417.7" cy="307.9" r="1.1" fill="#F6E3FF" opacity="0.26"/><circle cx="244.4" cy="385.9" r="1.3" fill="#F6E3FF" opacity="0.64"/><circle cx="23.5" cy="333.2" r="1.2" fill="#F6E3FF" opacity="0.48"/><circle cx="110.3" cy="171.2" r="1.3" fill="#F6E3FF" opacity="0.61"/><circle cx="15.8" cy="42.3" r="2.1" fill="#F6E3FF" opacity="0.59"/><circle cx="129.8" cy="482.6" r="2.3" fill="#F6E3FF" opacity="0.22"/><circle cx="301.1" cy="115.0" r="1.5" fill="#F6E3FF" opacity="0.30"/><circle cx="256.8" cy="267.0" r="2.2" fill="#F6E3FF" opacity="0.43"/><circle cx="41.5" cy="287.0" r="1.3" fill="#F6E3FF" opacity="0.56"/><circle cx="307.1" cy="357.7" r="2.1" fill="#F6E3FF" opacity="0.34"/><circle cx="260.9" cy="149.5" r="0.6" fill="#F6E3FF" opacity="0.40"/><circle cx="103.4" cy="229.8" r="2.4" fill="#F6E3FF" opacity="0.38"/><circle cx="378.8" cy="358.0" r="1.8" fill="#F6E3FF" opacity="0.29"/><circle cx="341.4" cy="287.0" r="2.2" fill="#F6E3FF" opacity="0.48"/><circle cx="106.5" cy="188.6" r="1.7" fill="#F6E3FF" opacity="0.48"/><circle cx="145.3" cy="172.0" r="1.3" fill="#F6E3FF" opacity="0.22"/><circle cx="172.2" cy="317.9" r="1.3" fill="#F6E3FF" opacity="0.54"/><circle cx="299.3" cy="29.2" r="1.0" fill="#F6E3FF" opacity="0.25"/><circle cx="96.6" cy="164.0" r="1.9" fill="#F6E3FF" opacity="0.19"/><circle cx="298.3" cy="475.3" r="2.0" fill="#F6E3FF" opacity="0.31"/>
+    <rect width="400" height="600" fill="url(#vig)"/>
+    <rect width="400" height="600" filter="url(#grain)" opacity="0.5"/>
+  <rect width="400" height="600" fill="url(#band)"/>
+  <text x="200" y="310" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="34" font-weight="700" fill="#FFFFFF" style="paint-order: stroke; stroke: rgba(0,0,0,0.35); stroke-width: 6px; stroke-linejoin: round"><tspan x="200" dy="0">The CEO&#39;s</tspan><tspan x="200" dy="37.4">Accidental</tspan><tspan x="200" dy="37.4">Nanny</tspan></text>
+</svg>

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-label="Ice Queen CEO, Warm Heart">
+  <defs><linearGradient id="sky" x1="0.08" y1="0" x2="0.92" y2="1">
+      <stop offset="0" stop-color="#0B1A24"/><stop offset="0.52" stop-color="#2E7C8C"/><stop offset="1" stop-color="#0B1A24"/>
+    </linearGradient>
+    <radialGradient id="rim" cx="0.64" cy="0.36" r="0.72">
+      <stop offset="0" stop-color="#9AE8F0" stop-opacity="0.62"/>
+      <stop offset="0.55" stop-color="#9AE8F0" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#9AE8F0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.46" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="0.58" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.44" r="0.78">
+      <stop offset="0.45" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.62"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="69" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.16"/></feComponentTransfer>
+    </filter><filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="41"/>
+    </filter></defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+    <g filter="url(#soft)" opacity="0.9">
+      <ellipse cx="1150.0" cy="288.0" rx="270.0" ry="234.0" fill="#9AE8F0" opacity="0.30"/>
+      <ellipse cx="826.0" cy="576.0" rx="216.0" ry="189.0" fill="#123A46" opacity="0.24"/>
+    </g>
+    <rect width="1600" height="900" fill="url(#rim)"/>
+    <g opacity="0.85" fill="#050D12">
+      <ellipse cx="920.5" cy="427.5" rx="63.0" ry="73.1"/>
+      <path d="M 725.2 963.0
+               C 725.2 571.8
+                 831.0 505.6
+                 920.5 505.6
+               C 1010.0 505.6
+                 1115.8 571.8
+                 1115.8 963.0
+               Z"/>
+    </g>
+    <g opacity="0.92" fill="#050D12">
+      <ellipse cx="1136.5" cy="388.8" rx="70.6" ry="81.8"/>
+      <path d="M 917.8 970.6
+               C 917.8 550.4
+                 1036.3 476.3
+                 1136.5 476.3
+               C 1236.7 476.3
+                 1355.2 550.4
+                 1355.2 970.6
+               Z"/>
+    </g>
+    <rect width="1600" height="900" fill="url(#sweep)"/>
+    <circle cx="1612.2" cy="458.3" r="1.7" fill="#DEF8FA" opacity="0.53"/><circle cx="526.9" cy="83.5" r="1.4" fill="#DEF8FA" opacity="0.67"/><circle cx="1498.5" cy="120.2" r="0.7" fill="#DEF8FA" opacity="0.54"/><circle cx="1398.3" cy="65.7" r="1.7" fill="#DEF8FA" opacity="0.55"/><circle cx="659.0" cy="567.6" r="1.6" fill="#DEF8FA" opacity="0.23"/><circle cx="372.8" cy="160.2" r="1.2" fill="#DEF8FA" opacity="0.40"/><circle cx="1281.9" cy="490.9" r="0.7" fill="#DEF8FA" opacity="0.61"/><circle cx="-40.1" cy="269.9" r="0.7" fill="#DEF8FA" opacity="0.65"/><circle cx="1148.7" cy="536.6" r="1.7" fill="#DEF8FA" opacity="0.59"/><circle cx="907.8" cy="1.8" r="1.4" fill="#DEF8FA" opacity="0.60"/><circle cx="617.0" cy="297.8" r="1.0" fill="#DEF8FA" opacity="0.41"/><circle cx="691.0" cy="114.0" r="1.0" fill="#DEF8FA" opacity="0.51"/><circle cx="-62.9" cy="139.8" r="2.0" fill="#DEF8FA" opacity="0.23"/><circle cx="948.9" cy="182.7" r="1.8" fill="#DEF8FA" opacity="0.55"/><circle cx="251.6" cy="439.9" r="0.9" fill="#DEF8FA" opacity="0.58"/><circle cx="532.5" cy="245.1" r="2.1" fill="#DEF8FA" opacity="0.31"/><circle cx="79.4" cy="317.7" r="1.2" fill="#DEF8FA" opacity="0.55"/><circle cx="1036.5" cy="246.0" r="1.6" fill="#DEF8FA" opacity="0.46"/><circle cx="1635.8" cy="561.9" r="2.2" fill="#DEF8FA" opacity="0.24"/><circle cx="61.3" cy="610.0" r="2.4" fill="#DEF8FA" opacity="0.47"/><circle cx="265.2" cy="247.6" r="0.8" fill="#DEF8FA" opacity="0.46"/><circle cx="1327.7" cy="703.9" r="1.0" fill="#DEF8FA" opacity="0.19"/><circle cx="907.8" cy="642.7" r="1.0" fill="#DEF8FA" opacity="0.63"/><circle cx="52.6" cy="85.3" r="0.7" fill="#DEF8FA" opacity="0.54"/><circle cx="660.1" cy="264.0" r="2.5" fill="#DEF8FA" opacity="0.26"/><circle cx="490.7" cy="214.2" r="0.7" fill="#DEF8FA" opacity="0.34"/>
+    <rect width="1600" height="900" fill="url(#vig)"/>
+    <rect width="1600" height="900" filter="url(#grain)" opacity="0.5"/>
+</svg>

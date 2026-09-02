@@ -211,11 +211,105 @@ const heroTall = (show) => {
 `;
 };
 
+// ── cover: 2:3, the reference home's frame (docs/design/reference-ui-spec.md §1–§2a) ────────
+// Every card on that home is 2:3 — the 3-column grid at 116×174, the coming-soon rail at
+// 113 wide, the New Titles poster at 81×127, the sheet poster at 110×165 — so the art is
+// authored 2:3 and displayed 2:3, never the 3:4 poster cropped a quarter (AGENTS.md). Its
+// composition differs from the poster's in one measured way: the CORNERS BELONG TO THE
+// MARKUP. Top-right carries the HOT/NEW badge, bottom-left the ORIGINAL mark on a 56pt scrim,
+// bottom-right the flame and the play count — so the title sits in the MIDDLE band (44–66%),
+// centred, and the bottom third carries nothing that reads as type.
+const cover = (show) => {
+  const W = 400, H = 600;
+  const rand = rng(seedOf(`${show.slug}-cover`));
+  const p = show.palette;
+  const L = artLayers(W, H, p, rand, { x: 0.5, y: 0.30 });
+  const lines = wrap(show.title, 15, 3);
+  const size = lines.length >= 3 ? 34 : 38;
+  const lead = size * 1.1;
+  const block = size + (lines.length - 1) * lead;
+  const first = Math.round(H * 0.55 - block / 2 + size);
+  const tspans = lines.map((l, i) => `<tspan x="${W / 2}" ${i === 0 ? 'dy="0"' : `dy="${lead.toFixed(1)}"`}>${esc(l)}</tspan>`).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(show.title)}">
+  <defs>${L.defs}
+    <linearGradient id="band" x1="0" y1="0.36" x2="0" y2="0.78">
+      <stop offset="0" stop-color="#05030A" stop-opacity="0"/>
+      <stop offset="0.4" stop-color="#05030A" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#05030A" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  ${L.body}
+  <rect width="${W}" height="${H}" fill="url(#band)"/>
+  <text x="${W / 2}" y="${first}" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="${size}" font-weight="700" fill="#FFFFFF" style="paint-order: stroke; stroke: rgba(0,0,0,0.35); stroke-width: 6px; stroke-linejoin: round">${tspans}</text>
+</svg>
+`;
+};
+
+// ── title art: the show's LOGO, on a transparent ground (spec §3b, the episodes sheet) ──────
+// Displayed ~180×80 and centred over the sheet's panel, so it is authored 9:4 with no backdrop:
+// the type is the asset. The glow behind it is the show's own palette, which is what makes
+// twelve logos read as twelve shows rather than twelve captions.
+const titleArt = (show) => {
+  const W = 720, H = 320;
+  const p = show.palette;
+  const lines = wrap(show.title, 16, 3);
+  const size = lines.length >= 3 ? 64 : lines.length === 2 ? 74 : 84;
+  const lead = size * 1.02;
+  const block = size + (lines.length - 1) * lead;
+  const first = Math.round(H / 2 - block / 2 + size * 0.82);
+  const tspans = lines.map((l, i) => `<tspan x="${W / 2}" ${i === 0 ? 'dy="0"' : `dy="${lead.toFixed(1)}"`}>${esc(l)}</tspan>`).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(show.title)}">
+  <defs>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.55">
+      <stop offset="0" stop-color="${p.glow}" stop-opacity="0.42"/>
+      <stop offset="0.7" stop-color="${p.glow}" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="${p.glow}" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="tsoft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter>
+  </defs>
+  <ellipse cx="${W / 2}" cy="${H / 2}" rx="${W * 0.48}" ry="${H * 0.42}" fill="url(#halo)"/>
+  <text x="${W / 2}" y="${first + 4}" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="${size}" font-weight="700" fill="${p.deep}" opacity="0.8" filter="url(#tsoft)">${tspans}</text>
+  <text x="${W / 2}" y="${first}" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="${size}" font-weight="700" fill="#FFFFFF" style="paint-order: stroke; stroke: ${p.mid}; stroke-width: 3px; stroke-linejoin: round">${tspans}</text>
+  <rect x="${W / 2 - 36}" y="${first + 22}" width="72" height="3" rx="1.5" fill="${p.glow}" opacity="0.9"/>
+</svg>
+`;
+};
+
+// ── the bell: the permission sheet's 64pt illustration (spec §2b) — an ASSET, not a glyph ───
+// An emoji is a font-dependent picture with no per-platform twin (AGENTS.md), and an icon-font
+// bell at 64pt is a glyph blown up. This is a drawn object in the app's own palette — the gold
+// of the crown, the teal of the accent as the "new" dot — so it reads as the app's rather than
+// the OS's. Transparent ground: the sheet's panel shows through.
+const bell = () => {
+  const W = 128, H = 128;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Notification bell">
+  <defs>
+    <linearGradient id="gold" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#FFE38A"/><stop offset="0.55" stop-color="#F5C518"/><stop offset="1" stop-color="#C98F0A"/>
+    </linearGradient>
+    <radialGradient id="bellglow" cx="0.5" cy="0.55" r="0.6">
+      <stop offset="0" stop-color="#F5C518" stop-opacity="0.35"/><stop offset="1" stop-color="#F5C518" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="70" r="58" fill="url(#bellglow)"/>
+  <path d="M64 18c3.6 0 6.4 2.8 6.4 6.3v2.3c14.2 3 24 15.4 24 30.4v17.2l9.6 12.6c1.9 2.5.1 6.2-3 6.2H26.9c-3.1 0-4.9-3.7-3-6.2l9.6-12.6V57c0-15 9.8-27.4 24-30.4v-2.3c0-3.5 2.8-6.3 6.5-6.3z" fill="url(#gold)"/>
+  <path d="M42 57c0-11 8.2-20.6 19-22.6" stroke="#FFF4C2" stroke-width="3.5" stroke-linecap="round" fill="none" opacity="0.85"/>
+  <path d="M52 100h24c0 6.6-5.4 12-12 12s-12-5.4-12-12z" fill="#C98F0A"/>
+  <circle cx="94" cy="34" r="13" fill="#4ADFB4"/>
+  <circle cx="94" cy="34" r="13" fill="none" stroke="#0B1D18" stroke-width="3" opacity="0.6"/>
+</svg>
+`;
+};
+
 let n = 0;
 for (const show of SHOWS) {
   writeFileSync(resolve(OUT, `${show.slug}-poster.svg`), poster(show));
+  writeFileSync(resolve(OUT, `${show.slug}-cover.svg`), cover(show));
+  writeFileSync(resolve(OUT, `${show.slug}-title.svg`), titleArt(show));
   writeFileSync(resolve(OUT, `${show.slug}-hero.svg`), heroWide(show));
   writeFileSync(resolve(OUT, `${show.slug}-hero-tall.svg`), heroTall(show));
-  n += 3;
+  n += 5;
 }
-console.log(`[art] ${n} files → public/posters (${SHOWS.length} shows)`);
+mkdirSync(resolve("public/assets"), { recursive: true });
+writeFileSync(resolve("public/assets/bell.svg"), bell());
+console.log(`[art] ${n} files → public/posters (${SHOWS.length} shows) + public/assets/bell.svg`);

@@ -21,6 +21,21 @@
            second table would cost a join on the hot path to buy nothing this app needs.
            Split on read, never trusted for authority — they are discovery labels. -->
       <field as="tags" type="text"/>
+      <!-- THE REFERENCE HOME'S FIELDS (docs/design/reference-ui-spec.md §1–§2b). `cover` is
+           the 2:3 key art every card on that home is built on — `poster` stays the 3:4 card
+           the desktop lane and the older screens measure against, because art is authored at
+           the ratio it is displayed at (AGENTS.md) and one file cannot serve both. `title_art`
+           is the show's logo image, for the player's episodes sheet. The three booleans are
+           the badges, set by the operator (never derived from a rank at paint time). A show
+           with `coming_soon` is live in the catalogue and absent from every watchable rail,
+           Browse, Search and the reel; `release_at` is what Remind Me counts down to. -->
+      <field as="cover" type="text"/>
+      <field as="title_art" type="text"/>
+      <field as="hot" type="boolean"/>
+      <field as="is_new" type="boolean"/>
+      <field as="original" type="boolean"/>
+      <field as="coming_soon" type="boolean"/>
+      <field as="release_at" type="timestamptz"/>
       <index on="state"/>
     </entity>
 
@@ -53,16 +68,31 @@
       }
       const card = (s, i) => ({
         id: s.id, title: s.title, genre: s.genre, poster: s.poster, hero: s.hero, hero_tall: s.hero_tall,
+        // the 2:3 art, falling back to the 3:4 poster for a row seeded before the field existed
+        // — a frame with no art at all is worse than one cropped a quarter
+        cover: s.cover == null || s.cover === '' ? s.poster : s.cover,
+        titleArt: s.title_art == null ? '' : s.title_art,
         synopsis: s.synopsis, free_until: s.free_until, featured: s.featured === true,
+        hot: s.hot === true, isNew: s.is_new === true, original: s.original === true,
+        comingSoon: s.coming_soon === true, releaseAt: s.release_at == null ? '' : s.release_at,
         views: s.views == null ? 0 : s.views, rating: s.rating == null ? '' : s.rating,
         tags: s.tags == null || s.tags === '' ? [] : s.tags.split(',').map(t => t.trim()).filter(t => t !== ''),
+        // the same tags as ROWS for a nested repeater: a repeater row is a dict, never a
+        // scalar (`item` is the row SCOPE), so a chip list bound to an array of strings
+        // renders "[object Object]" — the New Titles row and the coming-soon sheet read these
+        chips: (s.tags == null || s.tags === '' ? [] : s.tags.split(',').map(t => t.trim()).filter(t => t !== ''))
+          .slice(0, 3).map(t => ({ name: t })),
         episodes: counts[s.id] == null ? 0 : counts[s.id],
         rank: i + 1
       })
       // Each row may appear on several rails; the wire serializer elides a dict it has
       // already written (identity cycle-guard — upstream ledger), so every rail carries
       // value COPIES, never shared references.
-      const rows = shows.data
+      // A COMING-SOON SHOW IS ON ITS OWN RAIL AND NOWHERE ELSE: it has no live episode, so a
+      // card for it on a watchable rail is a tap that lands on an empty grid.
+      const rows = shows.data.filter(s => s.coming_soon !== true)
+      const upcoming = shows.data.filter(s => s.coming_soon === true)
+        .sort((a, b) => (a.release_at == null ? '' : a.release_at) < (b.release_at == null ? '' : b.release_at) ? -1 : 1)
       const featured = rows.filter(s => s.featured === true).slice(0, 5).map((s, i) => card(s, i))
       // JSE collections are value-typed (the Swift model): reading byGenre[g] hands back a
       // copy, so mutate-in-place is a silent no-op — group by WRITE-BACK instead.
@@ -73,11 +103,23 @@
       }
       const shelves = Object.entries(byGenre).map(([genre, items]) => ({ genre: genre, items: items }))
       const trending = rows.filter(s => s.featured === true).concat(rows.filter(s => s.featured !== true))
+      // THE REFERENCE HOME (spec §1–§2). `grid` is the Hot tab's Trending Now grid — the whole
+      // live catalogue, HOT titles first and then by play count, because a 3-column grid wants
+      // every title and the reader scrolls. `picks` is the Picks tab (the operator's featured
+      // set), `newTitles` the New tab's vertical list (the NEW badge is the membership test),
+      // `comingSoon` its rail, soonest premiere first.
+      const viewsOf = (s) => s.views == null ? 0 : s.views
+      const grid = rows.filter(s => s.hot === true).sort((a, b) => viewsOf(b) - viewsOf(a))
+        .concat(rows.filter(s => s.hot !== true).sort((a, b) => viewsOf(b) - viewsOf(a)))
       return {
         hero: featured,
         latest: rows.slice(0, 12).map((s, i) => card(s, i)),
         trending: trending.slice(0, 10).map((s, i) => card(s, i)),
-        shelves: shelves
+        shelves: shelves,
+        grid: grid.map((s, i) => card(s, i)),
+        picks: rows.filter(s => s.featured === true).map((s, i) => card(s, i)),
+        newTitles: rows.filter(s => s.is_new === true).sort((a, b) => a.created_at < b.created_at ? 1 : -1).map((s, i) => card(s, i)),
+        comingSoon: upcoming.map((s, i) => card(s, i))
       }
     </action>
 
@@ -245,13 +287,24 @@
       showOut.tags = s.data.tags == null || s.data.tags === ''
         ? []
         : s.data.tags.split(',').map(t => t.trim()).filter(t => t !== '')
+      // the reference fields in the shape the screens read (camelCase, never null): the
+      // player's episodes sheet centres `titleArt`, the badges read the three flags
+      showOut.cover = s.data.cover == null || s.data.cover === '' ? s.data.poster : s.data.cover
+      showOut.titleArt = s.data.title_art == null ? '' : s.data.title_art
+      showOut.hot = s.data.hot === true
+      showOut.isNew = s.data.is_new === true
+      showOut.original = s.data.original === true
+      showOut.comingSoon = s.data.coming_soon === true
+      showOut.releaseAt = s.data.release_at == null ? '' : s.data.release_at
       return { show: showOut, episodes: episodes, related: related }
     </action>
 
     <action as="searchShows" inputs="q">
       const term = (q == null ? '' : String(q)).trim().toLowerCase()
-      const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 100 })
-      if (!shows.ok) { throw { reason: 'unavailable', message: 'catalogue unavailable' } }
+      const all = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 100 })
+      if (!all.ok) { throw { reason: 'unavailable', message: 'catalogue unavailable' } }
+      // a coming-soon series has nothing to watch yet: it lives on the New tab's rail only
+      const shows = { ok: true, data: all.data.filter(s => s.coming_soon !== true) }
       const hit = (s) => {
         if (term === '') { return true }
         const t = (s.title == null ? '' : s.title).toLowerCase()

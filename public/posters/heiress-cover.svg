@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600" role="img" aria-label="Secret Heiress of Time">
+  <defs><linearGradient id="sky" x1="0.08" y1="0" x2="0.92" y2="1">
+      <stop offset="0" stop-color="#1B0A33"/><stop offset="0.52" stop-color="#7A34C8"/><stop offset="1" stop-color="#1B0A33"/>
+    </linearGradient>
+    <radialGradient id="rim" cx="0.5" cy="0.24" r="0.72">
+      <stop offset="0" stop-color="#C79BFF" stop-opacity="0.62"/>
+      <stop offset="0.55" stop-color="#C79BFF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#C79BFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.46" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="0.58" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.44" r="0.78">
+      <stop offset="0.45" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.62"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="29" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.16"/></feComponentTransfer>
+    </filter><filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <linearGradient id="band" x1="0" y1="0.36" x2="0" y2="0.78">
+      <stop offset="0" stop-color="#05030A" stop-opacity="0"/>
+      <stop offset="0.4" stop-color="#05030A" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#05030A" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#sky)"/>
+    <g filter="url(#soft)" opacity="0.9">
+      <ellipse cx="256.0" cy="140.0" rx="120.0" ry="104.0" fill="#C79BFF" opacity="0.30"/>
+      <ellipse cx="112.0" cy="268.0" rx="96.0" ry="84.0" fill="#3A0F6B" opacity="0.24"/>
+    </g>
+    <rect width="400" height="600" fill="url(#rim)"/>
+    <g opacity="0.85" fill="#0D0420">
+      <ellipse cx="154.0" cy="202.0" rx="28.0" ry="32.5"/>
+      <path d="M 67.2 628.0
+               C 67.2 266.1
+                 114.2 236.7
+                 154.0 236.7
+               C 193.8 236.7
+                 240.8 266.1
+                 240.8 628.0
+               Z"/>
+    </g>
+    <g opacity="0.92" fill="#0D0420">
+      <ellipse cx="250.0" cy="184.8" rx="31.4" ry="36.4"/>
+      <path d="M 152.8 631.4
+               C 152.8 256.6
+                 205.5 223.7
+                 250.0 223.7
+               C 294.5 223.7
+                 347.2 256.6
+                 347.2 631.4
+               Z"/>
+    </g>
+    <rect width="400" height="600" fill="url(#sweep)"/>
+    <circle cx="286.9" cy="15.2" r="1.6" fill="#EBDCFF" opacity="0.34"/><circle cx="410.9" cy="455.2" r="2.4" fill="#EBDCFF" opacity="0.26"/><circle cx="214.7" cy="399.9" r="1.7" fill="#EBDCFF" opacity="0.42"/><circle cx="179.8" cy="149.4" r="1.3" fill="#EBDCFF" opacity="0.32"/><circle cx="149.0" cy="302.4" r="2.0" fill="#EBDCFF" opacity="0.35"/><circle cx="28.9" cy="336.4" r="1.3" fill="#EBDCFF" opacity="0.68"/><circle cx="287.7" cy="223.0" r="2.0" fill="#EBDCFF" opacity="0.50"/><circle cx="293.3" cy="434.7" r="1.6" fill="#EBDCFF" opacity="0.62"/><circle cx="228.8" cy="245.4" r="0.8" fill="#EBDCFF" opacity="0.36"/><circle cx="294.0" cy="187.5" r="1.0" fill="#EBDCFF" opacity="0.27"/><circle cx="17.3" cy="17.9" r="0.9" fill="#EBDCFF" opacity="0.47"/><circle cx="69.7" cy="191.0" r="1.8" fill="#EBDCFF" opacity="0.39"/><circle cx="352.7" cy="383.5" r="1.8" fill="#EBDCFF" opacity="0.37"/><circle cx="192.3" cy="153.6" r="1.8" fill="#EBDCFF" opacity="0.36"/><circle cx="200.8" cy="348.9" r="2.1" fill="#EBDCFF" opacity="0.57"/><circle cx="250.4" cy="288.5" r="0.8" fill="#EBDCFF" opacity="0.46"/><circle cx="336.0" cy="8.7" r="1.0" fill="#EBDCFF" opacity="0.34"/><circle cx="224.5" cy="471.2" r="0.6" fill="#EBDCFF" opacity="0.23"/><circle cx="122.5" cy="170.1" r="1.3" fill="#EBDCFF" opacity="0.21"/><circle cx="222.9" cy="304.6" r="1.3" fill="#EBDCFF" opacity="0.64"/><circle cx="59.5" cy="411.6" r="1.2" fill="#EBDCFF" opacity="0.44"/><circle cx="141.8" cy="308.9" r="0.9" fill="#EBDCFF" opacity="0.37"/><circle cx="122.9" cy="51.8" r="1.0" fill="#EBDCFF" opacity="0.43"/><circle cx="214.2" cy="312.3" r="1.6" fill="#EBDCFF" opacity="0.67"/><circle cx="204.2" cy="301.5" r="2.4" fill="#EBDCFF" opacity="0.44"/><circle cx="1.9" cy="352.6" r="2.2" fill="#EBDCFF" opacity="0.65"/>
+    <rect width="400" height="600" fill="url(#vig)"/>
+    <rect width="400" height="600" filter="url(#grain)" opacity="0.5"/>
+  <rect width="400" height="600" fill="url(#band)"/>
+  <text x="200" y="328" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="38" font-weight="700" fill="#FFFFFF" style="paint-order: stroke; stroke: rgba(0,0,0,0.35); stroke-width: 6px; stroke-linejoin: round"><tspan x="200" dy="0">Secret Heiress</tspan><tspan x="200" dy="41.8">of Time</tspan></text>
+</svg>

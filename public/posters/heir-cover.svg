@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600" role="img" aria-label="The Hidden Heir Returns">
+  <defs><linearGradient id="sky" x1="0.08" y1="0" x2="0.92" y2="1">
+      <stop offset="0" stop-color="#0B1522"/><stop offset="0.52" stop-color="#2F5F86"/><stop offset="1" stop-color="#0B1522"/>
+    </linearGradient>
+    <radialGradient id="rim" cx="0.5" cy="0.24" r="0.72">
+      <stop offset="0" stop-color="#93CBEF" stop-opacity="0.62"/>
+      <stop offset="0.55" stop-color="#93CBEF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#93CBEF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.46" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="0.58" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.44" r="0.78">
+      <stop offset="0.45" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.62"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="24" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.16"/></feComponentTransfer>
+    </filter><filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <linearGradient id="band" x1="0" y1="0.36" x2="0" y2="0.78">
+      <stop offset="0" stop-color="#05030A" stop-opacity="0"/>
+      <stop offset="0.4" stop-color="#05030A" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#05030A" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#sky)"/>
+    <g filter="url(#soft)" opacity="0.9">
+      <ellipse cx="256.0" cy="140.0" rx="120.0" ry="104.0" fill="#93CBEF" opacity="0.30"/>
+      <ellipse cx="112.0" cy="268.0" rx="96.0" ry="84.0" fill="#123044" opacity="0.24"/>
+    </g>
+    <rect width="400" height="600" fill="url(#rim)"/>
+    <g opacity="0.85" fill="#050B12">
+      <ellipse cx="154.0" cy="202.0" rx="28.0" ry="32.5"/>
+      <path d="M 67.2 628.0
+               C 67.2 266.1
+                 114.2 236.7
+                 154.0 236.7
+               C 193.8 236.7
+                 240.8 266.1
+                 240.8 628.0
+               Z"/>
+    </g>
+    <g opacity="0.92" fill="#050B12">
+      <ellipse cx="250.0" cy="184.8" rx="31.4" ry="36.4"/>
+      <path d="M 152.8 631.4
+               C 152.8 256.6
+                 205.5 223.7
+                 250.0 223.7
+               C 294.5 223.7
+                 347.2 256.6
+                 347.2 631.4
+               Z"/>
+    </g>
+    <rect width="400" height="600" fill="url(#sweep)"/>
+    <circle cx="153.1" cy="143.9" r="2.2" fill="#DCEEFB" opacity="0.66"/><circle cx="-9.6" cy="226.8" r="1.4" fill="#DCEEFB" opacity="0.57"/><circle cx="255.8" cy="53.1" r="1.1" fill="#DCEEFB" opacity="0.67"/><circle cx="299.0" cy="226.4" r="1.0" fill="#DCEEFB" opacity="0.40"/><circle cx="304.7" cy="198.1" r="2.3" fill="#DCEEFB" opacity="0.50"/><circle cx="254.2" cy="94.7" r="0.9" fill="#DCEEFB" opacity="0.41"/><circle cx="64.4" cy="468.2" r="1.4" fill="#DCEEFB" opacity="0.63"/><circle cx="346.3" cy="391.1" r="2.3" fill="#DCEEFB" opacity="0.25"/><circle cx="408.4" cy="326.3" r="1.3" fill="#DCEEFB" opacity="0.35"/><circle cx="85.3" cy="8.9" r="2.4" fill="#DCEEFB" opacity="0.34"/><circle cx="416.8" cy="46.2" r="2.5" fill="#DCEEFB" opacity="0.66"/><circle cx="326.9" cy="223.5" r="2.2" fill="#DCEEFB" opacity="0.51"/><circle cx="414.0" cy="354.2" r="1.6" fill="#DCEEFB" opacity="0.30"/><circle cx="113.1" cy="108.9" r="1.8" fill="#DCEEFB" opacity="0.55"/><circle cx="392.2" cy="467.4" r="0.9" fill="#DCEEFB" opacity="0.51"/><circle cx="391.1" cy="311.5" r="1.7" fill="#DCEEFB" opacity="0.64"/><circle cx="110.1" cy="137.0" r="0.7" fill="#DCEEFB" opacity="0.58"/><circle cx="277.6" cy="186.6" r="1.3" fill="#DCEEFB" opacity="0.63"/><circle cx="89.7" cy="338.9" r="1.1" fill="#DCEEFB" opacity="0.24"/><circle cx="279.3" cy="224.7" r="0.9" fill="#DCEEFB" opacity="0.38"/><circle cx="172.5" cy="192.0" r="1.1" fill="#DCEEFB" opacity="0.23"/><circle cx="321.5" cy="280.5" r="1.8" fill="#DCEEFB" opacity="0.38"/><circle cx="401.2" cy="255.7" r="2.4" fill="#DCEEFB" opacity="0.42"/><circle cx="377.7" cy="426.4" r="1.8" fill="#DCEEFB" opacity="0.41"/><circle cx="187.5" cy="103.4" r="0.8" fill="#DCEEFB" opacity="0.66"/><circle cx="121.9" cy="18.7" r="1.8" fill="#DCEEFB" opacity="0.34"/>
+    <rect width="400" height="600" fill="url(#vig)"/>
+    <rect width="400" height="600" filter="url(#grain)" opacity="0.5"/>
+  <rect width="400" height="600" fill="url(#band)"/>
+  <text x="200" y="328" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="38" font-weight="700" fill="#FFFFFF" style="paint-order: stroke; stroke: rgba(0,0,0,0.35); stroke-width: 6px; stroke-linejoin: round"><tspan x="200" dy="0">The Hidden Heir</tspan><tspan x="200" dy="41.8">Returns</tspan></text>
+</svg>
