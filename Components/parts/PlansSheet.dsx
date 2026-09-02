@@ -121,12 +121,12 @@
          cards wear); hover lifts on a pointer device -->
     <formula as="tierFx" id="item.id">
       const lift = dsx.variable.hovId == id ? 'translateY(-2px)' : 'none'
-      const ring = dsx.variable.selId == id ? selectGreen() : 'rgba(0,0,0,0)'
+      const ring = dsx.variable.selId == id ? planSelected() : 'rgba(0,0,0,0)'
       const glow = dsx.variable.hovId == id ? '0 10px 30px rgba(230,190,110,0.25)' : 'none'
       return 'background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%); border: 2px solid ' + ring + '; transform: ' + lift + '; box-shadow: ' + glow + '; transition: transform 0.18s ease, box-shadow 0.18s ease'
     </formula>
     <formula as="tierRing" id="item.id">
-      return dsx.variable.selId == id ? selectGreen() : 'rgba(0,0,0,0)'
+      return dsx.variable.selId == id ? planSelected() : 'rgba(0,0,0,0)'
     </formula>
 
     <action as="openPlans">

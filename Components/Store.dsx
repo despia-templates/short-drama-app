@@ -118,11 +118,11 @@
          the Membership page's cards wear, and a pointer device gets the hover lift -->
     <formula as="packCardFx" id="item.id">
       const lift = dsx.variable.hovId == ('p-' + id) ? 'translateY(-2px)' : 'none'
-      const ring = dsx.variable.selId == id ? selectGreen() : 'rgba(0,0,0,0)'
+      const ring = dsx.variable.selId == id ? planSelected() : 'rgba(0,0,0,0)'
       return 'border: 1.5px solid ' + ring + '; transform: ' + lift + '; transition: transform 0.18s ease, border-color 0.15s ease'
     </formula>
     <formula as="packRing" id="item.id">
-      return dsx.variable.selId == id ? selectGreen() : 'rgba(0,0,0,0)'
+      return dsx.variable.selId == id ? planSelected() : 'rgba(0,0,0,0)'
     </formula>
     <!-- the price a pack displays: the store's localized string when the build asked one,
          else the server's list price (read by BARE NAME inside the repeater) -->

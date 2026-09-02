@@ -768,7 +768,7 @@
               <vstack class="railItem" style="pointer-events: {{ dsx.variable.holding ? 'none' : 'auto' }}" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button"
                       a11yLabel="{{ dsx.variable.favOn ? 'Saved to My List' : 'Save to My List' }}">
                 <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="26"
-                       color="{{ dsx.variable.favOn ? savedLime() : ink() }}" a11yHidden="true"/>
+                       color="{{ dsx.variable.favOn ? savedMark() : ink() }}" a11yHidden="true"/>
                 <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="railCap"/>
               </vstack>
               <vstack class="railItem" style="pointer-events: {{ dsx.variable.holding ? 'none' : 'auto' }}" on:tap="dsx.action.openPanel({ tab: 'episodes' })" a11yGroup="true"

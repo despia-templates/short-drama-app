@@ -470,9 +470,9 @@
     <style as="permSub" fontSize="15" color="#8E8E93" textAlign="center" lineSpacing="5"/>
     <style as="permCard" background="#1C1C1E" radius="12" paddingH="16" paddingV="16" spacing="12" alignItems="center"/>
     <style as="checkOff" width="20" height="20" radius="5" borderWidth="1.5" borderColor="#48484A" background="#1C1C1E" alignItems="center" alignY="center"/>
-    <style as="checkOn" width="20" height="20" radius="5" background="#4ADFB4" alignItems="center" alignY="center"/>
+    <style as="checkOn" width="20" height="20" radius="5" background="#FF2C55" alignItems="center" alignY="center"/>
     <style as="permLabel" fontSize="15" color="#FFFFFF"/>
-    <style as="required" fontSize="15" color="#4ADFB4"/>
+    <style as="required" fontSize="15" color="#FF2C55"/>
     <style as="maybe" fontSize="15" color="#8E8E93" textAlign="center" paddingTop="2"/>
     <!-- the toast: card fill, radius 10, 13 ink, padding 10×14 (spec −1) -->
     <style as="toastRow" background="#1C1C1E" radius="10" paddingH="14" paddingV="10" spacing="10" alignItems="center"/>

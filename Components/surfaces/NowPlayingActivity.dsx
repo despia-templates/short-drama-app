@@ -9,7 +9,7 @@
      card is byte-parallel to Components/surfaces/NowPlayingWidget.dsx — the home widget that
      takes over when this activity ends — so the two surfaces show one card. Snapshot
      dialect only (no JSE, literal colours mirroring Theme.dsx: widgetCard #0E0E10 · ink3
-     #8E8E93 · sheetCard #1C1C1E · accentWidget #6EE7C5 · ink #FFFFFF · stage #000000);
+     #8E8E93 · sheetCard #1C1C1E · accentWidget #FF3D5D · ink #FFFFFF · stage #000000);
      the <head> documents the seed contract and the renderer ignores it, because in an
      <activity> root only the slot elements are read.
 
@@ -51,8 +51,8 @@
           </hstack>
         </hstack>
         <spacer/>
-        <hstack bg="#6EE7C5" radius="12" paddingv="12" paddingh="14" grow="width" align="center">
-          <text size="17" weight="bold" color="#000000" lines="1">{{ dsx.variable.cta }}</text>
+        <hstack bg="#FF3D5D" radius="12" paddingv="12" paddingh="14" grow="width" align="center">
+          <text size="17" weight="bold" color="#FFFFFF" lines="1">{{ dsx.variable.cta }}</text>
         </hstack>
       </vstack>
     </hstack>
@@ -74,7 +74,7 @@
     <compact>
       <leading><image src="{{ dsx.variable.poster }}" width="22" height="22" radius="6" fit="cover"
                       href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}"/></leading>
-      <trailing><text size="13" weight="bold" color="#6EE7C5" lines="1"
+      <trailing><text size="13" weight="bold" color="#FF3D5D" lines="1"
                       href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}">{{ dsx.variable.ep }}</text></trailing>
     </compact>
 
@@ -92,9 +92,9 @@
         </vstack>
       </center>
       <bottom>
-        <hstack bg="#6EE7C5" radius="12" paddingv="10" paddingh="14" grow="width" align="center"
+        <hstack bg="#FF3D5D" radius="12" paddingv="10" paddingh="14" grow="width" align="center"
                 href="/watch/{{ dsx.variable.show }}/{{ dsx.variable.idx }}">
-          <text size="15" weight="bold" color="#000000" lines="1">{{ dsx.variable.cta }}</text>
+          <text size="15" weight="bold" color="#FFFFFF" lines="1">{{ dsx.variable.cta }}</text>
         </hstack>
       </bottom>
     </expanded>

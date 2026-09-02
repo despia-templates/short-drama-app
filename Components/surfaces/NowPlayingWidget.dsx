@@ -8,7 +8,7 @@
      widget process runs no JSE and fetches nothing, so the dialect is the small one — stacks,
      text, image, spacer, `{{ dsx.variable.<key> }}` holes only (no ternaries, no calls), and
      every colour is a LITERAL. The literals are checked mirrors of Components/parts/Theme.dsx
-     (widgetCard #0E0E10 · ink3 #8E8E93 · sheetCard #1C1C1E · accentWidget #6EE7C5 · ink
+     (widgetCard #0E0E10 · ink3 #8E8E93 · sheetCard #1C1C1E · accentWidget #FF3D5D · ink
      #FFFFFF · stage #000000), the same rule every <style> block already lives under.
 
      THE VARIABLES the app publishes (Components/parts/NowPlayingSurface.dsx, through
@@ -69,8 +69,8 @@
         </hstack>
       </hstack>
       <spacer/>
-      <hstack bg="#6EE7C5" radius="12" paddingv="12" paddingh="14" grow="width" align="center">
-        <text size="17" weight="bold" color="#000000" lines="1">{{ dsx.variable.cta }}</text>
+      <hstack bg="#FF3D5D" radius="12" paddingv="12" paddingh="14" grow="width" align="center">
+        <text size="17" weight="bold" color="#FFFFFF" lines="1">{{ dsx.variable.cta }}</text>
       </hstack>
     </vstack>
   </hstack>

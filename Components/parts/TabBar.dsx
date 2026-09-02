@@ -59,11 +59,11 @@
     <style as="item" spacing="3" alignItems="center" paddingV="1" paddingH="4" width="64"/>
     <style as="glyph" width="24" height="24" alignItems="center" alignY="center"/>
     <style as="cap" fontSize="11" fontWeight="medium"/>
-    <!-- the callout: teal, fully round, ink-on-light figures; sits above and to the right
+    <!-- the callout: the accent pink, fully round, white figures; sits above and to the right
          of the coin, over the bar's top edge — position: absolute + edge insets are bridged
          on both native lanes now, so this is one declaration on three renderers -->
-    <style as="callout" background="#4ADFB4" radius="9" paddingH="6" paddingV="2" alignItems="center" zIndex="2"/>
-    <style as="calloutTxt" fontSize="11" fontWeight="bold" color="#111111" lineLimit="1"/>
+    <style as="callout" background="#FF2C55" radius="9" paddingH="6" paddingV="2" alignItems="center" zIndex="2"/>
+    <style as="calloutTxt" fontSize="11" fontWeight="bold" color="#FFFFFF" lineLimit="1"/>
   </head>
 
   <!-- FIRST CHILD, always. `<functions global="true">` registers at INSTANTIATE, not at

@@ -155,7 +155,7 @@
     <style as="gridWrap" paddingBottom="16"/>
     <style as="cell" radius="8" height="38" alignItems="center" background="#2C2C2E"/>
     <style as="cellNum" fontSize="17" fontWeight="bold"/>
-    <style as="eqBar" width="3" radius="1.5" background="#4ADFB4"/>
+    <style as="eqBar" width="3" radius="1.5" background="#FF2C55"/>
     <style as="detailsWrap" paddingTop="16" paddingBottom="24" spacing="24" alignItems="stretch"/>
     <style as="synopsisTxt" fontSize="15" color="#C7C7CC" lineSpacing="7"/>
     <style as="moreHead" fontSize="20" fontWeight="bold" color="#FFFFFF"/>

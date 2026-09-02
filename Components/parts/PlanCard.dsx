@@ -41,7 +41,7 @@
       return s === true || s === 'true'
     </variable>
     <variable as="hasOff" computed="true">return Number(dsx.attribute.off) > 0</variable>
-    <variable as="ring" computed="true">return dsx.variable.isSelected ? selectGreen() : 'rgba(0,0,0,0)'</variable>
+    <variable as="ring" computed="true">return dsx.variable.isSelected ? planSelected() : 'rgba(0,0,0,0)'</variable>
     <variable as="cardFx" computed="true">
       return 'position: relative; border: 1.5px solid ' + dsx.variable.ring + '; transition: border-color 0.15s ease'
     </variable>

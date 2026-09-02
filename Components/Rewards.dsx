@@ -284,7 +284,7 @@
     <style as="head" alignItems="center" spacing="12" paddingTop="12" paddingBottom="4"/>
     <style as="h1" fontSize="22" fontWeight="bold" color="#FFFFFF"/>
     <style as="claimPill" background="rgba(74,223,180,0.16)" radius="14" paddingH="10" paddingV="6" spacing="4" alignItems="center"/>
-    <style as="claimTxt" fontSize="13" fontWeight="semibold" color="#4ADFB4"/>
+    <style as="claimTxt" fontSize="13" fontWeight="semibold" color="#FF2C55"/>
     <style as="balancePill" background="#1C1C1E" radius="16" paddingH="12" paddingV="8" spacing="6" alignItems="center"/>
     <style as="balanceNum" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
     <style as="toastRow" background="#1C1C1E" radius="10" paddingH="14" paddingV="10" spacing="10" alignItems="center"/>
@@ -308,7 +308,7 @@
     <style as="missionRow" spacing="14" alignItems="center"/>
     <style as="missionTile" width="44" height="44" radius="10" background="#2C2C2E" alignItems="center"/>
     <style as="track" background="#2C2C2E" radius="3" height="6" alignItems="flex-start"/>
-    <style as="fill" background="#4ADFB4" radius="3" height="6"/>
+    <style as="fill" background="#FF2C55" radius="3" height="6"/>
     <style as="msChip" radius="6" paddingV="8" spacing="2" alignItems="center"/>
     <style as="msMin" fontSize="13" fontWeight="semibold"/>
     <style as="msCoins" fontSize="12"/>

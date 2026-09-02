@@ -70,7 +70,7 @@ Custom control geometry (measured on the reference's More sheet and permission s
 | ink | `#FFFFFF` | titles, active labels, prices |
 | ink-2 | `#C7C7CC` | synopsis body, locked episode numbers |
 | ink-3 | `#8E8E93` | secondary labels, inactive tabs, footnotes |
-| accent (teal) | `#4ADFB4` | current-episode outline + equaliser, timer ring, "(Required)", checkbox, widget CTA (`#6EE7C5` on the widget) |
+| accent (ReelShort pink/red) | `#FF2C55` | the founder's call, 2026-09-02: the reference app is teal here, ReelShort's pink/red is what this template wears — current-episode outline + equaliser, timer ring, "(Required)", checkbox, the tab-bar coin callout (white figures), the selected plan outline and the saved bookmark; the Live Activity / widget CTA is `#FF3D5D` (ReelShort's own player pink) with white ink |
 | gold | `#F5C518` | crown, plan titles, "% OFF" badges, unlock pill text; CTA fill `#F5D33D` |
 | gold-dim | `#3B3410` | unlock pill fill |
 | hot red | `#E0342C` | HOT / NEW badges |

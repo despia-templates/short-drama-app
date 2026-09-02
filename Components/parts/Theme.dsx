@@ -197,14 +197,14 @@
          the five-tab bar paint these and only these. Named by job, like everything above;
          `sheet()` / `sheetCard()` / `sheetCell()` already ARE the spec's panel / card / chip
          tones (#141414 / #1C1C1E / #2C2C2E), so those three are not repeated here. */
-      function accent() { return '#4ADFB4' }         /* teal: the current episode, the timer ring, a required mark, the checkbox, the coin callout */
-      function accentWidget() { return '#6EE7C5' }   /* the Live Activity CTA's brighter teal */
+      function accent() { return '#FF2C55' }         /* = brand(): the ReelShort pink/red — the founder's call (2026-09-02) over the reference app's teal — for the current episode, the timer ring, a required mark, the checkbox, the coin callout */
+      function accentWidget() { return '#FF3D5D' }   /* the Live Activity / widget CTA: ReelShort's own player pink (measured, AGENTS.md), a step lighter on the #0E0E10 card; white ink on it */
       function crownGold() { return '#F5C518' }      /* the crown, plan titles, % OFF badges, unlock-pill text */
       function ctaGold() { return '#F5D33D' }        /* the membership CTA fill */
       function goldDim() { return '#3B3410' }        /* the unlock pill fill */
       function hotRed() { return '#E0342C' }         /* the HOT and NEW badges */
-      function selectGreen() { return '#8DD35F' }    /* the selected plan card outline */
-      function savedLime() { return '#C6E36A' }      /* the player's saved bookmark */
+      function planSelected() { return '#FF2C55' }   /* the selected plan card outline — the accent, not the reference app's green */
+      function savedMark() { return '#FF2C55' }      /* the player's saved bookmark — the accent, not the reference app's lime */
       function ink2() { return '#C7C7CC' }           /* synopsis body, locked episode numbers */
       function ink3() { return '#8E8E93' }           /* secondary labels, inactive tabs, footnotes */
       function grabber() { return '#48484A' }        /* the sheet grabber, a checkbox outline at rest */
