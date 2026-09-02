@@ -21,6 +21,10 @@
     "authDeviceUrl": "/auth/device",
     "authLinkUrl": "/auth/link",
     "authUnlinkUrl": "/auth/unlink",
+    "followFacebookUrl": "",
+    "followYoutubeUrl": "",
+    "followTiktokUrl": "",
+    "followInstagramUrl": "",
     "termsUrl": "",
     "privacyUrl": "",
     "supportUrl": ""

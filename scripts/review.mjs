@@ -32,10 +32,16 @@ const PALETTE = new Set(themeTones().keys());
 // the measured ramp: the iOS scale plus the category-reference sizes this app is built to.
 // 10 is the reference's ORIGINAL badge and its bottom-left mark (docs/design/reference-ui-spec.md
 // §1, read off the founder's screenshots at 601×1306) — a measured size, not a slider stop.
-const TYPE_RAMP = new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32, 34]);
+// 40 is the Rewards balance hero (docs/design/reference-ui-spec.md §9.1, read off the
+// founder's 1206×2622 captures ÷3) — one measured size, one screen, the coin figure.
+const TYPE_RAMP = new Set([10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32, 34, 40]);
 
+// THE CLI, overridable: `DSX_CLI="node …/packages/cli/bin/dsx.ts"` runs the reviewer from the
+// framework SOURCE when the sibling checkout's dist is mid-rebuild (a broken or unexecutable
+// node_modules/.bin/despia would otherwise read as eight design failures).
+const CLI = process.env.DSX_CLI ?? "npx despia";
 let out = "";
-try { out = execSync("npx despia review --strict 2>&1", { encoding: "utf8" }); }
+try { out = execSync(`${CLI} review --strict 2>&1`, { encoding: "utf8" }); }
 catch (e) { out = (e.stdout ?? "") + (e.stderr ?? ""); }
 
 const lines = out.split("\n").filter((l) => l.trim() !== "" && !/^despia review:/.test(l));

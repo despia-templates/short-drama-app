@@ -214,3 +214,66 @@ create unique index if not exists dsx_report_owner_target_uniq
 -- lock is belt-and-braces against a concurrent double-link rather than the sole guard.
 create unique index if not exists dsx_ledger_merge_once
   on dsx_ledger (owner_id, source, ref) where source = 'merge';
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════════════
+-- THE REWARDS CATALOGUE (server/engage.dsx, docs/design/reference-ui-spec.md §9) — the same
+-- two gaps, §6.25 (no all-read/own-write word) and §6.83 (no unique index), for the tables
+-- the industry-standard Rewards page added.
+
+-- one push token row per viewer: the token rotates and re-arrives on every launch, so the
+-- action upserts and the loser of a first-launch race re-reads the winner
+create unique index if not exists dsx_pushtoken_owner_uniq on dsx_pushtoken (owner_id);
+
+-- THE TWO ALL-READ REFERRAL TABLES: an invitee resolves an invite code by listing it, and an
+-- inviter lists the proofs written against their code — neither is possible on an owner
+-- table, and a declared action cannot write another viewer's row. Same shape as dsx_comment:
+-- owner_id defaulted by Postgres, a declared `owner` twin filled the same way (what lets an
+-- account deletion enumerate one viewer's rows), and own-write policies.
+alter table dsx_invitecode alter column owner_id set default auth.uid();
+alter table dsx_invitecode alter column owner set default auth.uid();
+update dsx_invitecode set owner = owner_id where owner is null and owner_id is not null;
+drop policy if exists dsx_invitecode_owner_write on dsx_invitecode;
+create policy dsx_invitecode_owner_write on dsx_invitecode for insert with check (owner_id = auth.uid());
+drop policy if exists dsx_invitecode_owner_delete on dsx_invitecode;
+create policy dsx_invitecode_owner_delete on dsx_invitecode for delete using (owner_id = auth.uid());
+-- one code per viewer, and one viewer per code — the code is the wallet id's first eight
+-- hex characters, so a collision is a refused insert rather than a shared code
+create unique index if not exists dsx_invitecode_code_uniq on dsx_invitecode (code);
+create unique index if not exists dsx_invitecode_owner_uniq on dsx_invitecode (owner_id);
+
+alter table dsx_referralproof alter column owner_id set default auth.uid();
+alter table dsx_referralproof alter column owner set default auth.uid();
+update dsx_referralproof set owner = owner_id where owner is null and owner_id is not null;
+drop policy if exists dsx_referralproof_owner_write on dsx_referralproof;
+create policy dsx_referralproof_owner_write on dsx_referralproof for insert with check (owner_id = auth.uid());
+drop policy if exists dsx_referralproof_owner_delete on dsx_referralproof;
+create policy dsx_referralproof_owner_delete on dsx_referralproof for delete using (owner_id = auth.uid());
+-- one proof per invitee, ever: the invitee's watchTick writes it at the first verified
+-- minute, and a replayed tick is refused here
+create unique index if not exists dsx_referralproof_owner_uniq on dsx_referralproof (owner_id);
+
+-- one attachment per invitee device; one credit per (inviter, invitee) — the exactly-once
+-- lock the invite sweep writes BEFORE the coin moves (engage.dsx claimTask)
+create unique index if not exists dsx_referral_owner_uniq on dsx_referral (owner_id);
+create unique index if not exists dsx_referralcredit_owner_invitee_uniq on dsx_referralcredit (owner_id, invitee);
+
+-- the Daily Draw: one per member per day (the row is also the membership timeline)
+create unique index if not exists dsx_memberday_owner_day_uniq on dsx_memberday (owner_id, day);
+
+-- a redemption is idempotent per day and card (spec 9.4): a double tap extends once
+create unique index if not exists dsx_redeem_owner_day_card_uniq on dsx_redeem (owner_id, day, card);
+
+-- THE ONCE-EVER GRANTS, through the ledger like every other exactly-once grant here:
+--   signin    written by the PROVIDER inside the link merge (scripts/serve.mjs)
+--   push      the 60 coins for the first push token (engage.dsx registerPush)
+--   pts_push  the 30 member points for the same event
+-- One row per owner per source, so the grant cannot land twice however the event repeats
+-- (a token re-arrives on every launch; a device can be linked, unlinked and linked again).
+create unique index if not exists dsx_ledger_once_per_owner
+  on dsx_ledger (owner_id, source) where source in ('signin', 'push', 'pts_push');
+
+-- ...and the per-day / per-invitee grants: draw (ref = day), pts_watch30 (ref = day),
+-- redeem (ref = day:card), invite (ref = the invitee). Partial, so nothing else is caught.
+create unique index if not exists dsx_ledger_rewards_once
+  on dsx_ledger (owner_id, source, ref) where source in ('draw', 'pts_watch30', 'redeem', 'invite');

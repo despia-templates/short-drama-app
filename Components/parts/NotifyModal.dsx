@@ -1,0 +1,102 @@
+<!-- NotifyModal — the enable-notification card (docs/design/reference-ui-spec.md §9.7): a
+     120-tall phone mock at the top (the app's name and an "Allow notifications" toggle ON,
+     on the tile plate), "Enable Notification" 20 semibold, three benefit columns (a 44
+     glyph over a 15 label: New Shows · Bonus Rewards · Promos), a full-width 47 "Enable"
+     pill in the accent, and the ⊗ below.
+
+     THE TOGGLE IS DRAWN, not a platform control (spec −1): the 51×31 gold track, the 27
+     white knob, the same pixels on three lanes. It is an ILLUSTRATION of the setting the
+     viewer is about to grant, not a control — the tap that grants is the Enable pill, which
+     raises `enable`; the screen asks Core/Notify for the permission and then registers the
+     device's push token, because the reward is tied to the TOKEN landing on the server
+     (server/engage.dsx registerPush), never to the permission prompt itself (App Store
+     5.1.2(i)). The sheet is the host's; this part raises `enable` and `close`. -->
+<vstack class="wrap">
+  <head>
+    <attribute as="busy" default="false"/>
+    <event as="enable"/>
+    <event as="close"/>
+
+    <variable as="isBusy" computed="true">
+      const v = dsx.attribute.busy
+      return v === true || v === 'true'
+    </variable>
+
+    <style as="wrap" spacing="0" alignItems="stretch"/>
+    <style as="body" spacing="16" alignItems="center" paddingBottom="4"/>
+    <!-- the phone mock: a 120-tall plate, radius 14, the app row inside it -->
+    <style as="plate" background="#2A2A2A" radius="14" height="120" paddingH="16" alignItems="center" alignY="center"/>
+    <style as="appRow" spacing="12" alignItems="center"/>
+    <style as="appMark" width="36" height="36" radius="9" background="#E0342C" alignItems="center" alignY="center"/>
+    <style as="appName" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+    <style as="appSub" fontSize="12" color="#8E8E93" lineLimit="1"/>
+    <style as="track" width="51" height="31" radius="16" background="#F5C518" alignItems="flex-end" alignY="center" paddingH="2"/>
+    <style as="knob" width="27" height="27" radius="14" background="#FFFFFF" shadow="4" shadowColor="rgba(0,0,0,0.3)" shadowY="2"/>
+    <style as="title" fontSize="20" fontWeight="semibold" color="#FFFFFF" textAlign="center"/>
+    <style as="cols" spacing="8" alignItems="flex-start"/>
+    <style as="colItem" spacing="8" alignItems="center"/>
+    <style as="glyphTile" width="44" height="44" radius="22" background="#2A2A2A" alignItems="center" alignY="center"/>
+    <style as="colLbl" fontSize="15" color="#FFFFFF" textAlign="center" lineLimit="2"/>
+    <style as="enable" height="47" radius="24" background="#FF2C55" alignItems="center" alignY="center"/>
+    <style as="enableTxt" fontSize="17" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="closeBtn" width="44" height="44" radius="22" alignItems="center" alignY="center"/>
+    <style as="closeRing" width="28" height="28" radius="14" borderWidth="1.5" borderColor="#8E8E93" alignItems="center" alignY="center"/>
+  </head>
+
+  <Theme/>
+  <!-- ROOT SPACING 0, BRIDGED LOUDLY (PLAN.md §6.183): on iOS a file component whose root is a
+       SPACED vstack pays one spacing at its top — probe-measured on an iPhone 17 Pro, +16pt for a
+       spacing-16 root, +0 for the identical inline stack. The root here carries no spacing and the
+       body below carries the card's; delete this wrapper the day the engine entry closes. -->
+  <vstack class="body">
+  <hstack class="plate" style="width: 100%; justify-content: center" a11yHidden="true">
+    <hstack class="appRow" style="width: 100%">
+      <vstack class="appMark" style="justify-content: center; flex: none">
+        <image icon="play.fill" iconSize="16" color="#FFFFFF" a11yHidden="true"/>
+      </vstack>
+      <vstack spacing="2" grow="width" style="flex: 1; min-width: 0" alignItems="stretch">
+        <text value="Short Drama" class="appName"/>
+        <text value="Allow notifications" class="appSub" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+      </vstack>
+      <!-- the drawn toggle, ON: gold track, the knob at the trailing edge -->
+      <hstack class="track" style="justify-content: flex-end; flex: none">
+        <stack class="knob" style="box-shadow: 0 2px 4px rgba(0,0,0,0.3)"/>
+      </hstack>
+    </hstack>
+  </hstack>
+
+  <text value="Enable Notification" class="title"/>
+
+  <hstack class="cols" style="width: 100%; justify-content: space-around">
+    <vstack class="colItem" style="width: 30%">
+      <vstack class="glyphTile" style="justify-content: center">
+        <image icon="play.rectangle.fill" iconSize="22" color="{{ warmGold() }}" a11yHidden="true"/>
+      </vstack>
+      <text value="New Shows" class="colLbl"/>
+    </vstack>
+    <vstack class="colItem" style="width: 30%">
+      <vstack class="glyphTile" style="justify-content: center">
+        <image icon="gift.fill" iconSize="22" color="{{ warmGold() }}" a11yHidden="true"/>
+      </vstack>
+      <text value="Bonus Rewards" class="colLbl"/>
+    </vstack>
+    <vstack class="colItem" style="width: 30%">
+      <vstack class="glyphTile" style="justify-content: center">
+        <image icon="sparkles" iconSize="22" color="{{ warmGold() }}" a11yHidden="true"/>
+      </vstack>
+      <text value="Promos" class="colLbl"/>
+    </vstack>
+  </hstack>
+
+  <hstack class="enable" style="width: 100%; justify-content: center" opacity="{{ dsx.variable.isBusy ? 0.6 : 1 }}"
+          on:tap="dsx.event('enable', {})" a11yGroup="true" a11yTrait="button" a11yLabel="Enable notifications">
+    <text value="{{ dsx.variable.isBusy ? 'One moment…' : 'Enable' }}" class="enableTxt"/>
+  </hstack>
+
+  <vstack class="closeBtn" style="justify-content: center" on:tap="dsx.event('close', {})" a11yTrait="button" a11yLabel="Not now">
+    <vstack class="closeRing" style="justify-content: center; border: 1.5px solid #8E8E93">
+      <image icon="xmark" iconSize="14" color="{{ ink3() }}" a11yHidden="true"/>
+    </vstack>
+  </vstack>
+  </vstack>
+</vstack>

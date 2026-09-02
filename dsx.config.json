@@ -151,6 +151,14 @@
       }
     },
     {
+      "path": "/invite/:code",
+      "component": "shortdrama.Invite",
+      "meta": {
+        "title": "You are invited — Short Drama"
+      },
+      "_note": "THE INVITE LINK (docs/design/reference-ui-spec.md 9.3 row 5): a friend's share carries /invite/<code>; the screen keeps the code in a cookie and replaces itself with Home, where Components/parts/ReferralSeam.dsx attaches it to the device identity. The inviter is credited only when this device records its first server-verified watch minute (server/engage.dsx)."
+    },
+    {
       "path": "/admin",
       "component": "shortdrama.Admin",
       "meta": {
@@ -158,6 +166,13 @@
       }
     }
   ],
+  "_consts_note": "THE FOLLOW ROWS (docs/design/reference-ui-spec.md 9.3 row 6) read their destinations from `dsx.const.follow*Url`, which App.json ships EMPTY on purpose — a placeholder URL reads as a broken promise to a store reviewer — and a row whose URL is empty is not rendered. This local overlay points the demo at the networks' own front pages so the page can be judged against the reference; an adopter puts their real pages in App.json.",
+  "consts": {
+    "followFacebookUrl": "https://www.facebook.com/",
+    "followYoutubeUrl": "https://www.youtube.com/",
+    "followTiktokUrl": "https://www.tiktok.com/",
+    "followInstagramUrl": "https://www.instagram.com/"
+  },
   "router": {
     "transition": "ios",
     "swipeBack": true,

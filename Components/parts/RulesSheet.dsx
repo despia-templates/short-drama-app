@@ -1,0 +1,75 @@
+<!-- RulesSheet — the content of the Rules sheet (docs/design/reference-ui-spec.md §9.6):
+     a chevron-down at the left, "Rules" 20 bold centred, the rules as a numbered list at
+     17 ink with 1.35 leading, and a full-width 47 "Got It" pill in the accent.
+
+     EVERY RULE IS TRUE OF THIS BACKEND, which is why two of the reference's five are not
+     copied word for word. Its third rule spends "the earliest-expiring bonus" first —
+     nothing here expires (App Store 3.1.1; wallet.dsx), so the rule says what the wallet
+     actually does: bonus first, then purchased coins, and neither ever expires. Its fourth
+     resets at midnight in the viewer's zone — every daily marker in server/engage.dsx is
+     keyed on the UTC date, so that is the hour the sheet names. A rule the server does not
+     keep is a promise the viewer cannot hold the app to. The sheet itself is the host's
+     (`present` is a two-way key); this part raises `close`. -->
+<vstack class="wrap">
+  <head>
+    <event as="close"/>
+
+    <style as="wrap" spacing="0" alignItems="stretch"/>
+    <style as="body" spacing="16" alignItems="stretch" paddingBottom="4"/>
+    <style as="headRow" alignItems="center" spacing="8"/>
+    <style as="chev" width="44" height="44" alignItems="center" alignY="center"/>
+    <style as="title" fontSize="20" fontWeight="bold" color="#FFFFFF" textAlign="center"/>
+    <style as="rules" spacing="12" alignItems="stretch"/>
+    <style as="rule" spacing="8" alignItems="flex-start"/>
+    <style as="num" fontSize="17" color="#FFFFFF" width="22"/>
+    <style as="txt" fontSize="17" color="#FFFFFF" lineSpacing="6"/>
+    <style as="gotIt" height="47" radius="24" background="#FF2C55" alignItems="center" alignY="center"/>
+    <style as="gotItTxt" fontSize="17" fontWeight="semibold" color="#FFFFFF"/>
+  </head>
+
+  <Theme/>
+  <!-- ROOT SPACING 0, BRIDGED LOUDLY (PLAN.md §6.183): on iOS a file component whose root is a
+       SPACED vstack pays one spacing at its top — probe-measured on an iPhone 17 Pro, +16pt for a
+       spacing-16 root, +0 for the identical inline stack. The root here carries no spacing and the
+       body below carries the card's; delete this wrapper the day the engine entry closes. -->
+  <vstack class="body">
+  <hstack class="headRow">
+    <vstack class="chev" style="justify-content: center; flex: none" on:tap="dsx.event('close', {})" a11yTrait="button" a11yLabel="Close the rules">
+      <!-- the catalog has no chevron.down: the physical right chevron turned a quarter points
+           down in every reading direction, on every lane (rotation= is bridged; the web twin
+           is the transform) -->
+      <image icon="chevron.right" iconSize="24" color="{{ ink() }}" rotation="90" a11yHidden="true" style="transform: rotate(90deg)"/>
+    </vstack>
+    <text value="Rules" class="title" grow="width" style="flex: 1"/>
+    <stack width="44" height="44" style="flex: none"/>
+  </hstack>
+
+  <vstack class="rules">
+    <hstack class="rule">
+      <text value="1." class="num"/>
+      <text value="Check in once a day. Missing a day restarts the seven-day cycle." class="txt" grow="width" style="flex: 1"/>
+    </hstack>
+    <hstack class="rule">
+      <text value="2." class="num"/>
+      <text value="Coins unlock episodes. Every movement is listed under My Page → Transaction History." class="txt" grow="width" style="flex: 1"/>
+    </hstack>
+    <hstack class="rule">
+      <text value="3." class="num"/>
+      <text value="Bonus coins are spent first, then the coins you bought — and coins never expire." class="txt" grow="width" style="flex: 1"/>
+    </hstack>
+    <hstack class="rule">
+      <text value="4." class="num"/>
+      <text value="Check-in and daily tasks reset once a day at 00:00 UTC." class="txt" grow="width" style="flex: 1"/>
+    </hstack>
+    <hstack class="rule">
+      <text value="5." class="num"/>
+      <text value="The operator may change these rules and reserves the right of final interpretation." class="txt" grow="width" style="flex: 1"/>
+    </hstack>
+  </vstack>
+
+  <hstack class="gotIt" style="width: 100%; justify-content: center" on:tap="dsx.event('close', {})"
+          a11yGroup="true" a11yTrait="button" a11yLabel="Got it">
+    <text value="Got It" class="gotItTxt"/>
+  </hstack>
+  </vstack>
+</vstack>

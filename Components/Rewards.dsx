@@ -1,52 +1,69 @@
-<!-- Rewards — the EARN lane, and a TAB ROOT now (docs/design/reference-ui-spec.md §8: the
-     fourth tab, with a callout above its icon showing the coins a viewer can claim). Four
-     earn mechanics in the category's own order — the daily check-in, the Watch Mission, the
-     capped rewarded ad, the wheel and the tasks — restyled to the reference's tokens (§0):
-     black ground, #1C1C1E cards at radius 12, 17 semibold card titles, 13 secondary copy,
-     48pt white primary buttons. Gold is the membership's job and appears here only on the
-     one door that opens it.
+<!-- Rewards — the industry-standard page (docs/design/reference-ui-spec.md §9, measured off
+     the founder's DramaBox / iDrama / NetShort reference set), a TAB ROOT with two swipeable
+     tabs under one 44pt header:
 
-     FUNNEL ROLE: retention. Every mechanic pays small and daily, which is what makes
-     tomorrow's open worth it; the screen sells nothing except through the labelled doors.
+       Reward coins   the balance hero · the seven-cell check-in card · the Earn Rewards row
+                      cards in the reference's order (sign-in · push · the rewarded ad · the two
+                      watch-mission rows · invite · the follow rows · share) · Spin the wheel ·
+                      the Apple footer
+       Member Points  the "Daily Rewards" hero with the points pill · the membership timeline ·
+                      the Daily Draw and Watch & Earn rows · Recommendations · the push row ·
+                      Redeem Points · the Coming Soon band (the Home rail, reused)
 
-     EVERY NUMBER IS A SERVER FACT. The streak curve, the ad cap, the wheel's prize table and
-     the watch-mission milestones all arrive in /rewards/state and /engage/watch/state, so an
-     operator changes the economy without a build and the client can never invent an
-     entitlement. Buttons only ASK — and a button with nothing to ask for is disabled in its
-     ACTION, not just grey.
+     The tabs are a `<pager>`: a swipe writes the index, the underline reads it, and a tab tap
+     writes it back — one store key, no second source of truth. The Rules pill hugs the right
+     screen edge over the first tab (§9.0), the success modal (§9.5), the Rules sheet (§9.6) and
+     the enable-notification modal (§9.7) are declared here and filled by their parts.
 
-     THE WATCH MISSION IS COUNTED SERVER-SIDE (server/engage.dsx watchTick): the player sends
-     heartbeats, the server counts wall-clock time between them and grants at 5 · 10 · 20 · 30
-     minutes up to the daily cap. This card only READS that state — it has no claim button
-     because there is nothing for the client to claim; the grant already landed the moment
-     the boundary was crossed.
+     EVERY NUMBER IS A SERVER FACT (server/engage.dsx). The curve, the seven cells, the ad cap,
+     each row's amount and progress, the invite code, the points balance, the draw's range, the
+     redeem cards — all arrive in /rewards/state, /rewards/points and /wallet/state; a button
+     only ASKS, and the rows whose grant lands without a tap (sign-in on link, push on token,
+     the watch milestones on the ledger's own tick) simply read `claimed` from the ledger. No
+     amount ever travels UP from this screen. The follow and share rows grant NOTHING, and say
+     "Help us grow" instead — a follow cannot be verified by this server (PLAN.md §6.182).
 
      THE CLAIMABLE TOTAL is one arithmetic in the global library (Theme.dsx rewardsClaimable):
-     this screen prints it and the tab bar's callout binds the same function over the
-     app-wide stash, so the two never disagree.
+     the tab bar's callout binds the same function over the app-wide stash, so they agree.
 
-     Signed out, this screen says so ONCE and shows nothing else. -->
+     Custom UI on every lane (spec −1): the tab strip, the pills, the cells, the toggle in the
+     notification modal and the sheets' chrome are drawn, never the platform's. -->
 <vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
+    <expects variable="nav"/>
+
     <!-- the seam owns the token (<AuthSeam/> at the foot of this file); every authenticated
-         read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
+         read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md.
+         Each payload is stashed app-wide (PLAN.md §6.30): the api cache dies with the mount. -->
     <api as="state" url="/rewards/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheRewards = global.auth.ok == true ? state.data : null"/>
     <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
-    <!-- the Watch Mission's read: the same shape a heartbeat answers (server/engage.dsx
-         watchState), bound DEFENSIVELY — a deployment without the route leaves the card out -->
-    <api as="watch" url="/engage/watch/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWatch = global.auth.ok == true ? watch.data : null"/>
+    <api as="points" url="/rewards/points" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cachePoints = global.auth.ok == true ? points.data : null"/>
+    <!-- the catalogue's public read, for the recommendations and the coming-soon band — the
+         same payload Home stashes, so a tab switch paints it before this refetch lands -->
+    <api as="home" url="/catalog/home" ssr="false" on:success="global.cacheHome = home.data"/>
     <api as="checkinCall" url="/rewards/checkin" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="spinCall" url="/rewards/spin" method="POST" auto="false" headers="global.auth.headers"/>
-    <!-- 2.5.18 wants a report-this-ad affordance that REACHES someone. The route landed with
-         the UGC safety pass and takes the {lane, creative} shape AdGate already emits. -->
-    <api as="adReportCall" url="/social/report/ad" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="claimCall" url="/rewards/task" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="pushCall" url="/viewer/push" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="drawCall" url="/rewards/draw" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="pointsTaskCall" url="/rewards/points/task" method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="redeemCall" url="/rewards/redeem" method="POST" auto="false" headers="global.auth.headers"/>
+    <!-- 2.5.18 wants a report-this-ad affordance that REACHES someone. -->
+    <api as="adReportCall" url="/social/report/ad" method="POST" auto="false" headers="global.auth.headers"/>
 
+    <variable as="tab">return 0</variable>            <!-- 0 Reward coins · 1 Member Points; the pager's key -->
     <variable as="toast">return ''</variable>
-    <variable as="wheelTurn">return 0</variable>     <!-- accumulated rotation, degrees -->
+    <variable as="toastDays">return 0</variable>      <!-- a redeem's toast is a plural template -->
+    <variable as="busy">return ''</variable>          <!-- the row id in flight -->
+    <variable as="wheelTurn">return 0</variable>      <!-- accumulated rotation, degrees -->
     <variable as="spinning">return false</variable>
-    <variable as="wheelResult">return ''</variable>  <!-- the hub label after a landing -->
-    <variable as="trackBox">return {}</variable>     <!-- the mission bar's measured box -->
+    <variable as="wheelResult">return ''</variable>   <!-- the hub label after a landing -->
+    <variable as="successOpen">return false</variable>
+    <variable as="successN">return 0</variable>
+    <variable as="successUnit">return 'coins'</variable>
+    <variable as="rulesOpen">return false</variable>
+    <variable as="notifyOpen">return false</variable>
+    <variable as="adOpen">return 0</variable>         <!-- the AdGate open nonce -->
 
     <!-- signed out is the seam's answer, not a 404 on a static file (docs/auth.md) -->
     <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
@@ -54,9 +71,12 @@
     <variable as="signedOut" computed="true">
       return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
     </variable>
-    <!-- stale-then-fresh (PLAN.md §6.30): the api cache dies with the mount, so the last good
-         payload lives app-wide and is the FIRST PAINT while the refetch runs. Viewer-scoped
-         stashes never survive the viewer (docs/auth.md). -->
+    <variable as="isAccount" computed="true">
+      if (global.auth == null) { return false }
+      return global.auth.kind == 'account'
+    </variable>
+    <!-- stale-then-fresh (PLAN.md §6.30): the last good payload is the FIRST PAINT while the
+         refetch runs. Viewer-scoped stashes never survive the viewer (docs/auth.md). -->
     <variable as="walletView" computed="true">
       if (dsx.variable.signedIn == false) { return null }
       if (wallet.data != null) { return wallet.data }
@@ -67,14 +87,17 @@
       if (state.data != null) { return state.data }
       return global.cacheRewards
     </variable>
-    <variable as="watchView" computed="true">
+    <variable as="pointsView" computed="true">
       if (dsx.variable.signedIn == false) { return null }
-      if (watch.data != null) { return watch.data }
-      return global.cacheWatch
+      if (points.data != null) { return points.data }
+      return global.cachePoints
+    </variable>
+    <variable as="homeView" computed="true">
+      if (home.data != null) { return home.data }
+      return global.cacheHome
     </variable>
     <!-- ENTITLEMENT, read from the wallet — never assumed, never remembered. It switches the
-         ad lane off (VIP is sold as "no ads", so it has to BE no ads) and stops the door
-         below pitching a pass the viewer already holds. Unknown resolves to false. -->
+         ad lane off (VIP is sold as "no ads", so it has to BE no ads). Unknown resolves to false. -->
     <variable as="isVip" computed="true">
       if (dsx.variable.walletView == null) { return false }
       return dsx.variable.walletView.vip === true
@@ -88,76 +111,38 @@
 
     <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
     <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
-    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 1100)</variable>
+    <!-- the content column: the reference's 16pt inset on a phone, a capped centred column wide -->
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 640)</variable>
+    <!-- ONE computed list for the column that pulls up under the hero wash: a `{{ chunk }}`
+         beside other declarations is discarded (AGENTS.md) -->
+    <variable as="shellPull" computed="true">return dsx.variable.shell + '; margin-top: -132px'</variable>
     <variable as="balance" computed="true">
-      if (dsx.variable.walletView == null) { return null }
+      if (dsx.variable.walletView == null) { return 0 }
       return dsx.variable.walletView.coins + dsx.variable.walletView.bonus
+    </variable>
+    <variable as="pointsBalance" computed="true">
+      if (dsx.variable.pointsView == null) { return 0 }
+      return Number(dsx.variable.pointsView.points)
     </variable>
     <!-- the one number the tab bar's callout also shows (Theme.dsx rewardsClaimable) -->
     <variable as="claimable" computed="true">return rewardsClaimable(dsx.variable.stateView, dsx.variable.isVip)</variable>
+    <variable as="checkedToday" computed="true">
+      if (dsx.variable.stateView == null) { return false }
+      return dsx.variable.stateView.checkedToday == true
+    </variable>
     <variable as="canCheckin" computed="true">
-      return dsx.variable.stateView != null &amp;&amp; dsx.variable.stateView.checkedToday == false
-    </variable>
-    <variable as="canSpin" computed="true">
-      return dsx.variable.stateView != null &amp;&amp; dsx.variable.stateView.freeSpinLeft &amp;&amp; dsx.variable.spinning == false
-    </variable>
-    <variable as="spinLabel" computed="true">
-      if (dsx.variable.spinning) { return 'Spinning…' }
-      if (dsx.variable.canSpin) { return 'Spin — 1 free today' }
-      return 'No spin left today'
+      return dsx.variable.stateView != null &amp;&amp; dsx.variable.checkedToday == false
     </variable>
     <variable as="streakCount" computed="true">
       return dsx.variable.stateView == null ? 0 : dsx.variable.stateView.streak
     </variable>
-    <!-- ── the Watch Mission facts, each defensive against an absent route ── -->
-    <variable as="hasWatch" computed="true">
-      return dsx.variable.watchView != null &amp;&amp; dsx.variable.watchView.milestones != null
+    <variable as="days" computed="true">
+      if (dsx.variable.stateView == null) { return [] }
+      if (dsx.variable.stateView.days == null) { return [] }
+      return dsx.variable.stateView.days
     </variable>
-    <variable as="watchMinutes" computed="true">
-      if (dsx.variable.watchView == null) { return 0 }
-      return Math.floor(Number(dsx.variable.watchView.watchedSeconds) / 60)
-    </variable>
-    <variable as="watchGranted" computed="true">
-      if (dsx.variable.watchView == null) { return 0 }
-      return Number(dsx.variable.watchView.grantedToday)
-    </variable>
-    <variable as="watchCap" computed="true">
-      if (dsx.variable.watchView == null) { return 0 }
-      return Number(dsx.variable.watchView.dailyCap)
-    </variable>
-    <variable as="watchDone" computed="true">
-      if (dsx.variable.watchView == null) { return false }
-      return dsx.variable.watchView.capReached == true
-    </variable>
-    <!-- the last milestone's minute mark is the bar's full length -->
-    <variable as="watchGoalSeconds" computed="true">
-      if (dsx.variable.hasWatch == false) { return 1800 }
-      const ms = dsx.variable.watchView.milestones
-      if (ms.length == 0) { return 1800 }
-      return Number(ms[ms.length - 1].minutes) * 60
-    </variable>
-    <variable as="watchFrac" computed="true">
-      if (dsx.variable.watchView == null) { return 0 }
-      const f = Number(dsx.variable.watchView.watchedSeconds) / dsx.variable.watchGoalSeconds
-      if (f > 1) { return 1 }
-      if (f < 0) { return 0 }
-      return f
-    </variable>
-    <!-- A PROGRESS FILL IS COMPUTED PX OFF A MEASURED TRACK, never `width: N%` — the native
-         bridge drops non-100 percent lengths silently (AGENTS.md, upstream #281) -->
-    <variable as="watchFillW" computed="true">
-      const b = dsx.variable.trackBox
-      if (b == null || b.width == null) { return 0 }
-      return Math.round(b.width * dsx.variable.watchFrac)
-    </variable>
-    <!-- THE SELL DOOR, which must not sell what the viewer already owns -->
-    <variable as="sellTitle" computed="true">
-      if (dsx.variable.isVip) { return 'Get coins' }
-      return 'Get coins or go VIP'
-    </variable>
-    <variable as="sellNote" computed="true">
-      if (dsx.variable.isVip) { return 'Your VIP pass already covers every unlock — coins are for when it ends.' }
-      return 'Buy a coin pack, or unlock every series with a membership.'
+    <variable as="canSpin" computed="true">
+      return dsx.variable.stateView != null &amp;&amp; dsx.variable.stateView.freeSpinLeft &amp;&amp; dsx.variable.spinning == false
     </variable>
     <variable as="spinRange" computed="true">
       if (dsx.variable.stateView == null || dsx.variable.stateView.spinPrizes == null) { return '' }
@@ -168,62 +153,181 @@
          the server's answer cannot snap the wheel mid-ride. wheelTurn only changes in `spin`. -->
     <variable as="wheelFx" computed="true">
       const a = accent()
-      const b = sheetCell()
+      const b = rewardsCell()
       const c = gold()
       const ring = 'conic-gradient(' + a + ' 0deg 45deg, ' + b + ' 45deg 90deg, ' + c + ' 90deg 135deg, ' + b + ' 135deg 180deg, ' + a + ' 180deg 225deg, ' + b + ' 225deg 270deg, ' + c + ' 270deg 315deg, ' + b + ' 315deg 360deg)'
       return 'width: 132px; height: 132px; border-radius: 66px; background: ' + ring + '; transform: rotate(' + dsx.variable.wheelTurn + 'deg); transition: transform 2.4s cubic-bezier(0.16, 0.8, 0.18, 1)'
     </variable>
+    <!-- ── the ad lane facts, read once for the row and for the success modal ── -->
+    <variable as="adsLeft" computed="true">
+      if (dsx.variable.stateView == null) { return 0 }
+      return Number(dsx.variable.stateView.adsLeft)
+    </variable>
+    <variable as="adReward" computed="true">
+      if (dsx.variable.stateView == null) { return 0 }
+      return Number(dsx.variable.stateView.adReward)
+    </variable>
+    <variable as="adAvailable" computed="true">
+      if (dsx.variable.isVip) { return false }
+      if (global.adOptOut == true) { return false }
+      return dsx.variable.adsLeft > 0
+    </variable>
+    <!-- ── THE ROWS, mapped from the server's task catalogue to the row recipe. The server
+         says WHAT each row is (kind · reward · progress · claimed); this screen only chooses
+         the glyph and which verb the pill wears. Two lists, because the rewarded-ad row sits
+         third and is its own component (<AdGate>, the creative and the 2.5.18 chrome). ── -->
+    <variable as="rowsBefore" computed="true">
+      const out = []
+      if (dsx.variable.stateView == null) { return out }
+      const tasks = dsx.variable.stateView.tasks
+      if (tasks == null) { return out }
+      for (const t of tasks) {
+        if (t.kind == 'signin') { out.push({ id: t.id, kind: 'signin', icon: 'person.fill', amount: t.reward, pill: 'signin', done: t.claimed == true }) }
+        if (t.kind == 'push') { out.push({ id: t.id, kind: 'push', icon: 'bell.fill', amount: t.reward, pill: 'claim', done: t.claimed == true }) }
+      }
+      return out
+    </variable>
+    <variable as="rowsAfter" computed="true">
+      const out = []
+      if (dsx.variable.stateView == null) { return out }
+      const tasks = dsx.variable.stateView.tasks
+      if (tasks == null) { return out }
+      for (const t of tasks) {
+        if (t.kind == 'watch') { out.push({ id: t.id, kind: 'watch', icon: 'timer', amount: t.reward, mins: t.minutes, pill: 'go', done: t.claimed == true, progress: t.progress, target: t.target, counted: true }) }
+        if (t.kind == 'invite') {
+          const pending = t.pending == null ? 0 : Number(t.pending)
+          out.push({ id: t.id, kind: 'invite', icon: 'person.3.fill', amount: t.reward, daily: t.daily, pill: pending > 0 ? 'claim' : 'invite', done: t.claimed == true, pending: pending })
+        }
+      }
+      return out
+    </variable>
+    <variable as="invitePending" computed="true">
+      if (dsx.variable.stateView == null) { return 0 }
+      return dsx.variable.stateView.invitePending == null ? 0 : Number(dsx.variable.stateView.invitePending)
+    </variable>
+    <variable as="inviteCode" computed="true">
+      if (dsx.variable.stateView == null) { return '' }
+      return dsx.variable.stateView.inviteCode == null ? '' : dsx.variable.stateView.inviteCode
+    </variable>
+    <!-- the follow rows read their destinations from the deployment plane (App.json consts,
+         EMPTY by default — a placeholder URL is a broken promise to a reviewer); a row with no
+         URL is not rendered. The names are proper nouns and never translated. -->
+    <variable as="socialRows" computed="true">
+      const out = []
+      const c = dsx.const
+      if (c == null) { return out }
+      if (c.followFacebookUrl != null &amp;&amp; c.followFacebookUrl != '') { out.push({ id: 'facebook', name: 'Facebook', icon: 'person.3.fill', href: c.followFacebookUrl }) }
+      if (c.followYoutubeUrl != null &amp;&amp; c.followYoutubeUrl != '') { out.push({ id: 'youtube', name: 'YouTube', icon: 'play.rectangle.fill', href: c.followYoutubeUrl }) }
+      if (c.followTiktokUrl != null &amp;&amp; c.followTiktokUrl != '') { out.push({ id: 'tiktok', name: 'TikTok', icon: 'music.note.list', href: c.followTiktokUrl }) }
+      if (c.followInstagramUrl != null &amp;&amp; c.followInstagramUrl != '') { out.push({ id: 'instagram', name: 'Instagram', icon: 'photo.on.rectangle', href: c.followInstagramUrl }) }
+      return out
+    </variable>
+    <!-- ── the Member Points facts ── -->
+    <variable as="memberDay" computed="true">
+      if (dsx.variable.pointsView == null) { return 0 }
+      return Number(dsx.variable.pointsView.memberDay)
+    </variable>
+    <variable as="timeline" computed="true">
+      if (dsx.variable.pointsView == null) { return [] }
+      if (dsx.variable.pointsView.timeline == null) { return [] }
+      return dsx.variable.pointsView.timeline
+    </variable>
+    <variable as="drawnToday" computed="true">
+      if (dsx.variable.pointsView == null) { return false }
+      return dsx.variable.pointsView.drawnToday == true
+    </variable>
+    <variable as="drawMin" computed="true">
+      if (dsx.variable.pointsView == null) { return 5 }
+      return Number(dsx.variable.pointsView.drawMin)
+    </variable>
+    <variable as="drawMax" computed="true">
+      if (dsx.variable.pointsView == null) { return 50 }
+      return Number(dsx.variable.pointsView.drawMax)
+    </variable>
+    <variable as="watch30" computed="true">
+      if (dsx.variable.pointsView == null) { return null }
+      return dsx.variable.pointsView.watch30
+    </variable>
+    <variable as="watch30Ready" computed="true">
+      const w = dsx.variable.watch30
+      if (w == null) { return false }
+      return w.ready == true
+    </variable>
+    <variable as="watch30Done" computed="true">
+      const w = dsx.variable.watch30
+      if (w == null) { return false }
+      return w.claimed == true
+    </variable>
+    <variable as="pushPtsDone" computed="true">
+      const v = dsx.variable.pointsView
+      if (v == null) { return false }
+      if (v.pushPoints == null) { return false }
+      return v.pushPoints.claimed == true
+    </variable>
+    <variable as="cards" computed="true">
+      if (dsx.variable.pointsView == null) { return [] }
+      if (dsx.variable.pointsView.cards == null) { return [] }
+      return dsx.variable.pointsView.cards
+    </variable>
+    <variable as="recRows" computed="true">
+      const v = dsx.variable.homeView
+      if (v == null) { return [] }
+      const src = v.trending != null &amp;&amp; v.trending.length > 0 ? v.trending : v.hero
+      if (src == null) { return [] }
+      return src.slice(0, 3)
+    </variable>
+    <variable as="soonRows" computed="true">
+      const v = dsx.variable.homeView
+      if (v == null) { return [] }
+      if (v.comingSoon == null) { return [] }
+      return v.comingSoon
+    </variable>
+    <variable as="soonDate" computed="true">
+      const rows = dsx.variable.soonRows
+      if (rows.length == 0) { return '' }
+      const at = rows[0].releaseAt
+      if (at == null || at == '') { return '' }
+      return shortDate(at)
+    </variable>
+    <!-- the floating card is 314 wide on the reference's 390 screen: the inset is derived,
+         so a wider window still centres a 314 card rather than stretching it -->
+    <variable as="cardInset" computed="true">
+      const w = dsx.screen.width
+      const inset = Math.round((w - 314) / 2)
+      if (inset < 14) { return 14 }
+      if (inset > 128) { return 128 }
+      return inset
+    </variable>
+    <!-- the enable-notification modal is one surface for two rows: the coin row on tab 1 and
+         the points row on tab 2. Both hang on the same server event — the token landing. -->
+    <variable as="notifyBusy" computed="true">return dsx.variable.busy == 'push'</variable>
 
-    <formula as="dayState" i="item.i">
-      if (dsx.variable.stateView == null) { return 'future' }
-      const pos = dsx.variable.stateView.streak % 7
-      const donePos = dsx.variable.stateView.checkedToday ? (pos == 0 ? 7 : pos) : pos
-      if (i < donePos) { return 'done' }
-      if (i == donePos &amp;&amp; !dsx.variable.stateView.checkedToday) { return 'next' }
-      return 'future'
-    </formula>
-    <!-- done = the accent wash, next = gold (the coin about to land), future = a chip -->
-    <formula as="dayColor" st="dayState">
-      if (st == 'done') { return 'rgba(74,223,180,0.18)' }
-      if (st == 'next') { return gold() }
-      return sheetCell()
-    </formula>
-    <formula as="dayInk" st="dayState">
-      if (st == 'next') { return stage() }
-      if (st == 'done') { return accent() }
-      return ink()
-    </formula>
-    <formula as="checkinLabel">
-      if (dsx.variable.stateView == null) { return 'Check in' }
-      if (dsx.variable.stateView.checkedToday) { return 'Checked in — come back tomorrow' }
-      return 'Check in'
-    </formula>
-    <!-- a milestone chip: reached paints the accent, the rest the chip -->
-    <formula as="msBg" reached="item.reached">
-      return reached ? 'rgba(74,223,180,0.18)' : sheetCell()
-    </formula>
-    <formula as="msInk" reached="item.reached">
-      return reached ? accent() : ink3()
-    </formula>
+    <action as="goTab" inputs="i">
+      dsx.variable.tab = Number(i)
+    </action>
 
-    <!-- disabled means DISABLED: the guard is in the action, the grey is just its face -->
+    <!-- CHECK-IN: the server grants; a success opens the modal (spec 9.5) -->
     <action as="checkin">
       if (dsx.variable.canCheckin == false) { return }
+      if (dsx.variable.busy != '') { return }
+      dsx.variable.busy = 'checkin'
       const r = await checkinCall.send({})
+      dsx.variable.busy = ''
       if (r.ok) {
-        dsx.variable.toast = '+' + r.data.reward + ' bonus coins — day ' + r.data.streak
+        dsx.variable.successN = Number(r.data.reward)
+        dsx.variable.successUnit = 'coins'
+        dsx.variable.successOpen = true
         state.refresh()
         wallet.refresh()
+        return
       }
-      else { dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : 'Check-in failed' }
+      dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : localize('Check-in failed')
     </action>
 
     <!-- The wheel SPINS the moment it is asked (2.4s of eased rotation), the server answers
          during the ride, and the hub shows the landing. NOT A LOOT BOX, and it must stay that
          way: `spinWheel` (server/engage.dsx) refuses a second spin the same day and never
-         debits a wallet — nothing sells a spin. The moment a "spin again for 50 coins" button
-         exists, App Store 3.1.1 wants the odds published BEFORE the purchase; the prize table
-         already travels in /rewards/state (`spinPrizes`, `spinOdds`). -->
+         debits a wallet — nothing sells a spin. -->
     <action as="spin">
       if (dsx.variable.canSpin == false) { return }
       dsx.variable.spinning = true
@@ -232,25 +336,194 @@
       const r = await spinCall.send({})
       if (r.ok) {
         dsx.variable.wheelResult = '+' + r.data.prize
-        dsx.variable.toast = 'The wheel lands on ' + r.data.prize + ' bonus coins'
+        dsx.variable.successN = Number(r.data.prize)
+        dsx.variable.successUnit = 'coins'
+        dsx.variable.successOpen = true
         state.refresh()
         wallet.refresh()
       } else {
-        dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : 'No spin left'
+        dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : localize('No spin left today')
       }
       dsx.variable.spinning = false
     </action>
 
-    <action as="claim" task="item.id" done="item.claimed">
-      if (done) { return }
-      const r = await claimCall.send({ task: task })
-      if (r.ok) { dsx.variable.toast = '+' + r.data.reward + ' bonus coins'; state.refresh(); wallet.refresh() }
-      else { dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : 'Not yet' }
+    <!-- ONE DISPATCH for every row tap. The event payload arrives FLAT, so the input names
+         the key bare (AGENTS.md). Every branch either opens a surface, pushes a route or asks
+         the server; none of them carries an amount. -->
+    <action as="rowTap" id="id">
+      if (dsx.variable.busy != '') { return }
+      if (id == 'signin') { dsx.module.route.push({ path: '/auth/signin' }); return }
+      if (id == 'push' || id == 'pushpts') { dsx.variable.notifyOpen = true; return }
+      if (id == 'watch5' || id == 'watch10') { dsx.module.route.reset({ path: '/discover' }); return }
+      if (id == 'invite') {
+        if (dsx.variable.invitePending > 0) { dsx.action.sweepInvites() } else { dsx.action.shareInvite() }
+        return
+      }
+      if (id == 'share') { dsx.action.shareApp(); return }
+      if (id == 'draw') {
+        if (dsx.variable.isVip == false) { dsx.action.openMembership() } else { dsx.action.draw() }
+        return
+      }
+      if (id == 'watch30') {
+        if (dsx.variable.watch30Ready) { dsx.action.claimWatch30() } else { dsx.module.route.reset({ path: '/discover' }) }
+        return
+      }
+    </action>
+
+    <!-- THE INVITE SWEEP: bounded and resumable on the server (twelve invitees a call), so
+         the client loops on `done` — never more than ten passes, which is a hundred and
+         twenty invitees in one sitting and past the daily ceiling anyway -->
+    <action as="sweepInvites">
+      dsx.variable.busy = 'invite'
+      let total = 0
+      let passes = 0
+      let more = true
+      while (more &amp;&amp; passes < 10) {
+        passes = passes + 1
+        const r = await claimCall.send({ task: 'invite' })
+        if (r.ok == false) {
+          if (total == 0) { dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : localize('Not yet') }
+          more = false
+        } else {
+          total = total + Number(r.data.reward)
+          more = r.data.done != true
+        }
+      }
+      dsx.variable.busy = ''
+      if (total > 0) {
+        dsx.variable.successN = total
+        dsx.variable.successUnit = 'coins'
+        dsx.variable.successOpen = true
+        state.refresh()
+        wallet.refresh()
+      }
+    </action>
+
+    <!-- SHARE, for real: the declared Core/SocialShare action; call-then-check because a
+         module chunk loads on first use, so `has()` would refuse the very first tap -->
+    <action as="shareInvite">
+      const code = dsx.variable.inviteCode
+      if (code == '') { return }
+      const r = await dsx.module.share.url({
+        message: localize('Join me on Short Drama — watch a minute and we both earn coins.'),
+        url: '/invite/' + code
+      })
+      if (r == null || r.ok === false) { dsx.variable.toast = localize('Sharing is not available on this platform.') }
+    </action>
+    <action as="shareApp">
+      const r = await dsx.module.share.url({
+        message: localize('Watch Short Drama with me.'),
+        url: '/'
+      })
+      if (r == null || r.ok === false) { dsx.variable.toast = localize('Sharing is not available on this platform.') }
+    </action>
+
+    <!-- THE PUSH ROW (spec 9.3 row 2 and 9.4's push row): the permission is Core/Notify's one
+         ladder, the TOKEN is what the server pays for — a real push server needs it, and the
+         reward is tied to the feature working, never to the OS prompt (App Store 5.1.2(i)).
+         Every lane says exactly which halves it managed; nothing here reports a grant the
+         server did not make. -->
+    <action as="enableNotify">
+      if (dsx.variable.busy != '') { return }
+      dsx.variable.busy = 'push'
+      let status = 'unknown'
+      if (has('notify')) {
+        const p = await dsx.module.notify.permission({})
+        if (p.ok) { if (p.data != null) { if (p.data.status != null) { status = p.data.status } } }
+      }
+      if (status == 'denied') {
+        dsx.variable.busy = ''
+        dsx.variable.notifyOpen = false
+        dsx.variable.toast = localize('Notifications are off for this app. Turn them on in Settings, then try again.')
+        return
+      }
+      let token = ''
+      if (has('notify')) {
+        const t = await dsx.module.notify.token({})
+        if (t.ok) { if (t.data != null) { if (t.data.token != null) { token = String(t.data.token) } } }
+      }
+      if (token == '') {
+        // Article 7: the permission is on, the transport is not in this build — say so
+        dsx.variable.busy = ''
+        dsx.variable.notifyOpen = false
+        dsx.variable.toast = localize('Notifications are on. This build has no push transport yet, so the reward waits for the app that carries one.')
+        return
+      }
+      const r = await pushCall.send({ token: token, platform: os })
+      dsx.variable.busy = ''
+      dsx.variable.notifyOpen = false
+      if (r.ok == false) {
+        dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : localize('The token could not be saved')
+        return
+      }
+      const coins = Number(r.data.coins)
+      const pts = Number(r.data.points)
+      state.refresh()
+      points.refresh()
+      wallet.refresh()
+      if (coins > 0) {
+        dsx.variable.successN = coins
+        dsx.variable.successUnit = 'coins'
+        dsx.variable.successOpen = true
+        return
+      }
+      if (pts > 0) {
+        dsx.variable.successN = pts
+        dsx.variable.successUnit = 'points'
+        dsx.variable.successOpen = true
+        return
+      }
+      dsx.variable.toast = localize('Notifications are on — this device already claimed its reward.')
+    </action>
+
+    <!-- ── Member Points ── -->
+    <action as="draw">
+      dsx.variable.busy = 'draw'
+      const r = await drawCall.send({})
+      dsx.variable.busy = ''
+      if (r.ok) {
+        dsx.variable.successN = Number(r.data.prize)
+        dsx.variable.successUnit = 'points'
+        dsx.variable.successOpen = true
+        points.refresh()
+        wallet.refresh()
+        return
+      }
+      dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : localize('Not yet')
+    </action>
+    <action as="claimWatch30">
+      dsx.variable.busy = 'watch30'
+      const r = await pointsTaskCall.send({ task: 'watch30' })
+      dsx.variable.busy = ''
+      if (r.ok) {
+        dsx.variable.successN = Number(r.data.reward)
+        dsx.variable.successUnit = 'points'
+        dsx.variable.successOpen = true
+        points.refresh()
+        wallet.refresh()
+        return
+      }
+      dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : localize('Not yet')
+    </action>
+    <action as="redeem" id="id">
+      if (dsx.variable.busy != '') { return }
+      dsx.variable.busy = 'redeem'
+      const r = await redeemCall.send({ card: id })
+      dsx.variable.busy = ''
+      if (r.ok) {
+        dsx.variable.toastDays = Number(r.data.days)
+        points.refresh()
+        wallet.refresh()
+        return
+      }
+      dsx.variable.toast = r.data != null &amp;&amp; r.data.message != null ? r.data.message : localize('Not yet')
     </action>
 
     <!-- the ad lane lives in <AdGate>; this screen only reacts to its outcome -->
     <action as="adGranted" reward="reward" left="left">
-      dsx.variable.toast = '+' + reward + ' bonus coins · ' + left + ' left today'
+      dsx.variable.successN = Number(reward)
+      dsx.variable.successUnit = 'coins'
+      dsx.variable.successOpen = true
       state.refresh()
       wallet.refresh()
     </action>
@@ -260,273 +533,386 @@
     <!-- the report seam (App Store 2.5.18): the creative is hidden locally either way, and
          the toast says which of the two things actually happened -->
     <action as="adReported" lane="lane" creative="creative">
-      dsx.variable.toast = 'Ad hidden for this session.'
+      dsx.variable.toast = localize('Ad hidden for this session.')
       const r = await adReportCall.send({ lane: lane, creative: creative })
       if (r.ok) {
-        dsx.variable.toast = 'Reported, and hidden for this session.'
+        dsx.variable.toast = localize('Reported, and hidden for this session.')
         return
       }
-      const msg = r.data == null || r.data.message == null ? '' : r.data.message
-      dsx.variable.toast = msg === ''
-        ? 'Ad hidden for this session. The report could not be filed.'
-        : 'Ad hidden for this session. ' + msg
+      dsx.variable.toast = localize('Ad hidden for this session. The report could not be filed.')
+    </action>
+    <!-- the success modal's CTA: close the card FIRST (a route or a second sheet over an open
+         sheet is the defect PLAN.md §6.95 records), then bump the nonce the ad row watches -->
+    <action as="successAd">
+      dsx.variable.successOpen = false
+      dsx.variable.adOpen = Number(dsx.variable.adOpen) + 1
+    </action>
+    <action as="closeSuccess">dsx.variable.successOpen = false</action>
+    <action as="openRules">dsx.variable.rulesOpen = true</action>
+    <action as="closeRules">dsx.variable.rulesOpen = false</action>
+    <action as="closeNotify">dsx.variable.notifyOpen = false</action>
+    <action as="clearToast">
+      dsx.variable.toast = ''
+      dsx.variable.toastDays = 0
+    </action>
+    <!-- the rail's honest line (which halves of Remind Me this lane managed) lands here -->
+    <action as="note" text="text">
+      dsx.variable.toast = text
     </action>
     <!-- a tab root is entered laterally; the store is a pushed page and the membership page
          is the crown's destination (Theme.dsx membershipPath) -->
     <action as="openStore">dsx.module.route.push({ path: '/store' })</action>
     <action as="openMembership">dsx.module.route.push({ path: membershipPath() })</action>
+    <action as="openBrowse">dsx.module.route.push({ path: '/browse' })</action>
 
-    <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
-    <style as="scroller" alignItems="stretch"/>
-    <style as="page" spacing="0" paddingBottom="32" alignItems="stretch"/>
-    <style as="section" spacing="14" alignItems="stretch" paddingTop="24"/>
-
-    <style as="head" alignItems="center" spacing="12" paddingTop="12" paddingBottom="4"/>
-    <style as="h1" fontSize="22" fontWeight="bold" color="#FFFFFF"/>
-    <style as="claimPill" background="rgba(74,223,180,0.16)" radius="14" paddingH="10" paddingV="6" spacing="4" alignItems="center"/>
-    <style as="claimTxt" fontSize="13" fontWeight="semibold" color="#FF2C55"/>
-    <style as="balancePill" background="#1C1C1E" radius="16" paddingH="12" paddingV="8" spacing="6" alignItems="center"/>
-    <style as="balanceNum" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="toastRow" background="#1C1C1E" radius="10" paddingH="14" paddingV="10" spacing="10" alignItems="center"/>
-    <style as="toastLine" fontSize="13" fontWeight="medium" color="#FFFFFF" lineSpacing="3"/>
-    <style as="sectionTitle" fontSize="22" fontWeight="bold" color="#FFFFFF"/>
-    <style as="sectionNote" fontSize="13" color="#8E8E93" lineSpacing="3"/>
-
-    <style as="card" background="#1C1C1E" radius="12" paddingH="16" paddingV="16" spacing="14" alignItems="stretch"/>
-    <style as="cardHead" alignItems="center" spacing="12"/>
-    <style as="h2" fontSize="17" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="note" fontSize="13" color="#8E8E93" lineSpacing="3"/>
-    <style as="streakRow" spacing="6" alignItems="center"/>
-    <style as="streakPill" fontSize="12" fontWeight="semibold" color="#F6B63D"/>
-    <style as="dayCell" spacing="4" alignItems="center" paddingV="8" radius="8"/>
-    <style as="dayAmt" fontSize="12" fontWeight="semibold"/>
-    <style as="dayNum" fontSize="11" color="#8E8E93"/>
-    <!-- the reference's button: 48pt, radius 12, ink fill, 17 semibold on black. ONE class;
-         the fill and the ink are interpolated attributes, because a class name is resolved
-         at compile time and cannot follow a runtime value. -->
-    <style as="btn" radius="12" minHeight="48" paddingV="14" fontSize="17" fontWeight="semibold"/>
-    <style as="missionRow" spacing="14" alignItems="center"/>
-    <style as="missionTile" width="44" height="44" radius="10" background="#2C2C2E" alignItems="center"/>
-    <style as="track" background="#2C2C2E" radius="3" height="6" alignItems="flex-start"/>
-    <style as="fill" background="#FF2C55" radius="3" height="6"/>
-    <style as="msChip" radius="6" paddingV="8" spacing="2" alignItems="center"/>
-    <style as="msMin" fontSize="13" fontWeight="semibold"/>
-    <style as="msCoins" fontSize="12"/>
-    <style as="factRow" alignItems="center" spacing="8"/>
-    <style as="factLabel" fontSize="13" color="#8E8E93"/>
-    <style as="factValue" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="wheelWrap" alignItems="center" spacing="12"/>
+    <!-- THE SCREEN ROOT is `grow="true" spacing="0"` on the reference's #0E0E0E ground; the
+         min-height rides `:web` (AGENTS.md) -->
+    <style as="screen" background="#0E0E0E" alignItems="stretch" grow="true" spacing="0"/>
+    <style as="frame" alignItems="stretch" grow="true" spacing="0"/>
+    <!-- the 44 header: the chevron at the left, the tab pair centred -->
+    <style as="head" height="44" alignItems="center"/>
+    <style as="tabs" spacing="24" alignItems="center"/>
+    <style as="tabCol" spacing="6" alignItems="center" paddingV="4"/>
+    <style as="tabOn" fontSize="17" fontWeight="bold" color="#FFFFFF" lineLimit="1"/>
+    <style as="tabOff" fontSize="17" color="#8E8E93" lineLimit="1"/>
+    <style as="tabRule" width="26" height="2" radius="1"/>
+    <!-- the Rules pill: 48×31 visible, radius 16, hanging 16 past the right edge (a negative
+         inset, bridged on every lane) so its right corners are clipped everywhere and only the
+         two left corners round; the label sits 4 in from the visible left edge -->
+    <style as="rulesPill" width="64" height="31" radius="16" background="rgba(255,255,255,0.12)" paddingLeading="4" alignItems="flex-start" alignY="center" zIndex="3"/>
+    <style as="rulesTxt" fontSize="15" color="#FFFFFF" lineLimit="1"/>
+    <style as="pageBody" spacing="0" paddingBottom="32" alignItems="stretch"/>
+    <!-- ── tab 1 ── -->
+    <!-- 9.1: the band is ~80 (105→183 on the reference), the number's top 13 under the band's
+         top and "Balance" 8 under its baseline. The 40pt line box is ~60 on the web (1.5em) and
+         seats the glyph ~16 down on its own, so the column carries no top padding and no
+         spacing, and the label is pulled 12 up with `offsetY` — a translate that reads the same
+         on three lanes and moves no sibling. (A smaller line box was NOT the tool: `lineSpacing`
+         reaches the web's box and not a native single line, so it would move the lanes apart.)
+         Measured before: card top 142 on the web, 204 on iOS (62 safe top), the label 80 under
+         the header on both; the spec wants the card at 127 and the label at 51. -->
+    <style as="hero" height="84" alignItems="flex-start"/>
+    <style as="heroCol" spacing="0" alignItems="flex-start" paddingLeading="15"/>
+    <style as="balanceNum" fontSize="40" fontWeight="bold" color="#F7C948" lineLimit="1"/>
+    <style as="balanceLbl" fontSize="15" color="#8E8E93"/>
+    <style as="heroArt" width="168" height="84" opacity="0.5"/>
+    <style as="sectionTitle" fontSize="17" fontWeight="semibold" color="#FFFFFF" paddingTop="28" paddingBottom="12"/>
+    <style as="rows" spacing="12" alignItems="stretch"/>
+    <style as="footer" fontSize="15" color="#8E8E93" textAlign="center" paddingTop="40" lineSpacing="4"/>
+    <style as="spinCard" background="#1A1A1A" radius="16" paddingH="16" paddingV="16" spacing="14" alignItems="center"/>
     <style as="wheelLabel" fontSize="15" fontWeight="bold" color="#FFFFFF" background="rgba(0,0,0,0.8)" paddingH="12" paddingV="6" radius="14"/>
-    <style as="taskRow" alignItems="center" spacing="12"/>
-    <style as="taskCol" spacing="2" alignItems="stretch"/>
-    <style as="taskTitle" fontSize="15" color="#FFFFFF"/>
-    <style as="taskMeta" fontSize="13" color="#8E8E93"/>
-    <style as="claimBtn" radius="10" paddingH="16" minHeight="44" fontSize="13" fontWeight="semibold"/>
-    <style as="doorCard" background="#1C1C1E" radius="12" paddingH="16" paddingV="16" spacing="12" alignItems="center"/>
-    <style as="doorTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="doorNote" fontSize="13" color="#8E8E93" lineSpacing="3"/>
-    <style as="vipDoor" background="#3B3410" radius="12" paddingH="16" paddingV="14" spacing="12" alignItems="center"/>
-    <style as="vipDoorTxt" fontSize="15" fontWeight="semibold" color="#F6B63D"/>
-    <style as="signCard" background="#1C1C1E" radius="12" spacing="10" paddingH="16" paddingV="24" alignItems="center"/>
-    <style as="signBtn" background="#FFFFFF" radius="12" minHeight="48" paddingH="20" paddingV="14" fontSize="15" fontWeight="semibold" color="#000000"/>
+    <style as="spinBtn" height="47" radius="8" paddingH="24" alignItems="center" alignY="center"/>
+    <style as="spinTxt" fontSize="17" fontWeight="semibold" lineLimit="1"/>
+    <!-- ── tab 2 ── -->
+    <style as="ptsHero" height="200" alignItems="flex-start" gradient="rgba(255,44,85,0.30)|rgba(106,42,122,0.20)|rgba(14,14,14,0)" gradientDir="vertical"/>
+    <style as="ptsHeadRow" alignItems="center" paddingTop="12"/>
+    <style as="ptsTitle" fontSize="24" fontWeight="bold" color="#FFFFFF" lineLimit="1"/>
+    <style as="ptsPill" background="rgba(255,255,255,0.12)" radius="18" paddingH="12" height="36" spacing="4" alignItems="center" alignY="center"/>
+    <style as="ptsNum" fontSize="18" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+    <style as="h24" fontSize="24" fontWeight="bold" color="#FFFFFF" lineLimit="1"/>
+    <style as="moreRow" spacing="4" alignItems="center"/>
+    <style as="moreTxt" fontSize="15" color="#8E8E93"/>
+    <style as="recTitle" fontSize="15" color="#FFFFFF" lineLimit="1" paddingTop="6"/>
+    <style as="redeemSub" fontSize="15" color="#8E8E93" lineSpacing="5"/>
+    <style as="soonBand" spacing="12" alignItems="stretch" paddingTop="24" paddingBottom="24" gradient="#3A1030|#0E0E0E" gradientDir="vertical"/>
+    <style as="soonDate" fontSize="15" color="#FFFFFF"/>
+    <style as="soonTrack" height="1" background="rgba(255,255,255,0.12)"/>
+    <!-- the signed-out card and the loading/error states -->
+    <style as="signCard" background="#1A1A1A" radius="16" spacing="10" paddingH="16" paddingV="24" alignItems="center"/>
+    <style as="signBtn" background="#FF2C55" radius="12" minHeight="48" paddingH="20" paddingV="14" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="empty" fontSize="13" color="#8E8E93"/>
+    <!-- the toast: card fill, radius 10, 13 ink, padding 10×14 (spec −1) -->
+    <style as="toastRow" background="#1C1C1E" radius="10" paddingH="14" paddingV="10" spacing="10" alignItems="center"/>
+    <style as="toastLine" fontSize="13" color="#FFFFFF" lineSpacing="3"/>
   </head>
 
   <!-- the design vocabulary registers here. FIRST CHILD, always (Components/parts/Theme.dsx). -->
   <Theme/>
   <!-- the funnel (Components/parts/Analytics.dsx) -->
   <Analytics/>
-  <scroll class="scroller" grow="true" style="flex: 1; min-height: 0">
-    <vstack class="page">
-      <TopNav active="rewards" visible-if="dsx.variable.wide"/>
+  <!-- an install that landed through an invite link attaches its code here -->
+  <ReferralSeam/>
 
-      <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-        <!-- a TAB ROOT has no back chevron: it is entered laterally and never pushed -->
-        <hstack class="head">
-          <text value="Rewards" class="h1"/>
-          <hstack class="claimPill" visible-if="dsx.variable.claimable > 0"
-                  a11yGroup="true" a11yLabel="{{ dsx.variable.claimable }} coins to claim">
-            <text value="+{{ dsx.variable.claimable }}" class="claimTxt"/>
-            <text value="to claim" class="claimTxt"/>
-          </hstack>
-          <spacer/>
-          <hstack class="balancePill" visible-if="dsx.variable.balance != null"
-                  on:tap="dsx.action.openStore()" a11yGroup="true" a11yTrait="button"
-                  a11yLabel="{{ dsx.variable.balance }} coins — get more in the store">
-            <image icon="dollarsign.circle.fill" iconSize="15" color="{{ coin() }}" a11yHidden="true"/>
-            <text value="{{ dsx.variable.balance }}" class="balanceNum"/>
-          </hstack>
+  <vstack class="frame" style="flex: 1; min-height: 0">
+    <TopNav active="rewards" visible-if="dsx.variable.wide"/>
+
+    <!-- ══ THE HEADER (spec 9.0): 44 tall, the two tabs centred 24 apart with a 26×2 rule
+         under the resting one ══ -->
+    <zstack class="head" style="width: 100%; position: relative">
+      <hstack style="width: 100%; justify-content: center; align-items: center; height: 44px">
+        <hstack class="tabs">
+          <vstack class="tabCol" on:tap="dsx.action.goTab({ i: 0 })" a11yTrait="button"
+                  a11yLabel="Reward coins{{ dsx.variable.tab == 0 ? ', selected' : '' }}">
+            <text value="Reward coins" class="{{ dsx.variable.tab == 0 ? 'tabOn' : 'tabOff' }}" style="white-space: nowrap"/>
+            <stack class="tabRule" background="{{ dsx.variable.tab == 0 ? ink() : 'rgba(0,0,0,0)' }}"/>
+          </vstack>
+          <vstack class="tabCol" on:tap="dsx.action.goTab({ i: 1 })" a11yTrait="button"
+                  a11yLabel="Member Points{{ dsx.variable.tab == 1 ? ', selected' : '' }}">
+            <text value="Member Points" class="{{ dsx.variable.tab == 1 ? 'tabOn' : 'tabOff' }}" style="white-space: nowrap"/>
+            <stack class="tabRule" background="{{ dsx.variable.tab == 1 ? ink() : 'rgba(0,0,0,0)' }}"/>
+          </vstack>
         </hstack>
-      </vstack>
+      </hstack>
+      <!-- NO BACK CHEVRON: the reference draws one because its Rewards is a pushed page; ours is
+           a TAB ROOT (spec 9.0, 8) entered laterally, so there is nothing to pop to and a chevron
+           would be a control that does nothing. The web router also reports canPop on a cold load
+           (the entry frame under the deep link), which is one more reason not to bind it here. -->
+    </zstack>
 
-      <!-- signed out: one honest card, nothing else -->
-      <vstack class="section" visible-if="dsx.variable.phase == 'signedout'">
-        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <SignInCard icon="gift.fill"
-                      title="Rewards belong to an account"
-                      note="Streaks, spins and coins need somewhere to land. Sign in and start earning — nothing here costs money."/>
-        </vstack>
-      </vstack>
+    <!-- ══ THE TWO TABS: a horizontal pager, each page its own scroller. The Rules pill floats
+         over the first page's top-right edge (spec 9.0, y 108). `overflow: hidden` on the web
+         wrapper is what lets the pill hang 16px past the edge without a horizontal scrollbar. ══ -->
+    <zstack grow="true" style="flex: 1; min-height: 0; width: 100%; position: relative; overflow: hidden">
+      <pager value="dsx.variable.tab" dots="false" grow="true" style="flex: 1; min-height: 0; width: 100%; height: 100%">
 
-      <vstack class="section" visible-if="dsx.variable.phase == 'loading'">
-        <vstack style="{{ dsx.variable.shell }}" spacing="14" alignItems="stretch">
-          <Skeleton height="180" radius="12"/>
-          <Skeleton height="140" radius="12"/>
-          <Skeleton height="140" radius="12"/>
-        </vstack>
-      </vstack>
+        <!-- ═══════════════════════════ TAB 1 · REWARD COINS ═══════════════════════════ -->
+        <scroll grow="true" style="height: 100%; min-height: 0">
+          <vstack class="pageBody" style="{{ dsx.variable.shell }}">
 
-      <vstack class="section" visible-if="dsx.variable.phase == 'error'">
-        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <vstack class="signCard">
-            <text value="Rewards are unavailable right now." fontSize="15" color="#FFFFFF"/>
-            <text value="Your balance is safe — this screen just could not load its state." class="empty" textAlign="center"/>
-            <button label="Retry" class="signBtn" on:tap="state.refresh()"/>
-          </vstack>
-        </vstack>
-      </vstack>
+            <!-- signed out: one honest card, nothing else -->
+            <vstack paddingTop="24" alignItems="stretch" visible-if="dsx.variable.phase == 'signedout'">
+              <LinkPrompt icon="gift.fill"
+                          title="Rewards belong to an account"
+                          note="Streaks, spins and coins need somewhere to land. Sign in and start earning — nothing here costs money."/>
+            </vstack>
+            <vstack paddingTop="16" spacing="14" alignItems="stretch" visible-if="dsx.variable.phase == 'loading'">
+              <Skeleton height="78" radius="12"/>
+              <Skeleton height="220" radius="16"/>
+              <Skeleton height="74" radius="12"/>
+              <Skeleton height="74" radius="12"/>
+            </vstack>
+            <vstack paddingTop="24" alignItems="stretch" visible-if="dsx.variable.phase == 'error'">
+              <vstack class="signCard">
+                <text value="Rewards are unavailable right now." fontSize="15" color="#FFFFFF"/>
+                <text value="Your balance is safe — this screen just could not load its state." class="empty" textAlign="center"/>
+                <button label="Retry" class="signBtn" on:tap="state.refresh()"/>
+              </vstack>
+            </vstack>
 
-      <!-- ═══ EARN ═══ -->
-      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
-        <vstack style="{{ dsx.variable.shell }}" spacing="14" alignItems="stretch">
-
-          <!-- daily check-in -->
-          <vstack class="card">
-            <hstack class="cardHead">
-              <text value="Daily check-in" class="h2" grow="width" style="flex: 1"/>
-              <hstack class="streakRow" a11yGroup="true" a11yLabel="{{ dsx.variable.streakCount }} day streak">
-                <image icon="flame.fill" iconSize="14" color="{{ gold() }}" a11yHidden="true"/>
-                <text value="{{ dsx.variable.streakCount }}" class="streakPill"/>
-                <text value="day streak" class="streakPill"/>
+            <vstack spacing="0" alignItems="stretch" visible-if="dsx.variable.phase == 'content'">
+              <!-- 9.1 · the balance hero: the number in coin gold, the illustration washed into
+                   the page at the right edge. A band, not a card. -->
+              <hstack class="hero" style="width: 100%; justify-content: space-between" a11yGroup="true"
+                      a11yLabel="Balance: {{ dsx.variable.balance }} coins">
+                <vstack class="heroCol" style="justify-content: flex-start; flex: none">
+                  <text value="{{ dsx.variable.balance }}" class="balanceNum"/>
+                  <text value="Balance" class="balanceLbl" offsetY="-12"/>
+                </vstack>
+                <!-- the 2:1 illustration at the right edge, bleeding to the screen edge and
+                     washed into the page; `flex: none` so the column keeps its own width -->
+                <image src="/assets/rewards-hero.svg" contentFit="contain" class="heroArt" a11yHidden="true"
+                       style="width: 168px; height: 84px; margin-right: -16px; opacity: 0.5; flex: none"/>
               </hstack>
-            </hstack>
-            <grid bind="dsx.variable.stateView.days" key="id" columns="7" spacing="6" scroll="false">
-              <vstack class="dayCell" background="{{ dayColor }}" style="transition: background-color 0.3s ease">
-                <image icon="checkmark" iconSize="12" color="{{ accent() }}" visible-if="dayState == 'done'" a11yHidden="true"/>
-                <text value="+{{ item.reward }}" class="dayAmt" color="{{ dayInk }}" visible-if="dayState != 'done'"/>
-                <text value="D{{ item.i + 1 }}" class="dayNum" color="{{ dayState == 'next' ? stage() : ink3() }}"/>
-              </vstack>
-            </grid>
-            <button label="{{ checkinLabel }}" class="btn"
-                    background="{{ dsx.variable.canCheckin ? ink() : sheetCell() }}"
-                    color="{{ dsx.variable.canCheckin ? stage() : ink3() }}"
-                    on:tap="dsx.action.checkin()"/>
-          </vstack>
 
-          <!-- the Watch Mission: read-only progress over a server count (see the header) -->
-          <vstack class="card" visible-if="dsx.variable.hasWatch">
-            <hstack class="missionRow">
-              <vstack class="missionTile" style="justify-content: center">
-                <image icon="timer" iconSize="24" color="{{ accent() }}" a11yHidden="true"/>
+              <!-- 9.2 · the check-in card -->
+              <CheckinCard days="{{ dsx.variable.days }}" streak="{{ dsx.variable.streakCount }}"
+                           checked="{{ dsx.variable.checkedToday }}" busy="{{ dsx.variable.busy == 'checkin' }}"
+                           on:checkin="dsx.action.checkin()"/>
+
+              <!-- 9.3 · Earn Rewards -->
+              <text value="Earn Rewards" class="sectionTitle"/>
+              <vstack class="rows">
+                <list bind="dsx.variable.rowsBefore" key="id" scroll="false" spacing="12">
+                  <RewardRow task="{{ item.id }}" kind="{{ item.kind }}" icon="{{ item.icon }}" amount="{{ item.amount }}"
+                             pill="{{ item.pill }}" done="{{ item.done }}" busy="{{ dsx.variable.busy == item.id }}"
+                             on:act="dsx.action.rowTap()"/>
+                </list>
+                <!-- row 3: the rewarded ad — the component owns the PLATFORM decision, the
+                     creative and the App Store 2.5.18 chrome; this screen owns the server facts
+                     and the outcome. `vip=` keeps a sold benefit true: a member is shown no ad. -->
+                <AdGate left="{{ dsx.variable.adsLeft }}"
+                        today="{{ dsx.variable.stateView == null ? 0 : dsx.variable.stateView.adsToday }}"
+                        cap="{{ dsx.variable.stateView == null ? 15 : dsx.variable.stateView.adCap }}"
+                        reward="{{ dsx.variable.adReward }}"
+                        vip="{{ dsx.variable.isVip }}"
+                        open="{{ dsx.variable.adOpen }}"
+                        on:granted="dsx.action.adGranted()"
+                        on:failed="dsx.action.adFailed()"
+                        on:reported="dsx.action.adReported()"/>
+                <list bind="dsx.variable.rowsAfter" key="id" scroll="false" spacing="12">
+                  <RewardRow task="{{ item.id }}" kind="{{ item.kind }}" icon="{{ item.icon }}" amount="{{ item.amount }}"
+                             mins="{{ item.mins }}" daily="{{ item.daily }}" progress="{{ item.progress }}" target="{{ item.target }}"
+                             counted="{{ item.counted }}" pill="{{ item.pill }}" done="{{ item.done }}" busy="{{ dsx.variable.busy == item.id }}"
+                             on:act="dsx.action.rowTap()"/>
+                </list>
+                <!-- rows 6: follow — links, no coins (Components/parts/FollowRow.dsx says why) -->
+                <list bind="dsx.variable.socialRows" key="id" scroll="false" spacing="12">
+                  <FollowRow net="{{ item.id }}" name="{{ item.name }}" icon="{{ item.icon }}" href="{{ item.href }}"/>
+                </list>
+                <!-- row 7: share — the share sheet, no coins -->
+                <RewardRow task="share" kind="share" icon="square.and.arrow.up" pill="go" on:act="dsx.action.rowTap()"/>
               </vstack>
-              <vstack spacing="3" grow="width" style="flex: 1; min-width: 0" alignItems="stretch">
-                <text value="Watch Mission" class="h2"/>
-                <text value="{{ dsx.variable.watchDone ? 'Today’s mission is complete — come back tomorrow.' : 'Earn bonus coins as you watch. Every milestone lands on its own.' }}" class="note"/>
-              </vstack>
-            </hstack>
-            <!-- the bar: a measured track, a computed-px fill -->
-            <hstack class="track" measure="dsx.variable.trackBox" style="width: 100%"
-                    a11yLabel="{{ dsx.variable.watchMinutes }} minutes watched today">
-              <stack class="fill" width="{{ dsx.variable.watchFillW }}" style="width: {{ dsx.variable.watchFillW }}px; transition: width 0.4s ease"/>
-            </hstack>
-            <!-- a <grid> sizes its DIRECT children, so four milestones share the width -->
-            <grid bind="dsx.variable.watchView.milestones" key="id" columns="4" spacing="8" scroll="false">
-              <vstack class="msChip" background="{{ msBg }}">
-                <hstack spacing="2" alignItems="center">
-                  <text value="{{ item.minutes }}" class="msMin" color="{{ msInk }}"/>
-                  <text value="min" class="msMin" color="{{ msInk }}"/>
+
+              <!-- Spin the wheel: a server-owned grant already, kept as a card after the list -->
+              <text value="Spin the wheel" class="sectionTitle"/>
+              <vstack class="spinCard">
+                <zstack>
+                  <stack style="{{ dsx.variable.wheelFx }}"/>
+                  <!-- explicit z: the wheel carries a transform, and a transformed sibling
+                       paints ABOVE later plain siblings (AGENTS.md) -->
+                  <vstack zIndex="1" style="z-index: 1; width: 132px; height: 132px; align-items: center; justify-content: center">
+                    <text value="{{ dsx.variable.wheelResult != '' ? dsx.variable.wheelResult : dsx.variable.spinRange }}"
+                          class="wheelLabel"
+                          a11yLabel="{{ dsx.variable.wheelResult != '' ? 'You won ' + dsx.variable.wheelResult + ' bonus coins' : 'Prizes from ' + dsx.variable.spinRange + ' coins' }}"/>
+                  </vstack>
+                </zstack>
+                <hstack class="spinBtn" style="width: 100%; justify-content: center"
+                        background="{{ dsx.variable.canSpin ? accent() : 'rgba(255,44,85,0.35)' }}"
+                        on:tap="dsx.action.spin()" a11yGroup="true" a11yTrait="button"
+                        a11yLabel="{{ dsx.variable.canSpin ? 'Spin the wheel, one free spin today' : 'No spin left today' }}">
+                  <text value="Spinning…" class="spinTxt" color="{{ ink() }}" visible-if="dsx.variable.spinning"/>
+                  <text value="Spin — 1 free today" class="spinTxt" color="{{ ink() }}" visible-if="dsx.variable.spinning == false &amp;&amp; dsx.variable.canSpin"/>
+                  <text value="No spin left today" class="spinTxt" color="{{ ink() }}" visible-if="dsx.variable.spinning == false &amp;&amp; dsx.variable.canSpin == false"/>
                 </hstack>
-                <text value="+{{ item.coins }}" class="msCoins" color="{{ msInk }}"/>
               </vstack>
-            </grid>
-            <hstack class="factRow">
-              <text value="Minutes watched today" class="factLabel" grow="width" style="flex: 1"/>
-              <text value="{{ dsx.variable.watchMinutes }}" class="factValue"/>
-            </hstack>
-            <hstack class="factRow">
-              <text value="Coins earned today" class="factLabel" grow="width" style="flex: 1"/>
-              <text value="{{ dsx.variable.watchGranted }} / {{ dsx.variable.watchCap }}" class="factValue"/>
-            </hstack>
-          </vstack>
 
-          <!-- rewarded ads: the capped lane. The component owns the PLATFORM decision, the
-               creative and the App Store 2.5.18 ad chrome; this screen owns the server facts
-               and the outcome. `vip=` keeps a sold benefit true: a member is shown no ad. -->
-          <AdGate left="{{ dsx.variable.stateView == null ? 0 : dsx.variable.stateView.adsLeft }}"
-                  today="{{ dsx.variable.stateView == null ? 0 : dsx.variable.stateView.adsToday }}"
-                  cap="{{ dsx.variable.stateView == null ? 10 : dsx.variable.stateView.adCap }}"
-                  reward="{{ dsx.variable.stateView == null ? 15 : dsx.variable.stateView.adReward }}"
-                  vip="{{ dsx.variable.isVip }}"
-                  on:granted="dsx.action.adGranted()"
-                  on:failed="dsx.action.adFailed()"
-                  on:reported="dsx.action.adReported()"/>
-
-          <!-- spin -->
-          <vstack class="card">
-            <vstack class="wheelWrap">
-              <text value="Spin the wheel" class="h2"/>
-              <zstack>
-                <stack style="{{ dsx.variable.wheelFx }}"/>
-                <!-- explicit z: the wheel carries a transform, and a transformed sibling
-                     paints ABOVE later plain siblings (AGENTS.md) -->
-                <vstack zIndex="1" style="z-index: 1; width: 132px; height: 132px; align-items: center; justify-content: center">
-                  <text value="{{ dsx.variable.wheelResult != '' ? dsx.variable.wheelResult : dsx.variable.spinRange }}"
-                        class="wheelLabel"
-                        a11yLabel="{{ dsx.variable.wheelResult != '' ? 'You won ' + dsx.variable.wheelResult + ' bonus coins' : 'Prizes from ' + dsx.variable.spinRange + ' coins' }}"/>
-                </vstack>
-              </zstack>
-              <button label="{{ dsx.variable.spinLabel }}" class="btn" paddingH="24"
-                      background="{{ dsx.variable.canSpin ? ink() : sheetCell() }}"
-                      color="{{ dsx.variable.canSpin ? stage() : ink3() }}"
-                      on:tap="dsx.action.spin()"/>
+              <!-- App Store 3.1.1 wording for a reward promotion -->
+              <text value="This activity is not affiliated with Apple Inc." class="footer"/>
             </vstack>
           </vstack>
+        </scroll>
 
-          <!-- tasks -->
-          <vstack class="card">
-            <text value="Tasks" class="h2"/>
-            <list bind="dsx.variable.stateView.tasks" key="id" scroll="false" spacing="14">
-              <hstack class="taskRow">
-                <vstack class="taskCol" grow="width" style="flex: 1; min-width: 0">
-                  <text value="{{ item.title }}" class="taskTitle" lineLimit="1" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
-                  <text value="{{ item.progress }}/{{ item.target }} · +{{ item.reward }}" class="taskMeta"/>
-                </vstack>
-                <button label="{{ item.claimed ? 'Claimed' : 'Claim' }}" class="claimBtn"
-                        color="{{ item.claimed ? '#8E8E93' : '#000000' }}"
-                        background="{{ item.claimed ? '#2C2C2E' : '#FFFFFF' }}"
-                        on:tap="dsx.action.claim()"/>
-              </hstack>
-            </list>
-          </vstack>
-
-          <!-- the doors to the SELL lane: coins on /store, the pass on the membership page.
-               The gold door is hidden from a member — a pass is not sold to its holder. -->
-          <hstack class="doorCard" on:tap="dsx.action.openStore()"
-                  a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.variable.sellTitle }}">
-            <vstack spacing="4" grow="width" style="flex: 1; min-width: 0" alignItems="stretch">
-              <text value="{{ dsx.variable.sellTitle }}" class="doorTitle"/>
-              <text value="{{ dsx.variable.sellNote }}" class="doorNote"/>
+        <!-- ═══════════════════════════ TAB 2 · MEMBER POINTS ══════════════════════════ -->
+        <scroll grow="true" style="height: 100%; min-height: 0">
+          <vstack class="pageBody" alignItems="stretch">
+            <!-- 9.4 · the hero band: the pink→plum wash behind "Daily Rewards" and the points pill -->
+            <vstack class="ptsHero" style="width: 100%; background: linear-gradient(180deg, rgba(255,44,85,0.30) 0%, rgba(106,42,122,0.20) 55%, rgba(14,14,14,0) 100%)">
+              <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+                <hstack class="ptsHeadRow" style="justify-content: space-between">
+                  <text value="Daily Rewards" class="ptsTitle"/>
+                  <hstack class="ptsPill" on:tap="dsx.action.goTab({ i: 1 })" a11yGroup="true" a11yTrait="button"
+                          a11yLabel="{{ dsx.variable.pointsBalance }} membership points">
+                    <image icon="bolt.fill" iconSize="16" color="{{ accent() }}" a11yHidden="true"/>
+                    <text value="{{ dsx.variable.pointsBalance }}" class="ptsNum"/>
+                    <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+                  </hstack>
+                </hstack>
+              </vstack>
             </vstack>
-            <image icon="chevron.forward" iconSize="14" color="{{ ink3() }}" a11yHidden="true"/>
-          </hstack>
-          <hstack class="vipDoor" visible-if="dsx.variable.isVip == false" on:tap="dsx.action.openMembership()"
-                  a11yGroup="true" a11yTrait="button" a11yLabel="Unlock unlimited watching — see the membership plans">
-            <image icon="crown.fill" iconSize="16" color="{{ gold() }}" a11yHidden="true"/>
-            <text value="Unlock Unlimited Watching" class="vipDoorTxt" grow="width" style="flex: 1"/>
-            <image icon="chevron.forward" iconSize="14" color="{{ gold() }}" a11yHidden="true"/>
-          </hstack>
-        </vstack>
-      </vstack>
 
-    </vstack>
-  </scroll>
+            <!-- the pull-under: a negative margin-top is bridged on every lane (AGENTS.md),
+                 so it is the CSS alone — an `offsetY` beside it doubled the pull on the web -->
+            <vstack style="{{ dsx.variable.shellPull }}" alignItems="stretch">
+              <vstack paddingTop="8" alignItems="stretch" visible-if="dsx.variable.phase == 'signedout'">
+                <LinkPrompt icon="bolt.fill"
+                            title="Member points belong to an account"
+                            note="Points, the daily draw and redemptions need somewhere to land."/>
+              </vstack>
+              <vstack paddingTop="8" spacing="14" alignItems="stretch" visible-if="dsx.variable.phase == 'loading'">
+                <Skeleton height="150" radius="16"/>
+                <Skeleton height="74" radius="12"/>
+                <Skeleton height="74" radius="12"/>
+              </vstack>
+
+              <vstack spacing="12" alignItems="stretch" visible-if="dsx.variable.phase == 'content'">
+                <MembershipTimeline day="{{ dsx.variable.memberDay }}" nodes="{{ dsx.variable.timeline }}" vip="{{ dsx.variable.isVip }}"
+                                    on:plans="dsx.action.openMembership()"/>
+
+                <RewardRow task="draw" kind="draw" icon="gift.fill" unit="points" low="{{ dsx.variable.drawMin }}" high="{{ dsx.variable.drawMax }}"
+                           pill="{{ dsx.variable.isVip ? 'claim' : 'plans' }}" done="{{ dsx.variable.drawnToday }}"
+                           busy="{{ dsx.variable.busy == 'draw' }}" on:act="dsx.action.rowTap()"/>
+                <RewardRow task="watch30" kind="watch30" icon="timer" unit="points"
+                           amount="{{ dsx.variable.watch30 == null ? 50 : dsx.variable.watch30.reward }}"
+                           mins="{{ dsx.variable.watch30 == null ? 30 : dsx.variable.watch30.target }}"
+                           progress="{{ dsx.variable.watch30 == null ? 0 : dsx.variable.watch30.progress }}"
+                           target="{{ dsx.variable.watch30 == null ? 30 : dsx.variable.watch30.target }}" counted="{{ true }}"
+                           pill="{{ dsx.variable.watch30Ready ? 'claim' : 'go' }}" done="{{ dsx.variable.watch30Done }}"
+                           busy="{{ dsx.variable.busy == 'watch30' }}" on:act="dsx.action.rowTap()"/>
+
+                <!-- Recommendations / More › — three 3:4 posters -->
+                <hstack style="justify-content: space-between" alignItems="center" paddingTop="16" visible-if="dsx.variable.recRows.length > 0">
+                  <text value="Recommendations" class="h24"/>
+                  <hstack class="moreRow" on:tap="dsx.action.openBrowse()" a11yGroup="true" a11yTrait="button" a11yLabel="More series">
+                    <text value="More" class="moreTxt"/>
+                    <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+                  </hstack>
+                </hstack>
+                <grid bind="dsx.variable.recRows" key="id" columns="3" spacing="8" scroll="false" visible-if="dsx.variable.recRows.length > 0">
+                  <vstack spacing="0" alignItems="stretch" href="/show/{{ item.id }}" a11yGroup="true" a11yLabel="{{ item.title }}">
+                    <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" grow="width" aspectRatio="3:4" radius="8"
+                           style="width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; display: block"/>
+                    <text value="{{ item.title }}" class="recTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+                  </vstack>
+                </grid>
+
+                <RewardRow task="pushpts" kind="pushpts" icon="bell.fill" unit="points"
+                           amount="{{ dsx.variable.pointsView == null ? 30 : dsx.variable.pointsView.pushPoints.reward }}"
+                           pill="open" done="{{ dsx.variable.pushPtsDone }}" busy="{{ dsx.variable.busy == 'push' }}"
+                           on:act="dsx.action.rowTap()"/>
+
+                <!-- Redeem Points -->
+                <text value="Redeem Points" class="h24" paddingTop="16"/>
+                <hstack spacing="12" alignItems="flex-start">
+                  <text value="This redemption extends your membership period only. Auto-renewal stays the same." class="redeemSub" grow="width" style="flex: 1"/>
+                  <image icon="info.circle.fill" iconSize="20" color="{{ ink3() }}" on:tap="dsx.action.openRules()"
+                         a11yTrait="button" a11yLabel="How redemption works"/>
+                </hstack>
+                <list bind="dsx.variable.cards" key="id" scroll="false" spacing="12">
+                  <RedeemCard card="{{ item.id }}" days="{{ item.days }}" points="{{ item.points }}" affordable="{{ item.affordable }}"
+                              redeemed="{{ item.redeemedToday }}" busy="{{ dsx.variable.busy == 'redeem' }}" on:redeem="dsx.action.redeem()"/>
+                </list>
+              </vstack>
+            </vstack>
+
+            <!-- the Coming Soon band: full-bleed wash, the title, the date on a 1pt track with
+                 the accent marker, then the Home rail in its band variant (§9.4, §2a/2b) -->
+            <vstack class="soonBand" style="width: 100%; margin-top: 28px; background: linear-gradient(180deg, #3A1030 0%, #0E0E0E 100%)"
+                    visible-if="dsx.variable.soonRows.length > 0">
+              <vstack style="{{ dsx.variable.shell }}" spacing="10" alignItems="stretch">
+                <text value="Coming Soon" class="h24"/>
+                <hstack spacing="8" alignItems="center">
+                  <text value="{{ dsx.variable.soonDate }}" class="soonDate" visible-if="dsx.variable.soonDate != ''"/>
+                  <image icon="play.fill" iconSize="10" color="{{ accent() }}" a11yHidden="true"/>
+                  <stack class="soonTrack" grow="width" style="flex: 1"/>
+                </hstack>
+              </vstack>
+              <ComingSoonRail rows="{{ dsx.variable.soonRows }}" variant="band" gutter="{{ gutterOf(dsx.variable.bp) }}" on:note="dsx.action.note()"/>
+            </vstack>
+          </vstack>
+        </scroll>
+      </pager>
+
+      <!-- the Rules pill (9.0): over the first tab only, hugging the right screen edge -->
+      <hstack class="rulesPill" visible-if="dsx.variable.tab == 0" on:tap="dsx.action.openRules()"
+              a11yTrait="button" a11yLabel="Rules"
+              style="position: absolute; right: -16px; top: 4px; border-radius: 16px">
+        <text value="Rules" class="rulesTxt"/>
+      </hstack>
+    </zstack>
+  </vstack>
 
   <!-- THE TOAST LIVES OUTSIDE THE SCROLL, pinned at the foot on every renderer -->
-  <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
-    <text value="{{ dsx.variable.toast }}" class="toastLine" grow="width" style="flex: 1"/>
-    <image icon="xmark" iconSize="12" color="{{ ink3() }}" on:tap="dsx.variable.toast = ''"
+  <hstack class="toastRow" visible-if="dsx.variable.toast != '' || dsx.variable.toastDays > 0" style="margin: 8px 16px">
+    <text value="{{ dsx.variable.toast }}" class="toastLine" grow="width" style="flex: 1" visible-if="dsx.variable.toast != ''"/>
+    <text value="{dsx.variable.toastDays, plural, one {Membership extended by # day} other {Membership extended by # days}}" class="toastLine" grow="width" style="flex: 1"
+          visible-if="dsx.variable.toast == '' &amp;&amp; dsx.variable.toastDays > 0"/>
+    <image icon="xmark" iconSize="12" color="{{ ink3() }}" on:tap="dsx.action.clearToast()"
            a11yLabel="Dismiss message" a11yTrait="button"/>
   </hstack>
+
+  <!-- ══ 9.5 · the success modal: a floating card 314 wide, the page dimmed behind it ══ -->
+  <sheet present="dsx.variable.successOpen" mode="card" detents="content" background="#1A1A1A"
+         inset="{{ dsx.variable.cardInset }}" a11yLabel="Reward received"
+         on:dismiss="dsx.action.closeSuccess()">
+    <RewardsSuccess n="{{ dsx.variable.successN }}" unit="{{ dsx.variable.successUnit }}"
+                    adReward="{{ dsx.variable.adReward }}"
+                    adAvailable="{{ dsx.variable.adAvailable &amp;&amp; dsx.variable.successUnit == 'coins' }}"
+                    on:ad="dsx.action.successAd()" on:close="dsx.action.closeSuccess()"/>
+  </sheet>
+
+  <!-- ══ 9.6 · the Rules sheet ══ -->
+  <sheet present="dsx.variable.rulesOpen" detents="content" background="#1A1A1A" a11yLabel="Rules"
+         on:dismiss="dsx.action.closeRules()">
+    <RulesSheet on:close="dsx.action.closeRules()"/>
+  </sheet>
+
+  <!-- ══ 9.7 · the enable-notification modal ══ -->
+  <sheet present="dsx.variable.notifyOpen" mode="card" detents="content" background="#1A1A1A"
+         inset="{{ dsx.variable.cardInset }}" a11yLabel="Enable notifications"
+         on:dismiss="dsx.action.closeNotify()">
+    <NotifyModal busy="{{ dsx.variable.notifyBusy }}" on:enable="dsx.action.enableNotify()" on:close="dsx.action.closeNotify()"/>
+  </sheet>
+
   <TabBar active="rewards" visible-if="dsx.variable.wide == false"/>
   <AuthSeam/>
 </vstack>

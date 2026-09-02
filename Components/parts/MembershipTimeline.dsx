@@ -1,0 +1,104 @@
+<!-- MembershipTimeline — "Your Membership Day n" (docs/design/reference-ui-spec.md §9.4):
+     a card with a five-node timeline — Day n-2 · Day n-1 · Today · Day n+1 · Day n+2 — the
+     22pt gems on a 3pt track, a claimed day's gem in the accent, an unclaimed past day a
+     grey ring with "Unclaimed" under it, and the accent ▾ under Today. A non-member sees
+     the same card with "Become a member to claim daily points" and a "See plans" pill.
+
+     THE NODES ARE THE SERVER'S (server/engage.dsx pointsState: n · state · claimed · today):
+     "claimed" means a Daily Draw row exists for that membership day, so the timeline and the
+     draw can never disagree. The catalog has no sad-face glyph, so the unclaimed node is the
+     hollow ring — a named divergence, not a synthetic icon key (AGENTS.md). -->
+<vstack class="wrap">
+  <head>
+    <attribute as="day" default="0"/>
+    <attribute as="nodes" default="[]"/>
+    <attribute as="vip" default="false"/>
+    <event as="plans"/>
+
+    <variable as="isVip" computed="true">
+      const v = dsx.attribute.vip
+      return v === true || v === 'true'
+    </variable>
+
+    <!-- one accessible name per node, composed in a formula rather than a nested ternary -->
+    <formula as="nodeA11y" n="item.n" t="item.today" st="item.state">
+      let s = 'Day ' + n
+      if (t) { s = s + ', today' }
+      if (st == 'unclaimed') { s = s + ', unclaimed' }
+      if (st == 'claimed') { s = s + ', claimed' }
+      return s
+    </formula>
+    <!-- the gem's ink: accent once claimed, the track's grey while it is still ahead -->
+    <formula as="gemInk" c="item.claimed" t="item.today">
+      if (c) { return accent() }
+      if (t) { return accent() }
+      return timelineTrack()
+    </formula>
+
+    <style as="wrap" spacing="0" alignItems="stretch"/>
+    <style as="card" background="#1A1A1A" radius="16" paddingH="16" paddingV="16" spacing="16" alignItems="center"/>
+    <style as="titleRow" spacing="0" alignItems="center"/>
+    <style as="title" fontSize="17" fontWeight="semibold" color="#FFFFFF" textAlign="center"/>
+    <style as="rail" alignItems="flex-start"/>
+    <style as="track" height="3" radius="2" background="#3A3A3A" zIndex="0"/>
+    <style as="node" spacing="6" alignItems="center" zIndex="1"/>
+    <style as="lbl" fontSize="15" lineLimit="1"/>
+    <style as="gemWrap" width="28" height="28" radius="14" background="#1A1A1A" alignItems="center" alignY="center"/>
+    <style as="sub" fontSize="13" color="#8E8E93" lineLimit="1" textAlign="center"/>
+    <style as="guest" spacing="16" alignItems="center"/>
+    <style as="guestLine" fontSize="15" color="#C7C7CC" textAlign="center" lineSpacing="5"/>
+    <style as="plansPill" background="#FF2C55" radius="8" paddingH="16" height="36" alignItems="center" alignY="center"/>
+    <style as="plansTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+  </head>
+
+  <Theme/>
+  <!-- ROOT SPACING 0, BRIDGED LOUDLY (PLAN.md §6.183): on iOS a file component whose root is a
+       SPACED vstack pays one spacing at its top — probe-measured on an iPhone 17 Pro, +16pt for a
+       spacing-16 root, +0 for the identical inline stack. The root here carries no spacing and the
+       body below carries the card's; delete this wrapper the day the engine entry closes. -->
+  <vstack class="card">
+  <!-- NO HIDDEN TEXT RUN IN THIS CENTRED COLUMN, BRIDGED LOUDLY (PLAN.md §6.184): on iOS a
+       spaced vstack with `alignItems="center"` keeps a slot for a `visible-if` false TEXT and
+       pays its spacing around it — a hidden container costs nothing, and a stretched column
+       drops both. The two titles are `visible-if` twins, so bare they cost a guest 16pt of
+       nothing above "Membership points" (measured: the title 38.3 under the card's top on the
+       phone against 21.5 on the web); inside one hstack the hidden twin has no height. The
+       guest half below is one container for the same reason — a member would otherwise pay
+       16 under the timeline for the hidden line. Delete both wrappers the day the entry closes. -->
+  <hstack class="titleRow">
+    <text value="{dsx.attribute.day, plural, other {Your Membership Day #}}" class="title" visible-if="dsx.variable.isVip"/>
+    <text value="Membership points" class="title" visible-if="dsx.variable.isVip == false"/>
+  </hstack>
+
+  <!-- the timeline: the track behind, the five columns distributed over it -->
+  <zstack style="width: 100%; position: relative" visible-if="dsx.variable.isVip">
+    <stack class="track" style="position: absolute; left: 10%; right: 10%; top: 38px"/>
+    <hstack class="rail" style="width: 100%; justify-content: space-between">
+      <list bind="dsx.attribute.nodes" key="id" axis="horizontal" scroll="false" spacing="0" style="width: 100%; justify-content: space-between">
+        <vstack class="node" style="width: 20%" a11yGroup="true" a11yLabel="{{ nodeA11y }}">
+          <text value="Today" class="lbl" color="{{ accent() }}" visible-if="item.today"/>
+          <text value="{item.n, plural, other {Day #}}" class="lbl" color="{{ ink() }}" visible-if="item.today == false"/>
+          <vstack class="gemWrap" style="justify-content: center">
+            <image icon="bolt.fill" iconSize="22" color="{{ gemInk }}" a11yHidden="true" visible-if="item.state != 'unclaimed'"/>
+            <image icon="circle" iconSize="22" color="{{ ink3() }}" a11yHidden="true" visible-if="item.state == 'unclaimed'"/>
+          </vstack>
+          <text value="Unclaimed" class="sub" visible-if="item.state == 'unclaimed'"/>
+          <!-- the ▾ under Today: the play triangle turned a quarter — a catalog glyph, not a character -->
+          <image icon="play.fill" iconSize="8" color="{{ accent() }}" rotation="90" a11yHidden="true" visible-if="item.today"
+                 style="transform: rotate(90deg)"/>
+        </vstack>
+      </list>
+    </hstack>
+  </zstack>
+
+  <!-- the guest half, ONE container (§6.184 again): a member hides both, and a bare hidden
+       text run would cost the centred card 16pt under the timeline -->
+  <vstack class="guest" visible-if="dsx.variable.isVip == false">
+    <text value="Become a member to claim daily points" class="guestLine"/>
+    <hstack class="plansPill" on:tap="dsx.event('plans', {})"
+            a11yGroup="true" a11yTrait="button" a11yLabel="See the membership plans">
+      <text value="See plans" class="plansTxt"/>
+    </hstack>
+  </vstack>
+  </vstack>
+</vstack>

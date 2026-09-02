@@ -1,0 +1,36 @@
+<!-- ReferralSeam — the invitee half of "Invite friends" (docs/design/reference-ui-spec.md
+     §9.3 row 5), a 0×0 mount with one job: if this install landed through an invite link
+     (Components/Invite.dsx wrote the code into the `sd_ref` cookie), attach it to the
+     device's identity the moment there is one. Mounted on Home and on Rewards, so a cold
+     link lands the attachment on the first screen a viewer sees.
+
+     THE COOKIE IS SPENT ONCE, WHATEVER THE ANSWER: a code the server refuses (unknown, the
+     viewer's own, or a device that has already watched) is not worth a retry loop, and a
+     stale cookie retrying on every mount would be a request the rate ceiling eventually
+     refuses for a real reason. The grant is never this device's: the inviter is credited
+     when THIS device records its first server-verified minute (server/engage.dsx watchTick
+     writes the proof; claimTask sweeps it). -->
+<stack width="0" height="0" on:appear="dsx.action.attachIfAny()">
+  <head>
+    <api as="attach" url="/rewards/referral" method="POST" auto="false" headers="global.auth.headers"/>
+    <variable as="busy">return false</variable>
+
+    <action as="attachIfAny">
+      const code = dsx.cookie.sd_ref
+      if (code == null) { return }
+      if (code == '') { return }
+      if (global.auth == null) { return }
+      if (global.auth.ok != true) { return }
+      if (dsx.variable.busy) { return }
+      dsx.variable.busy = true
+      const r = await attach.send({ code: code })
+      dsx.cookie.sd_ref = ''
+      dsx.variable.busy = false
+      // the inviter row in /rewards/state reads the proof later; nothing to refresh here
+      if (r.ok) { return }
+    </action>
+
+    <!-- the seam resolves identity after this mounts on a cold load, so the write waits on it -->
+    <watch value="global.auth.ok" on:change="dsx.action.attachIfAny()"/>
+  </head>
+</stack>

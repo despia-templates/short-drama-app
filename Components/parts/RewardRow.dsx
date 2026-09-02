@@ -1,0 +1,169 @@
+<!-- RewardRow — one Earn Rewards row card (docs/design/reference-ui-spec.md §9.3, §9.4):
+     a 44pt round tile with a warm-gold glyph, the title 17 ink (with an optional "(n/N)"
+     after it), a subtitle 15 ink-3 carrying the amount in gold, and a trailing 75×31 action
+     pill — accent with white ink while there is something to do, a 20% accent wash with
+     accent ink reading "Done" once the grant has landed. 74 tall, radius 12, on the row fill.
+
+     THE ROW NEVER GRANTS. Every amount here is a number the server sent, and the tap raises
+     `act` with the row id; the screen decides what a tap does (open the auth seam, ask the
+     notification permission, start the rewarded ad, share the invite link, push a route) and
+     the SERVER decides whether a coin moves. A row whose grant lands without a tap (sign-in,
+     push, the watch milestones) simply reads `done` from the ledger — there is no button that
+     could make it land.
+
+     THE WHOLE ROW IS THE TARGET, not the 31pt pill: the design bar puts the floor at 44 and
+     the reference's pill is under it, so the pill is the visual and the 74pt card is the hit
+     area on every lane (a11yGroup + trait button, one label).
+
+     COPY IS SWITCHED BY KIND, NOT COMPUTED — a `<text value="…">` per row kind under a
+     `visible-if`, each a bare literal or a message template, so every string is a key the
+     localisation seam reaches (scripts/strings.mjs; a computed that returns sentences is the
+     one tier it cannot read yet). The follow rows are `FollowRow`: a link needs `href`, and an
+     empty `href` on a tappable element is a reload on the web, so they are their own file. -->
+<hstack class="row" on:tap="dsx.action.tap()" a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.variable.a11y }}">
+  <head>
+    <!-- `task`, NOT `id`: `id=` on a mount tag is the element's IDENTITY on the native lanes
+         (Stack.swift's mount pass skips it — "selector / identity, not attributes") and only
+         the web hands it to the component, so an attribute named `id` reads '' on iOS and every
+         tap raised `{ id: '' }` into the host — no branch matched, nothing happened, no error
+         (PLAN.md §6.185). The event payload key stays `id`; that is a dict key, not an
+         attribute, and the host reads it bare. -->
+    <attribute as="task" default="''"/>
+    <attribute as="kind" default="''"/>         <!-- signin | push | ad | watch | invite | share | draw | watch30 | pushpts -->
+    <attribute as="icon" default="'gift.fill'"/>
+    <attribute as="amount" default="0"/>        <!-- the grant, in `unit` -->
+    <attribute as="unit" default="'coins'"/>    <!-- coins | points -->
+    <attribute as="mins" default="0"/>          <!-- watch rows: the milestone minute; watch30: the target -->
+    <attribute as="daily" default="0"/>         <!-- invite: the daily ceiling, in coins -->
+    <attribute as="low" default="0"/>           <!-- draw: the prize range -->
+    <attribute as="high" default="0"/>
+    <attribute as="progress" default="0"/>
+    <attribute as="target" default="0"/>
+    <attribute as="counted" default="false"/>   <!-- render "(progress/target)" after the title -->
+    <attribute as="pill" default="'go'"/>       <!-- signin | claim | link | watch | go | invite | open | plans -->
+    <attribute as="done" default="false"/>
+    <attribute as="busy" default="false"/>
+    <event as="act" payload="id"/>
+
+    <!-- attributes arrive as STRINGS unless the caller interpolates a value; both spellings
+         are accepted for every flag (AGENTS.md) -->
+    <variable as="isDone" computed="true">
+      const v = dsx.attribute.done
+      return v === true || v === 'true'
+    </variable>
+    <variable as="isCounted" computed="true">
+      const v = dsx.attribute.counted
+      return v === true || v === 'true'
+    </variable>
+    <variable as="isBusy" computed="true">
+      const v = dsx.attribute.busy
+      return v === true || v === 'true'
+    </variable>
+    <!-- the pill the row wears: done wins, then the caller's word -->
+    <variable as="p" computed="true">
+      if (dsx.variable.isDone) { return 'done' }
+      return dsx.attribute.pill
+    </variable>
+    <variable as="a11y" computed="true">
+      const k = dsx.attribute.kind
+      let s = ''
+      if (k == 'signin') { s = 'Login with any account' }
+      else if (k == 'push') { s = 'Turn on push notifications' }
+      else if (k == 'ad') { s = 'Earn rewards, watch a video' }
+      else if (k == 'watch') { s = 'Watch for ' + dsx.attribute.mins + ' minutes' }
+      else if (k == 'invite') { s = 'Invite friends' }
+      else if (k == 'share') { s = 'Share with friends' }
+      else if (k == 'draw') { s = 'Daily draw' }
+      else if (k == 'watch30') { s = 'Watch and earn' }
+      else { s = 'Enable push notifications' }
+      if (Number(dsx.attribute.amount) > 0) { s = s + ', plus ' + dsx.attribute.amount + ' ' + dsx.attribute.unit }
+      if (dsx.variable.isDone) { return s + ', done' }
+      return s
+    </variable>
+
+    <action as="tap">
+      if (dsx.variable.isDone) { return }
+      if (dsx.variable.isBusy) { return }
+      dsx.event('act', { id: dsx.attribute.task })
+    </action>
+
+    <!-- THE ROW IS 74 ON BOTH LANES BECAUSE ITS LINE BOXES ARE. The web sizes a text run at
+         1.5em (17 → 25.5, 15 → 22.5) where the native line height is the font's own (17 → ~20.3,
+         15 → ~18), so with the default boxes the web row measured 81 against 74 on iOS: the
+         column was 51 there and `minHeight` only bound natively. `lineSpacing` is the one
+         catalog word that reaches the web's BOX (`line-height: calc(1em + N)`, cssmap.ts) and is
+         extra space BETWEEN lines natively — a native single line is unchanged — so 3 seats the
+         title at 20 and the subtitle at 18 on the web, the same box iOS already draws, and the
+         column reads 41 on both: 41 + 30 rises to the 74 floor on both lanes. A two-line
+         subtitle reads 89 (web) against 90.3 (iOS). Measured 2026-09-02, 402×874 on each lane. -->
+    <style as="row" background="#161616" radius="12" paddingH="16" paddingV="15" spacing="8" alignItems="center" minHeight="74"/>
+    <style as="tile" width="44" height="44" radius="22" background="#2A2A2A" alignItems="center" alignY="center"/>
+    <style as="col" spacing="3" alignItems="stretch"/>
+    <style as="titleRow" spacing="6" alignItems="center"/>
+    <style as="title" fontSize="17" color="#FFFFFF" lineLimit="1" lineSpacing="3"/>
+    <style as="count" fontSize="15" color="#8E8E93" lineLimit="1" lineSpacing="3"/>
+    <style as="subRow" spacing="4" alignItems="flex-start"/>
+    <style as="sub" fontSize="15" color="#8E8E93" lineLimit="2" lineSpacing="3"/>
+    <style as="subGold" fontSize="15" color="#F6B63D" lineLimit="1" lineSpacing="3"/>
+    <style as="pill" minWidth="75" height="31" radius="8" paddingH="10" alignItems="center" alignY="center"/>
+    <style as="pillTxt" fontSize="15" fontWeight="semibold" lineLimit="1"/>
+  </head>
+
+  <Theme/>
+  <vstack class="tile" style="justify-content: center; flex: none">
+    <image icon="{{ dsx.attribute.icon }}" iconSize="19" color="{{ warmGold() }}" a11yHidden="true"/>
+  </vstack>
+
+  <vstack class="col" grow="width" style="flex: 1; min-width: 0">
+    <hstack class="titleRow">
+      <text value="Login with any account" class="title" visible-if="dsx.attribute.kind == 'signin'" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+      <text value="Turn on push notifications" class="title" visible-if="dsx.attribute.kind == 'push'" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+      <text value="Earn rewards" class="title" visible-if="dsx.attribute.kind == 'ad'" style="white-space: nowrap"/>
+      <text value="{dsx.attribute.mins, plural, one {Watch for # min} other {Watch for # mins}}" class="title" visible-if="dsx.attribute.kind == 'watch'" style="white-space: nowrap"/>
+      <text value="Invite friends" class="title" visible-if="dsx.attribute.kind == 'invite'" style="white-space: nowrap"/>
+      <text value="Share with friends" class="title" visible-if="dsx.attribute.kind == 'share'" style="white-space: nowrap"/>
+      <text value="Daily Draw" class="title" visible-if="dsx.attribute.kind == 'draw'" style="white-space: nowrap"/>
+      <text value="Watch &amp; Earn" class="title" visible-if="dsx.attribute.kind == 'watch30'" style="white-space: nowrap"/>
+      <text value="Enable Push Notifications" class="title" visible-if="dsx.attribute.kind == 'pushpts'" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+      <text value="({{ dsx.attribute.progress }}/{{ dsx.attribute.target }})" class="count" visible-if="dsx.variable.isCounted" style="white-space: nowrap"/>
+    </hstack>
+
+    <!-- the subtitle, by kind: the amount in gold where the reference paints it gold -->
+    <hstack class="subRow" style="min-width: 0" visible-if="dsx.attribute.kind == 'signin' || dsx.attribute.kind == 'push' || dsx.attribute.kind == 'watch'">
+      <text value="+ {{ dsx.attribute.amount }}" class="subGold" style="white-space: nowrap; flex: none"/>
+      <text value="Reward coins" class="sub" grow="width" style="flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+    </hstack>
+    <text value="{dsx.attribute.amount, plural, one {Watch a video to earn # coin} other {Watch a video to earn # coins}}" class="sub"
+          visible-if="dsx.attribute.kind == 'ad'" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+    <text value="{dsx.attribute.daily, plural, other {Earn up to # coins daily}}" class="sub"
+          visible-if="dsx.attribute.kind == 'invite'" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+    <text value="Help us grow" class="sub" visible-if="dsx.attribute.kind == 'share'" style="white-space: nowrap"/>
+    <hstack class="subRow" style="min-width: 0" visible-if="dsx.attribute.kind == 'draw'">
+      <text value="+{{ dsx.attribute.low }}–{{ dsx.attribute.high }}" class="subGold" style="white-space: nowrap; flex: none"/>
+      <text value="Points, once a day" class="sub" grow="width" style="flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+    </hstack>
+    <hstack class="subRow" style="min-width: 0" visible-if="dsx.attribute.kind == 'watch30'">
+      <text value="+ {{ dsx.attribute.amount }}" class="subGold" style="white-space: nowrap; flex: none"/>
+      <text value="{dsx.attribute.mins, plural, other {Points · Watch for # minutes}}" class="sub" grow="width" style="flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+    </hstack>
+    <hstack class="subRow" style="min-width: 0" visible-if="dsx.attribute.kind == 'pushpts'">
+      <text value="+ {{ dsx.attribute.amount }}" class="subGold" style="white-space: nowrap; flex: none"/>
+      <text value="Get daily rewards and must-see content." class="sub" grow="width" style="flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+    </hstack>
+  </vstack>
+
+  <!-- the pill: accent while there is something to do, the 20% wash once it is done -->
+  <vstack class="pill" style="flex: none; justify-content: center"
+          background="{{ dsx.variable.p == 'done' ? 'rgba(255,44,85,0.2)' : accent() }}"
+          opacity="{{ dsx.variable.isBusy ? 0.6 : 1 }}">
+    <text value="Done" class="pillTxt" visible-if="dsx.variable.p == 'done'" color="{{ accent() }}" style="white-space: nowrap"/>
+    <text value="Sign In" class="pillTxt" visible-if="dsx.variable.p == 'signin'" color="{{ ink() }}" style="white-space: nowrap"/>
+    <text value="Claim" class="pillTxt" visible-if="dsx.variable.p == 'claim'" color="{{ ink() }}" style="white-space: nowrap"/>
+    <text value="Link" class="pillTxt" visible-if="dsx.variable.p == 'link'" color="{{ ink() }}" style="white-space: nowrap"/>
+    <text value="Watch" class="pillTxt" visible-if="dsx.variable.p == 'watch'" color="{{ ink() }}" style="white-space: nowrap"/>
+    <text value="Invite" class="pillTxt" visible-if="dsx.variable.p == 'invite'" color="{{ ink() }}" style="white-space: nowrap"/>
+    <text value="Open" class="pillTxt" visible-if="dsx.variable.p == 'open'" color="{{ ink() }}" style="white-space: nowrap"/>
+    <text value="See plans" class="pillTxt" visible-if="dsx.variable.p == 'plans'" color="{{ ink() }}" style="white-space: nowrap"/>
+    <text value="Go" class="pillTxt" visible-if="dsx.variable.p == 'go'" color="{{ ink() }}" style="white-space: nowrap"/>
+  </vstack>
+</hstack>
