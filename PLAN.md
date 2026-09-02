@@ -4421,3 +4421,36 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      with no URL is not rendered"): the placeholders are gone from dsx.config.json, the rows
      appear on every lane the day the operator sets the real URLs in App.json `consts`, and
      never one lane before the other.
+
+198. **A ZERO BORDER WIDTH PAINTED ONE PIXEL ON THE COMPOSE LANES — `Modifier.border(0.dp)` IS
+     `Dp.Hairline` — FIXED UPSTREAM** (2026-09-02, Pixel emulator API 36 at density 420, kernel
+     485338f8 before, 3ea17b48 on dev after, cherry-picked from the agent worktree;
+     corpus: `Conformance/style-semantics/border-edges.json` gains a `stroke` section run by
+     `BorderEdgesConformanceTest`, `css-bridge.json` pins the travelling pair; :core 4219 ·
+     :render 367 · :desktop 193 green after `cleanTest`; the template is untouched.)
+     CheckinCard's seven cells write `borderWidth="{{ cellBorder }}" borderColor="{{ accent() }}"`
+     and the CSS twin `border: {{ cellBorder }}px solid …` over a formula answering 1 for today
+     and 0 otherwise; web (`0px solid`) and iOS (`.stroke(lineWidth: 0)`) outlined one cell,
+     Android outlined all seven — Today at 3 physical px, the other six at exactly one pixel
+     (278 pink px each on `/rewards`). Mechanism, measured on a probe screen and in the
+     foundation 1.10.6 bytecode: the formula's 0 interpolates as the string `"0"` (JSE.string is
+     integral), the attribute pair and the bridge's `border: 0px solid #FF2C55` (→ `{borderWidth
+     "0", borderColor}`, both bridges) reach StackStyle step 14 as that `"0"`, and Compose's
+     `BorderModifierNode` draws `if (width == Dp.Hairline) 1f else ceil(width.toPx())` with
+     `Dp.Hairline == 0.dp`; only a negative width reaches its draw-nothing branch. The per-edge
+     path already answered a zero stroke with no rect; the uniform path had no gate, and the
+     desktop lane made the same call. Fixed as one :core decision, `BorderEdges.stroke` — the
+     colour gates as on every lane, an absent, blank or unparsable width is the 1-unit default
+     (the web's rule: `borderColor` alone and an empty width both emit `1px solid`), zero or
+     less is no stroke — consulted by StackStyle step 14 and DesktopStyleRuntime before the
+     modifier. Probe: attrs `0`+colour 456 px / 1 px → 0; `style="border: 0px solid"` 456 / 1 px
+     → 0; the seven-cell twin 6 × 298 + today 1260 → 0 × 6 + 1260; `/rewards` 6 × 278 + 1202 →
+     0 × 6 + 1202; `borderWidth="1"`, a bare colour, an empty width and `border: 1px solid` all
+     1514 px / 3 px on both sides; the membership 30-day card's gold ring (4 px) and the store's
+     Google Play ring (3 px) byte-identical. The template's cell markup stays as written — the
+     attributes are the cross-platform spelling and the CSS twin the web's. OPEN RIDER, measured
+     on the same probe: a `style=""` border whose declaration holds a `{{ accent() }}` function
+     hole beside any second hole (`{{ cellBorder }}px solid {{ accent() }}`, a row ternary +
+     `accent()`, `{{ dsx.variable.bw }}px solid {{ accent() }}`) paints nothing on Android on
+     every cell, while the same declaration with the function as its only hole, or with two
+     variable/literal holes, paints; unaffected here because the attributes carry the outline.
