@@ -137,6 +137,29 @@
       return { show: show, featured: featured === true }
     </action>
 
+    <!-- THE LIMITED OFFER (server/store.dsx, the `offer` entity): one row per sku, upserted, so
+         a re-run moves the window rather than stacking rows. `endsAt` in the past is how an
+         operator ends an offer early — the price list stops applying it on the next read. -->
+    <action as="adminUpsertOffer" inputs="sku, endsAt, cents, productId">
+      if (sku == null || sku === '') { throw { reason: 'invalid', message: 'sku is required' } }
+      if (endsAt == null || endsAt === '') { throw { reason: 'invalid', message: 'endsAt is required' } }
+      const values = {
+        sku: sku, ends_at: endsAt,
+        cents: cents == null ? 0 : cents,
+        product_id: productId == null ? '' : productId
+      }
+      const have = await dsx.module.data.offer.list({ filters: { sku: sku }, limit: 100 })
+      const rows = have.ok ? have.data : []
+      if (rows.length > 0) {
+        const done = await dsx.module.data.offer.update({ id: rows[0].id, values: values })
+        if (!done.ok) { throw { reason: 'forbidden', message: 'operator authority required' } }
+        return { id: rows[0].id, updated: true }
+      }
+      const made = await dsx.module.data.offer.create(values)
+      if (!made.ok) { throw { reason: 'forbidden', message: 'operator authority required' } }
+      return { id: made.data.id, created: true }
+    </action>
+
     <action as="adminNotice" inputs="title, message, segment, kind">
       if (title == null || title === '') { throw { reason: 'invalid', message: 'title is required' } }
       const made = await dsx.module.data.notice.create({ title: title, message: message == null ? '' : message, segment: segment == null || segment === '' ? 'all' : segment, kind: kind == null || kind === '' ? 'push' : kind })
@@ -184,6 +207,7 @@
   <route method="POST" path="/admin/publish"  action="adminPublish"       auth="required" reach="" rate="600/m"/>
   <route method="POST" path="/admin/feature"  action="adminFeature"       auth="required" reach="" rate="600/m"/>
   <route method="POST" path="/admin/notice"   action="adminNotice"        auth="required" reach="" rate="600/m"/>
+  <route method="POST" path="/admin/offer"    action="adminUpsertOffer"   auth="required" reach="" rate="600/m"/>
 
   <tool action="adminStats"         description="Catalogue and operations counters for this deployment." auth="required"/>
   <tool action="adminListShows"     description="List every show with state, episode count and pricing window." auth="required"/>
@@ -191,4 +215,5 @@
   <tool action="adminUpsertEpisode" description="Create or update an episode (video URL, order, price, state)." auth="required" mutates="episode"/>
   <tool action="adminPublish"       description="Publish or unpublish a show (state live|draft)." auth="required" mutates="show"/>
   <tool action="adminNotice"        description="Send a notice: a push-style announcement to a viewer segment." auth="required" mutates="notice"/>
+  <tool action="adminUpsertOffer"   description="Set a limited offer on a membership sku: the countdown end, the offer price in cents (0 = countdown only), an optional store product id." auth="required" mutates="offer"/>
 </server>

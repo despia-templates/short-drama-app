@@ -16,11 +16,14 @@
   <head>
     <expects variable="nav"/>
 
-    <api as="browse" url="/catalog/browse/{{ dsx.variable.active }}"
+    <!-- `sort` is a query input the server folds into the action's inputs (server/catalog.dsx
+         browseCatalog): trending (hot first, then plays) or latest -->
+    <api as="browse" url="/catalog/browse/{{ dsx.variable.active }}?sort={{ dsx.variable.sort }}"
          on:success="global.cacheBrowse = browse.data"/>
 
     <!-- '' means "follow the route"; a chip tap overrides it without touching history -->
     <variable as="picked">return ''</variable>
+    <variable as="sort">return 'trending'</variable>
     <variable as="hovId">return ''</variable>
     <!-- The route param is read in a COMPUTED, not in a plain variable's initializer: an
          initializer runs at mount and `vars.genre` was still empty there, so /browse/Revenge
@@ -41,8 +44,13 @@
       if (browse.data != null) { return browse.data }
       const cached = global.cacheBrowse
       if (cached == null) { return null }
-      return cached.active == dsx.variable.active ? cached : null
+      if (cached.active != dsx.variable.active) { return null }
+      return cached.sort == dsx.variable.sort ? cached : null
     </variable>
+    <!-- THE GENRE PAGE (spec §11) is the same screen with a genre active — a deep link
+         (/browse/Revenge) or a chip tapped on /browse: a centred genre header, the
+         Trending | Latest chips, and LIST ROWS. /browse itself (every series) keeps its grid. -->
+    <variable as="isGenre" computed="true">return dsx.variable.active != 'all'</variable>
     <!-- the CHIP ROW is filter-independent, so it is never guarded: the row must not vanish
          while a new genre loads, or the control you just tapped disappears under your finger -->
     <variable as="chips" computed="true">
@@ -93,6 +101,22 @@
       return v.total == 1 ? '1 series' : v.total + ' series'
     </variable>
 
+    <!-- the sort chips: the active one accent-tinted (bg rgba(255,44,85,0.18), label accent),
+         the other ink-3 — ONE computed string per chip, used as the WHOLE style attribute; the
+         colour is also an attribute, because a native lane reads no CSS colour -->
+    <variable as="trendingFx" computed="true">
+      const on = dsx.variable.sort == 'trending'
+      return 'background: ' + (on ? 'rgba(255,44,85,0.18)' : 'rgba(0,0,0,0)') + '; border-radius: 6px; padding: 7px 14px; white-space: nowrap; transition: background-color 0.18s ease'
+    </variable>
+    <variable as="latestFx" computed="true">
+      const on = dsx.variable.sort == 'latest'
+      return 'background: ' + (on ? 'rgba(255,44,85,0.18)' : 'rgba(0,0,0,0)') + '; border-radius: 6px; padding: 7px 14px; white-space: nowrap; transition: background-color 0.18s ease'
+    </variable>
+    <variable as="trendingInk" computed="true">return dsx.variable.sort == 'trending' ? brand() : ink3()</variable>
+    <variable as="latestInk" computed="true">return dsx.variable.sort == 'latest' ? brand() : ink3()</variable>
+    <variable as="trendingBg" computed="true">return dsx.variable.sort == 'trending' ? 'rgba(255,44,85,0.18)' : 'rgba(0,0,0,0)'</variable>
+    <variable as="latestBg" computed="true">return dsx.variable.sort == 'latest' ? 'rgba(255,44,85,0.18)' : 'rgba(0,0,0,0)'</variable>
+
     <formula as="chipFx" name="item.name">
       const on = dsx.variable.active == name
       const bg = on ? brand() : 'rgba(255,255,255,0.08)'
@@ -108,12 +132,27 @@
       if (v == null || v < 1000) { return '' }
       return '  ·  ' + compactCount(v)
     </formula>
+    <!-- the list row's facts (spec §11): the play count at glance width, and the meta row's
+         left half — the genre and the first tag, "Revenge, Betrayal" -->
+    <formula as="rowViews" v="item.views">
+      if (v == null || v < 1000) { return '' }
+      return compactCount(v)
+    </formula>
+    <formula as="metaLeft" genre="item.genre" tags="item.tags">
+      if (tags == null || tags.length == 0) { return genre }
+      // the first tag that is not the genre again ("Revenge, Revenge" was measured)
+      for (const t of tags) { if (t != genre) { return genre + ', ' + t } }
+      return genre
+    </formula>
     <formula as="cardFx" id="item.id">
       const on = dsx.variable.hovId == id
       return 'width: 100%; aspect-ratio: 3/4; border-radius: 8px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.03 : 1) + ')'
     </formula>
 
+    <!-- back from a genre reached by a CHIP goes to every series (the route never changed);
+         back from a deep-linked genre or from /browse itself pops -->
     <action as="goBack">
+      if (dsx.variable.picked != '') { dsx.variable.picked = ''; return }
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
       else { dsx.module.route.replace({ path: '/' }) }
     </action>
@@ -132,6 +171,30 @@
 
     <style as="chipRow" spacing="8" alignItems="center"/>
     <style as="chipLabel" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <!-- the genre page (spec §11): a centred 17 semibold header, the two sort chips 15 semibold
+         at radius 6, rows 20 apart — poster 118×157 at radius 8, title 20 semibold on two lines,
+         synopsis 15 ink-3 on three, the meta row 15 ink-3 -->
+    <style as="genreNav" alignItems="center" minHeight="44" paddingBottom="4" spacing="8"/>
+    <style as="navBtn" width="44" minHeight="44" alignItems="center"/>
+    <style as="genreTitle" fontSize="17" fontWeight="semibold" color="#FFFFFF" textAlign="center"/>
+    <style as="sortRow" spacing="6" alignItems="center"/>
+    <style as="sortChip" fontSize="15" fontWeight="semibold" radius="6" paddingH="14" paddingV="7" minHeight="34"/>
+    <style as="rows" spacing="20" alignItems="stretch" maxWidth="760"/>
+    <style as="row" spacing="12" alignItems="stretch"/>
+    <style as="posterWrap" width="118" height="157" radius="8"/>
+    <style as="hotTag" background="#FF2C55" radius="4" paddingH="6" paddingV="2" fontSize="13" fontWeight="semibold" color="#FFFFFF" zIndex="2"/>
+    <!-- a 48pt bottom scrim so the count reads on any art (the CoverCard idiom: CSS run for web,
+         the catalog's gradient words for native) -->
+    <style as="rowScrim" gradient="rgba(0,0,0,0)|rgba(0,0,0,0.6)" gradientDir="vertical" height="48" zIndex="1"/>
+    <style as="playRow" spacing="3" alignItems="center" zIndex="2"/>
+    <style as="playTxt" fontSize="13" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+    <style as="rowBody" spacing="4" alignItems="stretch"/>
+    <style as="rowTitle" fontSize="20" fontWeight="semibold" color="#FFFFFF" lineLimit="2" lineSpacing="2"/>
+    <style as="rowSyn" fontSize="15" color="#8E8E93" lineLimit="3" lineSpacing="3"/>
+    <style as="metaRow" spacing="8" alignItems="center"/>
+    <style as="meta" fontSize="15" color="#8E8E93" lineLimit="1"/>
+    <style as="metaCount" spacing="4" alignItems="center"/>
+    <style as="skelRow" spacing="12" alignItems="stretch"/>
 
     <style as="card" spacing="7" alignItems="stretch"/>
     <!-- TWO lines, not one: at 3 columns on a 375pt phone a single clamped line ellipsised
@@ -157,27 +220,47 @@
   <scroll class="scroller" style="flex: 1; min-height: 0">
     <vstack class="page" style="{{ dsx.variable.shell }}" paddingTop="16">
 
-      <hstack class="crumbRow" visible-if="dsx.variable.wide">
+      <!-- THE GENRE HEADER (spec §11): back leading, the genre CENTRED, a blank 44 slot trailing
+           so the title sits on the true centre -->
+      <hstack class="genreNav" visible-if="dsx.variable.isGenre">
+        <vstack class="navBtn" style="justify-content: center" on:tap="dsx.action.goBack()"
+                a11yTrait="button" a11yLabel="Back">
+          <image icon="chevron.backward" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
+        </vstack>
+        <text value="{{ dsx.variable.heading }}" class="genreTitle" grow="width" style="flex: 1; min-width: 0"/>
+        <vstack class="navBtn"/>
+      </hstack>
+      <!-- Trending | Latest — the server sorts; the chip only names which order it asked for -->
+      <hstack class="sortRow" visible-if="dsx.variable.isGenre">
+        <text value="Trending" class="sortChip" color="{{ dsx.variable.trendingInk }}" background="{{ dsx.variable.trendingBg }}"
+              style="{{ dsx.variable.trendingFx }}" a11yTrait="button" a11yLabel="Sort by trending"
+              on:tap="dsx.variable.sort = 'trending'"/>
+        <text value="Latest" class="sortChip" color="{{ dsx.variable.latestInk }}" background="{{ dsx.variable.latestBg }}"
+              style="{{ dsx.variable.latestFx }}" a11yTrait="button" a11yLabel="Sort by latest"
+              on:tap="dsx.variable.sort = 'latest'"/>
+      </hstack>
+
+      <hstack class="crumbRow" visible-if="dsx.variable.wide &amp;&amp; dsx.variable.isGenre == false">
         <text value="Home" class="crumb" a11yTrait="button" on:tap="dsx.module.route.reset({ path: '/' })"/>
         <text value="/" class="crumb" a11yHidden="true"/>
         <text value="Browse" class="crumbOn"/>
       </hstack>
 
       <!-- a deep-linked phone has no TopNav: the back bar is the only way out -->
-      <hstack class="phoneBar" visible-if="dsx.variable.wide == false">
+      <hstack class="phoneBar" visible-if="dsx.variable.wide == false &amp;&amp; dsx.variable.isGenre == false">
         <image icon="chevron.backward" iconSize="20" color="#FFFFFF" on:tap="dsx.action.goBack()"
                a11yLabel="Back" a11yTrait="button"/>
         <text value="Browse" class="h1" style="font-size: 20px"/>
       </hstack>
 
-      <hstack class="headRow">
+      <hstack class="headRow" visible-if="dsx.variable.isGenre == false">
         <text value="{{ dsx.variable.heading }}" class="h1"/>
         <text value="{{ dsx.variable.countLabel }}" class="count"/>
       </hstack>
 
       <!-- the chip row scrolls horizontally on a phone and simply wraps when there is room;
            its TRACK is max-content (a rail capped at `width: 100%` makes its rows shrink) -->
-      <scroll axis="horizontal" visible-if="dsx.variable.chips != null">
+      <scroll axis="horizontal" visible-if="dsx.variable.chips != null &amp;&amp; dsx.variable.isGenre == false">
         <hstack class="chipRow" style="width: max-content">
           <text value="All" class="chipLabel" style="{{ dsx.variable.allChipFx }}"
                 a11yTrait="button" a11yLabel="Show every series"
@@ -199,7 +282,60 @@
 
       <!-- LOADING: a grid of cells in the real shape, so the page does not resize when the
            posters land (a spinner over a collapsed page is the layout jump we designed out) -->
-      <grid visible-if="dsx.variable.busy" bind="dsx.variable.skeletonRows" key="index"
+      <!-- the genre page's skeleton: rows in the real shape -->
+      <list visible-if="dsx.variable.busy &amp;&amp; dsx.variable.isGenre" bind="dsx.variable.skeletonRows" key="index"
+            class="rows" scroll="false" spacing="20">
+        <hstack class="skelRow">
+          <vstack class="skelCell" style="width: 118px; height: 157px; flex: none"/>
+          <vstack spacing="8" grow="width" style="flex: 1; min-width: 0" alignItems="stretch">
+            <vstack class="skelCell" style="height: 22px; width: 80%"/>
+            <vstack class="skelCell" style="height: 16px; width: 100%"/>
+            <vstack class="skelCell" style="height: 16px; width: 90%"/>
+            <vstack class="skelCell" style="height: 16px; width: 60%"/>
+          </vstack>
+        </hstack>
+      </list>
+
+      <!-- THE LIST ROWS (spec §11): the 118×157 poster with the play count and the Hot tag,
+           the title on two lines, the synopsis on three, and the meta row — genre and first tag
+           left, the episode count right. lineLimit is the native clamp; the box trio is the web
+           twin (AGENTS.md). The poster's overlays are one absolute plane each; the count and
+           the tag sit on opposite corners so they cannot collide. -->
+      <list visible-if="dsx.variable.isGenre &amp;&amp; dsx.variable.view != null &amp;&amp; dsx.variable.view.total > 0"
+            bind="dsx.variable.view.items" key="id" class="rows" scroll="false" spacing="20">
+        <hstack class="row" href="/show/{{ item.id }}" a11yGroup="true"
+                a11yLabel="{{ item.title }}, {{ item.episodes }} episodes">
+          <zstack class="posterWrap" style="width: 118px; height: 157px; position: relative; overflow: hidden; border-radius: 8px; flex: none">
+            <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true" width="118" height="157"
+                   style="width: 118px; height: 157px; object-fit: cover; border-radius: 8px; display: block"/>
+            <stack class="rowScrim" a11yHidden="true"
+                   style="position: absolute; left: 0; right: 0; bottom: 0; height: 48px; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%); pointer-events: none"/>
+            <text value="Hot" class="hotTag" visible-if="item.hot" a11yHidden="true"
+                  style="position: absolute; top: 6px; right: 6px"/>
+            <hstack class="playRow" visible-if="item.views >= 1000" a11yHidden="true"
+                    style="position: absolute; right: 8px; bottom: 8px">
+              <image icon="play.fill" iconSize="10" color="#FFFFFF" a11yHidden="true"/>
+              <text value="{{ rowViews }}" class="playTxt" style="white-space: nowrap"/>
+            </hstack>
+          </zstack>
+          <vstack class="rowBody" grow="width" style="flex: 1; min-width: 0">
+            <text value="{{ item.title }}" class="rowTitle"
+                  style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+            <text value="{{ item.synopsis }}" class="rowSyn"
+                  style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden"/>
+            <spacer/>
+            <hstack class="metaRow" style="justify-content: space-between">
+              <text value="{{ metaLeft }}" class="meta" grow="width" style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+              <hstack class="metaCount">
+                <text value="{{ item.episodes }}" class="meta"/>
+                <text value="Episodes" class="meta"/>
+              </hstack>
+            </hstack>
+          </vstack>
+        </hstack>
+      </list>
+
+      <grid visible-if="dsx.variable.busy &amp;&amp; dsx.variable.isGenre == false" bind="dsx.variable.skeletonRows" key="index"
             columns="{{ dsx.variable.cols }}" spacing="14" scroll="false">
         <vstack class="card">
           <vstack class="skelCell" style="width: 100%; aspect-ratio: 3/4"/>
@@ -207,7 +343,7 @@
         </vstack>
       </grid>
 
-      <grid visible-if="dsx.variable.view != null && dsx.variable.view.total > 0"
+      <grid visible-if="dsx.variable.isGenre == false &amp;&amp; dsx.variable.view != null &amp;&amp; dsx.variable.view.total > 0"
             bind="dsx.variable.view.items" key="id"
             columns="{{ dsx.variable.cols }}" spacing="14" scroll="false">
         <vstack class="card" href="/show/{{ item.id }}"

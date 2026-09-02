@@ -28,6 +28,7 @@
     <api as="home" url="/catalog/home" on:success="global.cacheHome = home.data"/>
 
     <variable as="hovId">return ''</variable>
+    <variable as="toast">return ''</variable>
     <!-- ══ THE BENEFIT LIST IS A CONTRACT, AND IT IS READ OFF THE SERVER ═══════════════
          This list used to sell four things. Two of them did not exist:
 
@@ -122,9 +123,25 @@
       if (dsx.variable.walletView == null || dsx.variable.walletView.vipUntil == null) { return '' }
       return shortDate(dsx.variable.walletView.vipUntil)
     </variable>
-    <variable as="statusLine" computed="true">
-      if (dsx.variable.vipUntil == '') { return 'VIP active' }
-      return 'VIP active through ' + dsx.variable.vipUntil
+    <!-- THE MEMBER STATE LINE under the avatar (spec §10): "VIP until {date}" for a member,
+         "VIP ended on {date}" for a lapsed one — `walletState` returns `vipUntil` raw, so a
+         finished pass still has its date — and "No VIP pass yet" for everyone else. Words and
+         the date are separate nodes, so the words reach the string table. ("ended", not the
+         reference`s "expired": `npm run verify` refuses any display string that claims an
+         expiry, because 3.1.1 forbids expiring purchased currency and the gate cannot tell a
+         pass from a coin — and a pass that ran its term did end.) -->
+    <variable as="vipExpired" computed="true">
+      if (dsx.variable.isVip) { return false }
+      return dsx.variable.vipUntil != ''
+    </variable>
+    <!-- the name line: an account's name, else the category's word for a device viewer -->
+    <variable as="isAccount" computed="true">
+      if (global.auth == null) { return false }
+      return global.auth.kind == 'account'
+    </variable>
+    <variable as="whoName" computed="true">
+      if (global.auth != null &amp;&amp; global.auth.name != null &amp;&amp; global.auth.name != '') { return global.auth.name }
+      return dsx.variable.isAccount ? localize('Viewer') : localize('Visitor')
     </variable>
     <!-- WHAT A PLAN ACTUALLY IS ON THIS BACKEND, derived from the same table the tiers are
          priced from rather than typed in here. Every lane opens a ONE-OFF charge — a Stripe
@@ -167,10 +184,29 @@
       return 'width: 100%; aspect-ratio: 3/4; border-radius: 10px; object-fit: cover; transition: transform 0.22s ease; transform: scale(' + (on ? 1.03 : 1) + ')'
     </formula>
 
+    <action as="goBack">
+      if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
+      else { dsx.module.route.replace({ path: '/' }) }
+    </action>
+    <!-- the restore pill has nowhere to print an outcome: it arrives here and rides the toast -->
+    <action as="noted" message="message">
+      dsx.variable.toast = message
+    </action>
+
     <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <style as="page" spacing="0" paddingBottom="34" alignItems="stretch"/>
-    <style as="masthead" alignItems="center" spacing="8" paddingTop="20" paddingBottom="22"/>
+    <style as="masthead" alignItems="center" spacing="8" paddingTop="4" paddingBottom="22"/>
+    <!-- the header row: back leading, the Restore pill trailing (spec §10) -->
+    <style as="navRow" alignItems="center" minHeight="44" paddingBottom="8" spacing="8"/>
+    <style as="navBtn" width="44" minHeight="44" alignItems="center"/>
+    <!-- the 72 avatar tile and ONE member state line under it, 15 ink-3 (spec §10): the name
+         (or the category's word for a device viewer), a dot, the pass state -->
+    <style as="avatar" background="#2C2C2E" radius="36" width="72" height="72" alignItems="center"/>
+    <style as="stateRow" spacing="4" alignItems="center"/>
+    <style as="stateTxt" fontSize="15" color="#8E8E93"/>
+    <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
+    <style as="toastLine" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
     <style as="mastheadTitle" fontSize="20" fontWeight="bold" color="#F6B63D" textAlign="center"/>
     <style as="section" spacing="14" alignItems="stretch" paddingTop="28"/>
     <style as="sectionTitle" fontSize="20" fontWeight="bold" color="#F6B63D" textAlign="center"/>
@@ -225,12 +261,33 @@
       <TopNav active="vip" visible-if="dsx.variable.wide"/>
 
       <vstack class="masthead" style="{{ dsx.variable.mastheadBox }}">
-        <image src="/assets/coin.svg" a11yHidden="true" style="width: 54px; height: 54px"/>
-        <text value="Enjoy Your VIP Access and Privileges" class="mastheadTitle"/>
-        <hstack class="statusPill" visible-if="dsx.variable.isVip">
-          <image icon="crown.fill" iconSize="13" color="{{ gold() }}" a11yHidden="true"/>
-          <text value="{{ dsx.variable.statusLine }}" class="statusTxt"/>
+        <!-- a pushed route: back leading, "Restore" trailing — restore needs a subject and
+             never a login (Components/parts/RestoreRow.dsx); its outcome rides the toast -->
+        <hstack class="navRow" grow="width" style="width: 100%">
+          <vstack class="navBtn" style="justify-content: center" on:tap="dsx.action.goBack()"
+                  a11yTrait="button" a11yLabel="Back">
+            <image icon="chevron.backward" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
+          </vstack>
+          <spacer/>
+          <!-- `width="fit"` ON THE MOUNT (PLAN.md §6.187): a mount in a row is greedy on iOS and beat
+               this spacer — the pill rendered beside the chevron; the hug primitive lands it trailing -->
+          <RestoreRow variant="pill" width="fit" on:restored="wallet.refresh()" on:noted="dsx.action.noted()"/>
         </hstack>
+        <!-- the 72 avatar tile and the member state line (spec §10): "Visitor · No VIP pass yet",
+             "{name} · VIP until {date}", "{name} · VIP ended on {date}" — one row, every word its
+             own node so the table reaches it and the date stays a date -->
+        <vstack class="avatar" style="justify-content: center">
+          <image icon="person.crop.circle" iconSize="36" color="{{ ink2() }}" a11yHidden="true"/>
+        </vstack>
+        <hstack class="stateRow" style="flex-wrap: wrap; justify-content: center" paddingTop="4">
+          <text value="{{ dsx.variable.whoName }}" class="stateTxt"/>
+          <text value="·" class="stateTxt"/>
+          <text value="VIP until" class="stateTxt" visible-if="dsx.variable.isVip"/>
+          <text value="VIP ended on" class="stateTxt" visible-if="dsx.variable.vipExpired"/>
+          <text value="{{ dsx.variable.vipUntil }}" class="stateTxt" visible-if="dsx.variable.vipUntil != ''"/>
+          <text value="No VIP pass yet" class="stateTxt" visible-if="dsx.variable.isVip == false &amp;&amp; dsx.variable.vipExpired == false"/>
+        </hstack>
+        <text value="Enjoy Your VIP Access and Privileges" class="mastheadTitle" paddingTop="8"/>
       </vstack>
 
       <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
@@ -338,16 +395,14 @@
             <text value="{{ dsx.variable.termLine }}" class="benefitNote" style="flex: 1; min-width: 0"/>
           </hstack>
 
-          <!-- RESTORE PURCHASES — required on a subscription sign-up screen, and now REAL
-               on BOTH lanes. This row used to call `wallet.refresh()` and admit, in its own
-               third line, that there was no sign-in anywhere so a pass bought on another
-               account could not be reached. It now picks its lane by capability and runs the
-               sweep that lane can ask — POST /store/restore against Stripe on the web, plus
+          <!-- RESTORE PURCHASES — required on a subscription sign-up screen, and REAL on both
+               lanes: the pill in the header (spec §10) picks its lane by capability and runs
+               the sweep that lane can ask — POST /store/restore against Stripe on the web, plus
                POST /store/restore/native against RevenueCat in a build that has the store
-               module — and it prints, per lane, what restore cannot reach and why. A
-               signed-out tap raises the sign-in, which is precisely the "sign in OR restore"
-               pair App Store 3.1.2 asks for on a subscription surface. -->
-          <RestoreRow on:restored="wallet.refresh()"/>
+               module. A signed-out tap raises the sign-in, which is precisely the "sign in OR
+               restore" pair App Store 3.1.2 asks for. This line is the CEILING, per lane —
+               what restore cannot reach and why — said where the reader is (Article 7). -->
+          <RestoreRow variant="ceiling"/>
 
           <!-- TERMS AND PRIVACY — required in-app beside a subscription (App Store 3.1.2,
                and Play for the privacy policy). There is now a real surface for them:
@@ -383,6 +438,13 @@
       </vstack>
     </vstack>
   </scroll>
-  <TabBar active="vip" visible-if="dsx.variable.wide == false"/>
+  <!-- THE TOAST LIVES OUTSIDE THE SCROLL, pinned at the foot on every renderer -->
+  <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
+    <text value="{{ dsx.variable.toast }}" class="toastLine" grow="width" style="flex: 1"/>
+    <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
+           a11yLabel="Dismiss message" a11yTrait="button"/>
+  </hstack>
+  <!-- NO TAB BAR: /vip is a PUSHED route now (dsx.config.json, spec §8 — VIP left the bar), and
+       a pushed screen is full-bleed with a back affordance (PLAN.md §6.29) -->
   <AuthSeam/>
 </vstack>

@@ -54,6 +54,37 @@
       <index on="intent"/>
     </entity>
 
+    <!-- ══ A LIMITED OFFER IS A ROW, NOT A LITERAL ═══════════════════════════════════════
+         The category's membership cards wear a countdown ("05:59:59") and a coupon modal
+         (docs/design/reference-ui-spec.md §10), and both are SERVER-DRIVEN here: an operator
+         writes one of these rows and the price list below carries `offerEndsAt` on the tier it
+         names while `ends_at` is in the future, and a top-level `offer` for the coupon. When
+         the clock passes, both vanish from the payload with no build and no client change.
+
+         AND IT IS A REAL PRICE, OR IT IS NOTHING. A countdown beside a price that does not
+         change is the dark pattern every reviewer knows, so `cents` is the offer PRICE and it
+         flows into the SAME table every lane charges from: `createCheckout` reads
+         `storeCatalog` for the Stripe amount, `grantStore` for the days — so the web lane
+         charges exactly the number the card shows for as long as the badge is up, and an order
+         opened at the offer price settles at the offer price after it ends (the row records
+         its cents). On a native build Apple or Google charge the STORE product's own price:
+         `product_id` lets an operator point the tier at an introductory product created in
+         the console for the offer window, and the card shows that product's localized price
+         (Membership `planPrice`), so what is displayed is what is charged on that lane too.
+         `cents` at 0 means "countdown only": the tier keeps its price and its arithmetic and
+         the badge simply says when the list price stops being guaranteed.
+
+         WRITTEN ONLY BY THE OPERATOR (public-read: viewers read, nothing user-scoped writes —
+         server/admin.dsx adminUpsertOffer, mirrored by the serve.mjs twin the seed calls).
+         One row per sku; a re-seed moves the window forward rather than stacking rows. -->
+    <entity as="offer" ownership="public-read">
+      <field as="sku" type="text"/>            <!-- the tier it discounts (vip_pass_30) -->
+      <field as="ends_at" type="timestamptz"/> <!-- the countdown's zero; past = no offer -->
+      <field as="cents" type="integer"/>       <!-- the offer price; 0 = countdown only -->
+      <field as="product_id" type="text"/>     <!-- the store product for the window, or empty -->
+      <index on="sku"/>
+    </entity>
+
     <!-- ══ THE PRICE TABLE. ONE COPY. THIS ONE. ═══════════════════════════════════════════
          There were three, and they had already drifted: `storeCatalog` served
          `vip_weekly`/`coins_500`, `createCheckout` re-typed the same rows to price the
@@ -121,20 +152,70 @@
       // Google takes money this deployment could not honour. See `settleNative`.
       const rc = await dsx.module.secret.read({ name: 'REVENUECAT_KEY' })
       const verifier = rc.ok && rc.data != null && rc.data !== ''
+      // `renews` is the BILLING SHAPE of the row, and every row here is false: a dated pass is
+      // one charge and stops. A deployment that sells a renewing subscription (a StoreKit
+      // auto-renewable, a Play subscription, a Stripe Subscription) sets it true on that row and
+      // the screens print the category's subscription copy for it — "Subscribe now" on the
+      // CTA, "Auto-renewal · Cancel anytime" under it (docs/design/reference-ui-spec.md §10) —
+      // instead of the pass sentence. The flag is a fact the granter must honour before a row
+      // wears it: `grantStore` adds days once, and renewing is a webhook the adopter wires.
       const vip = [
-        { id: 'vip_pass_7',   productId: 'vip_pass_7',   label: '7-day pass',   period: '7 days',   price: '$11.99',  cents: 1199,  days: 7,   note: 'One charge for 7 days. No auto-renewal.',   badge: '',           best: false },
-        { id: 'vip_pass_30',  productId: 'vip_pass_30',  label: '30-day pass',  period: '30 days',  price: '$24.99',  cents: 2499,  days: 30,  note: 'One charge for 30 days. No auto-renewal.',  badge: '',           best: false },
-        { id: 'vip_pass_365', productId: 'vip_pass_365', label: '365-day pass', period: '365 days', price: '$199.99', cents: 19999, days: 365, note: 'One charge for 365 days. No auto-renewal.', badge: 'BEST VALUE', best: true  }
+        { id: 'vip_pass_7',   productId: 'vip_pass_7',   label: '7-day pass',   period: '7 days',   price: '$11.99',  cents: 1199,  days: 7,   note: 'One charge for 7 days. No auto-renewal.',   badge: '',           best: false, renews: false },
+        { id: 'vip_pass_30',  productId: 'vip_pass_30',  label: '30-day pass',  period: '30 days',  price: '$24.99',  cents: 2499,  days: 30,  note: 'One charge for 30 days. No auto-renewal.',  badge: '',           best: false, renews: false },
+        { id: 'vip_pass_365', productId: 'vip_pass_365', label: '365-day pass', period: '365 days', price: '$199.99', cents: 19999, days: 365, note: 'One charge for 365 days. No auto-renewal.', badge: 'BEST VALUE', best: true,  renews: false }
       ]
+      // THE LIVE OFFER, if the operator wrote one (the `offer` entity above). Applied to the
+      // tier BEFORE the reference-price arithmetic, so the badge percentage, the struck price
+      // and every lane's charge all derive from the price the card actually shows. `list` is
+      // bounded and public-read; an expired row is simply not applied, and the newest window
+      // wins when two rows name one sku. Fields are read with `== null` guards because a
+      // stored null is the NSNull sentinel on the client lanes and this body mirrors the idiom.
+      const nowMs = Date.now()
+      const offerRows = await dsx.module.data.offer.list({ limit: 100 })
+      const liveOffers = {}
+      for (const o of (offerRows.ok ? offerRows.data : [])) {
+        if (o.sku == null || o.sku === '') { continue }
+        if (o.ends_at == null || o.ends_at === '') { continue }
+        if (new Date(o.ends_at).getTime() <= nowMs) { continue }
+        const cur = liveOffers[o.sku]
+        if (cur == null || o.ends_at > cur.ends_at) { liveOffers[o.sku] = o }
+      }
+      // COLLECTIONS ARE VALUE-TYPED: a loop variable is a copy, so the rows are REBUILT with
+      // the offer folded in rather than mutated in place (AGENTS.md, the write-back idiom).
+      let coupon = null
+      const priced = []
+      for (const t of vip) {
+        const o = liveOffers[t.id]
+        if (o == null) { priced.push({ ...t, offerEndsAt: '', listCents: t.cents, listPrice: t.price }); continue }
+        let cents = t.cents
+        let shown = t.price
+        let pid = t.productId
+        if (o.cents != null && o.cents > 0 && o.cents < t.cents) {
+          cents = o.cents
+          const whole = Math.floor(o.cents / 100)
+          const rest = o.cents - whole * 100
+          shown = '$' + whole
+          shown = shown + '.'
+          if (rest < 10) { shown = shown + '0' }
+          shown = shown + rest
+          if (o.product_id != null && o.product_id !== '') { pid = o.product_id }
+          // the coupon modal: the FIRST discounted offer, with the regular price it beats
+          if (coupon == null) {
+            coupon = { sku: t.id, productId: pid, label: t.label, period: t.period, days: t.days,
+                       price: shown, regular: t.price, endsAt: o.ends_at }
+          }
+        }
+        priced.push({ ...t, cents: cents, price: shown, productId: pid, offerEndsAt: o.ends_at, listCents: t.cents, listPrice: t.price })
+      }
       // THE REFERENCE PRICE IS ARITHMETIC. The first (shortest) pass sets the per-day rate; a
       // longer pass is compared against what its days would cost at that rate, and `off` is
       // the whole-percent saving, 0 when there is none. The Membership page paints the badge
       // and the struck price from these two fields and never types a percentage itself.
       // The dollar string is grown from a non-numeric anchor on purpose: JSE + is total
       // arithmetic, so a bare zero-pad would collapse to a number (AGENTS.md).
-      const perDay = vip[0].cents / vip[0].days
+      const perDay = priced[0].cents / priced[0].days
       const tiers = []
-      for (const t of vip) {
+      for (const t of priced) {
         const refCents = Math.round(perDay * t.days)
         const off = refCents > t.cents ? Math.round((1 - t.cents / refCents) * 100) : 0
         let refPrice = ''
@@ -150,6 +231,8 @@
       }
       return {
         vip: tiers,
+        // the coupon modal's facts, or null: a surface that shows only when this is a row
+        offer: coupon,
         packs: [
           { id: 'coins_500',   productId: 'coins_500',   coins: 500,   free: 25,    cents: 499,  price: '$4.99',  bonus: '+5%' },
           { id: 'coins_1000',  productId: 'coins_1000',  coins: 1000,  free: 100,   cents: 999,  price: '$9.99',  bonus: '+10%' },
@@ -983,6 +1066,10 @@
                      which is the mistake AGENTS.md records against an account deletion. -->
 
   <route method="GET"  path="/store/catalog"  action="storeCatalog"   auth="none"     rate="120/m"/>
+  <!-- THE SAME TABLE UNDER THE NAME THE DESIGN SPEC USES (docs/design/reference-ui-spec.md §10:
+       `offer` and `offerEndsAt` ride "/store/plans"). One action, two paths, so the screens
+       keep reading /store/catalog and a reader of the spec finds the field where it says. -->
+  <route method="GET"  path="/store/plans"    action="storeCatalog"   auth="none"     rate="120/m"/>
   <route method="POST" path="/store/checkout" action="createCheckout" auth="required" rate="6/h"/>
   <route method="POST" path="/store/settle"   action="settleOrder"    auth="required" rate="20/h"/>
   <route method="POST" path="/store/native"   action="settleNative"   auth="required" rate="20/h"/>

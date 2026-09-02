@@ -134,6 +134,14 @@ for (const row of existingShows) {
   retired += 1;
 }
 
+// THE LIMITED OFFER, six hours ahead of whenever the seed runs: the 30-day pass at $19.99
+// (list $24.99), so the Membership and Store cards show the countdown badge and the coupon
+// modal has something true to say (server/store.dsx, the `offer` entity). Re-seeding moves
+// the window forward again — a demo whose offer has expired is a demo of a plain card.
+const offerEndsAt = new Date(Date.now() + 6 * 3600 * 1000).toISOString();
+await call("/internal/admin/upsertoffer", { sku: "vip_pass_30", cents: 1999, endsAt: offerEndsAt });
+console.log(`[seed] limited offer on vip_pass_30 until ${offerEndsAt}`);
+
 const stats = await call("/internal/admin/stats", {});
 console.log(
   `[seed] ${created} created · ${updated} updated · ${retired} retired · ${episodesWritten} episode rows`,

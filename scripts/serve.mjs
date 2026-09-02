@@ -157,6 +157,25 @@ const opsHandlers = {
     if (row === null) throw { reason: "not_found", message: "no such show" };
     return { show: args.show, featured: args.featured === true };
   },
+  // the limited offer (server/store.dsx `offer`; server/admin.dsx adminUpsertOffer) — one row
+  // per sku, so a re-seed moves the window forward instead of stacking rows
+  upsertOffer: async (args) => {
+    const sku = String(need(args.sku, "sku"));
+    const values = {
+      sku,
+      ends_at: String(need(args.endsAt, "endsAt")),
+      cents: Number.isFinite(Number(args.cents)) ? Number(args.cents) : 0,
+      product_id: String(args.productId ?? ""),
+    };
+    const have = await svc.list("offer", { filters: { sku }, limit: 100 });
+    if (have.length > 0) {
+      const row = await svc.update("offer", have[0].id, values);
+      if (row === null) throw { reason: "not_found", message: "no such offer" };
+      return { id: have[0].id, updated: true };
+    }
+    const made = await svc.create("offer", values);
+    return { id: made.id, created: true };
+  },
   notice: async (args) => {
     const made = await svc.create("notice", {
       title: String(need(args.title, "title")),

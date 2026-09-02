@@ -270,7 +270,7 @@
       </vstack>
     </grid>
     <BuyButton visible-if="dsx.variable.phase == 'content'" sku="{{ dsx.variable.selId }}" productId="{{ dsx.variable.selProductId }}"
-               kind="vip" label="{{ dsx.variable.ctaLabel }}" price="{{ dsx.variable.selPrice }}" variant="gold" surface="plans"
+               kind="vip" label="{{ dsx.variable.ctaLabel }}" price="{{ dsx.variable.selPrice }}" variant="gold" funnel="plans"
                on:purchased="dsx.action.purchased()" on:failed="dsx.action.failed()"/>
   </vstack>
 
@@ -328,7 +328,7 @@
 
       <!-- THE PURCHASE: one control, both lanes, the server grants (BuyButton.dsx) -->
       <BuyButton visible-if="dsx.variable.phase == 'content'" sku="{{ dsx.variable.selId }}" productId="{{ dsx.variable.selProductId }}"
-                 kind="vip" label="{{ dsx.variable.ctaLabel }}" price="{{ dsx.variable.selPrice }}" variant="gold" surface="plans"
+                 kind="vip" label="{{ dsx.variable.ctaLabel }}" price="{{ dsx.variable.selPrice }}" variant="gold" funnel="plans"
                  on:purchased="dsx.action.purchased()" on:failed="dsx.action.failed()"/>
 
       <!-- SIGN IN OR RESTORE, on the surface that sells the subscription — App Store 3.1.2
