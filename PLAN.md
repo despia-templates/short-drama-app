@@ -3704,3 +3704,82 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      Also verified on the same pass: §6.170's `id` input reaches the phones — the Language
      sheet's ✓ on "Device language" paints on the iPhone 17 Pro simulator with a kernel at
      e6475d79, where the earlier build painted none.
+
+176. **AN ANDROID DEPTH STACK SIZED ITSELF TO ITS LARGEST LAYER, SO A `height: 100%` BADGE
+     WRAPPER HUGGED ITS TEXT OR SWALLOWED THE PROPOSAL** (found 2026-09-02 in the three-lane
+     sweep at 402×874, Vip.dsx's "Watch free with VIP" rail: every VIP badge sat at the
+     vertical middle of its poster on the phone, top-right on iOS and the web; fixed upstream,
+     6154b6a9 on the /tmp/wt-and3 worktree rebased onto dev 07d0e9a4, pending the coordinator's cherry-pick).
+
+     The rail's badge wrapper is `<vstack class="tagWrap" style="width: 100%; height: 100%">`
+     over a 3:4 `<image>` inside a `<zstack>`. The Android arm was a plain Compose `Box`,
+     which sizes to its largest child: under the vertical scroll's unbounded proposal a
+     `height: 100%` layer (the bridge's `grow`) filled nothing and hugged its one text, and the
+     box's centre alignment sat the badge mid-poster; under a bounded column the same layer
+     filled the whole proposal and inflated the box past the poster (probe 2a on the emulator:
+     the badge 180pt above its image); in a row it took the row's remaining width (probe 2b:
+     the fixed box centred in a 245pt zstack, the next sibling squeezed to nothing). iOS learned
+     this law at dev@4526ef24 (`CoverZStackLayout`); Android now runs the same one:
+     `StackNodeView.CoverZStack` sizes the box from its NON-greedy children only, a child
+     greedy on one axis covers that axis and still sizes the other, a layer greedy on both
+     covers the box, an axis nobody sized is fill-available under a bounded proposal and auto
+     under an unbounded one (CSS: a percentage against an auto-sized axis is auto). Greed is
+     declared by the cascade's `grow` (Compose measures once, so it cannot be detected by
+     proposal as SwiftUI does), and a greedy child's `zIndex` is lifted onto the wrapper it
+     rides, the node its siblings are ordered against (the AbsoluteHost rule, §6.167).
+     Measured after on DSX_API36_Phone_Final: the VIP badge at the top-right of every poster
+     (`and3-after-vip.png`), probes 2a/2b/2c all 100×133 with the tag in the corner.
+
+     Pin: `CoverZStackInstrumentedTest` (pixel-read through the real StackRootView) — the
+     scroll case and the bounded-column case, both red at 16f9c9ae (got the blue poster where
+     the tag belongs; got black where the poster belongs), both green with the fix; the 358
+     render unit tests unchanged.
+
+177. **ANDROID'S LAYOUT CORE DROPPED A `<stack>`'S ATTRIBUTE GEOMETRY, SO A 44pt SLOT
+     TOOK THE ROW AND THE TITLE BESIDE IT BROKE ONE GLYPH PER LINE** (found 2026-09-02 in the
+     same sweep, Membership.dsx's nav row: "Membership" rendered vertically, ten lines tall,
+     the chevron centred beside it; fixed upstream, 3da9bc64 on the same worktree).
+
+     The row is `<vstack class="navBtn">` · `<text grow="width" style="flex: 1; min-width:
+     0">` · `<stack class="navBtn"/>`, and the third child is the cause. The sweep's APK
+     carried libdsx_taffy.so (the export copies the framework cache's Android libraries into
+     the app), so the generic `<stack>` rendered through the DSX-CSS core — and the seam
+     handed the core a style built from CSS declarations alone while RETIRING the element's
+     attribute geometry (`containerGeometry`: width, height, min/max, padding, aspect ratio,
+     direction, alignment). A `<style as="navBtn" width="44" minHeight="44">` class is
+     attributes, never a sheet rule, so the core saw a flex column with no width; the
+     container's block-level fill sized it to the row's remaining width, and the weighted
+     title measured 0 wide (Compose lays a zero-width text out one character per line).
+     Every spelling of the title's growth was innocent — the probe rows with a `<vstack>`
+     in the third slot rendered right, which is also why a clean-worktree export (no cache,
+     no core) could not reproduce the sweep: the bug lived in the build that ships. Now
+     `CssLayoutStyle.attributeDeclarations` (:core) translates the retired keys into
+     declarations — the box, the padding precedence, the per-tag `align`/`alignY`
+     geometric words on the right axis, gaps, and against a layout parent `grow` →
+     `flex-grow` / `align-self: stretch` by the parent's axis (stamped by StampedChildren),
+     margins, self-alignment, the absolute plane — emitted BEFORE the CSS so a declaration
+     still wins; `CSSEngine.layoutStyle` takes them, and the render seam passes the resolved
+     attributes. Measured after, same build recipe with the core: the title `[408,194]
+     [672,248]` on one line at the screen's centre (`and3-after-membership.png`), probe rows
+     1a/1d one line.
+
+     Two riders, named. (a) The render module's own `jniLibs` pointer to the framework
+     cache was one directory short (`../../ClosedSource` from OpenSource/Engine/Android
+     names nothing), so `:render:connectedDebugAndroidTest` never carried the core and no
+     instrumented test could measure this lane; it points at the repository root now, and
+     the core-lane cases run where the cache exists and are assumed away where it does
+     not. (b) A bare `<stack/>` with no width in an `<hstack>` still fills the row's
+     remaining width on this lane (the container's block-level fill under any bounded
+     proposal, TaffyMeasurePolicy) where the web and SwiftUI's proposal negotiation give it
+     its content width — the same family, not measured by the flagship, left for the layout
+     core's own pass.
+
+     Pins: `CssLayoutStyleAttributesTest` (:core, 7 cases: the navBtn class keeps its box,
+     padding precedence, the geometric words per axis, a declaration beats an attribute,
+     `grow` against either parent axis, a legacy parent's relation keys stay with the
+     chain); `RowGrowTextInstrumentedTest` — six growth spellings beside a `<vstack>` slot
+     (green at 16f9c9ae and after), and beside a core-laid-out `<stack width="44">` slot
+     (RED at 16f9c9ae with the core in the test APK — every spelling measured
+     `title 0.0×200.0 at x 68.0, row 358×216`; GREEN with the fix inside the pinned bounds,
+     the title 250–258 wide and one line tall, the slot 43–45 — 5/5 on the emulator). :core 4166 tests, :render 358, unchanged but for the
+     new cases; the css-bridge `line-height` row stays red at this base as §6.172 recorded.
