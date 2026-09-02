@@ -100,6 +100,117 @@ gives an internal route. A phone on the dev LAN can still reach it, which is the
 
 ---
 
+## 2A · Device identity — the 90% path
+
+Most viewers never make an account. The founder's rule: *"My list should fully work locally
+based on device auth. 90% of users will not create an account… build a real auth system
+around that."* So a first run is not a guest with nothing — it is a **device**, with a real
+session, and favourites, history, the wallet and restore all work with no login. An account
+is an upgrade that makes that data **follow the viewer to another device**, not a gate in
+front of it.
+
+### The credential, and why it is shaped this way
+
+A device holds **one** credential in the platform vault
+(`dsx.module.identityvault`, Core/IdentityVault): a `{ deviceId, secret }` pair. Three
+founder constraints decide its shape, and each is load-bearing against a decompiled client:
+
+- **The secret is SERVER-generated** (`randomBytes(32)`), returned **once** at registration.
+  The server stores only `sha256(secret)`. *"A client-trusted grant of any kind will be
+  farmed within a week of launch. Assume the app is decompiled on day one."* A decompiled
+  client holds a secret that proves possession and reveals nothing about anyone else; a
+  leaked device table is a table of worthless hashes.
+- **The client never holds a long-lived server token.** *"Never hand the client a long-lived
+  or unscoped token."* The credential is exchanged for a **short-lived (1h) HS256 session**
+  on every cold start and on any 401. The session carries a UUID `sub` and a `kind`, and
+  **never a `role`** — a device can never be the operator.
+- **No coin ever originates here.** Device identity mints an IDENTITY, never an entitlement.
+  The account link sums two wallets **server-side**, under an idempotent ledger lock; every
+  credit still comes from the server grant paths (`server/wallet.dsx` / `server/store.dsx`).
+
+### Where the credential lives, per lane (the durability table)
+
+`dsx.module.identityvault.durability()` reports the truth the platform will actually deliver,
+and the link card's copy reads it directly (no `os` check). From the IdentityVault README:
+
+| Level | Means | Plane (this app) |
+|---|---|---|
+| `synced` | The platform's documented cross-device credential plane was used — a new phone keeps the purchases with nothing typed. | iOS iCloud Keychain (`keychain_synced`), Android Block Store (`blockstore_cloud`) |
+| `device` | Survives relaunch on this device; reaches no other. | `keychain_device`, `blockstore_local`, `keystore_prefs` |
+| `session` | Survives the process; the platform reclaims it on its own schedule. | web tab (`indexeddb`) |
+| `none` | Nothing durable was stored. | `none` |
+
+**On the web there is no cross-device credential plane** (a browser fact, not a gap), and
+IndexedDB is cleared with site data — so on web the seam **also mirrors the credential in a
+durable cookie** (`dsx.cookie.dsx_dev_id` / `dsx.cookie.dsx_dev_secret`, `days: 400`, the
+platform cap the fold clamps to). The cookie is written only where the vault is not a durable
+secure store (the web, and any build with no vault): on a native build the secret lives in
+the Keychain / Block Store and never touches a JS-readable cookie.
+
+> **One deploy note, native only.** Premium packages (IdentityVault among them) make the
+> native export refuse without a `despia-entitlement.json` beside the project — a local
+> unsigned file, **never committed**. `docs/monetization.md` documents it fully.
+
+### The flow (`Components/parts/AuthSeam.dsx`)
+
+```
+boot → account session? (cookie sd_auth == 'in') → use it (existing flow)
+     → else DEVICE: vault.read('dsx.deviceId'/'dsx.deviceSecret')  (web: cookie fallback)
+            found    → POST /auth/device        → publish device session
+            missing  → POST /auth/device/register → vault.write (+ web cookie) → publish
+     → any provider miss (offline / none wired) → publishGuest (catalogue is public)
+```
+
+The session is re-exchanged **before expiry** (a single keyed timer, `setTimeout(…, 'dsx.authRefresh')`,
+which a remount replaces rather than stacks — no busy loop) and on any near-expiry navigation.
+`global.auth` gains `kind` (`'device' | 'account'`), `deviceId`, `expiresAt`, `plane` and
+`durability` on top of the shape in §5.
+
+### Linking, and what the merge moves
+
+After a **real sign-in** (the `authSignInUrl` flow) the seam calls **`POST /auth/link`**
+automatically, so the list, coins and history the viewer built up as a guest merge into the
+account. The merge (server-side, one SQL transaction in the provider — it has the transaction
+seam a declared action lacks, §6.38):
+
+- **favourites and unlocks** — UNION (each idempotent on its own unique index);
+- **history / progress** — newest-wins;
+- **the two coin balances** — SUMMED into the account wallet, guarded by an exactly-once
+  `merge` ledger row keyed by the device viewer id (`dsx_ledger_merge_once`), so a concurrent
+  or replayed link folds the balance **once**;
+- **purchases, orders and VIP** — re-parented (VIP takes the later expiry);
+- **comments, reports and blocks** — re-parented to the account.
+
+On success the local credential is dropped, so a later **sign-out** drops to a **fresh
+device**, not the merged one. A **linked device** exchanges to the ACCOUNT subject (kind
+`account`), so it acts as the account — and its "sign out" is **`POST /auth/unlink`** (retire
+the credential, start fresh), never the account provider it never used. Account sign-out and
+delete stay account-only (`kind == 'account'`).
+
+### The provider is not `server/*.dsx`, and cannot be
+
+Minting a session is **provider** work (§1–2: the backend verifies, it never issues), so the
+four device endpoints live in the local origin (`scripts/serve.mjs`) beside `/dev-session.json`,
+and an adopter re-implements them in their IdP or a thin exchange service exactly as they
+replace `authSignInUrl`. It is also a framework fact that they *cannot* be declared actions: a
+declared body reaches the database only user-scoped, and its writes are refused for a caller
+with no identity — which every public registration is — while this store must be written with
+service authority no viewer may reach (PLAN.md §6.128). `App.json` `consts`
+(`authDeviceRegisterUrl` · `authDeviceUrl` · `authLinkUrl` · `authUnlinkUrl`) are the swap
+point; empty turns the device lane off and the app is a plain guest.
+
+The endpoints, in one table:
+
+| route | auth | shape |
+|---|---|---|
+| `POST /auth/device/register` | public | `{ platform?, plane? }` → `{ deviceId, secret, session, expiresIn, kind }` (once) |
+| `POST /auth/device` | public | `{ deviceId, secret }` → `{ session, kind, sub, deviceId, linked }` · unknown/wrong → 401 `device_unknown` (same timing) |
+| `POST /auth/link` | account session | `{ deviceId, secret }` → merges, `{ linked, done }` |
+| `POST /auth/unlink` | account session | `{ deviceId }` → `{ unlinked }` |
+| `POST /store/restore/native` | any session incl. device | anonymous restore — a subject, not a login |
+
+---
+
 ## 3 · How a screen consumes the seam
 
 Three spellings. No session block, no per-screen `authHeaders` computed, no `needs=` edge:

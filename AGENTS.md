@@ -66,6 +66,13 @@ Schema change → re-apply `server/generated/migration.sql` (re-runnable by cons
   whole scope object, so `item == null` is false for a null and the rejection branch is
   skipped. Cost a live payment guard. Use `picked`/`row`/`match` (upstream #242).
 - **A sibling action answers the module envelope** `{ ok, data }` — read `.data`.
+- **A PUBLIC declared action CANNOT WRITE, and cannot reach service scope.** `repoFor().create/
+  update/delete` calls `mustWrite()`, which throws `forbidden` the moment the caller has no
+  identity — so an `auth="none"` route's declared body cannot insert a row (measured, before RLS
+  is even consulted), and no declared action ever gets `serviceRepo()` (it "cannot be obtained
+  from a HostContext", repo.ts). A public endpoint that must write with service authority — a
+  device-registration mint, the ops twins — is a hand-written handler in `scripts/serve.mjs`
+  (the provider origin), NOT a `<server>` action, pending the upstream word (§6.128 / §6.7).
 - **Return value copies per collection** from server actions (`{ ...row }`) — the wire
   serializer elides repeated references.
 - **A sibling action answers the MODULE ENVELOPE**: `dsx.action.other()` resolves

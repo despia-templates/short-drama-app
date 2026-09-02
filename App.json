@@ -17,6 +17,10 @@
     "authSignUpUrl": "",
     "authSignOutUrl": "",
     "accountDeleteUrl": "/viewer/delete",
+    "authDeviceRegisterUrl": "/auth/device/register",
+    "authDeviceUrl": "/auth/device",
+    "authLinkUrl": "/auth/link",
+    "authUnlinkUrl": "/auth/unlink",
     "termsUrl": "",
     "privacyUrl": "",
     "supportUrl": ""
