@@ -78,6 +78,15 @@
     <api as="signOutCall" url="{{ dsx.variable.signOutUrl }}" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="deleteCall"  url="{{ dsx.variable.deleteUrl }}"  method="POST" auto="false" headers="global.auth.headers"/>
 
+    <!-- THE DEVICE-IDENTITY PROVIDER (server/auth.dsx; scripts/serve.mjs mints). These four are
+         the 90% path: a device holds ONE server-generated credential and exchanges it for a
+         short-lived session on every cold start, so favourites, history, the wallet and restore
+         all work with no account. Imperative (`auto="false"`) — the seam decides when. -->
+    <api as="deviceRegisterCall" url="{{ dsx.variable.deviceRegisterUrl }}" method="POST" auto="false"/>
+    <api as="deviceExchangeCall" url="{{ dsx.variable.deviceUrl }}"         method="POST" auto="false"/>
+    <api as="linkCall"   url="{{ dsx.variable.linkUrl }}"   method="POST" auto="false" headers="global.auth.headers"/>
+    <api as="unlinkCall" url="{{ dsx.variable.unlinkUrl }}" method="POST" auto="false" headers="global.auth.headers"/>
+
     <variable as="email">return ''</variable>
     <variable as="password">return ''</variable>
     <variable as="mode">return 'in'</variable>        <!-- in | up -->
@@ -86,6 +95,17 @@
     <variable as="confirmWord">return ''</variable>
     <variable as="deleteState">return ''</variable>   <!-- '' | done | absent | refused -->
     <variable as="deleteNote">return ''</variable>
+    <!-- the device credential in hand this session, and where the vault says it lives. `plane`
+         and `durability` drive the link-card copy (bound through global.auth); they are never
+         authority — what a device OWNS is always a server answer to a server question. -->
+    <variable as="devId">return ''</variable>
+    <variable as="devSecret">return ''</variable>
+    <variable as="devPlane">return 'none'</variable>
+    <variable as="devDurability">return 'none'</variable>
+    <!-- true when the vault answered an error that is NOT `not_found`: the store may HOLD a record
+         it cannot show right now (a locked device, a missing keychain entitlement). Registering
+         then would ORPHAN the device's data behind a new credential, so we do not — we wait. -->
+    <variable as="vaultBlocked">return false</variable>
 
     <!-- THE CONFIG PLANE. `dsx.const.*` is App.json's `consts`, overlaid by dsx.config.json
          `consts` — flat scalars, reactive, and typed-NULL when absent, which is exactly the
@@ -122,6 +142,32 @@
       const u = dsx.const.accountDeleteUrl
       return u == null ? '' : u
     </variable>
+    <!-- THE DEVICE-PROVIDER ENDPOINTS, config-driven like every other seam URL. Defaults are the
+         local provider (scripts/serve.mjs); an adopter points them at their own device-auth
+         service exactly as they point authSignInUrl at their IdP. An EMPTY value turns the device
+         lane off — the seam then falls back to the account/dev-session flow and the app is a plain
+         guest, which is the honest degradation when no device provider is wired. -->
+    <variable as="deviceRegisterUrl" computed="true">
+      const u = dsx.const.authDeviceRegisterUrl
+      if (u == null) { return '/auth/device/register' }
+      return u
+    </variable>
+    <variable as="deviceUrl" computed="true">
+      const u = dsx.const.authDeviceUrl
+      if (u == null) { return '/auth/device' }
+      return u
+    </variable>
+    <variable as="linkUrl" computed="true">
+      const u = dsx.const.authLinkUrl
+      if (u == null) { return '/auth/link' }
+      return u
+    </variable>
+    <variable as="unlinkUrl" computed="true">
+      const u = dsx.const.authUnlinkUrl
+      if (u == null) { return '/auth/unlink' }
+      return u
+    </variable>
+    <variable as="deviceEnabled" computed="true">return dsx.variable.deviceRegisterUrl != '' &amp;&amp; dsx.variable.deviceUrl != ''</variable>
     <!-- ONE test decides whether the credential form is real. No provider → no form. -->
     <variable as="hasProvider" computed="true">return dsx.variable.signInUrl != ''</variable>
     <variable as="canSignUp" computed="true">return dsx.variable.signUpUrl != ''</variable>
@@ -167,20 +213,219 @@
     <!-- Runs on every mount and does its work exactly once per app load: `state` is only
          absent before the first resolve, so a route change costs nothing. -->
     <action as="resolve">
-      if (global.auth != null && global.auth.state != null) { return }
-      if (dsx.cookie.sd_auth != 'in') {
+      // ALREADY RESOLVED THIS APP LOAD. `state` is only null before the first resolve, so a route
+      // change costs nothing but a re-arm of the refresh timer and a near-expiry check.
+      if (global.auth != null && global.auth.state != null) {
+        dsx.action.armRefresh()
+        dsx.action.refreshIfStale()
+        return
+      }
+      // AN ACCOUNT SESSION WINS. If the viewer signed in for real (the cookie says so), use the
+      // existing provider flow — device identity is the DEFAULT, never a replacement for an account.
+      if (dsx.cookie.sd_auth == 'in') {
+        const r = await sessionCall.send()
+        if (r.ok && r.data != null && r.data.viewer != null && r.data.viewer.token != null) {
+          dsx.action.publishIn({ payload: r.data })
+          return
+        }
+        // the account provider will not confirm — fall through to the device lane rather than
+        // stranding the viewer as a bare guest with no storage at all
+        dsx.cookie.sd_auth = 'guest'
+      }
+      // THE 90 PERCENT PATH. No account session, so become a DEVICE: read the credential from the
+      // platform vault (web: the durable cookie), register one if there is none, exchange it for a
+      // 1h session. Favourites, history, the wallet and restore then work with no account.
+      await dsx.action.ensureDevice()
+    </action>
+
+    <!-- ── DEVICE IDENTITY (server/auth.dsx / scripts/serve.mjs). One credential in the vault,
+         exchanged for a short-lived session; nothing here is ever a coin grant or an entitlement. -->
+
+    <action as="ensureDevice">
+      if (dsx.variable.deviceEnabled == false) {
+        // no device provider wired on this deployment — the honest bare-guest state
         dsx.action.publishGuest()
         return
       }
-      const r = await sessionCall.send()
-      if (r.ok && r.data != null && r.data.viewer != null && r.data.viewer.token != null) {
-        dsx.action.publishIn({ payload: r.data })
+      await dsx.action.readDurability()
+      await dsx.action.readCred()
+      if (dsx.variable.devId != '' && dsx.variable.devSecret != '') {
+        const ex = await deviceExchangeCall.send({ deviceId: dsx.variable.devId, secret: dsx.variable.devSecret })
+        if (ex.ok && ex.data != null && ex.data.session != null) {
+          dsx.action.publishDevice({ payload: ex.data, deviceId: dsx.variable.devId })
+          return
+        }
+        // the stored credential is no longer recognised (retired or unlinked elsewhere) — register anew
+      } else if (dsx.variable.vaultBlocked) {
+        // the vault refused the READ (locked device, missing entitlement) and there is no cookie
+        // fallback — the store may hold a record it cannot show, so do NOT register over it. Browse
+        // as a guest this boot; the next cold start (unlocked, or after the export fix) recovers it.
+        dsx.action.publishGuest()
         return
       }
-      // The provider will not confirm the session. That is SIGNED OUT, not a broken app:
-      // the catalogue is public and keeps working. The card that asks for identity says so.
-      dsx.cookie.sd_auth = 'guest'
-      dsx.action.publishGuest()
+      const reg = await deviceRegisterCall.send({ platform: os, plane: dsx.variable.devPlane })
+      if (reg.ok == false || reg.data == null || reg.data.session == null || reg.data.deviceId == null) {
+        // the provider did not answer (offline, or none wired) — browse as a guest; the catalogue is public
+        dsx.action.publishGuest()
+        return
+      }
+      dsx.action.storeCred({ id: reg.data.deviceId, secret: reg.data.secret })
+      dsx.action.publishDevice({ payload: reg.data, deviceId: reg.data.deviceId })
+    </action>
+
+    <!-- Read the credential: the vault first (iOS Keychain to iCloud, Android Block Store), then the
+         cookie (the web has no cross-device credential plane, and the cookie is the native fallback
+         until the export bundles the vault — PLAN 6.112). Writes to the seam variables, no envelope. -->
+    <!-- ONE record, key `dsx.device`, value a JSON {deviceId, secret} — the IdentityVault audit recipe
+         (dev@93a96b5f). `r.ok` → use the value; `r.error == 'not_found'` → there is nothing, register;
+         ANY OTHER error (store_unavailable: locked device -25308, no entitlement -34018) → the store may
+         HOLD a record it cannot show, so mark it BLOCKED and never mint over it — fall to the cookie. -->
+    <action as="readCred">
+      let blob = ''
+      dsx.variable.vaultBlocked = false
+      try {
+        const r = await dsx.module.identityvault.read({ key: 'dsx.device' })
+        if (r.ok && r.data != null && r.data.value != null) { blob = r.data.value }
+        else if (r.error != null && r.error != 'not_found') { dsx.variable.vaultBlocked = true }
+      } catch (e) {
+        // the vault module is not in this build — the cookie is the whole story
+      }
+      // the cookie mirror: the web store (no cross-device plane) and the native fallback when the
+      // Keychain / Block Store refused. Reading it here also clears `vaultBlocked` — we HAVE the record.
+      if (blob == '' && dsx.cookie.dsx_device != null && dsx.cookie.dsx_device != '') {
+        blob = dsx.cookie.dsx_device
+        dsx.variable.vaultBlocked = false
+      }
+      dsx.variable.devId = ''
+      dsx.variable.devSecret = ''
+      if (blob != '' && blob != null) {
+        try {
+          const parsed = JSON.parse(blob)
+          if (parsed != null && parsed.deviceId != null && parsed.secret != null) {
+            dsx.variable.devId = parsed.deviceId
+            dsx.variable.devSecret = parsed.secret
+          }
+        } catch (e) {
+          // a corrupt record is no record — the caller registers a fresh one
+        }
+      }
+    </action>
+
+    <action as="storeCred" inputs="id, secret">
+      dsx.variable.devId = id
+      dsx.variable.devSecret = secret
+      const blob = JSON.stringify({ deviceId: id, secret: secret })
+      let vaultOk = false
+      try {
+        const w = await dsx.module.identityvault.write({ key: 'dsx.device', value: blob, locked: false })
+        if (w.ok) { vaultOk = true }
+      } catch (e) {
+        // no vault in this build; the cookie below carries it
+      }
+      // THE COOKIE MIRROR, wherever the vault did not durably keep it — keyed on the vault RESULT and
+      // the durability plane, never on `os`: a web tab (durability 'session'), a store that refused
+      // the write (a simulator with no keychain entitlement), or a build with no vault. On a native
+      // device that DID keep it (durability 'device'/'synced'), the secret stays in the secure store
+      // and never touches a JS-readable cookie. 400 days is the platform cap the fold clamps to.
+      if (vaultOk == false || dsx.variable.devDurability == 'session' || dsx.variable.devDurability == 'none') {
+        dsx.cookie.dsx_device = { value: blob, days: 400 }
+      }
+    </action>
+
+    <action as="clearCred">
+      dsx.variable.devId = ''
+      dsx.variable.devSecret = ''
+      try {
+        await dsx.module.identityvault.write({ key: 'dsx.device', value: '', locked: false })
+      } catch (e) {
+        // nothing to clear in a build without the vault
+      }
+      dsx.cookie.dsx_device = null
+    </action>
+
+    <!-- Ask the vault what it will actually do; the plane it reports IS the truth on every lane
+         (indexeddb on the web, keychain on iOS, blockstore on Android). Keyed on the vault answering,
+         never on `os` — the package is folded into every export now, so a platform guess would be a
+         guess where a real fact is available. When it cannot answer, the pessimistic 'none' is what
+         urges a link. -->
+    <action as="readDurability">
+      try {
+        const d = await dsx.module.identityvault.durability()
+        if (d.ok && d.data != null && d.data.plane != null) {
+          dsx.variable.devPlane = d.data.plane
+          dsx.variable.devDurability = d.data.durability == null ? 'none' : d.data.durability
+          return
+        }
+      } catch (e) {
+        // the vault is not in this build, or would not answer — fall through to the pessimistic none
+      }
+      dsx.variable.devPlane = 'none'
+      dsx.variable.devDurability = 'none'
+    </action>
+
+    <action as="publishDevice" inputs="payload, deviceId">
+      const h = { authorization: 'Bearer ' + payload.session }
+      const ttl = payload.expiresIn == null ? 3600 : payload.expiresIn
+      // A LINKED device exchanges to kind 'account' (its rows already merged into the account); an
+      // unlinked device is kind 'device'. `deviceId` travels either way, so a sign-out on a linked
+      // device knows to UNLINK rather than call an account provider it never used.
+      global.auth = {
+        state: 'in',
+        ok: true,
+        kind: payload.kind == null ? 'device' : payload.kind,
+        sub: payload.sub == null ? '' : payload.sub,
+        name: '',
+        email: '',
+        deviceId: deviceId == null ? '' : deviceId,
+        headers: h,
+        opHeaders: h,
+        expiresAt: Date.now() + ttl * 1000,
+        plane: dsx.variable.devPlane,
+        durability: dsx.variable.devDurability
+      }
+      // NOT the account cookie: a real sign-in is still the only thing that flips sd_auth to 'in',
+      // and a reload re-derives the device session from the vault rather than from a stored token.
+      dsx.action.armRefresh()
+    </action>
+
+    <!-- ONE keyed timer app-wide (jse timers: a same-key setTimeout REPLACES rather than stacks), so
+         a route change re-arms it instead of piling up. Re-exchange the credential ~2 minutes before
+         the session expires; the device lane only. No busy loop. -->
+    <action as="armRefresh">
+      if (global.auth == null) { return }
+      if (global.auth.deviceId == null || global.auth.deviceId == '') { return }
+      if (global.auth.expiresAt == null) { return }
+      let ms = global.auth.expiresAt - Date.now() - 120000
+      if (ms < 30000) { ms = 30000 }
+      setTimeout(() => { dsx.action.refreshDevice() }, ms, 'dsx.authRefresh')
+    </action>
+
+    <action as="refreshIfStale">
+      if (global.auth == null || global.auth.expiresAt == null) { return }
+      if (global.auth.deviceId == null || global.auth.deviceId == '') { return }
+      // within 5 minutes of expiry, re-exchange now rather than waiting on the timer
+      if (global.auth.expiresAt - Date.now() < 300000) { dsx.action.refreshDevice() }
+    </action>
+
+    <action as="refreshDevice">
+      // the raw credential lives in the vault, not in this per-mount instance, so re-read it first
+      await dsx.action.readCred()
+      if (dsx.variable.devId == '' || dsx.variable.devSecret == '') { return }
+      const ex = await deviceExchangeCall.send({ deviceId: dsx.variable.devId, secret: dsx.variable.devSecret })
+      if (ex.ok && ex.data != null && ex.data.session != null) {
+        dsx.action.publishDevice({ payload: ex.data, deviceId: dsx.variable.devId })
+      }
+    </action>
+
+    <!-- After a REAL sign-in, link this device so the list, coins and history the viewer built as a
+         guest merge into the account. Best-effort: a failed link never blocks the sign-in (the
+         account session is already good and the data is still on the device to retry). On success the
+         local credential is dropped, so a later sign-out drops to a FRESH device, not the merged one. -->
+    <action as="linkAfterSignIn">
+      await dsx.action.readCred()
+      if (dsx.variable.devId == '' || dsx.variable.devSecret == '') { return }
+      const r = await linkCall.send({ deviceId: dsx.variable.devId, secret: dsx.variable.devSecret })
+      if (r.ok) { dsx.action.clearCred() }
     </action>
 
     <!-- ARGUMENTS TO A DECLARED ACTION ARE A NAMED DICT, not positional values, and this
@@ -204,11 +449,16 @@
       global.auth = {
         state: 'in',
         ok: true,
+        kind: 'account',
         sub: v.sub == null ? '' : v.sub,
         name: v.name == null ? '' : v.name,
         email: v.email == null ? '' : v.email,
+        deviceId: '',
         headers: h,
-        opHeaders: op
+        opHeaders: op,
+        expiresAt: null,
+        plane: 'none',
+        durability: 'none'
       }
       dsx.cookie.sd_auth = 'in'
     </action>
@@ -216,7 +466,12 @@
     <action as="publishGuest">
       // headers is an EMPTY DICT, never null and never a null-valued key: a header whose
       // value is null is a doc-11 "missing-value" hole that gates the block forever.
-      global.auth = { state: 'guest', ok: false, sub: '', name: '', email: '', headers: {}, opHeaders: {} }
+      // `kind` is '' for a guest — data features read `ok`, account-only ones read `kind == 'account'`.
+      global.auth = {
+        state: 'guest', ok: false, kind: '', sub: '', name: '', email: '', deviceId: '',
+        headers: {}, opHeaders: {}, expiresAt: null,
+        plane: dsx.variable.devPlane, durability: dsx.variable.devDurability
+      }
     </action>
 
     <!-- THE VIEWER-SCOPED CACHES DIE WITH THE VIEWER. docs/auth.md names these five: they
@@ -243,10 +498,23 @@
          and only then touch the cookie. The `on:success` writes are guarded as well — one
          request already in flight when the viewer taps Sign out cannot be reordered away. -->
     <action as="signOut">
-      if (dsx.variable.signOutUrl != '') { await signOutCall.send({}) }
+      // A LINKED DEVICE signs out by UNLINKING — the credential is retired and the device starts
+      // fresh, while the account keeps everything the merge already moved to it. A REAL account
+      // signs out through its provider. Either way the viewer drops to a DEVICE identity, never to a
+      // bare guest, because device auth is the baseline this app is built on (the founder rule).
+      if (global.auth != null && global.auth.deviceId != null && global.auth.deviceId != '') {
+        await unlinkCall.send({ deviceId: global.auth.deviceId })
+        dsx.action.clearCred()
+      } else if (dsx.variable.signOutUrl != '') {
+        await signOutCall.send({})
+      }
+      // ORDER IS LOAD-BEARING (docs/auth.md): drop the identity first so `auto` goes false and no
+      // authenticated block can refetch, THEN clear the caches, THEN touch the cookie.
       dsx.action.publishGuest()
       dsx.action.clearViewerCaches()
       dsx.cookie.sd_auth = 'guest'
+      // re-establish a device identity so the viewer keeps a working (empty) session to browse and save under
+      await dsx.action.ensureDevice()
       dsx.action.finish({ what: 'signedout' })
     </action>
 
@@ -282,6 +550,8 @@
       dsx.variable.busy = false
       if (r.ok && r.data != null && r.data.viewer != null && r.data.viewer.token != null) {
         dsx.action.publishIn({ payload: r.data })
+        // link the guest device (if any) so its list, coins and history merge into the account
+        await dsx.action.linkAfterSignIn()
         dsx.action.finish({ what: 'signedin' })
         return
       }
@@ -303,6 +573,8 @@
       dsx.variable.busy = false
       if (r.ok && r.data != null && r.data.viewer != null && r.data.viewer.token != null) {
         dsx.action.publishIn({ payload: r.data })
+        // link the guest device (if any) so its list, coins and history merge into the account
+        await dsx.action.linkAfterSignIn()
         dsx.action.finish({ what: 'signedin' })
         return
       }
