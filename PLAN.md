@@ -3213,3 +3213,38 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      twin already stripped the carrier ("the string-keyed dispatch carrier (Module.kt) — same
      slot, same repair"); the Swift lane now does the same, and the named action answers.
      The same class is worth a grep in every module that keeps a legacy catch-all.
+
+160. **THE FIRST LIVE ACTIVITY ON THE SIMULATOR TOOK SIX MEASURED CORRECTIONS BEFORE THE CARD OF
+     SPEC §7 STOOD ON THE LOCK SCREEN** (2026-09-02; every fix upstream on `dev` in this pass or
+     the template rule beside it). In the order they were met: (1) `ActivityInput error 0` on
+     every `Activity.request` — the whole `NowPlayingActivity.dsx` text (5.7 KB with its
+     comments) rode the activity's ATTRIBUTES, and ActivityKit caps attributes + content at
+     4 KB; the document now rides the App Group (`LiveActivityLayoutStore`: stashed under
+     `liveactivity.layout.<id>`, comments stripped, the attributes carry a reference the
+     extension resolves — exactly what live-surfaces-dsx.md had designed). (2) The same error
+     survived the stash: `pushType: .token` is REFUSED outright on a build with no push
+     entitlement — every simulator build of an export — so the bridge now asks for the token
+     and, when the system refuses it, starts local-only with one kernel line naming what the
+     backend channel lost. (3) A build made with `CODE_SIGNING_ALLOWED=NO` carries no App Group
+     at all (`containerURL` nil, `[dsx.snapshot] … not provisioned`); the export's simulator
+     entitlements twin (8248d08d) needs the ad-hoc signature Xcode gives a simulator build by
+     default — the loop's `xcodebuild` no longer strips signing. (4) The card's button opened
+     `shortdrama://watch/<show>/2.0`: a JSE number is a Double and the modules stringified it
+     with `"\(x)"`; both bridges now format vars through `JSE.string`, and the Router logs
+     `inbound URL → … /watch/<show>/3` for the same tap. (5) `"▶ Continue Watching"` painted the
+     blue emoji tile — U+25B6 takes the emoji presentation on iOS unless the text-presentation
+     selector follows it; both documents write `▶︎` (U+25B6 U+FE0E). (6) The two-line title
+     truncated after one line inside the content-sized card; a multi-line snapshot `<text>` now
+     takes the height its lines need (`fixedSize(horizontal: false, vertical: true)` when
+     `lines > 1`, StackLive.swift). Measured after all six on the iPhone 17 Pro simulator: the
+     Dynamic Island's compact slots (poster thumb · `EP.2` in the widget teal), the Lock Screen
+     card byte-for-byte to spec §7 — ground #0E0E10, poster 72×108 r8, "Currently Watching",
+     the two-line title, EP.3, the teal button, the mark tile — the pause reaching the activity
+     as an update, the end when the paywall episode arrives, and the button's deep link landing
+     on the player. Captures: scratchpad proof-ios/ (island, lock screen, after the tap). What
+     was NOT proven on iOS: the home-screen widget's PLACEMENT (the module publishes it — `[widget]
+     layout published — 7 var(s), 2 image(s)`, both pictures fetched under
+     `dsx.snapshot/widget.image/` — but placing a widget is a launcher gesture this pass did not
+     automate on the simulator); it renders through the same StackLive document the activity
+     does. Android's widget proof is the Kotlin lane's (5e4ec332): the card in Inter on #0E0E10
+     under both device themes, the tap resetting the Router to `/watch/alpha/1`.
