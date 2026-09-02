@@ -626,6 +626,15 @@
   <!-- the design vocabulary registers here. FIRST CHILD, always (Components/parts/Theme.dsx). -->
   <Theme/>
   <Analytics/>
+  <!-- THE SURFACE OUTSIDE THE APP (docs/design/reference-ui-spec.md §7, PLAN.md 6.153–6.160): the
+       Live Activity / Dynamic Island card on iOS and the Glance widget on Android follow this
+       episode — started while a playable episode is on the stage, updated on pause and on an
+       episode change, ended at the paywall. One mount, bound to the player's own facts; the part
+       owns the module calls and degrades by name where a lane has no surface. -->
+  <NowPlayingSurface show="{{ dsx.variable.showId }}" idx="{{ dsx.variable.cur }}"
+    title="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.title }}"
+    poster="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.poster }}"
+    active="{{ dsx.variable.epLocked == false }}" paused="{{ dsx.variable.paused }}"/>
   <TopNav active="" visible-if="dsx.variable.wide"/>
   <hstack alignItems="stretch" style="flex: 1; min-height: 0; width: 100%">
     <vstack alignItems="stretch" align:native="center" grow="width" style="flex: 1; min-width: 0">
