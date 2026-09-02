@@ -131,7 +131,9 @@
          from the catalogue), and `genre` filters the grid. 'all' is the unfiltered view. -->
     <action as="browseCatalog" inputs="genre">
       const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 100 })
-      const rows = shows.ok ? shows.data : []
+      // a coming-soon series has nothing to watch yet: it lives on the New tab's rail only, and
+      // a chip that counted it would narrow to a grid cell that opens onto nothing
+      const rows = (shows.ok ? shows.data : []).filter(s => s.coming_soon !== true)
       // the chips are DERIVED from the catalogue, so a new genre appears the day a show
       // carries it. Value-typed collections: group by WRITE-BACK, never mutate a read.
       const tally = {}
