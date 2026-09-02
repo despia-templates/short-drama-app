@@ -1,27 +1,46 @@
-<!-- Watch — the player, built to the category reference (DramaWave) surface for surface:
-     a full-bleed vertical stage, `‹ EP.n` and the speed/⋯ cluster on top, the ENGAGEMENT
-     RAIL down the right (bookmark · comments · share · download), a hairline scrubber, and
-     the EP.n / EP.N pill that raises the episode drawer.
+<!-- Watch — the player, rebuilt 1:1 to the founder's reference (docs/design/reference-ui-spec.md
+     §3, 3a–3d): a full-bleed black stage with the clip CENTRED between the top chrome and the
+     bottom meta; `‹ EP.n` and the Watch Mission hourglass ring up top; the rail down the right
+     (Save · Episodes · Share · More); the title ›, a two-line synopsis with "More", a hairline
+     and the gold "Unlock Unlimited Watching" pill at the bottom; hold anywhere for 2×.
 
-     The drawer is the show sheet: poster, title, All N Episodes, Follow, and Synopsis |
-     Episodes tabs with the ranged 6-column grid — and on a window wide enough to hold both,
-     that list is a PERSISTENT right-hand panel beside the clip instead (every reference
-     player does this; the drawer is the narrow-window fallback).
+     THE SHEETS, and why each is the level it is (AGENTS.md: a nested sheet has to BEAT a route
+     push). The More sheet (§3a) stacks THREE option sheets over itself (§3d: Playback Speed,
+     Subtitles, Video Quality) and a Report sheet — the viewer is mid-episode and a level keeps
+     the clip; the engine cascades a parent close through its children and closes every sheet
+     before a route push (PLAN.md §6.114), so this file carries no hand-rolled cascade any more.
+     The episodes sheet (§3b) is ONE part, Components/parts/EpisodePanel.dsx, mounted here and
+     again as the persistent right column on a wide window, so the two lanes cannot drift. The
+     Watch Mission sheet (§3c) explains the ring and lets the viewer hide it.
 
-     The ⋯ opens the options stack: subtitles and picture-in-picture (both real — declared
-     <video> booleans), speed (real), and quality as an honest disabled readout, because the
-     renderer has no quality attribute. There is no share or help sheet: Share is a direct
-     call to Core/SocialShare from the rail, and the quality LADDER and language PICKER that
-     used to live here were removed rather than left as controls that changed nothing.
+     EVERY OPTION IS REAL. Speed, subtitle and quality reach the `<video>` through declared
+     attributes (`speed`, `subtitle`, `quality`), and the two lists the sheets render are what
+     the STREAM carries — `<video>` publishes `tracks` and `variants` (and `resolution`, for
+     "Auto(360p)", and `cue`, the active subtitle text so the app draws it in its own type at
+     58% of the stage: the custom-UI law, spec §−1). The demo media is an HLS ladder with ten
+     WebVTT renditions (scripts/gen-hls.mjs); a progressive MP4 would publish empty lists and
+     the sheets would say so rather than invent rungs. The selection itself is the
+     renderer-neutral core in Conformance/media/playback-selection.json.
+
+     THE WATCH MISSION ACCRUES SERVER-SIDE (server/engage.dsx watchTick): this screen sends a
+     heartbeat every thirty seconds of PLAYBACK and never a number; the server counts wall-clock
+     time between heartbeats, grants at 5 · 10 · 20 · 30 minutes and caps the day at 70 coins.
+     The ring binds to the server's answer. No coin grant originates here.
+
+     WHAT LEFT THIS FILE, deliberately. The comment thread and its App Store 1.2 safety set
+     (report · block · delete) had their only surface in this player's rail; the reference rail
+     has no comments item and the founder asked for the reference 1:1. server/social.dsx and
+     its routes are untouched and `npm run verify` still exercises them — the thread needs a
+     new home (the show page is the natural one) and PLAN.md §6 records the hand-over. The
+     genre level over the drawer went with it: the reference shows genres as a text line.
 
      TRUST SHAPE (spec §3): the client never decides entitlement. `epLocked` reads
      /wallet/state, unlock spends server-side, and a locked episode never mounts a source. -->
-<!-- FULL-BLEED PLAYER ROOT (the safe-area LAW, §6.50's sibling): the stage owns the
-     whole window — ignoreSafeArea anchors it at y=0 so a screen-height stage cannot
-     spill past the safe region — and the CHROME pays the insets back through the
-     published facts (topBar pads safeTop, bottomBar pads safeBottom). In a browser the
-     insets are 0, so the web page is byte-true; a standalone PWA and both native lanes
-     get the same balanced clearances from one spelling. -->
+<!-- FULL-BLEED PLAYER ROOT (the safe-area LAW): the stage owns the whole window —
+     ignoreSafeArea anchors it at y=0 — and the CHROME pays the insets back through the
+     published facts (the top bar pads safeTop, the bottom block pads safeBottom). In a
+     browser the insets are 0, so the web page is byte-true; a standalone PWA and both
+     native lanes get the same balanced clearances from one spelling. -->
 <vstack background="#000000" alignItems="stretch" grow="true" spacing="0" ignoreSafeArea="true" style:web="min-height: {{ dsx.screen.height }}px">
   <head>
     <expects variable="nav"/>
@@ -29,44 +48,24 @@
     <api as="detail" url="/catalog/show/{{ vars.show }}" on:success="dsx.action.detailLanded()"/>
     <!-- the seam owns the token (<AuthSeam/> at the foot of this file); every authenticated
          read is gated on `global.auth.ok` and carries `global.auth.headers` — docs/auth.md -->
-    <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers"/>
+    <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers"
+         on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
     <api as="favs" url="/viewer/list" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers"/>
-    <!-- THE ENTITLED SOURCE. /catalog/show/:id no longer ships a paid episode's video_url to
-         anyone who asks — it returns `video: null` and `locked: true`, because the paywall
-         used to be enforced in this markup only and the API handed every paid MP4 to a bare
-         curl. So a paid episode's source now comes from a per-viewer, auth="required"
-         endpoint that re-runs the same free/VIP/unlock check server-side and mints a
-         short-lived playback ticket. Keyed to the ACTIVE episode: one ticket at a time, not
-         one per mounted pager page. Free episodes never come through here — they keep their
-         public source, which is the funnel's hook and is public by design. -->
+    <!-- THE ENTITLED SOURCE. /catalog/show/:id ships no paid source; a paid episode's source
+         comes from a per-viewer, auth="required" endpoint that re-runs the same free/VIP/unlock
+         check server-side and mints a short-lived playback ticket. Keyed to the ACTIVE
+         episode: one ticket at a time, not one per mounted pager page. -->
     <api as="play" url="/wallet/play/{{ dsx.variable.needsTicket }}" ssr="false"
          auto="global.auth.ok == true &amp;&amp; dsx.variable.needsTicket != ''" headers="global.auth.headers"/>
-    <!-- THE THREAD READ NOW CARRIES THE TOKEN, on a route that does not require one. That is
-         not a contradiction: reading a thread stays open to a guest (auth="none"), but BLOCK
-         is enforced inside the read, and the server can only scope a block list to a caller it
-         can identify. A guest sends `{}`, resolves to the anon role, and an owner-policy table
-         yields nothing — so the same action serves both without a branch. The whole URL is one
-         computed value because the filter level rides it as a query parameter. -->
-    <api as="thread" url="{{ dsx.variable.threadUrl }}" ssr="false" auto="false" headers="global.auth.headers"/>
-    <api as="blocks" url="/social/blocks" ssr="false" auto="false" headers="global.auth.headers"/>
     <api as="unlockCall" url="/wallet/unlock" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="progressCall" url="/viewer/progress" method="POST" auto="false" headers="global.auth.headers"/>
     <api as="favCall" url="/viewer/favorite" method="POST" auto="false" headers="global.auth.headers"/>
-    <api as="commentCall" url="/social/comment" method="POST" auto="false" headers="global.auth.headers"/>
-    <!-- THE SAFETY SET (App Store 1.2). Four writes, all imperative, all carrying the seam
-         token — reporting, blocking and deleting your own comment are identity acts and the
-         routes refuse an anonymous caller outright. -->
-    <api as="reportCall" url="/social/report" method="POST" auto="false" headers="global.auth.headers"/>
-    <api as="blockCall" url="/social/block" method="POST" auto="false" headers="global.auth.headers"/>
-    <api as="unblockCall" url="/social/unblock" method="POST" auto="false" headers="global.auth.headers"/>
-    <api as="commentDeleteCall" url="/social/comment/delete" method="POST" auto="false" headers="global.auth.headers"/>
-    <!-- THE GENRE LEVEL'S DATA — the SAME endpoint the Browse screen reads
-         (server/catalog.dsx browseCatalog), so the payload shape is one shape:
-         { active, genres, tags, items[], total }. `auto="false"` because a url carrying an
-         empty genre is `/catalog/browse/` and nobody asked for it; the open action refreshes
-         after writing the name, which is the idiom `thread` already uses two lines up. -->
-    <api as="genreList" url="/catalog/browse/{{ dsx.variable.genre }}" ssr="false" auto="false"
-         on:success="global.cacheBrowse = genreList.data"/>
+    <!-- THE WATCH MISSION: the read the ring opens on (no tick, no credit), and the heartbeat -->
+    <api as="mission" url="/engage/watch/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers"
+         on:success="global.cacheMission = global.auth.ok == true ? mission.data : null"/>
+    <api as="tickCall" url="/engage/watch/tick" method="POST" auto="false" headers="global.auth.headers"/>
+    <!-- the More sheet's Report row files against the EPISODE (server/social.dsx reportEpisode) -->
+    <api as="reportEpCall" url="/social/report/episode" method="POST" auto="false" headers="global.auth.headers"/>
 
     <variable as="page">return 0</variable>   <!-- 0-based; the vertical pager owns it -->
     <variable as="showId">return ''</variable>
@@ -74,169 +73,69 @@
     <variable as="lastFunnelKey">return ''</variable>
     <variable as="paused">return false</variable>
     <variable as="buffering">return false</variable>
-    <variable as="wMuted">return true</variable>
+    <!-- UNMUTED: the viewer reached this route by a tap, which is the gesture every browser
+         wants before audible autoplay. Where a browser still refuses, `paused` stays true and
+         the stage wears its play glyph — an honest tap-to-play, never a silent clip. -->
+    <variable as="wMuted">return false</variable>
     <variable as="pos">return 0</variable>
     <variable as="seekBox">return { width: 0, height: 0 }</variable>
-    <variable as="tabSynBox">return { width: 0, height: 0 }</variable>
-    <variable as="tabEpBox">return { width: 0, height: 0 }</variable>
-    <!-- `measure` writes an element's live BORDER box (getBoundingClientRect on web, the
-         StackMeasure contract natively). segBox is the segmented control's TRACK — the
-         padded inside of the trough, so the quarters are exact — and the two pane boxes
-         keep the drawer's depth stack exactly as tall as the pane you are looking at. -->
-    <variable as="segBox">return { width: 0, height: 0 }</variable>
-    <variable as="synPaneBox">return { width: 0, height: 0 }</variable>
-    <variable as="epPaneBox">return { width: 0, height: 0 }</variable>
     <variable as="scrubbing">return false</variable>   <!-- true while the finger owns the bar -->
     <variable as="time">return 0</variable>
     <variable as="duration">return 0</variable>
-    <variable as="speed">return 1</variable>
+    <!-- the viewer's CHOSEN rate; `speed` (computed) is what the video plays, 2× while held -->
+    <variable as="speedPick">return 1</variable>
     <variable as="holding">return false</variable>
+    <!-- ── the option-sheet state: what the video is asked for, and what it publishes ── -->
+    <variable as="subtitle">return ''</variable>          <!-- a BCP-47 tag, or '' = off -->
+    <variable as="quality">return 'auto'</variable>       <!-- auto | a height -->
+    <variable as="tracks">return []</variable>            <!-- published: [{ lang, label }] -->
+    <variable as="variants">return []</variable>          <!-- published: [{ height, bitrate }] -->
+    <variable as="resolution">return 0</variable>         <!-- published: the rendering height -->
+    <variable as="cue">return ''</variable>               <!-- published: the active subtitle text -->
+    <!-- OFF unless the viewer is a member: Mini View is a membership perk in the reference -->
+    <variable as="pip">return false</variable>
+    <!-- ── the sheets ── -->
     <variable as="drawer">return false</variable>
-    <variable as="drawerTab">return 'episodes'</variable>
-    <variable as="range">return 0</variable>
+    <variable as="drawerTab">return 'episodes'</variable>  <!-- episodes | details -->
     <variable as="menu">return false</variable>
-    <variable as="sheet">return ''</variable>        <!-- '' | speed -->
-    <variable as="comments">return false</variable>
-    <variable as="draft">return ''</variable>
-    <variable as="captions">return true</variable>
-    <variable as="pip">return true</variable>
+    <variable as="speedOpen">return false</variable>
+    <variable as="subOpen">return false</variable>
+    <variable as="qualOpen">return false</variable>
+    <variable as="reportOpen">return false</variable>
+    <variable as="missionOpen">return false</variable>
+    <variable as="missionLast">return null</variable>     <!-- the last tick answer -->
+    <variable as="reporting">return false</variable>
     <!-- OFF by default, and that is a deliberate divergence from the category. `onEnded`
          spends the viewer's balance on the next episode with no confirmation, at the moment
-         an episode ends — defaulting that ON is the sharpest dark pattern this genre has, and
-         it is the one users complain about. Opt-in costs the template nothing (the toggle sits
-         right on the paywall, where someone who wants to binge will find it) and it is the
-         difference between a reference other people copy and a reference that teaches them to
-         drain a wallet quietly. -->
+         an episode ends — defaulting that ON is the sharpest dark pattern this genre has. -->
     <variable as="autoUnlock">return false</variable>
     <variable as="unlocking">return false</variable>
     <variable as="toast">return ''</variable>
+    <!-- the Watch Mission grant, as a NUMBER: the toast is a plural message template, so one
+         key serves every count and each locale picks its own CLDR category (Arabic six) -->
+    <variable as="grantToast">return 0</variable>
     <variable as="favTouched">return ''</variable>
-    <variable as="plotOpen">return false</variable>
-
-    <!-- ── THE GENRE LEVEL: A SHEET OVER THE DRAWER, and why it is a sheet ──────────────
-         The chip used to be `href="/browse/:genre"`, and a route push from inside an open
-         `<sheet>` is a MEASURED defect on this build (dev@71155a18): the router has no
-         awareness of the overlay ledger — grep `router.ts` for `activateLayer` and it is not
-         there — so /browse mounted underneath and the episode drawer stayed painted over it,
-         scrim, blur and all. Measured at 375x812: frames 2 -> 3, path /browse/Revenge, and
-         `elementFromPoint(w/2, h/2)` still inside `.dsx-sheet-layer`. The viewer tapped
-         Revenge and saw the same drawer.
-
-         It is a sheet for a second reason that survives the bug being fixed: this viewer is
-         MID-EPISODE. A push tears them out of the clip and loses the drawer with it — its
-         detent, its scroll, its tab. A stacked sheet keeps every one of those and returns
-         them with one swipe, which is the whole argument for the instrument.
-
-         THE DESKTOP PANEL LANE KEEPS THE ROUTE, deliberately. At >= 1120 there is no drawer
-         at all — the episode list is a persistent 416px column — so there is no parent sheet
-         to stack on, and /browse/:genre is a shareable, back-navigable page with room to
-         render. Same intent, the container each lane actually has.
-
-         WHAT THE ENGINE DOES NOT DO YET, and is bridged loudly below: closing a parent sheet
-         does NOT close its declared children. Measured on this build — parent closed, child
-         left orphaned at level 1 with `present` still true. So every path that closes the
-         drawer closes this level FIRST, by hand, through `dsx.action.closeDrawer`. Filed as
-         PLAN.md 6.95; delete the hand cascade the day the engine owns it. -->
-    <variable as="genre">return ''</variable>
-    <variable as="genreOpen">return false</variable>
-
-    <!-- ── the comment sheet, which is THREE PANES IN ONE SHEET ─────────────────────────
-         NOT a second <sheet> over the first. docs/stacked-sheets.md measured what nesting
-         does today: the child present key is never written false when the parent tears the
-         chain down, so the child auto-presents the next time the parent opens (iOS), and on
-         web closing the parent does not close the child at all. A depth stack inside the one
-         sheet — the same shape the episode drawer already uses for its two tabs — has none of
-         that and works identically on every renderer. -->
-    <variable as="cPane">return 'thread'</variable>      <!-- thread | options | safety -->
-    <variable as="filterLevel">return 'standard'</variable>   <!-- standard | strict -->
-    <!-- the comment the options pane is about: { id, owner, author, body } -->
-    <variable as="pick">return null</variable>
-    <!-- THE OPTIMISTIC HIDE. A report has to feel done before the round trip finishes, and a
-         viewer who blocks someone must not watch that person sit on screen until a refetch
-         lands. These ids are dropped from the rendered thread immediately and put BACK if the
-         write fails — an acknowledgement that outlives a failed request is a lie. -->
-    <variable as="hiddenIds">return []</variable>
-    <variable as="modNote">return ''</variable>          <!-- the panel acknowledgement line -->
-    <variable as="modBusy">return false</variable>
-
-    <!-- FOUR RUNGS, and the same four on every surface that offers speed.
-         The ladder used to carry seven (0.5 … 3.0), which cannot fit a phone sheet, so
-         the control was a horizontal SCROLLER with a visible scrollbar — a picker you
-         have to drag past its own edge is not a picker. Four is what fits as a real
-         segmented control at every supported width: at the narrowest supported viewport
-         (320pt) the track measures 320 − 32 (sheet inset) − 28 (menu-card padding)
-         − 8 (trough inset) = 252pt, so a segment is 63pt against a ~38pt label.
-         ONE table drives BOTH the ⋯ menu's segment and the chip's Playback Speed list,
-         so the two surfaces can never offer different ladders. Note the consequence:
-         0.5×, 2.0× and 3.0× are gone from the app, and `holdStart` below (press-and-hold
-         to 2×, declared but wired to no element today) therefore sets an OFF-TABLE speed
-         — `speedIdx` parks the pill on 1.0× rather than off the end if it ever fires. -->
-    <variable as="speedOptions">
-      return [
-        { id: 's075', v: 0.75, label: '0.75x' }, { id: 's1', v: 1, label: '1.0x' },
-        { id: 's125', v: 1.25, label: '1.25x' }, { id: 's15', v: 1.5, label: '1.5x' }
-      ]
-    </variable>
 
     <variable as="cur" computed="true">return Number(dsx.variable.page) + 1</variable>
-    <!-- the scrub readout: elapsed / total, mm:ss. `pos` is the 0-1 fraction the
-         <video bind> publishes, `duration` the seconds it reports. -->
-    <!-- mm:ss, and the zero-pad has to be built on a NON-NUMERIC anchor. JSE `+` is total
-         arithmetic, so `'' + 4` is the NUMBER 4, not "4", and `'0' + that` is 4 again —
-         three seconds rendered as "0:3" on both lanes. Growing the string from `m + ':'`
-         (which can never parse as a number) keeps every later `+` a concatenation. -->
-    <variable as="posLabel" computed="true">
-      const t = Math.floor(dsx.variable.pos * dsx.variable.duration)
-      const m = Math.floor(t / 60)
-      const sec = t - m * 60
-      let out = m + ':'
-      if (sec < 10) { out = out + '0' }
-      return out + sec
-    </variable>
-    <variable as="durLabel" computed="true">
-      const t = Math.floor(dsx.variable.duration)
-      const m = Math.floor(t / 60)
-      const sec = t - m * 60
-      let out = m + ':'
-      if (sec < 10) { out = out + '0' }
-      return out + sec
-    </variable>
     <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
     <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
-    <!-- THE EPISODE PANEL LANE. Every reference player on desktop — ReelShort, Shortical,
-         Stardust, FlickReels — puts the episode grid in a PERSISTENT right-hand panel beside
-         the clip, with the breadcrumb, title, tags, plot and counts above it. Only when the
-         window cannot hold both does the list collapse into the bottom drawer. Ours hid all
-         of it behind the drawer at every width, so a 1440px window showed a 461px clip
-         between two black voids and no way to see episode 12 without opening a sheet.
-         416 is the measured reference width (PLAN.md's category read: "detail panel 416 with
-         a 6-col episode grid"); 1120 is this app's own desktop breakpoint, and below it the
-         clip plus the panel no longer fit, so the drawer takes over unchanged. -->
+    <!-- THE EPISODE PANEL LANE: at >= 1120 the episode list is a persistent right column
+         beside the clip and the sheet is never raised (AGENTS.md — a web pattern, kept). -->
     <variable as="panel" computed="true">return panelAt(dsx.screen.width)</variable>
-    <!-- the pill printed `{{ speed }}.0x`, which reads "0.5.0x" and "1.25.0x" for four of the
-         seven rungs. The option rows always used `item.label`; the pill now does too. -->
-    <!-- THE PLAYER HAD NO FAILURE SURFACE AT ALL. The word "error" did not appear in this
-         file: the pager binds the episode list directly, so a failed or in-flight
-         /catalog/show/:id rendered an empty stage — no message, no retry, no way back except
-         the browser. Same four-state shape every other screen carries (Notices.dsx is the
-         model), plus `on:error` from the <video> itself, which reports a dead source, an
-         unplayable asset or a CDN that neither plays nor fails within ~15s. -->
-    <!-- STALE-THEN-FRESH (PLAN.md §6.30), the one screen that never had it — and the one a
-         viewer pushes INTO. Reading `detail.data` raw meant every push mounted at
-         phase='loading': a black panel at z-index 3 that swallows the whole chrome, then
-         ~430ms later the art, then the clip. Measured on device: three distinct paints for
-         one tap. The ID GUARD is the half §6.30 warns about — a stash keyed by a route param
-         hands show B the art of show A without it. -->
+    <!-- STALE-THEN-FRESH (PLAN.md §6.30) with the ID GUARD it warns about: a stash keyed by a
+         route param hands show B the art of show A without it. -->
     <variable as="detailView" computed="true">
       if (detail.data != null) { return detail.data }
       const c = global.cacheDetail
       if (c != null && c.id == vars.show) { return c.data }
       return null
     </variable>
-    <!-- THE CURTAIN ON A FIRST VISIT. Home already holds every show's hero_tall, so the art
-         for the show being opened is in memory before the push starts — there is no reason
-         to paint black while the detail request flies. Falls through to '' when the viewer
-         arrived by deep link and no shelf has been fetched. -->
+    <variable as="walletView" computed="true">
+      if (global.auth.ok != true) { return null }
+      if (wallet.data != null) { return wallet.data }
+      return global.cacheWallet
+    </variable>
+    <!-- THE CURTAIN ON A FIRST VISIT: Home already holds the show's hero_tall -->
     <variable as="shelfArt" computed="true">
       const h = global.cacheHome
       if (h == null) { return '' }
@@ -257,95 +156,19 @@
       if (detail.error != null) { return 'error' }
       return 'loading'
     </variable>
-    <variable as="speedLabel" computed="true">
-      const match = dsx.variable.speedOptions.filter(o => o.v == dsx.variable.speed)
-      return match.length == 0 ? '1.0x' : match[0].label
-    </variable>
-    <!-- WHICH SEGMENT THE PILL SITS ON. Equal segments are what let the indicator be pure
-         arithmetic off ONE measured track — no per-segment measurement, no layout
-         animation, and no `width: N%` (the native bridge drops non-100 percent lengths —
-         upstream #281): the pill is `width = round(track/4)` at
-         `offsetX = round(track/4 * index)`. An off-table speed falls back to the 1.0×
-         rung so the pill can never park past the end of the trough. -->
-    <variable as="speedIdx" computed="true">
-      const opts = dsx.variable.speedOptions
-      const v = dsx.variable.speed
-      let found = 1
-      let i = 0
-      while (i < opts.length) {
-        if (opts[i].v == v) { found = i }
-        i = i + 1
-      }
-      return found
-    </variable>
-    <!-- ONE computed value used as the WHOLE style attribute (AGENTS.md): a clamp that
-         toggles cannot be spliced into a static style string. -->
-    <variable as="plotFx" computed="true">
-      if (dsx.variable.plotOpen) { return 'overflow: visible' }
-      return 'display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden'
-    </variable>
-    <variable as="showTags" computed="true">
-      if (dsx.variable.detailView == null || dsx.variable.detailView.show.tags == null) { return [] }
-      return dsx.variable.detailView.show.tags.map(t => ({ name: t }))
-    </variable>
-
-    <!-- ── the genre level's four reads ────────────────────────────────────────────────
-         STALE-THEN-FRESH WITH AN ID GUARD, TWICE. `global.cacheBrowse` is keyed by ENDPOINT
-         and shared with the Browse screen (AGENTS.md), so handing it back for a DIFFERENT
-         genre is the "show B borrows show A's art" defect — and `genreList.data` needs the
-         same guard for the same reason from the other side: it still holds the LAST genre
-         until the refetch lands, so re-opening the level on a new chip would paint the old
-         one for a frame. Both are checked against the name the viewer just tapped. -->
-    <variable as="genreView" computed="true">
-      const live = genreList.data
-      if (live != null) {
-        if (live.active == dsx.variable.genre) { return live }
-      }
-      const cached = global.cacheBrowse
-      if (cached == null) { return null }
-      if (cached.active != dsx.variable.genre) { return null }
-      return cached
-    </variable>
-    <variable as="genreBusy" computed="true">
-      if (dsx.variable.genreView != null) { return false }
-      if (genreList.error != null) { return false }
-      return true
-    </variable>
-    <variable as="genreCount" computed="true">
-      const v = dsx.variable.genreView
-      if (v == null) { return '' }
-      if (v.total == 1) { return '1 series' }
-      return v.total + ' series'
-    </variable>
-    <!-- THREE COLUMNS ON A PHONE, FOUR ON A TABLET — off the SHEET's width, not the
-         screen's: a bottom sheet is capped at 44rem (704px) from 48rem up, so the desktop
-         five of the Browse grid would draw 130px posters in a column that is not there. -->
-    <variable as="genreCols" computed="true">return dsx.variable.bp == 'phone' ? 3 : 4</variable>
-    <!-- the loading grid needs a bindable source, and a repeater row is a DICT (AGENTS.md) -->
-    <variable as="genreSkeleton" computed="true">
-      return [{ id: 'k1' }, { id: 'k2' }, { id: 'k3' }, { id: 'k4' }, { id: 'k5' }, { id: 'k6' }]
-    </variable>
-    <variable as="panelViews" computed="true">
-      if (dsx.variable.detailView == null || dsx.variable.detailView.show.views == null || dsx.variable.detailView.show.views < 1000) { return '' }
-      const v = dsx.variable.detailView.show.views
-      return compactCount(v)
-    </variable>
     <variable as="stageH" computed="true">
       if (dsx.variable.wide) { return dsx.screen.height - 62 }
       return dsx.screen.height
     </variable>
-    <!-- THE CLIP BAND. The category plays a 16:9 master on a 9:16 stage: the clip is
-         WIDTH 100% at its own ratio, pinned to the TOP under the transparent bar, and the
-         black below it is where the chrome lives (seek, then the episode selector). Cover-
-         cropping a landscape master into a portrait stage is what made every frame a
-         zoomed-in detail with no composition left. -->
-    <variable as="clipH" computed="true">
-      const w = dsx.variable.wide ? Math.min(dsx.variable.stageMax, dsx.screen.width) : dsx.screen.width
-      return Math.round(w * 9 / 16)
-    </variable>
     <variable as="stageMax" computed="true">
       if (dsx.variable.bp == 'phone') { return 4096 }
       return Math.round(Math.min(461, dsx.screen.height * 0.56))
+    </variable>
+    <!-- THE CLIP BAND: the master at its own ratio, full width, CENTRED in the stage (the
+         reference letterbox). The demo masters are 16:9; a 9:16 master fills the stage. -->
+    <variable as="clipH" computed="true">
+      const w = dsx.variable.wide ? Math.min(dsx.variable.stageMax, dsx.screen.width) : dsx.screen.width
+      return Math.round(w * 9 / 16)
     </variable>
     <variable as="episode" computed="true">
       if (dsx.variable.detailView == null) { return null }
@@ -366,106 +189,28 @@
       const ep = dsx.variable.episode
       if (ep == null) { return false }
       if (ep.free) { return false }
-      if (wallet.data == null) { return true }
-      if (wallet.data.vip == true) { return false }
-      return !wallet.data.unlocked.includes(ep.id)
+      const w = dsx.variable.walletView
+      if (w == null) { return true }
+      if (w.vip == true) { return false }
+      return !w.unlocked.includes(ep.id)
+    </variable>
+    <variable as="isVip" computed="true">
+      const w = dsx.variable.walletView
+      if (w == null) { return false }
+      return w.vip == true
     </variable>
     <variable as="balance" computed="true">
-      if (wallet.data == null) { return 0 }
-      return wallet.data.coins + wallet.data.bonus
+      const w = dsx.variable.walletView
+      if (w == null) { return 0 }
+      return w.coins + w.bonus
     </variable>
     <variable as="favOn" computed="true">
       if (dsx.variable.favTouched != '') { return dsx.variable.favTouched == 'y' }
       if (favs.data == null) { return false }
       return favs.data.items.filter(x => x.show == dsx.variable.showId).length > 0
     </variable>
-    <!-- THE THREAD URL IS ONE COMPUTED VALUE, so the filter level travels to the server as a
-         query parameter rather than being applied here. See `threadRows` for why. -->
-    <variable as="threadUrl" computed="true">
-      const ep = dsx.variable.epId
-      if (ep == null || ep === '') { return '' }
-      if (dsx.variable.filterLevel == 'strict') { return '/social/comments/' + ep + '?level=strict' }
-      return '/social/comments/' + ep
-    </variable>
-    <!-- WHAT THIS FILTER IS AND IS NOT. The SAFETY filters — a blocked author, and a comment
-         the community has flagged past the threshold — are applied on the SERVER and those
-         rows never reach this device (server/social.dsx says why: a row filtered in markup is
-         still in the payload, in the SSR html and in curl). What happens HERE is only the
-         optimistic hide: the rows this session has just reported or just blocked, dropped
-         before the refetch lands so the tap feels answered. -->
-    <variable as="threadRows" computed="true">
-      if (thread.data == null) { return [] }
-      return thread.data.rows.filter(r => dsx.variable.hiddenIds.includes(r.id) == false)
-    </variable>
-    <!-- the rail badge counts what a reader can actually see, not what the table holds -->
-    <variable as="commentCount" computed="true">
-      return dsx.variable.threadRows.length
-    </variable>
-    <variable as="emptyThread" computed="true">
-      return thread.data != null && dsx.variable.threadRows.length == 0
-    </variable>
-    <!-- THE RECEIPT. A filter that silently removes rows is indistinguishable from an empty
-         thread, and a reader deserves to know the difference. This is the sentence that says
-         it, and it is only ever rendered when something really was withheld. -->
-    <variable as="filterNote" computed="true">
-      if (thread.data == null) { return '' }
-      const b = Number(thread.data.blocked)
-      const h = Number(thread.data.hidden)
-      if (b == 0 && h == 0) { return '' }
-      let out = 'Hidden for you: '
-      if (b > 0) { out = out + b + (b == 1 ? ' comment from someone you blocked' : ' comments from people you blocked') }
-      if (b > 0 && h > 0) { out = out + ', ' }
-      if (h > 0) { out = out + h + (h == 1 ? ' flagged comment' : ' flagged comments') }
-      return out + '.'
-    </variable>
-    <variable as="filterLabel" computed="true">
-      return dsx.variable.filterLevel == 'strict' ? 'Strict' : 'Standard'
-    </variable>
-    <variable as="pickIsMine" computed="true">
-      const p = dsx.variable.pick
-      if (p == null) { return false }
-      return global.auth.sub != '' && p.owner == global.auth.sub
-    </variable>
-    <!-- The options pane reads these rather than `pick.author` directly: an interpolation is
-         evaluated whether or not its subtree is visible, so a null pick would be a read
-         through nothing. -->
-    <variable as="pickAuthor" computed="true">
-      const p = dsx.variable.pick
-      return p == null ? '' : p.author
-    </variable>
-    <variable as="pickBody" computed="true">
-      const p = dsx.variable.pick
-      return p == null ? '' : p.body
-    </variable>
-    <!-- ONE COMMENT GETS ONE DECISION. Once a report, a block or a delete has landed, the
-         row is in `hiddenIds` — so the choices that produced it are no longer offered, and
-         the pane shows what happened instead. A failed write puts the id back, which brings
-         the choices back with it: the pane can never sit on an outcome that did not occur. -->
-    <variable as="pickHandled" computed="true">
-      const p = dsx.variable.pick
-      if (p == null) { return false }
-      return dsx.variable.hiddenIds.includes(p.id)
-    </variable>
-    <variable as="blockedRows" computed="true">
-      if (blocks.data == null) { return [] }
-      return blocks.data.rows
-    </variable>
-    <variable as="blockedLabel" computed="true">
-      if (dsx.variable.signedIn == false) { return 'Sign in to block someone' }
-      if (blocks.data == null) { return 'Nobody blocked yet' }
-      const n = Number(blocks.data.count)
-      if (n == 0) { return 'Nobody blocked yet' }
-      return n == 1 ? '1 person blocked' : n + ' people blocked'
-    </variable>
-    <!-- G16: the composer had no cap and no counter, so 800 characters became a server
-         rejection after the fact. The server still owns the rule; this is the same number,
-         shown before the tap. -->
-    <variable as="draftLeft" computed="true">
-      return 500 - String(dsx.variable.draft).length
-    </variable>
     <!-- '' when the active episode carries its own public source (free) or when there is no
-         episode yet — the api block is skipped on that value, so a free binge never asks the
-         server for a ticket it does not need. -->
+         episode yet — the api block is skipped on that value -->
     <variable as="needsTicket" computed="true">
       const ep = dsx.variable.episode
       if (ep == null || ep.video != null) { return '' }
@@ -481,10 +226,19 @@
       if (d != null && d.show.hero_tall != null) { return d.show.hero_tall }
       return dsx.variable.shelfArt
     </variable>
-    <variable as="commentLabel" computed="true">
-      const n = Number(dsx.variable.commentCount)
-      if (n == 1) { return '1 comment' }
-      return n + ' comments'
+    <variable as="showTitle" computed="true">
+      const d = dsx.variable.detailView
+      return d == null ? '' : d.show.title
+    </variable>
+    <variable as="showSynopsis" computed="true">
+      const d = dsx.variable.detailView
+      if (d == null) { return '' }
+      return d.show.synopsis == null ? '' : d.show.synopsis
+    </variable>
+    <variable as="relatedRows" computed="true">
+      const d = dsx.variable.detailView
+      if (d == null) { return [] }
+      return d.related == null ? [] : d.related
     </variable>
     <variable as="unlockLabel" computed="true">
       if (dsx.variable.unlocking) { return 'Unlocking…' }
@@ -493,68 +247,97 @@
     </variable>
     <!-- signed in is the seam (docs/auth.md): one publication, no session block -->
     <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
-    <!-- The drawer's range pills, chunked at FIFTY. Measured live 2026-09-01 on two
-         references: ReelShort renders "1 - 50" / "51 - 62" for a 62-episode show, and
-         ShortMax renders "1-50" / "All Episodes". The 30 that used to be here matched
-         neither and was never sourced — the house law is that a design number comes from
-         measurement, so it goes. -->
-    <variable as="ranges" computed="true">
-      const n = dsx.variable.total
-      const out = []
-      let start = 1
-      while (start <= n) {
-        const end = Math.min(start + 49, n)
-        out.push({ id: 'r' + start, from: start, to: end, label: start + '-' + end })
-        start = end + 1
+
+    <!-- ── PLAYBACK OPTIONS: the effective rate, and the three lists the sheets render ── -->
+    <variable as="speed" computed="true">
+      return dsx.variable.holding ? 2 : dsx.variable.speedPick
+    </variable>
+    <!-- the reference ladder, exactly: 1.0x (Basic) · 1.25x · 1.5x · 2.0x -->
+    <variable as="speedRows" computed="true">
+      return [
+        { id: 's1', v: 1, label: localize('1.0x (Basic)'), short: '1.0x' },
+        { id: 's125', v: 1.25, label: '1.25x', short: '1.25x' },
+        { id: 's15', v: 1.5, label: '1.5x', short: '1.5x' },
+        { id: 's2', v: 2, label: '2.0x', short: '2.0x' }
+      ]
+    </variable>
+    <variable as="speedLabel" computed="true">
+      const hit = dsx.variable.speedRows.filter(r => r.v == dsx.variable.speedPick)
+      return hit.length == 0 ? '1.0x' : hit[0].short
+    </variable>
+    <!-- Off, then every legible track the stream carries, named by the stream (endonyms) -->
+    <variable as="subtitleRows" computed="true">
+      const out = [{ id: 'off', lang: '', label: localize('Off') }]
+      const ts = dsx.variable.tracks
+      let i = 0
+      while (i < ts.length) {
+        out.push({ id: 't' + i, lang: ts[i].lang, label: ts[i].label == null || ts[i].label == '' ? ts[i].lang : ts[i].label })
+        i = i + 1
       }
       return out
     </variable>
-    <variable as="visibleEps" computed="true">
-      if (dsx.variable.detailView == null) { return [] }
-      const rs = dsx.variable.ranges
-      const i = Number(dsx.variable.range)
-      if (i < 0 || i >= rs.length) { return dsx.variable.detailView.episodes }
-      const r = rs[i]
-      return dsx.variable.detailView.episodes.filter(e => e.idx >= r.from && e.idx <= r.to)
+    <variable as="subtitleLabel" computed="true">
+      if (dsx.variable.subtitle == '') { return localize('Off') }
+      const hit = dsx.variable.subtitleRows.filter(r => r.lang == dsx.variable.subtitle)
+      return hit.length == 0 ? dsx.variable.subtitle : hit[0].label
     </variable>
-    <!-- THE SLIDING UNDERLINE. ONE rule in a coordinate space both labels share, never
-         one rule per tab toggled by visible-if: a toggle JUMPS, a travelling rule reads
-         as a tab bar. The width is the active label's own measured box — the same
-         `measure` the two labels already published for the static rule — and the x is
-         that label's leading edge inside the rail: 0 for the first, the first label's
-         width plus the row's gap for the second. THE 28 IS `tabRow`'s OWN `spacing`:
-         they are the same gap seen from two elements, and nothing but this line holds
-         them together — change one, change the other. -->
-    <variable as="tabUnderW" computed="true">
-      if (dsx.variable.drawerTab == 'synopsis') { return Math.round(dsx.variable.tabSynBox.width || 0) }
-      return Math.round(dsx.variable.tabEpBox.width || 0)
+    <!-- "Auto(360p)" reads the rendition RENDERING now; the rungs are the ladder, highest first -->
+    <variable as="autoLabel" computed="true">
+      const r = Number(dsx.variable.resolution)
+      if (r > 0) { return localize('Auto') + '(' + r + 'p)' }
+      return localize('Auto')
     </variable>
-    <variable as="tabUnderX" computed="true">
-      if (dsx.variable.drawerTab == 'synopsis') { return 0 }
-      return Math.round(dsx.variable.tabSynBox.width || 0) + 28
+    <variable as="qualityRows" computed="true">
+      const out = [{ id: 'auto', v: 'auto', label: dsx.variable.autoLabel }]
+      const vs = dsx.variable.variants.slice().sort((a, b) => b.height - a.height)
+      let i = 0
+      while (i < vs.length) {
+        out.push({ id: 'q' + vs[i].height, v: String(vs[i].height), label: vs[i].height + 'p' })
+        i = i + 1
+      }
+      return out
     </variable>
-    <!-- and the pane stack is exactly as tall as the ACTIVE pane. Both panes stay MOUNTED
-         (that is what lets them cross-fade and travel instead of popping), and a depth
-         stack is as tall as its tallest child — so without this a 60-episode grid would
-         hang most of a screen of dead scroll under the synopsis. -->
-    <variable as="paneH" computed="true">
-      if (dsx.variable.drawerTab == 'synopsis') { return Math.round(dsx.variable.synPaneBox.height || 0) }
-      return Math.round(dsx.variable.epPaneBox.height || 0)
+    <variable as="qualityLabel" computed="true">
+      if (dsx.variable.quality == 'auto') { return dsx.variable.autoLabel }
+      return dsx.variable.quality + 'p'
+    </variable>
+    <!-- a stream with no ladder has nothing to pick: the row still opens, and the sheet says so -->
+    <variable as="hasLadder" computed="true">return dsx.variable.variants.length > 0</variable>
+    <variable as="hasTracks" computed="true">return dsx.variable.tracks.length > 0</variable>
+
+    <!-- ── THE WATCH MISSION READ: the last tick answer beats the opening read ── -->
+    <variable as="missionView" computed="true">
+      if (dsx.variable.missionLast != null) { return dsx.variable.missionLast }
+      if (mission.data != null) { return mission.data }
+      return global.cacheMission
+    </variable>
+    <variable as="missionFrac" computed="true">
+      const m = dsx.variable.missionView
+      if (m == null) { return 0 }
+      if (m.capReached == true) { return 1 }
+      const next = Number(m.nextMilestoneSeconds)
+      if (next <= 0) { return 1 }
+      return Math.min(1, Number(m.watchedSeconds) / next)
+    </variable>
+    <variable as="missionShown" computed="true">
+      if (dsx.variable.signedIn == false) { return false }
+      return global.missionHidden != true
+    </variable>
+    <!-- one heartbeat per thirty seconds of PLAYBACK per episode: the key changes only while
+         the clock runs, so a paused clip sends nothing and the server credits nothing -->
+    <variable as="tickKey" computed="true">
+      return Math.floor(Number(dsx.variable.time) / 30) + ':' + dsx.variable.epId
     </variable>
 
     <formula as="gridLocked" free="item.free" epid="item.id">
       if (free) { return false }
-      if (wallet.data == null) { return true }
-      if (wallet.data.vip == true) { return false }
-      return !wallet.data.unlocked.includes(epid)
+      const w = dsx.variable.walletView
+      if (w == null) { return true }
+      if (w.vip == true) { return false }
+      return !w.unlocked.includes(epid)
     </formula>
-    <!-- the whole style is ONE formula (a {{ }} hole spanning a ';' inside a compound
-         style is shredded by the pre-interpolation split — PLAN.md §6.17): locked pages
-         frost their art, unlocked pages show it plain until the clip covers it -->
     <!-- A row's playable source. Public when the episode carries one (free), the ticketed
-         source when it does not AND this row is the one playing, and empty otherwise — an
-         off-screen paid page must never hold a source, which is what keeps one ticket alive
-         at a time instead of one per mounted page. -->
+         source when it does not AND this row is the one playing, and empty otherwise. -->
     <formula as="rowSource" v="item.video" i="item.idx">
       if (v != null) { return v }
       if (i != Number(dsx.variable.cur)) { return '' }
@@ -565,112 +348,57 @@
       return 'width: 100%; height: ' + dsx.variable.clipH + 'px; object-fit: cover' + frost
     </formula>
 
-    <!-- The app-wide stash §6.30 asks for, with the ID GUARD it warns about: one key per
-         ENDPOINT, carrying the id it was fetched for, so the next show cannot read this
-         one's payload while its own request is still in the air. -->
-    <!-- THE EMIT SHELL (Components/parts/Analytics.dsx). Four lines, and they are copied
-         rather than shared because a `<functions global="true">` body is the EXPRESSION
-         tier: dsx.log, dsx.module.* and a global write are all silent no-ops there, measured
-         (PLAN.md §6.94). The POLICY is not copied — analyticsBlocked and analyticsSink are
-         pure expressions and live in that one file. -->
+    <!-- THE EMIT SHELL (Components/parts/Analytics.dsx) -->
     <action as="track" inputs="name, props">
       if (analyticsBlocked()) { return }
       if (analyticsSink() != '') { dsx.module.posthog.capture({ event: name, properties: props }) }
       else { dsx.log('funnel', name, props) }
     </action>
-
     <action as="detailLanded">
       global.cacheDetail = { id: vars.show, data: detail.data }
     </action>
     <action as="boot" show="vars.show" idx="vars.idx">
       dsx.variable.showId = show;
-      dsx.variable.page = Number(idx) - 1;
-      thread.refresh()
+      dsx.variable.page = Number(idx) - 1
     </action>
-    <!-- SHARE, for real. This used to be `sheet = ''; menu = true` — byte-identical to the
-         ⋯ button — so tapping Share opened a sheet headed "More" with no share row in it.
-         `share.url` is the declared Core/SocialShare action; its web lane uses the Web Share
-         API and falls back to the clipboard on its own, so both paths are the module's.
-         The URL is a PATH: there is no portable origin fact in the runtime, and a relative
-         url resolves against the document on web. A native build that wants a universal
-         link should prepend its own deep-link origin here.
-         CALL-THEN-CHECK, not `has()`: a module chunk is loaded on FIRST USE, so
-         `has('share')` is false until something has already called it — the guard would have
-         refused the very first tap forever. This is the same shape PlansSheet uses for
-         `stripe.session` (`opened.ok === false` → a named toast), which is the precedent in
-         this template for "the module may not be in this build". -->
+    <!-- THE TOAST: the reference geometry and its 1.5 s life (spec §−1) -->
+    <action as="say" inputs="text">
+      dsx.variable.toast = text
+      setTimeout(() => { dsx.variable.toast = '' }, 1500, 'toast')
+    </action>
+    <!-- SHARE, for real: the declared Core/SocialShare action; call-then-check because a
+         module chunk loads on first use, so `has()` would refuse the very first tap -->
     <action as="doShare">
-      const title = dsx.variable.detailView == null ? 'this series' : dsx.variable.detailView.show.title
+      const title = dsx.variable.showTitle == '' ? 'this series' : dsx.variable.showTitle
       const r = await dsx.module.share.url({
         message: title + ' — EP.' + dsx.variable.cur,
         url: '/watch/' + dsx.variable.showId + '/' + dsx.variable.cur
       })
-      if (r == null || r.ok === false) {
-        dsx.variable.toast = 'Sharing is not available on this platform.'
-      }
+      if (r == null || r.ok === false) { dsx.action.say({ text: 'Sharing is not available on this platform.' }) }
     </action>
     <action as="goBack">
       if (dsx.variable.nav.canPop) { dsx.module.route.pop() }
       else { dsx.module.route.replace({ path: '/' }) }
     </action>
-
-    <!-- ── THE GENRE LEVEL'S FIVE VERBS ────────────────────────────────────────────────
-         Every one of them exists so that no caller has to remember the cascade. -->
-    <action as="openGenre" inputs="name">
-      if (name == null) { return }
-      if (name == '') { return }
-      dsx.variable.genre = name
-      dsx.variable.genreOpen = true
-      genreList.refresh()
-      dsx.action.track({ name: 'genre_level_opened', props: { genre: name, show: dsx.variable.showId } })
-    </action>
-    <action as="closeGenre">dsx.variable.genreOpen = false</action>
-    <!-- THE HAND-ROLLED CASCADE. The engine does not close a declared child when its parent
-         goes down (PLAN.md 6.95, measured on dev@71155a18: the child is left orphaned at
-         level 1 with its key still true), so the drawer never closes except through here.
-         TOP-DOWN, like the engine will do it: the child first, then the parent. -->
-    <action as="closeDrawer">
-      // The engine cascades the nested genre sheet when its parent closes (§6.114), so one
-      // write is the whole close; the child key is cleared by the ledger, on every lane.
-      dsx.variable.drawer = false
-    </action>
-    <!-- and the one way IN, so the invariant "the drawer only ever moves through an action
-         that knows about its child" holds structurally rather than by everyone remembering.
-         The pill raises the drawer only in the lane that HAS one — with the panel beside the
-         clip it is a readout, not a control that opens a duplicate list. -->
-    <action as="raiseDrawer">
-      if (dsx.variable.panel) { dsx.action.closeDrawer(); return }
-      dsx.variable.drawer = true
-    </action>
-    <!-- A SERIES IS A DESTINATION, so this one is a ROUTE and not a third level: /show/:id
-         is a whole page — hero, episode grid, related rail — and it SHOULD take over the
-         frame. Both sheets close first, because the router will not do it for us. -->
+    <!-- A SERIES IS A DESTINATION, so it is a ROUTE: the router closes every declared overlay
+         before the swap (§6.114), children included, so no close runs here first. -->
     <action as="goShow" inputs="id">
-      // No closeDrawer() first: the router closes the declared overlays before the swap on
-      // every lane now (§6.114, dev@d21d5eb7 · 19bd4afc · f1c22794), children included.
-      dsx.module.route.push({ path: '/show/' + id })
+      const target = id == null || id == '' ? dsx.variable.showId : id
+      dsx.module.route.push({ path: '/show/' + target })
     </action>
-    <!-- and the door back out to the full, shareable, deep-linkable page. A sheet has no
-         URL; this row is what keeps that affordance reachable from inside one. -->
-    <action as="seeAllGenre">
-      const g = dsx.variable.genre
-      dsx.module.route.push({ path: '/browse/' + g })
+    <!-- the crown, the pill and the PIP row all open the Membership page (Theme.dsx) -->
+    <action as="goMembership">
+      dsx.action.track({ name: 'membership_opened', props: { from: 'player', show: vars.show } })
+      dsx.module.route.push({ path: membershipPath() })
     </action>
     <action as="saveNow" epid="dsx.variable.epId" epidx="dsx.variable.cur" locked="dsx.variable.epLocked">
       if (epid == null || epid === '' || locked) { return }
-      // A GUEST HAS NOWHERE TO SAVE PROGRESS, and this is the one place where that must be
-      // SILENT: a resume position is not something a viewer asked for, so interrupting a
-      // free episode with a login sheet to save it would be the wall guest browsing exists
-      // to avoid (App Store 5.1.1(v)).
+      // a guest has nowhere to save progress, and this is the one place that must be SILENT
       if (dsx.variable.signedIn == false) { return }
       await progressCall.send({ episode: epid, show: dsx.variable.showId, idx: Number(epidx), position: dsx.variable.time })
     </action>
-    <!-- THE ADDRESS BAR TRACKS THE EPISODE. `vars.idx` was read once at mount and never
-         again, so watching to EP.40 left the URL on /watch/{show}/1 — a reload, a share or a
-         back-then-forward all returned the viewer to episode 1, and the EP.n label disagreed
-         with the URL for the whole session. REPLACE, never push: 40 episodes must not become
-         40 history entries, and Back still leaves the player rather than stepping back one
-         episode at a time. -->
+    <!-- THE ADDRESS BAR TRACKS THE EPISODE. REPLACE, never push: 40 episodes must not become
+         40 history entries, and an in-place replace keeps the frame (§6.120/6.121). -->
     <action as="syncUrl">
       dsx.module.route.replace({ path: '/watch/' + dsx.variable.showId + '/' + dsx.variable.cur })
     </action>
@@ -682,30 +410,25 @@
       dsx.variable.page = n - 1;
       dsx.variable.pos = 0;
       dsx.variable.paused = false;
-      dsx.action.closeDrawer();
-      thread.refresh();
+      dsx.variable.drawer = false;
       dsx.action.syncUrl()
     </action>
-    <action as="next">dsx.action.go({ target: Number(dsx.variable.cur) + 1 })</action>
-    <!-- the pager rested on a new episode: the swipe IS the navigation, so the same
-         bookkeeping a tap would do runs here -->
+    <!-- the pager rested on a new episode: the swipe IS the navigation -->
     <action as="rest">
       dsx.action.saveNow();
       dsx.variable.pos = 0;
       dsx.variable.paused = false;
-      thread.refresh();
       dsx.action.syncUrl()
     </action>
     <action as="onEnded">
       const ep = dsx.variable.episode
       if (dsx.variable.detailView == null || ep == null) { return }
-      // FIRST, before any branch decides what happens next: the episode finished, and that
-      // is true whether the viewer auto-advances, hits the end of the series, or walks away.
       dsx.action.track({ name: 'episode_completed', props: { show: vars.show, episode: ep.id, idx: Number(dsx.variable.cur) } })
       const n = Number(dsx.variable.cur) + 1
       if (n > dsx.variable.detailView.episodes.length) { dsx.variable.paused = true; return }
       const nxt = dsx.variable.detailView.episodes[n - 1]
-      const nextLocked = nxt.free === false && wallet.data != null && wallet.data.vip != true && !wallet.data.unlocked.includes(nxt.id)
+      const w = dsx.variable.walletView
+      const nextLocked = nxt.free === false && w != null && w.vip != true && !w.unlocked.includes(nxt.id)
       if (nextLocked && dsx.variable.autoUnlock && dsx.variable.balance >= nxt.price) {
         dsx.variable.page = n - 1
         dsx.action.syncUrl()
@@ -714,27 +437,13 @@
         dsx.action.go({ target: n })
       }
     </action>
-    <!-- THE FUNNEL, AT THE EPISODE BOUNDARY. `epId` changes exactly once per arrival —
-         a tap, a swipe, a deep link, an auto-advance all land here — so this is the one
-         place that sees every episode a viewer reaches, and it sees whether the wall was
-         what they got instead of the clip. No title, no subject: ids and numbers only
-         (Components/parts/Analytics.dsx names the rule). -->
+    <!-- THE FUNNEL, AT THE EPISODE BOUNDARY: one event per (episode, wall) pair -->
     <action as="epChanged">
       const ep = dsx.variable.episode
       if (ep == null) { return }
-      // ONE EVENT PER (episode, wall) PAIR, and the pair rather than the episode is the key
-      // for a reason. The watch fires twice per boundary — measured, two identical
-      // episode_started lines per swipe, which would have doubled every number in the funnel.
-      // But the SAME episode legitimately reports twice when the wall comes down: a cold load
-      // reads epLocked true until /wallet/state answers, so an episode the viewer already
-      // owns is a paywall_shown followed by a real episode_started. Keying on the episode
-      // alone would swallow that second one and under-count every unlock.
       const key = ep.id + (dsx.variable.epLocked ? ':wall' : ':clip')
       if (dsx.variable.lastFunnelKey == key) { return }
       dsx.variable.lastFunnelKey = key
-      // `vars.show`, NOT dsx.variable.showId: showId is written by dsx.action.boot and the
-      // watch can fire first — measured, the first episode_started of a cold load carried
-      // show:"". A route param is readable in an action body from the first tick (AGENTS.md).
       const facts = { show: vars.show, episode: ep.id, idx: Number(dsx.variable.cur), price: ep.price }
       if (dsx.variable.epLocked) { dsx.action.track({ name: 'paywall_shown', props: facts }) }
       else { dsx.action.track({ name: 'episode_started', props: facts }) }
@@ -742,21 +451,16 @@
     <action as="unlockNow">
       const ep = dsx.variable.episode
       if (ep == null || dsx.variable.unlocking) { return }
-      // NO SIGN-IN GATE ON MONEY. Most revenue in this category never signs in, so a gate
-      // here is a revenue bug wearing a safety costume. `auth="required"` verifies a TOKEN,
-      // it does not ask who holds it — an anonymous session satisfies it unchanged, and the
-      // subject Postgres derives from that token owns the purchase exactly as a named one
-      // would. Sign-in is the UPSELL AFTER the purchase ("keep what you bought on another
-      // device"), never the toll in front of it.
+      // NO SIGN-IN GATE ON MONEY: an anonymous session satisfies auth="required" unchanged
       dsx.variable.unlocking = true
       dsx.action.track({ name: 'unlock_attempted', props: { show: vars.show, episode: ep.id, idx: Number(dsx.variable.cur), price: ep.price, kind: 'episode' } })
       const r = await unlockCall.send({ episode: ep.id })
       dsx.variable.unlocking = false
       if (r.ok) {
         dsx.action.track({ name: 'unlock_succeeded', props: { show: vars.show, episode: ep.id, idx: Number(dsx.variable.cur), spent: r.data.spent, kind: 'episode' } })
-        dsx.variable.toast = 'Unlocked for ' + r.data.spent + ' coins'; dsx.variable.paused = false; wallet.refresh()
+        dsx.action.say({ text: 'Unlocked for ' + r.data.spent + ' coins' }); dsx.variable.paused = false; wallet.refresh()
       }
-      else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Unlock failed' }
+      else { dsx.action.say({ text: r.data != null && r.data.message != null ? r.data.message : 'Unlock failed' }) }
     </action>
     <action as="toggleFav">
       if (dsx.variable.signedIn == false) {
@@ -766,376 +470,166 @@
       const r = await favCall.send({ show: dsx.variable.showId })
       if (r.ok) { dsx.variable.favTouched = r.data.favorite ? 'y' : 'n' }
     </action>
+    <!-- ── THE STAGE GESTURES: tap = pause/play, hold = 2× until release ── -->
+    <action as="stageTap">
+      if (dsx.variable.epLocked) { return }
+      dsx.variable.paused = dsx.variable.paused == false
+    </action>
     <action as="holdStart">
       if (dsx.variable.epLocked) { return }
-      dsx.variable.holding = true; dsx.variable.speed = 2
+      dsx.variable.holding = true
     </action>
     <action as="holdEnd">
-      if (!dsx.variable.holding) { return }
-      dsx.variable.holding = false; dsx.variable.speed = 1
+      dsx.variable.holding = false
     </action>
     <action as="seek">dsx.variable.pos = dsx.this.fraction</action>
-    <action as="openComments">
-      dsx.variable.comments = true
-      dsx.variable.cPane = 'thread'
-      dsx.variable.modNote = ''
-      thread.refresh()
+    <!-- ── the option sheets write ONE variable each; the video reads it live ── -->
+    <action as="pickSpeed" inputs="v">
+      dsx.variable.speedPick = Number(v)
+      dsx.variable.speedOpen = false
     </action>
-    <action as="closeComments">
-      dsx.variable.comments = false
-      dsx.variable.cPane = 'thread'
-      dsx.variable.pick = null
-      dsx.variable.modNote = ''
+    <action as="pickSubtitle" inputs="lang">
+      dsx.variable.subtitle = lang == null ? '' : lang
+      dsx.variable.subOpen = false
     </action>
-    <action as="postComment">
-      const text = dsx.variable.draft
-      if (text == null || text === '') { return }
-      // A COMMENT CARRIES AN IDENTITY, so posting needs one. Reading the thread does not:
-      // /social/comments is auth="none" and a guest sees the whole conversation.
+    <action as="pickQuality" inputs="v">
+      dsx.variable.quality = v == null ? 'auto' : String(v)
+      dsx.variable.qualOpen = false
+    </action>
+    <!-- MINI VIEW IS A MEMBERSHIP PERK. A non-member gets the reference toast, and a way in. -->
+    <action as="togglePip">
+      if (dsx.variable.isVip == false) {
+        dsx.action.say({ text: 'Mini view (PIP mode) is for members only.' })
+        return
+      }
+      dsx.variable.pip = dsx.variable.pip == false
+    </action>
+    <action as="reportNow" inputs="reason">
+      if (dsx.variable.reporting) { return }
       if (dsx.variable.signedIn == false) {
         dsx.module.route.push({ path: '/auth/signin' })
         return
       }
-      const r = await commentCall.send({ show: dsx.variable.showId, episode: dsx.variable.epId, body: text })
-      if (r.ok) { dsx.variable.draft = ''; thread.refresh() }
-      // A DECLARED REJECTION IS THE FILTER TALKING, and its words are the useful ones: the
-      // server says which shape it refused (a link, a phone number, all capitals), so a
-      // viewer can fix the comment instead of guessing. `r.error` is transport only.
-      else { dsx.variable.toast = r.data != null && r.data.message != null ? r.data.message : 'Could not post' }
+      dsx.variable.reporting = true
+      const r = await reportEpCall.send({ episode: dsx.variable.epId, show: dsx.variable.showId, reason: reason })
+      dsx.variable.reporting = false
+      dsx.variable.reportOpen = false
+      dsx.variable.menu = false
+      if (r.ok) { dsx.action.say({ text: r.data != null && r.data.duplicate == true ? 'You already reported this episode.' : 'Reported. Thank you.' }) }
+      else { dsx.action.say({ text: r.data != null && r.data.message != null ? r.data.message : 'The report could not be sent.' }) }
     </action>
-
-    <!-- ══ THE SAFETY SET (App Store 1.2) ═══════════════════════════════════════════════
-         Four viewer verbs — report, block, unblock, delete-own — plus the two pane moves.
-         Every one of them requires an identity and says so by PUSHING the sign-in route
-         rather than by refusing: the routes behind them are auth="required", so a control
-         that pretended to work for a guest would be a control that 401s. -->
-    <action as="setPane" inputs="next">
-      dsx.variable.cPane = next
-      dsx.variable.modNote = ''
+    <!-- "More" in the bottom meta opens the episodes panel on its Details tab; the rail's
+         Episodes item opens it on Episodes. In the panel lane there is no sheet to raise. -->
+    <action as="openPanel" inputs="tab">
+      dsx.variable.drawerTab = tab
+      if (dsx.variable.panel) { return }
+      dsx.variable.drawer = true
     </action>
-    <action as="openSafety">
-      dsx.variable.cPane = 'safety'
-      dsx.variable.modNote = ''
-      if (dsx.variable.signedIn) { blocks.refresh() }
+    <action as="openMission">
+      dsx.variable.missionOpen = true
+      dsx.action.track({ name: 'watch_mission_opened', props: { show: vars.show } })
     </action>
-    <action as="setFilter" inputs="level">
-      dsx.variable.filterLevel = level
-      // the level rides the URL and the block never fires on its own, so the refetch is explicit
-      thread.refresh()
+    <!-- the reference footnote is the contract: hidden for this run of the app, back on restart -->
+    <action as="hideTimer">
+      global.missionHidden = true
+      dsx.variable.missionOpen = false
     </action>
-    <action as="pickComment" inputs="id, owner, author, body">
-      dsx.variable.pick = { id: id, owner: owner, author: author, body: body }
-      dsx.variable.modNote = ''
-      dsx.variable.cPane = 'options'
-    </action>
-
-    <action as="reportPick" inputs="reason">
-      const p = dsx.variable.pick
-      if (p == null || dsx.variable.modBusy) { return }
-      if (dsx.variable.signedIn == false) {
-        dsx.module.route.push({ path: '/auth/signin' })
-        return
+    <!-- THE HEARTBEAT. Fires when `tickKey` changes — every 30 s of playback — and only while
+         the clip is actually running for a signed-in viewer. It sends the episode id and
+         nothing else; the server counts the clock (server/engage.dsx watchTick). -->
+    <action as="tick">
+      if (dsx.variable.signedIn == false) { return }
+      if (dsx.variable.epLocked || dsx.variable.paused) { return }
+      if (dsx.variable.epId == '') { return }
+      const r = await tickCall.send({ episode: dsx.variable.epId })
+      if (!r.ok) { return }
+      dsx.variable.missionLast = r.data
+      if (Number(r.data.granted) > 0) {
+        dsx.variable.grantToast = Number(r.data.granted)
+        setTimeout(() => { dsx.variable.grantToast = 0 }, 2500, 'grantToast')
+        wallet.refresh()
       }
-      dsx.variable.modBusy = true
-      // ACKNOWLEDGE FIRST. The row leaves this thread now, not when the round trip lands.
-      dsx.variable.hiddenIds = dsx.variable.hiddenIds.concat([p.id])
-      dsx.variable.modNote = 'Sending your report…'
-      const r = await reportCall.send({ target: p.id, reason: reason })
-      dsx.variable.modBusy = false
-      if (r.ok) {
-        dsx.variable.modNote = r.data != null && r.data.duplicate == true
-          ? 'You had already reported this comment. It stays hidden for you.'
-          : 'Reported. It is hidden for you, and it is in the moderation queue now.'
-        thread.refresh()
-        return
-      }
-      // THE ACKNOWLEDGEMENT MUST NOT OUTLIVE THE REQUEST. Put the row back and say what
-      // happened, because a comment that vanished while nothing was filed is the worst of
-      // both outcomes: the reader believes it is handled and it is not.
-      dsx.variable.hiddenIds = dsx.variable.hiddenIds.filter(x => x != p.id)
-      dsx.variable.modNote = r.data != null && r.data.message != null
-        ? r.data.message
-        : 'The report could not be sent. Nothing was filed — try again.'
     </action>
 
-    <action as="blockPick">
-      const p = dsx.variable.pick
-      if (p == null || dsx.variable.modBusy) { return }
-      if (dsx.variable.signedIn == false) {
-        dsx.module.route.push({ path: '/auth/signin' })
-        return
-      }
-      dsx.variable.modBusy = true
-      // every row by this author leaves the thread at once, not just the one that was tapped
-      const theirs = dsx.variable.threadRows.filter(x => x.owner == p.owner).map(x => x.id)
-      dsx.variable.hiddenIds = dsx.variable.hiddenIds.concat(theirs)
-      dsx.variable.modNote = 'Blocking…'
-      const r = await blockCall.send({ comment: p.id })
-      dsx.variable.modBusy = false
-      if (r.ok) {
-        dsx.variable.modNote = p.author + ' is blocked. You will not see their comments anywhere in the app. Undo it under Safety and filters.'
-        thread.refresh()
-        blocks.refresh()
-        return
-      }
-      dsx.variable.hiddenIds = dsx.variable.hiddenIds.filter(x => theirs.includes(x) == false)
-      dsx.variable.modNote = r.data != null && r.data.message != null
-        ? r.data.message
-        : 'The block could not be saved. Nothing changed — try again.'
-    </action>
-
-    <action as="unblockOne" inputs="subject, handle">
-      if (dsx.variable.modBusy) { return }
-      dsx.variable.modBusy = true
-      const r = await unblockCall.send({ subject: subject })
-      dsx.variable.modBusy = false
-      if (r.ok) {
-        dsx.variable.modNote = handle + ' is unblocked. Their comments are back in every thread.'
-        blocks.refresh()
-        thread.refresh()
-        return
-      }
-      dsx.variable.modNote = r.data != null && r.data.message != null ? r.data.message : 'That block could not be removed.'
-    </action>
-
-    <!-- DELETE YOUR OWN. The row is offered only when the comment subject matches the seam
-         published subject, and the SERVER never takes that word for it: RLS is what refuses a
-         delete of somebody else row, so the worst a tampered client achieves is a 403. -->
-    <action as="deletePick">
-      const p = dsx.variable.pick
-      if (p == null || dsx.variable.modBusy) { return }
-      dsx.variable.modBusy = true
-      const r = await commentDeleteCall.send({ comment: p.id })
-      dsx.variable.modBusy = false
-      if (r.ok) {
-        dsx.variable.hiddenIds = dsx.variable.hiddenIds.concat([p.id])
-        dsx.variable.modNote = 'Your comment is deleted.'
-        thread.refresh()
-        return
-      }
-      dsx.variable.modNote = r.data != null && r.data.message != null ? r.data.message : 'That comment could not be deleted.'
-    </action>
-
-    <!-- ── stage chrome ── -->
-
-    <!-- one observer, the whole funnel at this boundary (see dsx.action.epChanged) -->
+    <!-- one observer, the whole funnel at this boundary -->
     <watch value="dsx.variable.epId" on:change="dsx.action.epChanged()"/>
+    <watch value="dsx.variable.tickKey" on:change="dsx.action.tick()"/>
+
+    <!-- ══ §0 / §3 GEOMETRY, in pt. Every hex is a Theme.dsx tone (check:styles). ══ -->
     <style as="chromeLayer" zIndex="2"/>
-    <!-- The loading/error panel used to be an OPAQUE black stage: it sat at z-index 3 over
-         everything, so even once the curtain art was known it could not be seen, and the
-         whole chrome was absent until `ready` and then arrived at once (measured: the bars
-         jump in ~430ms after the tap). It now paints black only when there is genuinely
-         nothing behind it; with art, it is a scrim the curtain reads through. -->
     <style as="stateWrap" alignItems="center" spacing="10" paddingH="24" paddingV="20"/>
     <style as="stateWrapBare" background="#000000"/>
     <style as="stateWrapOverArt" background="rgba(0,0,0,0.38)"/>
     <style as="stateHead" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="stateBody" fontSize="13" color="rgba(255,255,255,0.55)"/>
-    <style as="stateBtn" background="#FF2C55" radius="22" paddingH="20" paddingV="11" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="stateBody" fontSize="13" color="#8E8E93"/>
+    <style as="stateBtn" background="#F5C518" radius="12" paddingH="20" paddingV="12" fontSize="15" fontWeight="semibold" color="#000000"/>
     <style as="lockedLayer" zIndex="3"/>
-    <style as="topBar" paddingLeading="10" paddingTrailing="14" paddingTop="12" spacing="10" alignItems="center"/>
-    <style as="epLabel" fontSize="17" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="speedChip" spacing="5" alignItems="center" paddingH="4"/>
-    <style as="speedText" fontSize="15" color="#FFFFFF"/>
-
-    <!-- ── the engagement rail ── -->
-    <style as="rail" spacing="22" alignItems="center" paddingTrailing="12"/>
-    <style as="railItem" spacing="4" alignItems="center"/>
-    <style as="railCount" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="railCap" fontSize="11" color="rgba(255,255,255,0.9)"/>
-    <style as="vipTag" background="#F6B63D" radius="4" paddingH="5" paddingV="1" fontSize="11" fontWeight="bold" color="#3A2A08"/>
-    <!-- the corner twin: a badge riding an icon is a MARKER, not a label. 11 is the bottom
-         of the type ramp and the review gate is right to hold it there — a 9pt badge reads
-         as noise at arm's length. The pill stays small by trimming its PADDING instead. -->
-    <style as="vipCorner" background="#F6B63D" radius="4" paddingH="4" paddingV="0" fontSize="11" fontWeight="bold" color="#3A2A08"/>
-    <style as="cellTag" background="#F6B63D" paddingH="3" paddingV="0" fontSize="11" fontWeight="bold" color="#3A2A08"/>
-    <style as="nowBars" alignItems="center"/>
-
-    <!-- ── bottom: scrubber + the EP pill ── -->
-    <style as="bottomBar" paddingLeading="14" paddingTrailing="14" paddingBottom="14" spacing="10" alignItems="stretch"/>
-    <style as="epPill" background="rgba(255,255,255,0.12)" radius="12" paddingH="14" paddingV="12" spacing="9" alignItems="center"/>
-    <style as="epPillNow" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="epPillAll" fontSize="15" color="rgba(255,255,255,0.55)"/>
-    <style as="toastLine" fontSize="12" color="#F6B63D"/>
-    <style as="seekTimeNow" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="seekTimeAll" fontSize="13" color="rgba(255,255,255,0.62)"/>
-    <style as="speedToast" background="rgba(0,0,0,0.72)" radius="18" paddingH="14" paddingV="8" spacing="7" alignItems="center"/>
-    <style as="speedToastLabel" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
-
-    <!-- ── the locked stage ── -->
+    <!-- top chrome: back 20 at x16 · EP.n 17 bold at x44 · the ring at the trailing edge -->
+    <style as="topBar" paddingLeading="4" paddingTrailing="0" spacing="0" alignItems="center"/>
+    <style as="epLabel" fontSize="17" fontWeight="bold" color="#FFFFFF"/>
+    <style as="ringHit" width="48" height="48" alignItems="center"/>
+    <!-- the rail: icons 26 ink, labels 12 semibold, 4 under, items 24 apart, right inset 16 -->
+    <style as="rail" spacing="24" alignItems="center" width="72"/>
+    <style as="railItem" spacing="4" alignItems="center" minHeight="44"/>
+    <style as="railCap" fontSize="12" fontWeight="semibold" color="#FFFFFF"/>
+    <!-- bottom meta: title 17 bold · synopsis 13 ink-2 · More 13 semibold · hairline · pill -->
+    <style as="meta" spacing="8" alignItems="stretch" paddingLeading="16" paddingTrailing="100"/>
+    <style as="metaTitle" fontSize="17" fontWeight="bold" color="#FFFFFF"/>
+    <style as="metaPlot" fontSize="13" color="#C7C7CC" lineSpacing="5"/>
+    <style as="metaMore" fontSize="13" fontWeight="semibold" color="#FFFFFF" paddingLeading="6"/>
+    <style as="unlockPill" background="#3B3410" radius="20" height="40" paddingH="16" spacing="6" alignItems="center"/>
+    <style as="unlockPillTxt" fontSize="14" fontWeight="semibold" color="#F5C518"/>
+    <!-- the hold overlay and the subtitle line -->
+    <style as="holdPill" background="rgba(0,0,0,0.55)" radius="16" paddingH="14" paddingV="7" spacing="6" alignItems="center"/>
+    <style as="holdTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="subLine" fontSize="20" fontWeight="semibold" color="#FFFFFF" textAlign="center" lineSpacing="4"/>
+    <style as="pauseBadge" padding="25" radius="42" background="rgba(0,0,0,0.45)" alignItems="center"/>
+    <style as="toastCard" background="#1C1C1E" radius="10" paddingH="14" paddingV="10" fontSize="13" color="#FFFFFF" textAlign="center"/>
+    <!-- the locked stage -->
     <style as="lockBlock" spacing="14" alignItems="center" paddingH="26"/>
     <style as="lockHead" fontSize="17" fontWeight="bold" color="#FFFFFF" textAlign="center" lineSpacing="4"/>
-    <style as="unlockBtn" background="#FF2C55" radius="24" paddingV="14" paddingH="30" spacing="8" alignItems="center"/>
-    <style as="unlockLabelTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="unlockBtn" background="#F5C518" radius="24" paddingV="14" paddingH="30" spacing="8" alignItems="center"/>
+    <style as="unlockLabelTxt" fontSize="15" fontWeight="semibold" color="#000000"/>
     <style as="lockDoors" spacing="10" alignItems="center"/>
-    <style as="earnBtn" background="rgba(255,255,255,0.1)" radius="24" paddingV="14" paddingH="20" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="earnBtn" background="#2C2C2E" radius="24" paddingV="14" paddingH="20" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
     <style as="lockClose" width="34" height="34" radius="17" background="rgba(255,255,255,0.12)" alignItems="center"/>
     <style as="lockMetaRow" spacing="6" alignItems="center"/>
-    <style as="lockMeta" fontSize="13" color="#F6B63D"/>
+    <style as="lockMeta" fontSize="13" color="#F5C518"/>
     <style as="autoRow" spacing="9" alignItems="center" paddingTop="2"/>
-    <style as="checkBox" width="20" height="20" radius="6" alignItems="center"/>
-    <style as="autoLabel" fontSize="13" color="rgba(255,255,255,0.66)"/>
-
-    <!-- ── the desktop episode panel ── -->
-    <!-- the SAME surface colour as the drawer: the panel and the drawer are one component
-         wearing two layouts, so they must not read as two different materials -->
+    <style as="checkBox" width="20" height="20" radius="5" alignItems="center"/>
+    <style as="autoLabel" fontSize="13" color="#C7C7CC"/>
+    <!-- the wide lane's persistent panel: the same part, in a 416 column -->
     <style as="panelScroll" background="#141414" alignItems="stretch"/>
-    <style as="panelBody" spacing="12" paddingH="20" paddingTop="18" paddingBottom="28" alignItems="stretch"/>
-    <style as="panelCrumbs" spacing="6" alignItems="center"/>
-    <style as="crumb" fontSize="12" color="rgba(255,255,255,0.45)"/>
-    <style as="crumbOn" fontSize="12" fontWeight="medium" color="rgba(255,255,255,0.8)"/>
-    <style as="panelTitle" fontSize="20" fontWeight="bold" color="#FFFFFF" lineLimit="2" tracking="-0.3" lineSpacing="2"/>
-    <style as="tagFlow" alignItems="flex-start"/>
-    <style as="tagSoft" background="rgba(255,233,168,0.10)" radius="4" paddingH="9" paddingV="4" fontSize="12" color="#FFE9A8"/>
-    <style as="panelTags" spacing="8" alignItems="center"/>
-    <style as="panelPlot" fontSize="13" color="rgba(255,255,255,0.62)" lineSpacing="3"/>
-    <style as="panelMore" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="panelStats" spacing="8" alignItems="center" paddingTop="2"/>
-    <style as="panelStat" fontSize="13" fontWeight="medium" color="rgba(255,255,255,0.62)"/>
-    <style as="panelAct" spacing="5" alignItems="center"/>
-    <style as="panelRanges" spacing="16" alignItems="center" paddingTop="6"/>
-
-    <!-- ── the episode drawer ── -->
-    <!-- 15, not 18: the tab labels now sit inside a `tabHit` column that carries 3pt of
-         its own top padding for the tap target, and the two together hold the measured
-         18pt gap the head had before. -->
-    <style as="drawerHead" spacing="14" alignItems="center" paddingH="16" paddingTop="10" paddingBottom="15"/>
-    <style as="drawerTitle" fontSize="17" fontWeight="bold" color="#FFFFFF" lineLimit="2" lineSpacing="3"/>
-    <style as="drawerSub" fontSize="13" color="rgba(255,255,255,0.5)"/>
-    <style as="followBtn" radius="24" paddingH="24" paddingV="13" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="tabRow" spacing="28" alignItems="center" paddingH="16"/>
-    <!-- the tap target, unchanged in size: the label used to share its column with the
-         rule (spacing 5 + a 3pt rule = 8pt of extra target), and 3 + 5 here restores
-         exactly that 8pt now that the rule has moved out into its own rail -->
-    <style as="tabHit" alignItems="center" paddingTop="3" paddingBottom="5"/>
-    <style as="tabTxt" fontSize="16" fontWeight="semibold"/>
-    <!-- THE RAIL is the underline's coordinate space, and it carries the SAME 16pt gutter
-         as the label row so that x=0 here is the first label's leading edge. -->
-    <style as="tabRail" paddingH="16" paddingBottom="4"/>
-    <!-- THE RULE IS ITS LABEL'S WIDTH, measured. A guessed 26pt was too short and
-         grow="width" was too long — a greedy child makes the tab column greedy too, so
-         the column ate the row and the rule ran past the word. `measure` writes the
-         text's live box (custom-ux.md §2), which is the only spelling that tracks the
-         label on every renderer and at every type size. -->
-    <style as="tabUnderline" background="#FF2C55" height="3" radius="2"/>
-    <style as="rangeRow" spacing="20" alignItems="center" paddingH="16" paddingTop="18" paddingBottom="12"/>
-    <style as="rangeTxt" fontSize="14" fontWeight="semibold"/>
-    <!-- the sheet supplies the bottom inset (and folds the safe area into it); 28 here
-         was a third layer solving the same problem — PLAN.md §6.69 -->
-    <style as="epGridWrap" paddingH="12" paddingBottom="8"/>
-    <!-- radius 8: ReelShort's 64.33x46 cells and ShortMax's 40x40 cells both measure 8,
-         and AGENTS.md has recorded 8 since the first pass — the code had drifted to 11
-         against the project's own reference. -->
-    <style as="epCell" radius="8" alignItems="center" background="#2C2C2E"/>
-    <style as="epNum" fontSize="16" fontWeight="semibold"/>
-    <style as="synopsisWrap" paddingH="18" paddingTop="14" paddingBottom="26" spacing="12" alignItems="flex-start"/>
-    <style as="tagRow" spacing="8" alignItems="center"/>
-    <style as="tag" background="rgba(255,255,255,0.1)" radius="6" paddingH="12" paddingV="6" fontSize="13" color="rgba(255,255,255,0.7)"/>
-    <style as="synopsisTxt" fontSize="15" color="rgba(255,255,255,0.8)" lineSpacing="6"/>
-
-    <!-- ── the genre level (a sheet over the drawer) ── -->
-    <!-- the SAME 16pt gutter the drawer's own head and tab row carry, so the two levels read
-         as one surface at two depths rather than two unrelated cards -->
-    <style as="genreBody" spacing="14" paddingH="16" paddingTop="4" paddingBottom="28" alignItems="stretch"/>
-    <!-- THE BACK AFFORDANCE. The system close control (close="trailing") is the GESTURE
-         twin — it dismisses the top card — but a bare X cannot say WHERE it goes, and a
-         viewer two levels down needs to be told. 44 tall is the tap floor. -->
-    <style as="genreBack" spacing="4" alignItems="center" minHeight="44"/>
-    <style as="genreBackTxt" fontSize="15" fontWeight="semibold" color="rgba(255,255,255,0.7)"/>
-    <style as="genreCountTxt" fontSize="13" color="rgba(255,255,255,0.5)"/>
-    <style as="genreCard" spacing="6" alignItems="stretch"/>
-    <style as="genreCardTitle" fontSize="13" fontWeight="medium" color="#FFFFFF" lineLimit="2" lineSpacing="2"/>
-    <style as="genreCardMeta" fontSize="12" color="rgba(255,255,255,0.45)"/>
-    <style as="genreSkel" background="#1C1C1E" radius="8"/>
-    <style as="genreState" spacing="8" alignItems="center" paddingV="40"/>
-    <style as="genreStateHead" fontSize="16" fontWeight="semibold" color="#FFFFFF" textAlign="center"/>
-    <style as="genreStateBody" fontSize="13" color="rgba(255,255,255,0.5)" textAlign="center" lineSpacing="4"/>
-    <style as="genreRetry" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="genreAll" background="rgba(255,255,255,0.06)" radius="12" paddingH="14" paddingV="14" spacing="10" alignItems="center" minHeight="44"/>
-    <style as="genreAllTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-
-    <!-- ── the options stack ── -->
-    <!-- the sheet already insets its content 16 a side; 12 more made the card read
-         narrow and the header sat flush against the grabber -->
-    <style as="menuBody" paddingH="0" paddingTop="8" paddingBottom="14" spacing="0" alignItems="stretch"/>
-    <style as="menuCard" background="#1C1C1E" radius="14" paddingH="14" spacing="0" alignItems="stretch"/>
-    <style as="menuRow" spacing="13" alignItems="center" paddingV="13"/>
-    <style as="menuLabel" fontSize="16" color="#FFFFFF"/>
-    <style as="menuValue" fontSize="15" color="rgba(255,255,255,0.5)"/>
-    <style as="menuHead" fontSize="20" fontWeight="bold" color="#FFFFFF" paddingH="4" paddingBottom="8" paddingTop="2"/>
-    <style as="pauseBadge" padding="25" radius="42" background="rgba(0,0,0,0.45)" alignItems="center"/>
-    <!-- THE SEGMENTED CONTROL. Trough 10 · inset 4 · pill 6 is the CONCENTRIC-RADIUS rule
-         (an inner radius is the outer radius minus the inset), the same rule the platform
-         segmented control follows at 9 · 2 · 7. The segment's 45pt height is MEASURED,
-         not chosen: a 14pt label's line box is 14 × the sheet's 1.5 body leading (the
-         `dsx-type-body-leading` token) = 21pt, and 12 above and below carries it to 45 —
-         the 44pt tap floor of designing-an-app §7, rather than the platform control's
-         tighter 32pt, because this one is hand-rolled and carries no system hit-slop. -->
-    <style as="speedSeg" background="rgba(255,255,255,0.08)" radius="10" padding="4" spacing="0" alignItems="stretch"/>
-    <style as="speedPill" background="rgba(255,255,255,0.16)" radius="6"/>
-    <style as="speedOpt" paddingV="12" fontSize="14" textAlign="center"/>
-    <style as="optRow" spacing="12" alignItems="center" paddingV="13" paddingH="12" radius="10"/>
-    <style as="optLabel" fontSize="17"/>
-    <style as="optNote" fontSize="13" color="rgba(255,255,255,0.5)"/>
-
-    <!-- ── comments ── -->
-    <style as="cHead" alignItems="center" paddingH="16" paddingV="12"/>
-    <style as="cTitle" fontSize="17" fontWeight="bold" color="#FFFFFF"/>
-    <style as="cRow" spacing="12" alignItems="flex-start" paddingH="16" paddingV="12"/>
-    <style as="cAvatar" width="34" height="34" radius="17" background="#2A2A2E" alignItems="center"/>
-    <style as="cAuthor" fontSize="14" color="rgba(255,255,255,0.55)"/>
-    <style as="cBody" fontSize="15" color="#FFFFFF" lineSpacing="4"/>
-    <style as="cMeta" fontSize="12" color="rgba(255,255,255,0.4)"/>
-    <style as="cEmpty" fontSize="14" color="rgba(255,255,255,0.45)" textAlign="center" paddingV="30"/>
-    <style as="cField" background="#1C1C1E" radius="22" paddingLeading="16" paddingTrailing="6" paddingV="6" spacing="8" alignItems="center"/>
-    <style as="cSend" background="#FF2C55" radius="18" paddingH="16" paddingV="9" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
-
-    <!-- ── the safety set: the filter chip, the per-comment options pane, the safety pane ── -->
-    <style as="cChip" background="rgba(255,255,255,0.1)" radius="16" paddingH="12" paddingV="8" spacing="6" alignItems="center" minHeight="44"/>
-    <style as="cChipTxt" fontSize="13" fontWeight="semibold" color="rgba(255,255,255,0.8)"/>
-    <style as="cBack" width="44" height="44" radius="22" alignItems="center"/>
-    <style as="cReceipt" background="rgba(255,255,255,0.04)" paddingH="16" paddingV="10" spacing="8" alignItems="center"/>
-    <style as="cReceiptTxt" fontSize="12" color="rgba(255,255,255,0.62)" lineSpacing="3"/>
-    <style as="cFlagBtn" width="44" height="44" radius="22" alignItems="center"/>
-    <style as="cFlagged" fontSize="12" color="#F6B63D"/>
-    <style as="cPaneBody" spacing="14" paddingH="16" paddingTop="4" paddingBottom="24" alignItems="stretch"/>
-    <style as="cQuote" background="rgba(255,255,255,0.05)" radius="12" paddingH="14" paddingV="12" spacing="5" alignItems="stretch"/>
-    <style as="cQuoteWho" fontSize="12" fontWeight="semibold" color="rgba(255,255,255,0.55)"/>
-    <style as="cQuoteTxt" fontSize="14" color="rgba(255,255,255,0.85)" lineSpacing="4"/>
-    <style as="cGroupCap" fontSize="12" fontWeight="semibold" color="rgba(255,255,255,0.45)" tracking="0.4"/>
-    <style as="cOptRow" background="rgba(255,255,255,0.06)" radius="12" paddingH="14" paddingV="13" spacing="12" alignItems="center" minHeight="44"/>
-    <style as="cOptTxt" fontSize="15" color="#FFFFFF"/>
-    <style as="cOptTxtBad" fontSize="15" color="#FF6B8A"/>
-    <style as="cOptNote" fontSize="12" color="rgba(255,255,255,0.5)" lineSpacing="3"/>
-    <style as="cNote" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="flex-start"/>
-    <style as="cNoteTxt" fontSize="13" fontWeight="medium" color="#F6B63D" lineSpacing="3"/>
-    <style as="cSmall" fontSize="12" color="rgba(255,255,255,0.5)" lineSpacing="4"/>
-    <style as="cCounter" fontSize="12" color="rgba(255,255,255,0.45)" paddingTrailing="8"/>
-    <style as="cCounterHot" fontSize="12" fontWeight="semibold" color="#FF6B8A" paddingTrailing="8"/>
-    <style as="cRule" fontSize="12" color="rgba(255,255,255,0.42)" lineSpacing="4" paddingH="16" paddingBottom="6"/>
-    <style as="cBlockRow" background="rgba(255,255,255,0.06)" radius="12" paddingH="14" paddingV="11" spacing="12" alignItems="center" minHeight="44"/>
-    <style as="cUndo" background="rgba(255,255,255,0.12)" radius="16" paddingH="14" paddingV="9" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
+    <!-- the More sheet (§3a) and its option sheets (§3d): rows 52 · 17 ink · value 15 ink-3 -->
+    <style as="menuBody" paddingH="0" paddingTop="4" paddingBottom="8" spacing="0" alignItems="stretch"/>
+    <style as="menuRow" spacing="12" alignItems="center" height="52" paddingH="16"/>
+    <style as="menuLabel" fontSize="17" color="#FFFFFF"/>
+    <style as="menuValue" fontSize="15" color="#8E8E93"/>
+    <style as="menuMuted" fontSize="17" color="#8E8E93"/>
+    <style as="sheetBack" spacing="4" alignItems="center" paddingH="12" minHeight="44"/>
+    <style as="sheetBackTxt" fontSize="15" fontWeight="semibold" color="#8E8E93"/>
+    <style as="optRow" spacing="12" alignItems="center" height="52" paddingH="16"/>
+    <style as="optLabel" fontSize="17" color="#FFFFFF"/>
+    <style as="optNote" fontSize="13" color="#8E8E93" paddingH="16" paddingV="12" lineSpacing="4"/>
+    <!-- the custom toggle (§−1): track 51×31 r15.5, knob 27 white, 2 inset, 0.2 s -->
+    <style as="toggleTrack" width="51" height="31" radius="15.5" alignItems="center"/>
+    <style as="toggleKnob" width="27" height="27" radius="13.5" background="#FFFFFF" shadow="2"/>
+    <!-- the Watch Mission sheet (§3c) -->
+    <style as="missionBody" spacing="14" alignItems="center" paddingH="16" paddingTop="8" paddingBottom="12"/>
+    <style as="missionTitle" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
+    <style as="missionTxt" fontSize="15" color="#8E8E93" textAlign="center" lineSpacing="5"/>
+    <style as="missionBtn" radius="12" height="48" alignItems="center" fontSize="17" fontWeight="semibold" color="#FFFFFF"/>
+    <style as="missionFoot" fontSize="12" color="#8E8E93" textAlign="center" lineSpacing="4"/>
   </head>
 
-  <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
-       FIRST CHILD, always: the block registers on instantiate, and this screen reads its
-       own `wide` computed on the very next line. See Components/parts/Theme.dsx. -->
+  <!-- the design vocabulary registers here. FIRST CHILD, always (Components/parts/Theme.dsx). -->
   <Theme/>
-  <!-- the funnel (Components/parts/Analytics.dsx). The mount is what fires app_open,
-       once per session however many screens mount it. -->
   <Analytics/>
   <TopNav active="" visible-if="dsx.variable.wide"/>
   <hstack alignItems="stretch" style="flex: 1; min-height: 0; width: 100%">
-    <!-- the stage centers its CAPPED pager: web spells it margin:auto on the pager; the
-         native twin is the column's own cross alignment, platform-suffixed so the web
-         sheet keeps stretch (align-self has no native bridge — the §6.21/§6.43 fork) -->
     <vstack alignItems="stretch" align:native="center" grow="width" style="flex: 1; min-width: 0">
       <zstack>
-        <!-- THE CURTAIN. The stage's own art lives inside the pager row, so while the
-             episode list is in flight there is no row, no image, and the screen is black —
-             measured: 430ms of black on every push before this layer existed. Home already
-             holds the show's hero_tall, so the art is in memory before the push begins.
-             Sits at the bottom of the depth stack; the clip covers it as frames land. -->
+        <!-- THE CURTAIN: the show's tall hero under everything until the clip has frames -->
         <image src="{{ dsx.variable.stageArt }}" visible-if="dsx.variable.stageArt != '' && dsx.variable.phase != 'ready'"
                contentFit="cover" a11yHidden="true"
                height="{{ dsx.variable.clipH }}" grow="width" style="width: 100%"/>
@@ -1143,18 +637,16 @@
                 class="stateWrap {{ dsx.variable.stageArt == '' ? 'stateWrapBare' : 'stateWrapOverArt' }}"
                 height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                 style="width: 100%; margin-left: auto; margin-right: auto; z-index: 3">
-          <image icon="chevron.backward" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()"
+          <image icon="chevron.backward" iconSize="20" paddingV="12" paddingH="12" color="#FFFFFF" on:tap="dsx.action.goBack()"
                  a11yLabel="Back" a11yTrait="button" style="align-self: flex-start"/>
           <spacer/>
-          <spinner color="{{ brand() }}" visible-if="dsx.variable.phase == 'loading'"/>
+          <spinner color="{{ accent() }}" visible-if="dsx.variable.phase == 'loading'"/>
           <text value="Loading the episode…" class="stateBody" visible-if="dsx.variable.phase == 'loading'"/>
-
           <image icon="play.rectangle.fill" iconSize="34" color="rgba(255,255,255,0.35)" a11yHidden="true"
                  visible-if="dsx.variable.phase != 'loading'"/>
           <text value="This series is unavailable." class="stateHead" visible-if="dsx.variable.phase == 'error'"/>
           <text value="Check your connection and try again." class="stateBody" visible-if="dsx.variable.phase == 'error'"/>
           <button label="Retry" class="stateBtn" on:tap="detail.refresh()" visible-if="dsx.variable.phase == 'error'"/>
-
           <text value="No episodes yet." class="stateHead" visible-if="dsx.variable.phase == 'empty'"/>
           <text value="This series has not published an episode." class="stateBody" visible-if="dsx.variable.phase == 'empty'"/>
           <button label="Browse series" class="stateBtn" on:tap="dsx.module.route.reset({ path: '/browse' })"
@@ -1162,60 +654,58 @@
           <spacer/>
         </vstack>
 
-        <!-- THE VERTICAL PAGER over episodes — swiping up is how this category moves to
-             the next episode, and it is the whole feel of the surface. Only the RESTING
-             page is active, so a fling never plays three soundtracks at once; the chrome
-             lives outside and binds to the resting index, so it never moves with the art.
-             `dismissEdge="left"` gives the edge swipe-back the reference has. -->
+        <!-- THE VERTICAL PAGER over episodes — swiping up is how this category moves to the
+             next episode. Only the RESTING page is active; the chrome lives outside and binds
+             to the resting index, so it never moves with the art. -->
         <pager axis="vertical" ignoreSafeArea="true" bind="dsx.variable.detailView.episodes" key="id"
                value="dsx.variable.page" dots="false" dismissEdge="left" on:change="dsx.action.rest()"
                height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                style="width: 100%; margin-left: auto; margin-right: auto">
-          <!-- THE CLIP IS CENTRED IN A BLACK STAGE — the reference letterbox (ReelShort,
-               Shortical, FlickReels all do this): a 16:9 master sits mid-screen at full
-               width with black above and below, and the CHROME stays pinned to the screen's
-               own edges rather than following the picture. grow="true" is load-bearing: a
-               depth stack sizes from its non-greedy children, so once the clip became a
-               226pt band the PAGE became 226pt too and the pager showed three at once. -->
-          <zstack grow="true" on:tap="dsx.variable.paused = dsx.variable.paused == false">
-            <!-- the KEY ART is every page's first paint — an episode that boots onto black
-                 and pops a bright frame reads as a glitch; booting onto the show's art
-                 reads as a curtain. Locked pages keep the art frosted; unlocked pages let
-                 the clip (z-index 1, still under the z=2 chrome) cover it as frames land. -->
-            <!-- the TALL HERO, never the poster: the 3:4 poster bakes its title at card
-                 size, and covered into a full stage that type renders gigantic under the
-                 chrome (the same measured flash the For-You fix names) -->
-            <!-- THE CLIP BAND is its own box: art and clip share it, and it CLIPS. The
-                 key art carries the show's own 3:4 ratio, so at full width it stood 536pt
-                 tall and spilled a third of a screen of poster below the 226pt clip
-                 (measured on device). One band, one height, overflow hidden. -->
-            <zstack height="{{ dsx.variable.clipH }}" grow="width" style="overflow: hidden">
-              <image src="{{ dsx.variable.stageArt == '' ? item.poster : dsx.variable.stageArt }}"
-                     contentFit="cover" a11yHidden="true"
-                     height="{{ dsx.variable.clipH }}" style="{{ stageArtFx }}"/>
-              <!-- a locked page never mounts a source: entitlement is the server's word -->
-              <video visible-if="gridLocked == false"
-                     src="{{ rowSource }}"
-                     active="{{ item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false }}"
-                     muted="{{ dsx.variable.wMuted }}" paused="dsx.variable.paused"
-                     bind="dsx.variable.pos" time="dsx.variable.time" duration="dsx.variable.duration"
-                     buffering="dsx.variable.buffering"
-                     scrubbing="dsx.variable.scrubbing"
-                     speed="{{ dsx.variable.speed }}" gravity="fill" audio="playback" loop="false"
-                     pip="{{ dsx.variable.pip }}" subtitles="{{ dsx.variable.captions }}"
-                     height="{{ dsx.variable.clipH }}" style="width: 100%; z-index: 1"
-                     on:ready="dsx.variable.paused = false" on:ended="dsx.action.onEnded()"
-                     on:error="dsx.variable.toast = 'This episode would not play — try another.'"
-                     on:appear="dsx.action.boot()"/>
-            </zstack>
-            <!-- TAP-TO-PAUSE, the category standard: any tap on the stage toggles playback
-                 (the zstack's on:tap above), and the paused stage wears the big center
-                 glyph every reference app shows. passthrough keeps the glyph decorative —
-                 the tap lands on the stage and toggles back. -->
-            <!-- the badge rides a GREEDY centering layer: a bare 84pt child would SIZE the
-                 depth stack (the cover law — non-greedy children form the box; measured:
-                 the whole page collapsed to an 84pt strip), while a width/height-100%
-                 wrapper is a covering layer that cannot. -->
+          <!-- THE PAGE: a black stage with the clip band CENTRED (§3). grow="true" is
+               load-bearing: a depth stack sizes from its non-greedy children, so without it
+               the page collapses to the band. Two spacers centre the band on every lane —
+               main-axis centring has no attribute twin natively (upstream #238), a pair of
+               greedy spacers does the same arithmetic on all three renderers. -->
+          <zstack grow="true">
+            <vstack grow="true" alignItems="stretch" spacing="0" style="width: 100%; height: 100%">
+              <spacer/>
+              <!-- THE CLIP BAND is its own box: art and clip share it, and it CLIPS. -->
+              <zstack height="{{ dsx.variable.clipH }}" grow="width" style="overflow: hidden">
+                <image src="{{ dsx.variable.stageArt == '' ? item.poster : dsx.variable.stageArt }}"
+                       contentFit="cover" a11yHidden="true"
+                       height="{{ dsx.variable.clipH }}" style="{{ stageArtFx }}"/>
+                <!-- a locked page never mounts a source: entitlement is the server's word.
+                     `subtitle`/`quality` are the viewer's choices; `tracks`/`variants`/
+                     `resolution`/`cue` are what the stream says back (Conformance/media/
+                     playback-selection.json). `cue` bound = the app draws the subtitle line. -->
+                <video visible-if="gridLocked == false"
+                       src="{{ rowSource }}"
+                       active="{{ item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false }}"
+                       muted="{{ dsx.variable.wMuted }}" paused="dsx.variable.paused"
+                       bind="dsx.variable.pos" time="dsx.variable.time" duration="dsx.variable.duration"
+                       buffering="dsx.variable.buffering"
+                       scrubbing="dsx.variable.scrubbing"
+                       speed="{{ dsx.variable.speed }}" gravity="fill" audio="playback" loop="false"
+                       pip="{{ dsx.variable.pip }}"
+                       subtitle="{{ dsx.variable.subtitle }}" quality="{{ dsx.variable.quality }}"
+                       tracks="dsx.variable.tracks" variants="dsx.variable.variants"
+                       resolution="dsx.variable.resolution" cue="dsx.variable.cue"
+                       height="{{ dsx.variable.clipH }}" style="width: 100%; z-index: 1"
+                       on:ready="dsx.variable.paused = false" on:ended="dsx.action.onEnded()"
+                       on:error="dsx.action.say({ text: 'This episode would not play — try another.' })"
+                       on:appear="dsx.action.boot()"/>
+              </zstack>
+              <spacer/>
+            </vstack>
+            <!-- THE STAGE GESTURE SURFACE: one transparent pressable over the whole page.
+                 Tap toggles playback; HOLD is the lifecycle pair the reference player runs on
+                 (`on:longPress` at 0.4 s → 2×, `on:longPressEnd` on release → back), declared
+                 on all three lanes (Conformance/elements/pressable.json). Inside the page so a
+                 vertical swipe still reaches the pager. -->
+            <pressable on:tap="dsx.action.stageTap()" on:longPress="dsx.action.holdStart()" on:longPressEnd="dsx.action.holdEnd()"
+                       grow="true" a11yLabel="{{ dsx.variable.paused ? 'Play. Hold for double speed.' : 'Pause. Hold for double speed.' }}"
+                       style="width: 100%; height: 100%; background: transparent; border: 0; padding: 0; margin: 0; border-radius: 0; z-index: 1"/>
+            <!-- TAP-TO-PAUSE wears the big centre glyph every reference app shows -->
             <vstack visible-if="dsx.variable.paused && item.idx == Number(dsx.variable.cur) && dsx.variable.epLocked == false"
                     passthrough="true" style="width: 100%; height: 100%; justify-content: center; align-items: center; pointer-events: none; z-index: 2">
               <vstack class="pauseBadge" enter="fade" anim="spring">
@@ -1225,141 +715,148 @@
           </zstack>
         </pager>
 
-        <!-- ══ chrome: top bar · right rail · bottom ══ -->
-        <!-- The chrome stays mounted from the first frame. Gating it on `ready` meant the
-             bars were ABSENT for the whole load and then appeared together — the jump the
-             founder reported. Only the error state, which owns the whole screen and offers
-             its own way back, takes the chrome away. -->
+        <!-- ══ THE CHROME: top bar · rail · bottom meta · scrubber. Mounted from the first frame;
+             HIDDEN (opacity, not removal) while the viewer holds for 2× — the reference clears
+             the stage for the speed overlay and brings everything back on release. ══ -->
         <vstack class="chromeLayer" visible-if="dsx.variable.phase != 'error'"
                 height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
+                opacity="{{ dsx.variable.holding ? 0 : 1 }}" anim="easeOut" animDuration="0.18"
                 style="width: 100%; margin-left: auto; margin-right: auto; justify-content: space-between; pointer-events: none">
-          <hstack class="topBar" paddingTop="{{ dsx.variable.wide ? 0 : (dsx.screen.safeTop || 0) }}" style="pointer-events: auto">
-            <image icon="chevron.backward" iconSize="22" paddingV="11" paddingH="11" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
+          <hstack class="topBar" paddingTop="{{ (dsx.variable.wide ? 0 : (dsx.screen.safeTop || 0)) + 12 }}"
+                  style="pointer-events: {{ dsx.variable.holding ? 'none' : 'auto' }}">
+            <image icon="chevron.backward" iconSize="20" paddingV="12" paddingH="12" color="#FFFFFF" on:tap="dsx.action.goBack()" a11yLabel="Back" a11yTrait="button"/>
             <text value="EP.{{ dsx.variable.cur }}" class="epLabel"/>
             <spacer/>
-            <hstack class="speedChip" on:tap="dsx.variable.sheet = 'speed'; dsx.variable.menu = true"
-                    a11yGroup="true" a11yTrait="button" a11yLabel="Playback speed">
-              <image icon="arrow.clockwise" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
-              <text value="{{ dsx.variable.speedLabel }}" class="speedText"/>
-            </hstack>
-            <image icon="ellipsis" iconSize="19" color="#FFFFFF" on:tap="dsx.variable.sheet = ''; dsx.variable.menu = true"
-                   a11yLabel="More options" a11yTrait="button"/>
-          </hstack>
-
-          <!-- the rail sits mid-screen on the trailing edge, over the clip and its
-               letterbox alike — the reference's own placement -->
-          <hstack style="width: 100%; align-items: flex-end; pointer-events: none">
-            <spacer/>
-            <vstack class="rail" style="pointer-events: auto">
-              <vstack class="railItem" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button" a11yLabel="Save to My List">
-                <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="27"
-                       color="{{ dsx.variable.favOn ? brand() : '#FFFFFF' }}" a11yHidden="true"/>
-                <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="railCap"/>
-              </vstack>
-              <!-- the shared catalog has no speech-bubble glyph (upstream #235); note.text
-                   is the closest three-way match until one lands -->
-              <vstack class="railItem" on:tap="dsx.action.openComments()" a11yGroup="true" a11yTrait="button" a11yLabel="Comments">
-                <image icon="note.text" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
-                <text value="{{ dsx.variable.commentCount }}" class="railCount"/>
-              </vstack>
-              <vstack class="railItem" on:tap="dsx.action.doShare()" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
-                <image icon="square.and.arrow.up" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
-                <text value="Share" class="railCap"/>
-              </vstack>
-              <!-- THE DOWNLOAD CONTROL IS GONE. There is no download plane in this build —
-                   no file store, no queue, no setting — and the control's entire behaviour
-                   was to route to the screen selling it. That is a purchase inducement for a
-                   feature that does not exist, in the most-used surface in the app.
-                   It is NOT the same call as the Quality row in the ⋯ menu, which stays: a
-                   rendition is a real property of the thing playing, so that row degrades
-                   into a true readout (Article 7). A download control has no underlying fact
-                   to report, so there is nothing to degrade INTO — the honest form is its
-                   absence. Same split Phase 1 made when it deleted the quality ladder and
-                   kept the note. The gap belongs in PLAN.md §6, not in a dead button. -->
+            <!-- THE WATCH MISSION RING: a 28pt hourglass inside a 2pt accent ring that fills
+                 toward the next milestone; hidden by the sheet's Hide Timer for this run -->
+            <vstack class="ringHit" visible-if="dsx.variable.missionShown" on:tap="dsx.action.openMission()"
+                    a11yGroup="true" a11yTrait="button"
+                    a11yLabel="Watch Mission, {{ Math.round(dsx.variable.missionFrac * 100) }} percent to the next bonus"
+                    style="justify-content: center">
+              <zstack width="28" height="28" align="center">
+                <ProgressRing value="{{ dsx.variable.missionFrac }}" max="1" size="28" lineWidth="2"
+                              color="{{ accent() }}" trackColor="rgba(255,255,255,0.22)" a11yHidden="true"/>
+                <image src="/assets/hourglass.svg" a11yHidden="true" width="16" height="16"
+                       style="width: 16px; height: 16px"/>
+              </zstack>
             </vstack>
           </hstack>
 
-          <!-- pinned to the screen's bottom edge, over the letterbox — the reference
-               keeps the transport at the edge, not tucked under the picture -->
-          <vstack class="bottomBar" paddingBottom="{{ dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0) }}" style="pointer-events: auto">
-            <text value="{{ dsx.variable.toast }}" visible-if="dsx.variable.toast != ''" class="toastLine"/>
-            <!-- grow="width" on the SURFACE, not just the track: web gives a block-level
-                 stack the full row for free, native hugs it — so the track's own
-                 grow="width" had nothing to fill and the rail never painted (measured on
-                 device: no 4pt band anywhere right of the pin, while web read 362px). -->
-            <!-- THE SCRUB READOUT. Always mounted, never inserted: it rises and fades on
-                 the tween (opacity + offsetY + scale off `scrubbing`), so it arrives the way
-                 the reference players do instead of popping in on an insertion transition —
-                 and because it holds its row at opacity 0, the transport never shifts under
-                 the finger when it appears. -->
-            <hstack spacing="4" align="center" height="18" style="justify-content: center"
-                    opacity="{{ dsx.variable.scrubbing ? 1 : 0 }}"
-                    offsetY="{{ dsx.variable.scrubbing ? 0 : 7 }}"
-                    scale="{{ dsx.variable.scrubbing ? 1 : 0.94 }}"
-                    anim="easeOut" animDuration="0.22"
-                    a11yHidden="{{ dsx.variable.scrubbing ? 'false' : 'true' }}">
-              <text value="{{ dsx.variable.posLabel }}" class="seekTimeNow"/>
-              <text value="/" class="seekTimeAll"/>
-              <text value="{{ dsx.variable.durLabel }}" class="seekTimeAll"/>
+          <spacer/>
+
+          <!-- THE BOTTOM BLOCK, in FLOW, top to bottom: the rail (trailing), then the meta column
+               under it, then the seek bar — no cross-axis alignment of a tall row, because that
+               is exactly what drifted on iOS (measured: the row's tall padded rail and the meta
+               column landed 200pt above their design and the seek bar spilled below the stage).
+               The reference's own geometry is vertical anyway: the rail's last item ends 200
+               above the safe bottom, the pill 34 above it, and the ~130pt meta sits in between —
+               so a 36pt gap between the rail and the meta reproduces both numbers on every lane
+               with nothing but stacking. The row is a pass-through; only its controls take taps. -->
+          <hstack alignItems="flex-end" paddingTrailing="16" style="width: 100%; justify-content: flex-end; pointer-events: none">
+            <spacer/>
+            <vstack class="rail" style="pointer-events: none">
+              <vstack class="railItem" style="pointer-events: {{ dsx.variable.holding ? 'none' : 'auto' }}" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button"
+                      a11yLabel="{{ dsx.variable.favOn ? 'Saved to My List' : 'Save to My List' }}">
+                <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="26"
+                       color="{{ dsx.variable.favOn ? savedLime() : ink() }}" a11yHidden="true"/>
+                <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="railCap"/>
+              </vstack>
+              <vstack class="railItem" style="pointer-events: {{ dsx.variable.holding ? 'none' : 'auto' }}" on:tap="dsx.action.openPanel({ tab: 'episodes' })" a11yGroup="true"
+                      a11yTrait="{{ dsx.variable.panel ? 'text' : 'button' }}" a11yLabel="Episodes, {{ dsx.variable.cur }} of {{ dsx.variable.total }}">
+                <image icon="rectangle.stack.fill" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
+                <text value="Episodes" class="railCap"/>
+              </vstack>
+              <vstack class="railItem" style="pointer-events: {{ dsx.variable.holding ? 'none' : 'auto' }}" on:tap="dsx.action.doShare()" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
+                <image icon="square.and.arrow.up" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
+                <text value="Share" class="railCap"/>
+              </vstack>
+              <vstack class="railItem" style="pointer-events: {{ dsx.variable.holding ? 'none' : 'auto' }}" on:tap="dsx.variable.menu = true" a11yGroup="true" a11yTrait="button" a11yLabel="More options">
+                <image icon="ellipsis" iconSize="26" color="#FFFFFF" a11yHidden="true"/>
+                <text value="More" class="railCap"/>
+              </vstack>
+            </vstack>
+          </hstack>
+          <vstack class="meta" paddingTop="36" paddingBottom="4" style="pointer-events: {{ dsx.variable.holding ? 'none' : 'auto' }}">
+            <hstack spacing="4" alignItems="center" on:tap="dsx.action.goShow({ id: dsx.variable.showId })"
+                    a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.variable.showTitle }}, open the series page">
+              <text value="{{ dsx.variable.showTitle }}" class="metaTitle" lineLimit="1"
+                    style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0"/>
+              <image icon="chevron.forward" iconSize="14" color="{{ ink3() }}" a11yHidden="true"/>
             </hstack>
-            <stack height="26" grow="width" style="justify-content: center" on:drag="dsx.action.seek()" a11yLabel="Seek"
-                   on:dragStart="dsx.variable.scrubbing = true" on:dragEnd="dsx.variable.scrubbing = false"
-                   a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
-                   on:adjust="dsx.variable.pos = dsx.variable.pos + (dsx.this.direction == 'increment' ? 0.05 : -0.05)">
-              <!-- THE REFERENCE SCRUBBER (custom-ux.md, PlayerScrubber): track + fill +
-                   thumb off one measured box, drag/tap = seek, playback moves the fill
-                   through the shared <video bind>. One markup, every renderer. -->
-              <zstack grow="width" height="22" align="leading" measure="dsx.variable.seekBox">
-                <vstack grow="width" height="4" radius="2" background="rgba(255,255,255,0.28)"/>
-                <!-- the GLIDE: playback ticks position 4×/s and anim= tweens the change
-                     linearly between ticks (custom-ux.md §3 — both renderers), so the fill
-                     and thumb TRAVEL instead of stepping. While the finger owns the bar the
-                     tween stands down — a scrub must track the touch, not lag it. -->
-                <!-- BOTH ON THE COMPOSITOR, which is what keeps them welded AND smooth.
-                     Animating the fill's `width` is a layout pass on the main thread while
-                     an offsetX pin is a transform on the compositor: two pipelines, two
-                     rates, and the pin visibly drifted from the edge (measured on web: an
-                     11px sawtooth). Parenting the pin to the fill welded them but left the
-                     motion itself steppy, because layout animation is what it is. `scaleX`
-                     on a full-width bar is the CSS answer and is now a real DSX primitive
-                     (transformOrigin picks the anchor) — fill and pin are both transforms,
-                     so they share one pipeline, one rate, and the GPU. The right cap's
-                     squash under scale is exactly where the pin sits, so it never shows.
-                     The tween outruns the player's 250ms tick so motion never waits. -->
-                <vstack grow="width" height="4" radius="2" background="#FFFFFF"
-                        scaleX="{{ dsx.variable.pos }}" transformOrigin="leading"
-                        anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.32"/>
-                <vstack width="14" height="14" radius="7" background="#FFFFFF" shadow="3"
-                        offsetX="{{ (dsx.variable.pos * (dsx.variable.seekBox.width || 1)) - 7 }}"
-                        anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.32"/>
-              </zstack>
-            </stack>
-            <!-- the pill RAISES the drawer only in the lane that has one; with the panel
-                 beside the clip it is a readout, not a control that opens a duplicate list -->
-            <hstack class="epPill" on:tap="dsx.action.raiseDrawer()"
-                    a11yGroup="true" a11yTrait="{{ dsx.variable.panel ? 'text' : 'button' }}"
-                    a11yLabel="Episode {{ dsx.variable.cur }} of {{ dsx.variable.total }}">
-              <image icon="rectangle.stack.fill" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
-              <text value="EP.{{ dsx.variable.cur }}" class="epPillNow"/>
-              <!-- the total is unknown until the episode list lands; "/ EP.0" for a beat
-                   is the kind of detail that reads as a half-built app -->
-              <text value="/ EP.{{ dsx.variable.total }}" class="epPillAll" visible-if="dsx.variable.total > 0"/>
-              <spacer/>
-              <image icon="chevron.up.chevron.down" iconSize="14" color="rgba(255,255,255,0.7)"
-                     a11yHidden="true" visible-if="dsx.variable.panel == false"/>
+            <hstack spacing="0" alignItems="flex-end" visible-if="dsx.variable.showSynopsis != ''">
+              <text value="{{ dsx.variable.showSynopsis }}" class="metaPlot" lineLimit="2" grow="width"
+                    style="flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+              <text value="More" class="metaMore" a11yTrait="button" a11yLabel="More about this series"
+                    on:tap="dsx.action.openPanel({ tab: 'details' })"/>
+            </hstack>
+            <stack height="1" background="rgba(255,255,255,0.12)" style="width: 100%" paddingTop="4"/>
+            <hstack visible-if="dsx.variable.isVip == false" alignItems="flex-start" style="align-items: flex-start">
+              <hstack class="unlockPill" on:tap="dsx.action.goMembership()" a11yGroup="true" a11yTrait="button"
+                      a11yLabel="Unlock unlimited watching — membership plans">
+                <image icon="crown.fill" iconSize="14" color="{{ crownGold() }}" a11yHidden="true"/>
+                <text value="Unlock Unlimited Watching" class="unlockPillTxt" style="white-space: nowrap"/>
+              </hstack>
             </hstack>
           </vstack>
+
+          <!-- THE SEEK BAR (spec §−1): track 4 at 30% ink, fill ink, thumb 14 — the reference
+               scrubber off one measured box; drag = seek; playback moves the fill through the
+               shared <video bind>. Pinned to the bottom edge, inside the safe area. -->
+          <stack height="26" grow="width" paddingH="16" paddingBottom="{{ (dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0)) + 4 }}"
+                 style="justify-content: center; pointer-events: {{ dsx.variable.holding ? 'none' : 'auto' }}" on:drag="dsx.action.seek()" a11yLabel="Seek"
+                 on:dragStart="dsx.variable.scrubbing = true" on:dragEnd="dsx.variable.scrubbing = false"
+                 a11yValue="{{ Math.round(dsx.variable.pos * 100) }} percent"
+                 on:adjust="dsx.variable.pos = dsx.variable.pos + (dsx.this.direction == 'increment' ? 0.05 : -0.05)">
+            <zstack grow="width" height="22" align="leading" measure="dsx.variable.seekBox">
+              <vstack grow="width" height="4" radius="2" background="rgba(255,255,255,0.3)"/>
+              <vstack grow="width" height="4" radius="2" background="#FFFFFF"
+                      scaleX="{{ dsx.variable.pos }}" transformOrigin="leading"
+                      anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.32"/>
+              <vstack width="14" height="14" radius="7" background="#FFFFFF" shadow="3"
+                      offsetX="{{ (dsx.variable.pos * (dsx.variable.seekBox.width || 1)) - 7 }}"
+                      anim="{{ dsx.variable.scrubbing ? 'none' : 'linear' }}" animDuration="0.32"/>
+            </zstack>
+          </stack>
         </vstack>
 
-        <!-- ══ the locked stage ══ The dim is the BASE read on every renderer; the frost
-             is the web enhancement (an unmapped declaration passes through on web and is
-             dropped per-declaration native, so nothing load-bearing rides it). The X is
-             the paywall's own way out — a wall the viewer cannot leave is a refund. -->
+        <!-- ══ THE HOLD OVERLAY: "2.0x ▶▶" at y 70 while the finger is down ══ -->
+        <vstack visible-if="dsx.variable.holding" passthrough="true" alignItems="center"
+                paddingTop="{{ (dsx.variable.wide ? 0 : (dsx.screen.safeTop || 0)) + 70 }}"
+                style="position: absolute; inset: 0; pointer-events: none; z-index: 4">
+          <hstack class="holdPill" enter="fade" anim="easeOut" a11yGroup="true" a11yLabel="Playing at double speed">
+            <text value="2.0x" class="holdTxt"/>
+            <image icon="forward.fill" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
+          </hstack>
+        </vstack>
+
+        <!-- ══ THE SUBTITLE LINE: the active cue, drawn by the app at 58% of the stage in its
+             own type (20 semibold ink, a soft shadow) — the same pixels on every lane ══ -->
+        <vstack visible-if="dsx.variable.cue != '' && dsx.variable.epLocked == false" passthrough="true" alignItems="center"
+                paddingTop="{{ Math.round(dsx.variable.stageH * 0.58) }}" paddingH="16"
+                style="position: absolute; inset: 0; pointer-events: none; z-index: 3">
+          <text value="{{ dsx.variable.cue }}" class="subLine" shadow="2"
+                style="text-shadow: 0 1px 2px rgba(0,0,0,0.8)"/>
+        </vstack>
+
+        <!-- ══ THE TOAST: card fill, radius 10, 13 ink, centred 88 above the safe bottom, 1.5 s ══ -->
+        <vstack visible-if="dsx.variable.toast != ''" passthrough="true" alignItems="center"
+                paddingBottom="{{ (dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0)) + 88 }}"
+                style="position: absolute; inset: 0; justify-content: flex-end; pointer-events: none; z-index: 5">
+          <text value="{{ dsx.variable.toast }}" class="toastCard" enter="fade" anim="easeOut"/>
+        </vstack>
+        <!-- the grant toast: the plural tier, complete on this client-mounted surface (the
+             player is never server-rendered with a grant in flight — PLAN.md §6.101) -->
+        <vstack visible-if="dsx.variable.grantToast > 0" passthrough="true" alignItems="center"
+                paddingBottom="{{ (dsx.variable.wide ? 0 : (dsx.screen.safeBottom || 0)) + 88 }}"
+                style="position: absolute; inset: 0; justify-content: flex-end; pointer-events: none; z-index: 5">
+          <text value="{dsx.variable.grantToast, plural, one {+# coin from the Watch Mission} other {+# coins from the Watch Mission}}"
+                class="toastCard" enter="fade" anim="easeOut"/>
+        </vstack>
+
+        <!-- ══ the locked stage ══ The paywall the coin economy runs on (server-priced); the X is
+             the wall's own way out — a wall the viewer cannot leave is a refund. -->
         <vstack class="lockedLayer" visible-if="dsx.variable.epLocked" height="{{ dsx.variable.stageH }}" maxWidth="{{ dsx.variable.stageMax }}"
                 style="width: 100%; margin-left: auto; margin-right: auto; align-items: center; justify-content: center; backdrop-filter: blur(22px) saturate(1.15); -webkit-backdrop-filter: blur(22px) saturate(1.15)" background="rgba(0,0,0,0.45)">
-          <!-- THE SAFE-AREA LAW: the stage is full-bleed, so a corner control pays the top
-               inset back through the FACT — 0 in a browser tab and on the wide lane (the
-               nav consumed it), real on a notched phone and in a standalone PWA. -->
           <vstack class="lockClose" style="position: absolute; top: {{ (dsx.variable.wide ? 0 : (dsx.screen.safeTop || 0)) + 14 }}px; right: 14px; justify-content: center; z-index: 1"
                   on:tap="dsx.action.goBack()" a11yTrait="button" a11yLabel="Close and go back">
             <image icon="xmark" iconSize="15" color="rgba(255,255,255,0.9)" a11yHidden="true"/>
@@ -1375,12 +872,15 @@ Please unlock to watch." class="lockHead"/>
               <text value="{{ dsx.variable.unlockLabel }}" class="unlockLabelTxt"/>
             </hstack>
             <hstack class="lockDoors">
-              <!-- pill labels NEVER wrap ("Get coins" measured 105px wide with 40px of
-                   padding: the space became a break point and the label split — not a
-                   renderer bug, white-space: normal is the web default; the pill idiom
-                   is nowrap + hug) -->
+              <!-- Rewards is a TAB ROOT, so the way there is a reset, never a push (the router
+                   lint refuses a pushed tab root); the Store is a page and takes a push -->
               <button label="Get coins" class="earnBtn" style="flex: 1; white-space: nowrap" on:tap="dsx.module.route.push({ path: '/store' })"/>
               <button label="Earn free" class="earnBtn" style="flex: 1; white-space: nowrap" on:tap="dsx.module.route.reset({ path: '/rewards' })"/>
+            </hstack>
+            <hstack class="unlockPill" on:tap="dsx.action.goMembership()" a11yGroup="true" a11yTrait="button"
+                    a11yLabel="Unlock unlimited watching — membership plans">
+              <image icon="crown.fill" iconSize="14" color="{{ crownGold() }}" a11yHidden="true"/>
+              <text value="Unlock Unlimited Watching" class="unlockPillTxt" style="white-space: nowrap"/>
             </hstack>
             <hstack class="lockMetaRow" a11yGroup="true" a11yLabel="Balance {{ dsx.variable.balance }} coins">
               <text value="Balance:" class="lockMeta"/>
@@ -1390,13 +890,10 @@ Please unlock to watch." class="lockHead"/>
             <hstack class="autoRow" on:tap="dsx.variable.autoUnlock = !dsx.variable.autoUnlock"
                     a11yGroup="true" a11yTrait="button"
                     a11yLabel="Auto-unlock next episodes, {{ dsx.variable.autoUnlock ? 'on' : 'off' }}">
-              <!-- the control ANIMATES rather than snapping: the box springs on toggle and
-                   the tick scales in behind it (web enhancement; native gets the platform
-                   control's own animation) -->
-              <vstack class="checkBox" background="{{ dsx.variable.autoUnlock ? brand() : 'rgba(255,255,255,0.08)' }}"
-                      style="justify-content: center; border: 1.5px solid {{ dsx.variable.autoUnlock ? brand() : 'rgba(255,255,255,0.32)' }}; transition: background 0.18s ease, border-color 0.18s ease, transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1); transform: scale({{ dsx.variable.autoUnlock ? 1.08 : 1 }})">
-                <image icon="checkmark" iconSize="12" color="#FFFFFF" a11yHidden="true"
-                       style="transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.16s ease; transform: scale({{ dsx.variable.autoUnlock ? 1 : 0.3 }}); opacity: {{ dsx.variable.autoUnlock ? 1 : 0 }}"/>
+              <!-- the custom checkbox (§−1): 20 r5, accent fill + white check on, 1.5 outline off -->
+              <vstack class="checkBox" background="{{ dsx.variable.autoUnlock ? accent() : sheetCard() }}"
+                      style="justify-content: center; border: 1.5px solid {{ dsx.variable.autoUnlock ? accent() : grabber() }}; transition: background 0.18s ease, border-color 0.18s ease">
+                <image icon="checkmark" iconSize="12" color="#FFFFFF" a11yHidden="true" visible-if="dsx.variable.autoUnlock"/>
               </vstack>
               <text value="Auto-unlock next episodes" class="autoLabel"/>
             </hstack>
@@ -1404,751 +901,187 @@ Please unlock to watch." class="lockHead"/>
         </vstack>
       </zstack>
     </vstack>
-    <!-- ══ the DESKTOP episode panel — the shape every reference player uses ══
-         A sibling of the clip column, never an overlay: it owns real estate the video was
-         wasting, and it scrolls on its own so a 60-episode grid never moves the clip. It is
-         the drawer's content, laid out permanently — same ranges, same 6-column grid, same
-         lock and now-playing tells — so the two lanes cannot drift apart in behaviour. -->
+
+    <!-- ══ the wide lane's persistent panel — the SAME part the sheet mounts ══ -->
     <scroll class="panelScroll" visible-if="dsx.variable.panel && dsx.variable.phase == 'ready'"
             style="width: 416px; flex: none; height: {{ dsx.variable.stageH }}px">
-      <vstack class="panelBody">
-
-        <hstack class="panelCrumbs">
-          <text value="Home" class="crumb" a11yTrait="button"
-                on:tap="dsx.module.route.reset({ path: '/' })"/>
-          <text value="/" class="crumb" a11yHidden="true"/>
-          <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.title }}" class="crumb"
-                a11yTrait="button" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
-                on:tap="dsx.module.route.push({ path: '/show/' + dsx.variable.showId })"/>
-          <text value="/" class="crumb" a11yHidden="true"/>
-          <text value="Episode {{ dsx.variable.cur }}" class="crumbOn"/>
-        </hstack>
-
-        <text value="Episode {{ dsx.variable.cur }} — {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.title }}"
-              class="panelTitle"
-              style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
-
-        <hstack class="panelTags">
-          <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre }}" class="tag" a11yTrait="button"
-                href="/browse/{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre }}"/>
-          <text value="EP 1–{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.free_until }} Free" class="tag"/>
-        </hstack>
-        <flow class="tagFlow" bind="dsx.variable.showTags" key="name" spacing="6" lineSpacing="6"
-              visible-if="dsx.variable.showTags.length > 0">
-          <text value="{{ item.name }}" class="tagSoft" a11yTrait="button"
-                a11yLabel="Browse {{ item.name }}" href="/browse/{{ item.name }}"/>
-        </flow>
-
-        <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.synopsis }}" class="panelPlot"
-              style="{{ dsx.variable.plotFx }}"/>
-        <text value="{{ dsx.variable.plotOpen ? 'Show less' : 'Show more' }}" class="panelMore"
-              a11yTrait="button" on:tap="dsx.variable.plotOpen = !dsx.variable.plotOpen"/>
-
-        <hstack class="panelStats" visible-if="dsx.variable.panelViews != ''">
-          <image icon="play.fill" iconSize="14" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
-          <text value="{{ dsx.variable.panelViews }}" class="panelStat"
-                a11yLabel="{{ dsx.variable.panelViews }} views"/>
-          <image icon="star.fill" iconSize="13" color="{{ gold() }}" a11yHidden="true"/>
-          <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.rating }}" class="panelStat"
-                a11yLabel="rated {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.rating }} out of 10"/>
-          <spacer/>
-          <hstack class="panelAct" on:tap="dsx.action.toggleFav()" a11yGroup="true" a11yTrait="button"
-                  a11yLabel="{{ dsx.variable.favOn ? 'Remove from My List' : 'Save to My List' }}">
-            <image icon="{{ dsx.variable.favOn ? 'bookmark.fill' : 'bookmark' }}" iconSize="15"
-                   color="{{ dsx.variable.favOn ? brand() : '#FFFFFF' }}" a11yHidden="true"/>
-            <text value="{{ dsx.variable.favOn ? 'Saved' : 'Save' }}" class="panelStat"/>
-          </hstack>
-          <hstack class="panelAct" on:tap="dsx.action.doShare()" a11yGroup="true" a11yTrait="button" a11yLabel="Share">
-            <image icon="square.and.arrow.up" iconSize="15" color="#FFFFFF" a11yHidden="true"/>
-            <text value="Share" class="panelStat"/>
-          </hstack>
-        </hstack>
-
-        <hstack class="panelRanges">
-          <list bind="dsx.variable.ranges" key="id" axis="horizontal" scroll="false" spacing="16">
-            <text value="{{ item.label }}" class="rangeTxt"
-                  color="{{ item.from - 1 == Number(dsx.variable.range) * 30 ? brand() : 'rgba(255,255,255,0.6)' }}"
-                  on:tap="dsx.variable.range = (item.from - 1) / 30" a11yTrait="button"/>
-          </list>
-          <spacer/>
-          <text value="{{ dsx.variable.total }} EP" class="panelStat"/>
-        </hstack>
-
-        <!-- the cell is the DIRECT grid child: a wrapper loses the column width (AGENTS.md) -->
-        <grid bind="dsx.variable.visibleEps" key="id" columns="6" spacing="8" scroll="false">
-          <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center; overflow: hidden"
-                  on:tap="dsx.action.go({ target: item.idx })"
-                  background="{{ item.idx == Number(dsx.variable.cur) ? brand() : '#2C2C2E' }}"
-                  a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', VIP' : '' }}" a11yTrait="button" a11yGroup="true">
-            <text value="{{ item.idx }}" class="epNum" color="#FFFFFF"/>
-            <text value="VIP" class="cellTag" visible-if="gridLocked"
-                  style="position: absolute; top: 0; right: 0; border-bottom-left-radius: 6px"/>
-            <image icon="waveform" iconSize="11" color="#FFFFFF" visible-if="item.idx == Number(dsx.variable.cur)"
-                   a11yHidden="true" style="position: absolute; top: 4px; right: 5px"/>
-          </vstack>
-        </grid>
-
+      <!-- the sheet lane gets its 16pt gutter from the sheet itself; this column pays it here -->
+      <vstack alignItems="stretch" paddingH="16" paddingBottom="24">
+      <EpisodePanel show="{{ dsx.variable.detailView == null ? null : dsx.variable.detailView.show }}"
+                    episodes="{{ dsx.variable.detailView == null ? [] : dsx.variable.detailView.episodes }}"
+                    related="{{ dsx.variable.relatedRows }}" cur="{{ dsx.variable.cur }}"
+                    wallet="{{ dsx.variable.walletView }}" tab="{{ dsx.variable.drawerTab }}"
+                    on:pick="dsx.action.go({ target: idx })" on:open="dsx.action.goShow({ id: id })"
+                    on:pane="dsx.variable.drawerTab = pane"/>
       </vstack>
     </scroll>
   </hstack>
 
-  <!-- ══════ the episode drawer ══════ -->
-  <!-- `on:dismiss` runs the CASCADE, never a bare `drawer = false`: a swipe-dismiss of the
-       parent has to take the genre level with it, and today only the author can do that
-       (PLAN.md 6.95). -->
+  <!-- ══════ the episodes sheet (§3b) — half,full; the part inside ══════ -->
   <sheet present="dsx.variable.drawer" detents="half,full" background="#141414"
-         on:dismiss="dsx.action.closeDrawer()">
+         on:dismiss="dsx.variable.drawer = false">
     <scroll style="flex: 1; min-height: 0">
-      <vstack alignItems="stretch">
-        <hstack class="drawerHead">
-          <image src="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.poster }}" contentFit="cover" a11yHidden="true"
-                 style="width: 52px; height: 69px; border-radius: 8px; object-fit: cover"/>
-          <vstack spacing="4" style="flex: 1; min-width: 0">
-            <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.title }}" class="drawerTitle"
-                  style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
-            <text value="All {{ dsx.variable.total }} Episodes" class="drawerSub"/>
-          </vstack>
-          <button label="{{ dsx.variable.favOn ? 'Following' : 'Follow' }}" class="followBtn"
-                  background="{{ dsx.variable.favOn ? brandPressed() : brand() }}" on:tap="dsx.action.toggleFav()"/>
-        </hstack>
-
-        <!-- THE TABS ARE A TAB BAR, so the rule TRAVELS. Each label used to own a rule
-             that visible-if switched on and off, which is a jump cut — the ink vanished
-             under one word and reappeared under the other. The rule now lives once, in
-             its own rail below the labels, and moves between them on offsetX (a
-             compositor transform) while its width morphs to the label it lands on. Both
-             are bindable transforms the value-tween carries on every renderer:
-             web through a CSS transition, iOS through StackNodeView's anim tween
-             (dev@ca2b0c78). -->
-        <!-- labels and rail are ONE band with `spacing="0"`: they are two children where
-             there used to be one, and the drawer column's default 8pt gap would otherwise
-             float the rule 13pt under its label instead of the measured 5. -->
-        <vstack spacing="0" alignItems="stretch">
-          <hstack class="tabRow">
-            <vstack class="tabHit" on:tap="dsx.variable.drawerTab = 'synopsis'" a11yTrait="button"
-                    a11yLabel="Synopsis{{ dsx.variable.drawerTab == 'synopsis' ? ', selected' : '' }}">
-              <text value="Synopsis" class="tabTxt" measure="dsx.variable.tabSynBox"
-                    color="{{ dsx.variable.drawerTab == 'synopsis' ? brand() : 'rgba(255,255,255,0.75)' }}"/>
-            </vstack>
-            <vstack class="tabHit" on:tap="dsx.variable.drawerTab = 'episodes'" a11yTrait="button"
-                    a11yLabel="Episodes{{ dsx.variable.drawerTab == 'episodes' ? ', selected' : '' }}">
-              <text value="Episodes" class="tabTxt" measure="dsx.variable.tabEpBox"
-                    color="{{ dsx.variable.drawerTab == 'episodes' ? brand() : 'rgba(255,255,255,0.75)' }}"/>
-            </vstack>
-          </hstack>
-          <zstack class="tabRail" grow="width" align="leading" style="width: 100%">
-            <stack class="tabUnderline" width="{{ dsx.variable.tabUnderW }}"
-                   offsetX="{{ dsx.variable.tabUnderX }}" anim="easeOut" animDuration="0.2"/>
-          </zstack>
-        </vstack>
-        <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
-
-        <!-- ══ THE TWO PANES CROSS-FADE — they do not swap ══
-             Both stay MOUNTED in one depth stack and change only opacity and offsetX,
-             the two things that tween identically on both lanes (a CSS transition on
-             web, StackNodeView's anim value-tween on iOS — dev@ca2b0c78). The travel is
-             16pt in the DIRECTION of the switch: Synopsis is the LEFT tab, so it leaves
-             to the left and Episodes arrives from the right. 16 is not a taste number —
-             it is the framework's own declared slide distance (element-motion.ts
-             `motionFrom`, the web twin of SwiftUI `.move(edge:)`).
-
-             `keep="true"` is what makes a mounted-but-hidden pane HONEST, and it is the
-             only spelling that does it on both lanes: the framework fades it on the
-             curve declared here, turns hit-testing off (`allowsHitTesting(false)` /
-             `pointer-events: none`) and marks it aria-hidden + inert. Without it, 60
-             invisible episode cells sit over the synopsis and swallow the genre chip's
-             tap. (`passthrough=` cannot do this job: both renderers read it as a RAW
-             literal `=== "true"`, so it is not bindable.)
-
-             WHY NOT `transition=`: an insert/remove cannot cross-fade — the outgoing
-             pane is already gone when the incoming one paints — and `transition="slide-*"`
-             is the one token whose lanes genuinely differ (native moves the whole
-             container edge, web moves 16px; documented in element-motion.ts).
-             WHY THE MEASURED HEIGHT: a depth stack is as tall as its tallest child and
-             both children are always mounted, so `paneH` holds the stack to the pane you
-             are looking at. `position: absolute` would be the other way to keep the idle
-             pane out of the box and it CANNOT be used here: the native detacher is a
-             raw-literal sniff (StackAbsolutePlane.isAbsolute), so a computed
-             `position: absolute` stays in flow on iOS and Android and only web collapses.
-             `overflow: hidden` is the WEB half of that height: a fixed native frame
-             already reports its own size to the scroller, but a CSS box lets an
-             overflowing child extend the SCROLLER's extent, so the idle pane would put
-             its full height back as dead scroll. The native twin is the frame itself. -->
-        <zstack height="{{ dsx.variable.paneH }}" grow="width" align="topLeading"
-                style="width: 100%; overflow: hidden">
-
-          <!-- Synopsis -->
-          <vstack keep="true" visible-if="dsx.variable.drawerTab == 'synopsis'"
-                  anim="easeOut" animDuration="0.2" grow="width" alignItems="stretch"
-                  measure="dsx.variable.synPaneBox" style="width: 100%">
-            <vstack class="synopsisWrap" grow="width" style="width: 100%"
-                    offsetX="{{ dsx.variable.drawerTab == 'synopsis' ? 0 : -16 }}"
-                    anim="easeOut" animDuration="0.2">
-              <hstack class="tagRow">
-                <!-- THE GENRE CHIP RAISES A LEVEL, it does not leave. It used to be
-                     `href="/browse/:genre"` and that push is measurably broken from inside
-                     a presented sheet on this build — /browse mounted UNDER the drawer and
-                     the drawer stayed painted over it (the head's `genre` note carries the
-                     measurement). It is also the wrong verb: this viewer is mid-episode.
-                     "Series" stays INERT deliberately: it is a FORMAT, not a genre and
-                     not a tag, so /browse/Series would reach an empty Browse — a control
-                     that reaches nothing is worse than a label. -->
-                <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre }}" class="tag"
-                      a11yTrait="button"
-                      a11yLabel="Browse {{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre }}, opens over this drawer"
-                      on:tap="dsx.action.openGenre({ name: dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.genre })"/>
-                <text value="EP 1–{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.free_until }} Free" class="tag"
-                      visible-if="dsx.variable.detailView != null"/>
-              </hstack>
-              <!-- THE SHOW'S OWN TAGS, the same flow the wide panel draws, and now the same
-                   DESTINATION as the genre chip beside them: browseCatalog matches genre OR
-                   tag, so one endpoint and one level serve both. They were rendered in the
-                   panel lane ONLY, so a phone viewer never saw a single tag: the drawer and
-                   the panel are one component in two layouts and the house law is that both
-                   lanes render the SAME pieces, or they drift. -->
-              <flow class="tagFlow" bind="dsx.variable.showTags" key="name" spacing="6" lineSpacing="6"
-                    visible-if="dsx.variable.showTags.length > 0">
-                <text value="{{ item.name }}" class="tagSoft" a11yTrait="button"
-                      a11yLabel="Browse {{ item.name }}, opens over this drawer"
-                      on:tap="dsx.action.openGenre({ name: item.name })"/>
-              </flow>
-              <text value="{{ dsx.variable.detailView == null ? '' : dsx.variable.detailView.show.synopsis }}" class="synopsisTxt"/>
-            </vstack>
-          </vstack>
-
-          <!-- Episodes -->
-          <vstack keep="true" visible-if="dsx.variable.drawerTab == 'episodes'"
-                  anim="easeOut" animDuration="0.2" grow="width" alignItems="stretch"
-                  measure="dsx.variable.epPaneBox" style="width: 100%">
-            <vstack alignItems="stretch" grow="width" style="width: 100%"
-                    offsetX="{{ dsx.variable.drawerTab == 'episodes' ? 0 : 16 }}"
-                    anim="easeOut" animDuration="0.2">
-              <hstack class="rangeRow">
-                <list bind="dsx.variable.ranges" key="id" axis="horizontal" scroll="false" spacing="18">
-                  <text value="{{ item.label }}" class="rangeTxt"
-                        color="{{ item.from - 1 == Number(dsx.variable.range) * 30 ? brand() : 'rgba(255,255,255,0.6)' }}"
-                        on:tap="dsx.variable.range = (item.from - 1) / 30" a11yTrait="button"/>
-                </list>
-                <spacer/>
-              </hstack>
-              <vstack class="epGridWrap">
-                <!-- the cell is the DIRECT grid child: a wrapper here loses the column width
-                     (AGENTS.md). The VIP tag overlays by position, flow-fallback on native. -->
-                <grid bind="dsx.variable.visibleEps" key="id" columns="6" spacing="8" scroll="false">
-                  <vstack class="epCell" style="position: relative; aspect-ratio: 1/1; justify-content: center; overflow: hidden"
-                          on:tap="dsx.action.go({ target: item.idx })"
-                          background="{{ item.idx == Number(dsx.variable.cur) ? brand() : '#2C2C2E' }}"
-                          a11yLabel="Episode {{ item.idx }}{{ gridLocked ? ', VIP' : '' }}" a11yTrait="button" a11yGroup="true">
-                    <text value="{{ item.idx }}" class="epNum" color="#FFFFFF"/>
-                    <!-- the corner tab: flush to the cell's own corner, never over the numeral -->
-                    <text value="VIP" class="cellTag" visible-if="gridLocked"
-                          style="position: absolute; top: 0; right: 0; border-bottom-left-radius: 6px"/>
-                    <!-- the now-playing tell the reference puts on the current cell -->
-                    <image icon="waveform" iconSize="11" color="#FFFFFF" visible-if="item.idx == Number(dsx.variable.cur)"
-                           a11yHidden="true" style="position: absolute; top: 4px; right: 5px"/>
-                  </vstack>
-                </grid>
-              </vstack>
-            </vstack>
-          </vstack>
-        </zstack>
-
-        <!-- ══════ LEVEL 2 — the genre drawer ══════════════════════════════════════════
-             DECLARED INSIDE ITS PARENT'S SLOT, and that placement IS the declaration: on
-             iOS the sheet slot is an escaping closure, so this anchor only exists once the
-             drawer is presented, and UIKit then presents from the drawer's own view
-             controller — which is what stacks the two cards. Two `<sheet>` tags side by
-             side at the screen root are NOT a stack: a view controller presents one thing
-             at a time, so the second would silently do nothing while the first is up.
-
-             ITS POSITION IN THE COLUMN IS ALSO DELIBERATE. The anchor renders at zero size
-             on web (`display: contents`) but is a real 0x0 child of a stack on iOS, where
-             a zero-size child still pays the column's gaps. LAST child of the drawer's
-             SCROLL CONTENT is the one place that costs nothing a reader can see: the gap
-             lands at the end of a scroller. As a sibling of the `<scroll>` it would have
-             opened a visible strip above the sheet's bottom edge.
-
-             MEASURED HERE, on this build, at 375x812: parent level 1 / child level 2,
-             z 10001 / 10002, the parent's portal scope inert + aria-hidden, Escape closing
-             exactly one level at a time, and the document scroll lock surviving both. The
-             engine gives all of that for free. What it does NOT give is the cascade — see
-             `closeDrawer`. -->
-        <!-- `detents="content"`, and that is the detent that makes a STACK legible. A `full`
-             child covers its parent completely, so the viewer pays for the whole card-stack
-             apparatus and then cannot see it; a content-height child hugs its result set —
-             three series draw a short card with the drawer visible above it, twenty-four
-             draw a tall one, and the 90%-of-screen cap turns the inner `<scroll>` on by
-             itself. It is also ONE stop, so a single downward drag dismisses rather than
-             stepping through a half detent first.
-             `title=` is not decoration on a stacked child: it is the panel's accessible
-             name (`aria-labelledby` -> the chrome h2), and a level-2 dialog with no name is
-             disorienting in a way a level-1 one survives. -->
-        <sheet present="dsx.variable.genreOpen" detents="content" background="#141414"
-               title="{{ dsx.variable.genre }}" close="trailing"
-               on:dismiss="dsx.variable.genreOpen = false">
-          <scroll grow="true" style="flex: 1; min-height: 0">
-            <vstack class="genreBody" alignItems="stretch">
-
-              <!-- the BACK affordance. The system close control at the trailing edge is the
-                   gesture twin (and the swipe-down is the third); this row is the only one
-                   of the three that can say where it goes. -->
-              <hstack class="genreBack" on:tap="dsx.action.closeGenre()"
-                      a11yGroup="true" a11yTrait="button" a11yLabel="Back to all episodes">
-                <image icon="chevron.backward" iconSize="14" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
-                <text value="All episodes" class="genreBackTxt"/>
-              </hstack>
-
-              <text value="{{ dsx.variable.genreCount }}" class="genreCountTxt"
-                    visible-if="dsx.variable.genreCount != ''"/>
-
-              <!-- LOADING: the grid in its real shape, so arrival is a repaint and not a
-                   reflow (the same contract Browse honours on the full page) -->
-              <grid visible-if="dsx.variable.genreBusy" bind="dsx.variable.genreSkeleton" key="id"
-                    columns="{{ dsx.variable.genreCols }}" spacing="12" scroll="false">
-                <vstack class="genreCard">
-                  <vstack class="genreSkel" style="width: 100%; aspect-ratio: 3/4"/>
-                  <vstack class="genreSkel" height="12" style="height: 12px; width: 70%"/>
-                </vstack>
-              </grid>
-
-              <grid visible-if="dsx.variable.genreView != null &amp;&amp; dsx.variable.genreView.total > 0"
-                    bind="dsx.variable.genreView.items" key="id"
-                    columns="{{ dsx.variable.genreCols }}" spacing="12" scroll="false">
-                <vstack class="genreCard" on:tap="dsx.action.goShow({ id: item.id })"
-                        a11yGroup="true" a11yTrait="button"
-                        a11yLabel="{{ item.title }}, {{ item.episodes }} episodes">
-                  <image src="{{ item.poster }}" contentFit="cover" a11yHidden="true"
-                         style="width: 100%; aspect-ratio: 3/4; border-radius: 8px; object-fit: cover"/>
-                  <text value="{{ item.title }}" class="genreCardTitle" lineLimit="2"
-                        style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
-                  <text value="EP {{ item.episodes }}" class="genreCardMeta"
-                        style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
-                </vstack>
-              </grid>
-
-              <!-- EMPTY. A tag the server matched to nothing is rare but reachable, and the
-                   way out is the level below, not the app. -->
-              <vstack class="genreState"
-                      visible-if="dsx.variable.genreView != null &amp;&amp; dsx.variable.genreView.total == 0">
-                <image icon="rectangle.stack.fill" iconSize="28" color="rgba(255,255,255,0.35)" a11yHidden="true"/>
-                <text value="Nothing in {{ dsx.variable.genre }} yet" class="genreStateHead"/>
-                <text value="New series land here as they go live." class="genreStateBody"/>
-              </vstack>
-
-              <!-- ERROR. It says what is still true — the episode never stopped — because a
-                   failed side-panel is not a dead app, and a viewer who cannot tell the
-                   difference will close the whole player. -->
-              <vstack class="genreState"
-                      visible-if="genreList.error != null &amp;&amp; dsx.variable.genreView == null">
-                <text value="This list could not be loaded." class="genreStateHead"/>
-                <text value="Your episode is still playing behind this sheet — close it and nothing is lost." class="genreStateBody"/>
-                <button label="Retry" class="genreRetry" on:tap="genreList.refresh()"/>
-              </vstack>
-
-              <!-- THE DOOR BACK TO A URL. A sheet has no address, and /browse/:genre is
-                   shareable, deep-linkable and back-navigable — so the affordance the level
-                   replaced stays reachable from inside it, for the viewer who wants the page
-                   rather than the glance. It leaves the player, which is why it is the last
-                   row and not the first. -->
-              <hstack class="genreAll" on:tap="dsx.action.seeAllGenre()"
-                      visible-if="dsx.variable.genreView != null &amp;&amp; dsx.variable.genreView.total > 0"
-                      a11yGroup="true" a11yTrait="button"
-                      a11yLabel="See all {{ dsx.variable.genre }} on the Browse page — leaves the player">
-                <text value="See all in {{ dsx.variable.genre }}" class="genreAllTxt" grow="width" style="flex: 1"/>
-                <image icon="arrow.forward" iconSize="12" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
-              </hstack>
-
-            </vstack>
-          </scroll>
-        </sheet>
-      </vstack>
+      <EpisodePanel show="{{ dsx.variable.detailView == null ? null : dsx.variable.detailView.show }}"
+                    episodes="{{ dsx.variable.detailView == null ? [] : dsx.variable.detailView.episodes }}"
+                    related="{{ dsx.variable.relatedRows }}" cur="{{ dsx.variable.cur }}"
+                    wallet="{{ dsx.variable.walletView }}" tab="{{ dsx.variable.drawerTab }}"
+                    on:pick="dsx.action.go({ target: idx })" on:open="dsx.action.goShow({ id: id })"
+                    on:pane="dsx.variable.drawerTab = pane"/>
     </scroll>
   </sheet>
 
-  <!-- ══════ options: the ⋯ stack ══════ -->
+  <!-- ══════ the More sheet (§3a) — and, NESTED INSIDE IT, the option sheets (§3d) ══════
+       A child `<sheet>` is declared inside its parent's children: on iOS the sheet slot is an
+       escaping closure, so the child's anchor exists only while the parent is presented and
+       UIKit stacks the two cards (PLAN.md §6.95/6.114). The children are the LAST children of
+       the parent's column, where a zero-size anchor costs nothing a reader can see. Each
+       carries `title=` (the panel's accessible name) and a back row naming the level below. -->
   <sheet present="dsx.variable.menu" detents="content" background="#141414"
-         on:dismiss="dsx.variable.menu = false; dsx.variable.sheet = ''">
-    <vstack class="menuBody" enter="slide-bottom" anim="spring">
-      <!-- root -->
-      <vstack visible-if="dsx.variable.sheet == ''" alignItems="stretch">
-        <text value="More" class="menuHead"/>
-        <vstack class="menuCard">
-          <!-- SUBTITLES IS REAL: `<video subtitles>` is a declared boolean, so this toggle
-               reaches the player. The eleven-language PICKER that used to live behind this
-               row was not — `<video>` has no track or language attribute — so a viewer chose
-               "Tamil" and got whatever the asset carried. The picker is gone; the switch that
-               works stayed (PLAN.md §6.36). -->
-          <hstack class="menuRow" a11yGroup="true" a11yLabel="Subtitles">
-            <image icon="globe" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
-            <text value="Subtitles" class="menuLabel" style="flex: 1"/>
-            <toggle bind="dsx.variable.captions" color="{{ brand() }}" a11yLabel="Subtitles"/>
+         on:dismiss="dsx.variable.menu = false">
+    <vstack class="menuBody">
+      <hstack class="menuRow" on:tap="dsx.variable.speedOpen = true" a11yGroup="true" a11yTrait="button"
+              a11yLabel="Playback speed, {{ dsx.variable.speedLabel }}">
+        <text value="Playback Speed" class="menuLabel" grow="width" style="flex: 1"/>
+        <text value="{{ dsx.variable.speedLabel }}" class="menuValue"/>
+        <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+      </hstack>
+      <hstack class="menuRow" on:tap="dsx.variable.subOpen = true" a11yGroup="true" a11yTrait="button"
+              a11yLabel="Subtitles, {{ dsx.variable.subtitleLabel }}">
+        <text value="Subtitles" class="menuLabel" grow="width" style="flex: 1"/>
+        <text value="{{ dsx.variable.subtitleLabel }}" class="menuValue"/>
+        <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+      </hstack>
+      <hstack class="menuRow" on:tap="dsx.variable.qualOpen = true" a11yGroup="true" a11yTrait="button"
+              a11yLabel="Video quality, {{ dsx.variable.qualityLabel }}">
+        <text value="Video Quality" class="menuLabel" grow="width" style="flex: 1"/>
+        <text value="{{ dsx.variable.qualityLabel }}" class="menuValue"/>
+        <image icon="chevron.forward" iconSize="12" color="{{ ink3() }}" a11yHidden="true"/>
+      </hstack>
+      <!-- MINI VIEW: the gold crown marks a membership perk; the toggle is the app's own
+           control (spec §−1), never a platform switch, and a non-member's tap is a toast -->
+      <hstack class="menuRow" on:tap="dsx.action.togglePip()" a11yGroup="true" a11yTrait="button"
+              a11yLabel="Mini view, picture in picture, {{ dsx.variable.pip ? 'on' : 'off' }}{{ dsx.variable.isVip ? '' : ', members only' }}">
+        <text value="Mini View (PIP mode)" class="menuLabel"/>
+        <image icon="crown.fill" iconSize="14" color="{{ crownGold() }}" a11yHidden="true"/>
+        <spacer/>
+        <zstack class="toggleTrack" align="leading"
+                background="{{ dsx.variable.pip ? crownGold() : toggleOff() }}"
+                style="transition: background 0.2s ease">
+          <vstack class="toggleKnob" offsetX="{{ dsx.variable.pip ? 22 : 2 }}" anim="easeOut" animDuration="0.2"
+                  style="box-shadow: 0 2px 4px rgba(0,0,0,0.3)"/>
+        </zstack>
+      </hstack>
+      <stack height="1" background="rgba(255,255,255,0.12)" style="width: 100%"/>
+      <hstack class="menuRow" on:tap="dsx.variable.reportOpen = true" a11yGroup="true" a11yTrait="button" a11yLabel="Report this episode">
+        <text value="Report" class="menuMuted"/>
+      </hstack>
+
+      <!-- ── LEVEL 2: Playback Speed ── -->
+      <sheet present="dsx.variable.speedOpen" detents="content" background="#141414"
+             title="Playback Speed" close="trailing" on:dismiss="dsx.variable.speedOpen = false">
+        <vstack class="menuBody">
+          <hstack class="sheetBack" on:tap="dsx.variable.speedOpen = false" a11yGroup="true" a11yTrait="button" a11yLabel="Back to More">
+            <image icon="chevron.backward" iconSize="14" color="{{ ink3() }}" a11yHidden="true"/>
+            <text value="More" class="sheetBackTxt"/>
           </hstack>
-          <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
-          <!-- QUALITY IS NAMED, NOT FAKED (Article 7, the AdGate precedent). `<video>` has no
-               quality attribute, so the 240p–1080p ladder this row used to open changed
-               nothing — and it priced 1080p behind VIP, which made it a paywall on a no-op.
-               The row stays as an honest disabled readout; the ask is filed upstream. -->
-          <hstack class="menuRow" a11yGroup="true" a11yLabel="Quality: adaptive. A quality ladder needs renderer support and is not available in this build.">
-            <image icon="slider.horizontal.3" iconSize="20" color="rgba(255,255,255,0.4)" a11yHidden="true"/>
-            <vstack spacing="2" style="flex: 1">
-              <text value="Quality" class="menuLabel" color="rgba(255,255,255,0.4)"/>
-              <text value="Adaptive — one rendition in this build" class="optNote"/>
-            </vstack>
-          </hstack>
-          <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
-          <vstack spacing="10" alignItems="stretch" paddingV="13">
-            <hstack spacing="14" alignItems="center">
-              <image icon="arrow.clockwise" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
-              <text value="Speed" class="menuLabel"/>
+          <list bind="dsx.variable.speedRows" key="id" scroll="false" spacing="0">
+            <hstack class="optRow" on:tap="dsx.action.pickSpeed({ v: item.v })" a11yTrait="button" a11yGroup="true"
+                    a11yLabel="{{ item.label }}{{ item.v == dsx.variable.speedPick ? ', selected' : '' }}">
+              <text value="{{ item.label }}" class="optLabel" grow="width" style="flex: 1"/>
+              <image icon="checkmark" iconSize="16" color="#FFFFFF" visible-if="item.v == dsx.variable.speedPick" a11yHidden="true"/>
             </hstack>
-            <!-- A REAL SEGMENTED CONTROL, AND IT MOVES LIKE ONE.
-                 Seven pills never fit a 390 sheet (measured: 3.0x ran 27px past the
-                 viewport), so this was a horizontal SCROLLER — a control with a
-                 scrollbar through it, and a selection that only REPAINTED: tap a rung
-                 and the highlight teleported. Four rungs fit the row at every supported
-                 width, so the scroller is gone and the segments are equal quarters
-                 (`flex: 1` = `1 1 0%`, which divides the track EVENLY — the catalog's
-                 `grow="width"` alone is `flex-grow: 1` with an auto basis, so "0.75x"
-                 would take more room than "1.0x"; both spellings are written, the
-                 attribute for the native lane and the raw literal for the web sheet).
-                 THE INDICATOR IS ONE ELEMENT that travels: a constant width and an
-                 offsetX computed off the measured track, both compositor transforms on
-                 one element, so they cannot drift from each other and the same markup
-                 tweens on web and on iOS (dev@ca2b0c78). Never `width: N%` — the native
-                 bridge drops non-100 percent lengths (upstream #281).
-                 zIndex ON THE LABEL ROW is load-bearing: the pill carries a transform,
-                 and a transformed sibling paints ABOVE later plain siblings (the
-                 badgeWrap law) — without it the pill covers the labels it sits under. -->
-            <vstack class="speedSeg">
-              <zstack grow="width" align="leading" measure="dsx.variable.segBox" style="width: 100%">
-                <vstack class="speedPill" grow="height" style="height: 100%"
-                        width="{{ Math.round((dsx.variable.segBox.width || 0) / 4) }}"
-                        offsetX="{{ Math.round((dsx.variable.segBox.width || 0) / 4 * dsx.variable.speedIdx) }}"
-                        anim="easeOut" animDuration="0.22"/>
-                <list bind="dsx.variable.speedOptions" key="id" axis="horizontal" scroll="false"
-                      spacing="0" grow="width" zIndex="1" style="width: 100%">
-                  <text value="{{ item.label }}" class="speedOpt" grow="width" style="flex: 1"
-                        color="{{ item.v == dsx.variable.speed ? '#FFFFFF' : 'rgba(255,255,255,0.55)' }}"
-                        on:tap="dsx.variable.speed = item.v" a11yTrait="button"
-                        a11yLabel="{{ item.label }} speed{{ item.v == dsx.variable.speed ? ', selected' : '' }}"/>
-                </list>
-              </zstack>
-            </vstack>
-          </vstack>
-          <stack height="1" background="rgba(255,255,255,0.07)" style="width: 100%"/>
-          <hstack class="menuRow" a11yGroup="true" a11yLabel="Picture in picture">
-            <image icon="rectangle.stack.fill" iconSize="20" color="#FFFFFF" a11yHidden="true"/>
-            <text value="Picture in Picture" class="menuLabel" style="flex: 1"/>
-            <toggle bind="dsx.variable.pip" color="{{ brand() }}" a11yLabel="Picture in picture"/>
+          </list>
+        </vstack>
+      </sheet>
+
+      <!-- ── LEVEL 2: Subtitles — the tracks the STREAM carries, named by the stream ── -->
+      <sheet present="dsx.variable.subOpen" detents="content" background="#141414"
+             title="Subtitles" close="trailing" on:dismiss="dsx.variable.subOpen = false">
+        <vstack class="menuBody">
+          <hstack class="sheetBack" on:tap="dsx.variable.subOpen = false" a11yGroup="true" a11yTrait="button" a11yLabel="Back to More">
+            <image icon="chevron.backward" iconSize="14" color="{{ ink3() }}" a11yHidden="true"/>
+            <text value="More" class="sheetBackTxt"/>
+          </hstack>
+          <list bind="dsx.variable.subtitleRows" key="id" scroll="false" spacing="0">
+            <hstack class="optRow" on:tap="dsx.action.pickSubtitle({ lang: item.lang })" a11yTrait="button" a11yGroup="true"
+                    a11yLabel="{{ item.label }}{{ item.lang == dsx.variable.subtitle ? ', selected' : '' }}">
+              <text value="{{ item.label }}" class="optLabel" grow="width" style="flex: 1"/>
+              <image icon="checkmark" iconSize="16" color="#FFFFFF" visible-if="item.lang == dsx.variable.subtitle" a11yHidden="true"/>
+            </hstack>
+          </list>
+          <text class="optNote" visible-if="dsx.variable.hasTracks == false"
+                value="This stream carries no subtitle tracks."/>
+        </vstack>
+      </sheet>
+
+      <!-- ── LEVEL 2: Video Quality — Auto reads the rendition rendering now; the rungs are the ladder ── -->
+      <sheet present="dsx.variable.qualOpen" detents="content" background="#141414"
+             title="Video Quality" close="trailing" on:dismiss="dsx.variable.qualOpen = false">
+        <vstack class="menuBody">
+          <hstack class="sheetBack" on:tap="dsx.variable.qualOpen = false" a11yGroup="true" a11yTrait="button" a11yLabel="Back to More">
+            <image icon="chevron.backward" iconSize="14" color="{{ ink3() }}" a11yHidden="true"/>
+            <text value="More" class="sheetBackTxt"/>
+          </hstack>
+          <list bind="dsx.variable.qualityRows" key="id" scroll="false" spacing="0">
+            <hstack class="optRow" on:tap="dsx.action.pickQuality({ v: item.v })" a11yTrait="button" a11yGroup="true"
+                    a11yLabel="{{ item.label }}{{ item.v == dsx.variable.quality ? ', selected' : '' }}">
+              <text value="{{ item.label }}" class="optLabel" grow="width" style="flex: 1"/>
+              <image icon="checkmark" iconSize="16" color="#FFFFFF" visible-if="item.v == dsx.variable.quality" a11yHidden="true"/>
+            </hstack>
+          </list>
+          <text class="optNote" visible-if="dsx.variable.hasLadder == false"
+                value="This stream carries one rendition, so there is nothing to pick."/>
+        </vstack>
+      </sheet>
+
+      <!-- ── LEVEL 2: Report — files against the episode (server/social.dsx reportEpisode) ── -->
+      <sheet present="dsx.variable.reportOpen" detents="content" background="#141414"
+             title="Report" close="trailing" on:dismiss="dsx.variable.reportOpen = false">
+        <vstack class="menuBody">
+          <hstack class="sheetBack" on:tap="dsx.variable.reportOpen = false" a11yGroup="true" a11yTrait="button" a11yLabel="Back to More">
+            <image icon="chevron.backward" iconSize="14" color="{{ ink3() }}" a11yHidden="true"/>
+            <text value="More" class="sheetBackTxt"/>
+          </hstack>
+          <text class="optNote" value="Tell us what is wrong with this episode. Reports go to a person."/>
+          <hstack class="optRow" on:tap="dsx.action.reportNow({ reason: 'spam' })" a11yTrait="button" a11yGroup="true" a11yLabel="Report as spam or a scam">
+            <text value="Spam or a scam" class="optLabel" grow="width" style="flex: 1"/>
+          </hstack>
+          <hstack class="optRow" on:tap="dsx.action.reportNow({ reason: 'harassment' })" a11yTrait="button" a11yGroup="true" a11yLabel="Report as harassment or hate">
+            <text value="Harassment or hate" class="optLabel" grow="width" style="flex: 1"/>
+          </hstack>
+          <hstack class="optRow" on:tap="dsx.action.reportNow({ reason: 'sexual' })" a11yTrait="button" a11yGroup="true" a11yLabel="Report as sexual content">
+            <text value="Sexual content" class="optLabel" grow="width" style="flex: 1"/>
+          </hstack>
+          <hstack class="optRow" on:tap="dsx.action.reportNow({ reason: 'violence' })" a11yTrait="button" a11yGroup="true" a11yLabel="Report as violence or a threat">
+            <text value="Violence or a threat" class="optLabel" grow="width" style="flex: 1"/>
+          </hstack>
+          <hstack class="optRow" on:tap="dsx.action.reportNow({ reason: 'other' })" a11yTrait="button" a11yGroup="true" a11yLabel="Report for another reason">
+            <text value="Something else" class="optLabel" grow="width" style="flex: 1"/>
           </hstack>
         </vstack>
-      </vstack>
-
-      <!-- speed -->
-      <vstack visible-if="dsx.variable.sheet == 'speed'" alignItems="stretch">
-        <hstack alignItems="center" paddingBottom="8">
-          <image icon="chevron.backward" iconSize="19" paddingV="12" paddingH="12" color="#FFFFFF" on:tap="dsx.variable.sheet = ''" a11yLabel="Back" a11yTrait="button"/>
-          <text value="Playback Speed" class="menuHead"/>
-        </hstack>
-        <list bind="dsx.variable.speedOptions" key="id" scroll="false" spacing="2">
-          <hstack class="optRow" on:tap="dsx.variable.speed = item.v" a11yTrait="button" a11yLabel="{{ item.label }}"
-                  background="{{ item.v == dsx.variable.speed ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0)' }}">
-            <image icon="checkmark" iconSize="15" color="{{ brand() }}" visible-if="item.v == dsx.variable.speed" a11yHidden="true"/>
-            <text value="{{ item.label }}" class="optLabel" color="#FFFFFF"/>
-          </hstack>
-        </list>
-      </vstack>
+      </sheet>
     </vstack>
   </sheet>
 
-  <!-- ══════ comments — THREE PANES IN ONE SHEET ══════════════════════════════════════════
-       App Store guideline 1.2 requires four things of an app carrying user-generated content:
-       a way to FILTER objectionable material, a way to REPORT it, a way to BLOCK a person,
-       and PUBLISHED CONTACT INFORMATION. All four are reachable from this sheet, and the two
-       that are safety boundaries — block, and the community flag threshold — are enforced in
-       `server/social.dsx` rather than here, so a filtered row is not in the payload at all.
-
-       WHY ONE SHEET AND NOT THREE. A `<sheet>` presented over a presented `<sheet>` has two
-       measured defects today (docs/stacked-sheets.md): the child `present` key is never
-       written false when the parent tears the chain down, so it auto-presents next time on
-       iOS, and on web closing the parent does not close the child at all. A depth stack
-       inside the one sheet is the same shape the episode drawer already uses, and it behaves
-       identically on every renderer. -->
-  <sheet present="dsx.variable.comments" detents="half,full" background="#141414"
-         on:dismiss="dsx.action.closeComments()">
-    <vstack alignItems="stretch" grow="true" style="flex: 1; min-height: 0">
-
-      <!-- ══ PANE 1 — THE THREAD ═══════════════════════════════════════════════════════ -->
-      <vstack alignItems="stretch" grow="true" style="flex: 1; min-height: 0"
-              visible-if="dsx.variable.cPane == 'thread'">
-        <hstack class="cHead">
-          <text value="{{ dsx.variable.commentLabel }}" class="cTitle" grow="width" style="flex: 1"/>
-          <!-- 1.2(a) as a control the viewer can actually see and change. An icon beside text
-               is an hstack with one a11y label, never a `button` carrying both. -->
-          <hstack class="cChip" on:tap="dsx.action.openSafety()" a11yGroup="true" a11yTrait="button"
-                  a11yLabel="Safety and filters. Filtering is {{ dsx.variable.filterLabel }}. Opens blocked people, the filter level and how to contact us.">
-            <image icon="line.3.horizontal.decrease" iconSize="14" color="rgba(255,255,255,0.8)" a11yHidden="true"/>
-            <text value="{{ dsx.variable.filterLabel }}" class="cChipTxt"/>
-          </hstack>
-        </hstack>
-        <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
-
-        <!-- THE RECEIPT. A filter that removes rows silently is indistinguishable from a quiet
-             thread. This says what was withheld and why, and renders only when something was. -->
-        <hstack class="cReceipt" visible-if="dsx.variable.filterNote != ''" a11yGroup="true">
-          <image icon="line.3.horizontal.decrease" iconSize="12" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
-          <text value="{{ dsx.variable.filterNote }}" class="cReceiptTxt" grow="width" style="flex: 1"/>
-        </hstack>
-
-        <scroll grow="true" style="flex: 1; min-height: 0">
-          <vstack alignItems="stretch">
-            <text class="cEmpty" visible-if="dsx.variable.emptyThread"
-                  value="No comments yet — be the first."/>
-            <list bind="dsx.variable.threadRows" key="id" scroll="false" spacing="0">
-              <hstack class="cRow">
-                <vstack class="cAvatar" style="justify-content: center">
-                  <image icon="person.fill" iconSize="16" color="rgba(255,255,255,0.5)" a11yHidden="true"/>
-                </vstack>
-                <vstack spacing="5" grow="width" style="flex: 1; min-width: 0">
-                  <!-- THE AUTHOR IS REAL NOW. `author` is derived server-side from the row
-                       owner_id — the verified subject Postgres assigned, which no client can
-                       forge — and the seam publishes this viewer own subject, so their rows
-                       read "You" without the server ever being asked who is looking. -->
-                  <text class="cAuthor"
-                        value="{{ item.owner == global.auth.sub &amp;&amp; global.auth.sub != '' ? 'You' : item.author }}"/>
-                  <text value="{{ item.body }}" class="cBody"/>
-                  <!-- A HAND-ROLLED `== 1` TERNARY IS A TWO-CATEGORY LANGUAGE HARD-CODED
-                       INTO THE MARKUP, and this one was worse than that: the extractor
-                       could only lift the singular arm as a key (a concatenation fragment
-                       is never a rendered form), so twelve locales translated "Flagged by
-                       1 reader" and every plural count stayed English. One plural group is
-                       the whole string in every language, and Arabic gets its six. Safe
-                       here for the same reason as the composer counter below: this sheet
-                       is never server-rendered. -->
-                  <text class="cFlagged" visible-if="item.flags &gt; 0"
-                        value="{item.flags, plural, one {Flagged by # reader} other {Flagged by # readers}}"/>
-                </vstack>
-                <!-- 1.2(b) and 1.2(c), one tap from every comment. 44pt, per the tap-target
-                     floor, because this is a hand-rolled hit area with no system hit-slop. -->
-                <vstack class="cFlagBtn" style="justify-content: center" a11yGroup="true" a11yTrait="button"
-                        a11yLabel="Report or block the author of this comment"
-                        on:tap="dsx.action.pickComment({ id: item.id, owner: item.owner, author: item.author, body: item.body })">
-                  <image icon="flag" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
-                </vstack>
-              </hstack>
-            </list>
-          </vstack>
-        </scroll>
-
-        <text class="cRule"
-              value="Comments are public. Anything reported is hidden from you at once and reviewed; three readers flagging the same comment hides it for everyone."/>
-        <vstack spacing="6" alignItems="stretch" style="padding: 0 16px 20px 16px">
-          <hstack alignItems="center">
-            <hstack class="cField" grow="width" style="flex: 1">
-              <!-- READING IS OPEN, POSTING NEEDS AN IDENTITY (/social/comments is auth="none";
-                   /social/comment is not). The composer stays for a guest — a disabled field
-                   beside a thread is a dead end — and the placeholder says which tap will ask,
-                   so the sign-in sheet is expected rather than a surprise. -->
-              <textfield bind="dsx.variable.draft" color="#FFFFFF"
-                         placeholder="{{ dsx.variable.signedIn ? 'Enter your comment here...' : 'Sign in to join the conversation' }}"
-                         grow="width" style="flex: 1" on:submit="dsx.action.postComment()"/>
-              <button label="Submit" class="cSend" on:tap="dsx.action.postComment()"/>
-            </hstack>
-          </hstack>
-          <!-- the 500-character rule, shown BEFORE the tap rather than as a server rejection
-               after it (audit G16). It appears only once it is about to matter.
-
-               ══ THE TWO STRINGS THAT CARRY THE PLURAL PLANE, AND WHY THEY ARE THESE TWO ══
-               `{n, plural, …}` is the framework's MESSAGE tier: the template is the table
-               key with its holes intact, so ONE entry serves every value of n and each
-               locale picks its own CLDR category. Arabic has SIX (zero/one/two/few/many/
-               other) and a `== 1` ternary can express two, which is why the plane exists.
-               A 500-character budget reaches ALL SIX by typing: 0 zero · 1 one · 2 two ·
-               3-10 few · 11-99 many · 100+ other. Nothing else in this app does that.
-
-               AND THIS COMPOSER IS THE ONE PLACE THE TIER IS SAFE TODAY. `localizeTemplate`
-               lives in the CLIENT mount (dom/src/mount.ts); the SSR renderer does not run
-               it, so a plural group at a server-rendered display point ships the RAW ICU
-               text in the HTML — measured on /show, the grid caption served
-               `{dsx.variable.freeCount, plural, one {# free} other {# free}}` verbatim
-               until hydration replaced it (PLAN.md §6.101). This sheet is mounted by a tap
-               and appears NOWHERE in the SSR body (asserted in scripts/verify.mjs, both
-               directions), so the tier is complete by the time these render. Six further
-               counted strings are named in the ledger and are waiting on that gap. -->
-          <text class="cCounter" textAlign="right" visible-if="dsx.variable.draftLeft &lt; 80 &amp;&amp; dsx.variable.draftLeft &gt;= 0"
-                value="{dsx.variable.draftLeft, plural, one {# character left} other {# characters left}}"/>
-          <text class="cCounterHot" textAlign="right" visible-if="dsx.variable.draftLeft &lt; 0"
-                value="{0 - dsx.variable.draftLeft, plural, one {# character over the 500 limit} other {# characters over the 500 limit}}"/>
-          <!-- The EULA acknowledgement Apple wants beside a UGC composer, from the same
-               config plane the account screen reads. It names its own gap when unset. -->
-          <LegalLinks variant="line"/>
-        </vstack>
-      </vstack>
-
-      <!-- ══ PANE 2 — ONE COMMENT: REPORT · BLOCK · DELETE ═════════════════════════════ -->
-      <vstack alignItems="stretch" grow="true" style="flex: 1; min-height: 0"
-              visible-if="dsx.variable.cPane == 'options'">
-        <hstack class="cHead">
-          <vstack class="cBack" style="justify-content: center" on:tap="dsx.action.setPane({ next: 'thread' })"
-                  a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
-            <image icon="chevron.backward" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
-          </vstack>
-          <text value="Report or block" class="cTitle" grow="width" style="flex: 1"/>
-        </hstack>
-        <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
-        <scroll grow="true" style="flex: 1; min-height: 0">
-          <vstack class="cPaneBody">
-            <vstack class="cQuote">
-              <text value="{{ dsx.variable.pickAuthor }}" class="cQuoteWho"/>
-              <text value="{{ dsx.variable.pickBody }}" class="cQuoteTxt" lineLimit="4"
-                    style="display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden"/>
-            </vstack>
-
-            <hstack class="cNote" visible-if="dsx.variable.modNote != ''">
-              <image icon="exclamationmark.triangle" iconSize="14" color="{{ gold() }}" a11yHidden="true"/>
-              <text value="{{ dsx.variable.modNote }}" class="cNoteTxt" grow="width" style="flex: 1"/>
-            </hstack>
-
-            <vstack spacing="8" alignItems="stretch"
-                    visible-if="dsx.variable.pickIsMine == false &amp;&amp; dsx.variable.pickHandled == false">
-              <text value="WHY ARE YOU REPORTING THIS?" class="cGroupCap"/>
-              <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'spam' })"
-                      a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment as spam or a scam">
-                <image icon="flag" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
-                <text value="Spam or a scam" class="cOptTxt" grow="width" style="flex: 1"/>
-              </hstack>
-              <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'harassment' })"
-                      a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment as harassment or hate">
-                <image icon="flag" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
-                <text value="Harassment or hate" class="cOptTxt" grow="width" style="flex: 1"/>
-              </hstack>
-              <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'sexual' })"
-                      a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment as sexual content">
-                <image icon="flag" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
-                <text value="Sexual content" class="cOptTxt" grow="width" style="flex: 1"/>
-              </hstack>
-              <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'violence' })"
-                      a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment as violence or a threat">
-                <image icon="flag" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
-                <text value="Violence or a threat" class="cOptTxt" grow="width" style="flex: 1"/>
-              </hstack>
-              <hstack class="cOptRow" on:tap="dsx.action.reportPick({ reason: 'other' })"
-                      a11yGroup="true" a11yTrait="button" a11yLabel="Report this comment for another reason">
-                <image icon="flag" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
-                <text value="Something else" class="cOptTxt" grow="width" style="flex: 1"/>
-              </hstack>
-
-              <text value="BLOCK" class="cGroupCap" paddingTop="6"/>
-              <hstack class="cOptRow" on:tap="dsx.action.blockPick()"
-                      a11yGroup="true" a11yTrait="button"
-                      a11yLabel="Block {{ dsx.variable.pickAuthor }}. Their comments disappear for you everywhere in the app.">
-                <image icon="person.slash" iconSize="16" color="{{ brandTint() }}" a11yHidden="true"/>
-                <vstack spacing="3" grow="width" style="flex: 1; min-width: 0">
-                  <text value="Block {{ dsx.variable.pickAuthor }}" class="cOptTxtBad"/>
-                  <text class="cOptNote"
-                        value="Their comments disappear for you everywhere in the app. They are not told, and you can undo it under Safety and filters."/>
-                </vstack>
-              </hstack>
-            </vstack>
-
-            <!-- YOUR OWN COMMENT. The row is offered on a subject match; the SERVER still
-                 decides, because RLS is what refuses a delete of anyone else row. -->
-            <vstack spacing="8" alignItems="stretch"
-                    visible-if="dsx.variable.pickIsMine &amp;&amp; dsx.variable.pickHandled == false">
-              <text value="YOUR COMMENT" class="cGroupCap"/>
-              <hstack class="cOptRow" on:tap="dsx.action.deletePick()"
-                      a11yGroup="true" a11yTrait="button" a11yLabel="Delete your comment permanently">
-                <image icon="trash" iconSize="16" color="{{ brandTint() }}" a11yHidden="true"/>
-                <text value="{{ dsx.variable.modBusy ? 'Deleting…' : 'Delete my comment' }}" class="cOptTxtBad" grow="width" style="flex: 1"/>
-              </hstack>
-              <text class="cSmall" value="This removes it for everyone, and it cannot be undone."/>
-            </vstack>
-
-            <!-- HANDLED. The decision is made; offering the same choices again would only
-                 earn a "you already reported this". -->
-            <hstack class="cOptRow" visible-if="dsx.variable.pickHandled"
-                    on:tap="dsx.action.setPane({ next: 'thread' })"
-                    a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
-              <image icon="chevron.backward" iconSize="16" color="rgba(255,255,255,0.7)" a11yHidden="true"/>
-              <text value="Back to the comments" class="cOptTxt" grow="width" style="flex: 1"/>
-            </hstack>
-
-            <!-- 1.2(d), at the point of need: if this needs a person, here is the person. -->
-            <ContactRow label="Contact us about this comment"
-                        note="If it needs a human decision, or you disagree with one, write to us."/>
-          </vstack>
-        </scroll>
-      </vstack>
-
-      <!-- ══ PANE 3 — SAFETY AND FILTERS ═══════════════════════════════════════════════ -->
-      <vstack alignItems="stretch" grow="true" style="flex: 1; min-height: 0"
-              visible-if="dsx.variable.cPane == 'safety'">
-        <hstack class="cHead">
-          <vstack class="cBack" style="justify-content: center" on:tap="dsx.action.setPane({ next: 'thread' })"
-                  a11yGroup="true" a11yTrait="button" a11yLabel="Back to the comments">
-            <image icon="chevron.backward" iconSize="17" color="#FFFFFF" a11yHidden="true"/>
-          </vstack>
-          <text value="Safety &amp; filters" class="cTitle" grow="width" style="flex: 1"/>
-        </hstack>
-        <stack height="1" background="rgba(255,255,255,0.08)" style="width: 100%"/>
-        <scroll grow="true" style="flex: 1; min-height: 0">
-          <vstack class="cPaneBody">
-            <hstack class="cNote" visible-if="dsx.variable.modNote != ''">
-              <image icon="exclamationmark.triangle" iconSize="14" color="{{ gold() }}" a11yHidden="true"/>
-              <text value="{{ dsx.variable.modNote }}" class="cNoteTxt" grow="width" style="flex: 1"/>
-            </hstack>
-
-            <text value="WHAT YOU SEE" class="cGroupCap"/>
-            <hstack class="cOptRow" on:tap="dsx.action.setFilter({ level: 'standard' })"
-                    a11yGroup="true" a11yTrait="button"
-                    a11yLabel="Standard filtering. Hides people you blocked and comments three or more readers have flagged.">
-              <image icon="checkmark" iconSize="16" color="{{ brand() }}" visible-if="dsx.variable.filterLevel == 'standard'" a11yHidden="true"/>
-              <image icon="circle" iconSize="16" color="rgba(255,255,255,0.25)" visible-if="dsx.variable.filterLevel != 'standard'" a11yHidden="true"/>
-              <vstack spacing="3" grow="width" style="flex: 1; min-width: 0">
-                <text value="Standard" class="cOptTxt"/>
-                <text class="cOptNote" value="Hides anyone you blocked, and any comment three or more readers have flagged."/>
-              </vstack>
-            </hstack>
-            <hstack class="cOptRow" on:tap="dsx.action.setFilter({ level: 'strict' })"
-                    a11yGroup="true" a11yTrait="button"
-                    a11yLabel="Strict filtering. Also hides every comment carrying any flag at all.">
-              <image icon="checkmark" iconSize="16" color="{{ brand() }}" visible-if="dsx.variable.filterLevel == 'strict'" a11yHidden="true"/>
-              <image icon="circle" iconSize="16" color="rgba(255,255,255,0.25)" visible-if="dsx.variable.filterLevel != 'strict'" a11yHidden="true"/>
-              <vstack spacing="3" grow="width" style="flex: 1; min-width: 0">
-                <text value="Strict" class="cOptTxt"/>
-                <text class="cOptNote" value="Everything Standard hides, plus every comment carrying a single flag."/>
-              </vstack>
-            </hstack>
-
-            <text value="{{ dsx.variable.blockedLabel }}" class="cGroupCap" paddingTop="6"/>
-            <text class="cSmall" visible-if="dsx.variable.blockedRows.length == 0"
-                  value="When you block someone their comments disappear for you everywhere in the app, and they are never told. Nothing you post changes."/>
-            <list bind="dsx.variable.blockedRows" key="id" scroll="false" spacing="8">
-              <hstack class="cBlockRow">
-                <image icon="person.slash" iconSize="16" color="rgba(255,255,255,0.6)" a11yHidden="true"/>
-                <text value="{{ item.handle }}" class="cOptTxt" grow="width" style="flex: 1; min-width: 0"/>
-                <text value="Unblock" class="cUndo" a11yTrait="button"
-                      a11yLabel="Unblock {{ item.handle }}"
-                      on:tap="dsx.action.unblockOne({ subject: item.subject, handle: item.handle })"/>
-              </hstack>
-            </list>
-
-            <!-- ARTICLE 7, IN THE PRODUCT AND NOT ONLY IN AN AUDIT. What the filter really
-                 does and really does not, said to the person relying on it. -->
-            <text value="WHAT THE FILTER CHECKS" class="cGroupCap" paddingTop="6"/>
-            <text class="cSmall"
-                  value="Before a comment is posted the server refuses links, phone numbers, all-capitals and repeated-character mashing. It does NOT read meaning: it cannot recognise hate speech, harassment or a threat, and no word list can — which is why this app ships none, and why reporting and blocking exist. A production deployment adds a moderation service in front of the same check; server/social.dsx names the exact seam."/>
-
-            <!-- 1.2(d): published contact information, from App.json `consts.supportUrl`. -->
-            <ContactRow label="Contact us"
-                        note="Report something to a person, ask about a decision, or tell us this filter got it wrong."/>
-            <LegalLinks variant="line"/>
-          </vstack>
-        </scroll>
-      </vstack>
+  <!-- ══════ the Watch Mission sheet (§3c) ══════ -->
+  <sheet present="dsx.variable.missionOpen" detents="content" background="#141414"
+         on:dismiss="dsx.variable.missionOpen = false">
+    <vstack class="missionBody">
+      <image src="/assets/hourglass.svg" a11yHidden="true" width="44" height="44" style="width: 44px; height: 44px"/>
+      <hstack spacing="6" alignItems="center">
+        <text value="Watch Mission" class="missionTitle"/>
+        <!-- the ⓘ: a universal hint under a fine pointer, an accessible description everywhere;
+             the rule it explains is also the body text below, so nothing is gated behind it -->
+        <image icon="info.circle.fill" iconSize="16" color="{{ ink3() }}" a11yLabel="How the Watch Mission counts"
+               tooltip="Minutes count only while an episode plays. Bonuses land at 5, 10, 20 and 30 minutes, up to 70 coins a day."/>
+      </hstack>
+      <text class="missionTxt" value="Earn bonus coins at 5, 10, 20 &amp; 30 mins! You can get up to 70 coins daily to unlock premium episodes."/>
+      <button label="Hide Timer" class="missionBtn" grow="width" on:tap="dsx.action.hideTimer()"
+              style="width: 100%; border: 1px solid rgba(255,255,255,0.12); background: transparent"/>
+      <text class="missionFoot" value="Timer hides automatically but reappears when you restart the app."/>
     </vstack>
   </sheet>
-  <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of
-       the layout, so a zero-height child here cannot disturb any chrome. -->
+
+  <!-- THE SEAM. One mount per screen, at the foot of the root. -->
   <AuthSeam/>
 </vstack>

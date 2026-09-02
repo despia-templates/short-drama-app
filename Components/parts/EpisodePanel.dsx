@@ -1,0 +1,247 @@
+<!-- EpisodePanel — the player's episode list, built to docs/design/reference-ui-spec.md §3b
+     and mounted TWICE by Components/Watch.dsx: inside the episodes sheet on a phone, and as
+     the persistent right-hand column on a window wide enough to hold one. One part, two
+     lanes, so the two cannot drift (AGENTS.md: "both lanes render the SAME pieces").
+
+     WHAT IT DRAWS, top to bottom: the show's TITLE ART centred (its generated logo; the title
+     in 20 bold when a show has none), the genre line ("Romance · Billionaire" — the genre and
+     the first tag, joined with a middle dot, in ink-3), the Episodes | Details tabs with one
+     travelling 2pt underline, and then one of two panes:
+       · EPISODES — range chips per fifty (`1-50`, `51-62`), then a FIVE-column grid of
+         65×38 cells at radius 8 on the chip tone; the CURRENT cell drops its number for a
+         1.5pt accent outline and a three-bar equaliser; a LOCKED cell prints its number in
+         ink-2 with a 10pt lock top-right in ink-3. The free-until boundary is where the
+         locks start — no caption, exactly as the reference.
+       · DETAILS — the synopsis in 15 ink-2 at line height 22, then "More Like This": a
+         three-column poster grid (2:3 covers at radius 6, title 15, genre 13).
+
+     THE PART OWNS NO DECISION. The parent hands it the show, the episodes, the related rail,
+     the current index and the wallet, and hears back three events: `pick` (an episode was
+     tapped — the parent decides whether that means play or paywall), `open` (a related show
+     was tapped — the parent pushes the route, which closes the sheet first), and `pane` (the
+     viewer switched panes — the parent owns the tab because "More" in the player's bottom
+     meta opens this panel on Details, and a part cannot be told which pane to start on any
+     other way). `gridLocked` is a FORMULA over the wallet the parent passed, never a client
+     guess: the free flag and the unlock list are the server's word (spec §3).
+
+     THE RANGE CHIPS CHUNK AT FIFTY, the category's own number (ReelShort and ShortMax both;
+     AGENTS.md). "(Completed)" after the last chip is a catalogue fact this template does not
+     carry — every demo show is complete and none says so — so the chip prints the range
+     alone rather than a word no server sent. -->
+<vstack alignItems="stretch" spacing="0">
+  <head>
+    <attribute as="show" default="null"/>          <!-- the show dict: title, titleArt, genre, tags, synopsis -->
+    <attribute as="episodes" default="[]"/>        <!-- the episode rows: id, idx, free, price -->
+    <attribute as="related" default="[]"/>         <!-- More Like This: id, title, genre, cover|poster -->
+    <attribute as="cur" default="1"/>              <!-- the episode playing, 1-based -->
+    <attribute as="wallet" default="null"/>        <!-- /wallet/state, or null while it is in flight -->
+    <attribute as="tab" default="'episodes'"/>     <!-- episodes | details — the PARENT owns it -->
+    <event as="pick" payload="idx"/>
+    <event as="open" payload="id"/>
+    <event as="pane" payload="pane"/>
+
+    <variable as="range">return 0</variable>
+    <variable as="tabEpBox">return { width: 0, height: 0 }</variable>
+    <variable as="tabDetBox">return { width: 0, height: 0 }</variable>
+
+    <!-- a markup attribute arrives as a STRING (AGENTS.md); the parent interpolates the real
+         value, and both spellings are accepted here so a caller cannot get it wrong -->
+    <variable as="pane" computed="true">
+      return dsx.attribute.tab == 'details' ? 'details' : 'episodes'
+    </variable>
+    <variable as="showView" computed="true">
+      const s = dsx.attribute.show
+      return s == null ? null : s
+    </variable>
+    <variable as="title" computed="true">
+      const s = dsx.variable.showView
+      return s == null ? '' : s.title
+    </variable>
+    <variable as="titleArt" computed="true">
+      const s = dsx.variable.showView
+      if (s == null) { return '' }
+      if (s.titleArt == null) { return '' }
+      return s.titleArt
+    </variable>
+    <!-- "Romance · Billionaire": the genre, then the first tag, joined with a middle dot -->
+    <variable as="genreLine" computed="true">
+      const s = dsx.variable.showView
+      if (s == null) { return '' }
+      let out = s.genre == null ? '' : String(s.genre)
+      if (s.tags != null) {
+        if (s.tags.length > 0) { out = out == '' ? String(s.tags[0]) : out + ' · ' + s.tags[0] }
+      }
+      return out
+    </variable>
+    <variable as="synopsis" computed="true">
+      const s = dsx.variable.showView
+      return s == null || s.synopsis == null ? '' : s.synopsis
+    </variable>
+    <variable as="rows" computed="true">
+      const e = dsx.attribute.episodes
+      return e == null ? [] : e
+    </variable>
+    <variable as="total" computed="true">return dsx.variable.rows.length</variable>
+    <variable as="curIdx" computed="true">return Number(dsx.attribute.cur)</variable>
+    <variable as="ranges" computed="true">
+      const n = dsx.variable.total
+      const out = []
+      let start = 1
+      while (start <= n) {
+        const end = Math.min(start + 49, n)
+        out.push({ id: 'r' + start, from: start, to: end, i: (start - 1) / 50, label: start + '-' + end })
+        start = end + 1
+      }
+      return out
+    </variable>
+    <variable as="visibleEps" computed="true">
+      const rs = dsx.variable.ranges
+      const i = Number(dsx.variable.range)
+      if (i < 0 || i >= rs.length) { return dsx.variable.rows }
+      const r = rs[i]
+      return dsx.variable.rows.filter(e => e.idx >= r.from && e.idx <= r.to)
+    </variable>
+    <variable as="relatedRows" computed="true">
+      const r = dsx.attribute.related
+      return r == null ? [] : r
+    </variable>
+    <!-- THE SLIDING UNDERLINE (the shape the drawer already used): one rule in the coordinate
+         space both labels share, x = 0 for the first label and the first label's measured
+         width plus the row's 24pt gap for the second; width = the active label's own box -->
+    <variable as="tabUnderW" computed="true">
+      if (dsx.variable.pane == 'details') { return Math.round(dsx.variable.tabDetBox.width || 0) }
+      return Math.round(dsx.variable.tabEpBox.width || 0)
+    </variable>
+    <variable as="tabUnderX" computed="true">
+      if (dsx.variable.pane == 'details') { return Math.round(dsx.variable.tabEpBox.width || 0) + 24 }
+      return 0
+    </variable>
+
+    <formula as="gridLocked" free="item.free" epid="item.id">
+      if (free) { return false }
+      const w = dsx.attribute.wallet
+      if (w == null) { return true }
+      if (w.vip == true) { return false }
+      return !w.unlocked.includes(epid)
+    </formula>
+
+    <action as="pickRange" inputs="i">dsx.variable.range = Number(i)</action>
+    <action as="pickEp" inputs="idx">dsx.event('pick', { idx: Number(idx) })</action>
+    <action as="openShow" inputs="id">dsx.event('open', { id: id })</action>
+    <!-- the event is `pane`, not `tab`: the linter reads an `on:tab` suffix as a platform word -->
+    <action as="setTab" inputs="tab">dsx.event('pane', { pane: tab })</action>
+
+    <!-- THE GUTTER IS THE HOST'S. A `<sheet>` insets its content 16 a side on its own, and this
+         part is mounted inside one — a second 16 here made the five cells 59 wide where the
+         reference measures 65 (measured on web: (390 − 64 − 32) / 5). The wide lane's column
+         carries its own 16 on the wrapper instead, so both lanes land on the same cell. -->
+    <!-- §3b geometry, in pt: 16 gutter (the host's) · title art ~180×80 · genre 15 ink-3 · tabs 17 semibold,
+         24 apart, underline 2 ink · 16 below · chips 15 bold · grid 5 col, gap 8, cells 65×38 r8,
+         number 17 bold · details synopsis 15 ink-2 lh22, 24 gap, heading 20 bold -->
+    <style as="head" alignItems="center" spacing="8" paddingTop="12" paddingBottom="16"/>
+    <style as="titleFallback" fontSize="20" fontWeight="bold" color="#FFFFFF" textAlign="center" lineLimit="2" lineSpacing="4"/>
+    <style as="genreTxt" fontSize="15" color="#8E8E93" textAlign="center"/>
+    <style as="tabRow" spacing="24" alignItems="center"/>
+    <style as="tabHit" alignItems="center" paddingTop="6" paddingBottom="8" minHeight="44"/>
+    <style as="tabTxt" fontSize="17" fontWeight="semibold"/>
+    <style as="tabRail"/>
+    <style as="tabUnderline" background="#FFFFFF" height="2" radius="1"/>
+    <style as="rangeRow" spacing="20" alignItems="center" paddingTop="16" paddingBottom="12"/>
+    <style as="rangeTxt" fontSize="15" fontWeight="bold" paddingV="8"/>
+    <style as="gridWrap" paddingBottom="16"/>
+    <style as="cell" radius="8" height="38" alignItems="center" background="#2C2C2E"/>
+    <style as="cellNum" fontSize="17" fontWeight="bold"/>
+    <style as="eqBar" width="3" radius="1.5" background="#4ADFB4"/>
+    <style as="detailsWrap" paddingTop="16" paddingBottom="24" spacing="24" alignItems="stretch"/>
+    <style as="synopsisTxt" fontSize="15" color="#C7C7CC" lineSpacing="7"/>
+    <style as="moreHead" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
+    <style as="card" spacing="0" alignItems="stretch"/>
+    <style as="cardTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="2" lineSpacing="3" paddingTop="6"/>
+    <style as="cardGenre" fontSize="13" color="#8E8E93" paddingTop="2"/>
+    <style as="emptyTxt" fontSize="13" color="#8E8E93" textAlign="center" paddingV="24"/>
+  </head>
+
+  <!-- ── the head: title art, genre line ── -->
+  <vstack class="head">
+    <image src="{{ dsx.variable.titleArt }}" visible-if="dsx.variable.titleArt != ''" contentFit="contain"
+           a11yLabel="{{ dsx.variable.title }}" width="180" height="80"
+           style="width: 180px; height: 80px; object-fit: contain"/>
+    <text value="{{ dsx.variable.title }}" class="titleFallback" visible-if="dsx.variable.titleArt == ''"
+          style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+    <text value="{{ dsx.variable.genreLine }}" class="genreTxt" visible-if="dsx.variable.genreLine != ''"/>
+  </vstack>
+
+  <!-- ── the tabs: Episodes | Details, one travelling rule ── -->
+  <vstack spacing="0" alignItems="stretch">
+    <hstack class="tabRow">
+      <vstack class="tabHit" on:tap="dsx.action.setTab({ tab: 'episodes' })" a11yTrait="button"
+              a11yLabel="{{ dsx.variable.pane == 'episodes' ? 'Episodes, selected' : 'Episodes' }}">
+        <text value="Episodes" class="tabTxt" measure="dsx.variable.tabEpBox"
+              color="{{ dsx.variable.pane == 'episodes' ? ink() : ink3() }}"/>
+      </vstack>
+      <vstack class="tabHit" on:tap="dsx.action.setTab({ tab: 'details' })" a11yTrait="button"
+              a11yLabel="{{ dsx.variable.pane == 'details' ? 'Details, selected' : 'Details' }}">
+        <text value="Details" class="tabTxt" measure="dsx.variable.tabDetBox"
+              color="{{ dsx.variable.pane == 'details' ? ink() : ink3() }}"/>
+      </vstack>
+    </hstack>
+    <zstack class="tabRail" grow="width" align="leading" style="width: 100%">
+      <stack class="tabUnderline" width="{{ dsx.variable.tabUnderW }}"
+             offsetX="{{ dsx.variable.tabUnderX }}" anim="easeOut" animDuration="0.2"/>
+    </zstack>
+  </vstack>
+  <stack height="1" background="rgba(255,255,255,0.12)" style="width: 100%"/>
+
+  <!-- ── EPISODES ── -->
+  <vstack alignItems="stretch" spacing="0" visible-if="dsx.variable.pane == 'episodes'">
+    <hstack class="rangeRow" visible-if="dsx.variable.ranges.length > 0">
+      <list bind="dsx.variable.ranges" key="id" axis="horizontal" scroll="false" spacing="20">
+        <text value="{{ item.label }}" class="rangeTxt" a11yTrait="button"
+              a11yLabel="Episodes {{ item.label }}{{ item.i == Number(dsx.variable.range) ? ', selected' : '' }}"
+              color="{{ item.i == Number(dsx.variable.range) ? ink() : ink3() }}"
+              on:tap="dsx.action.pickRange({ i: item.i })"/>
+      </list>
+      <spacer/>
+    </hstack>
+    <vstack class="gridWrap">
+      <!-- the cell is the DIRECT grid child: a wrapper loses the column width (AGENTS.md).
+           38 tall on a 5-column track: at 390pt that is (390 − 32 − 4×8)/5 = 65.2 wide, the
+           measured cell. The lock overlays by position; the equaliser is three accent bars. -->
+      <grid bind="dsx.variable.visibleEps" key="id" columns="5" spacing="8" scroll="false">
+        <vstack class="cell" style="position: relative; height: 38px; justify-content: center; overflow: hidden; box-sizing: border-box; border: {{ item.idx == dsx.variable.curIdx ? '1.5px solid ' + accent() : '0 solid transparent' }}"
+                on:tap="dsx.action.pickEp({ idx: item.idx })"
+                a11yLabel="Episode {{ item.idx }}{{ item.idx == dsx.variable.curIdx ? ', now playing' : '' }}{{ gridLocked ? ', locked' : '' }}"
+                a11yTrait="button" a11yGroup="true">
+          <text value="{{ item.idx }}" class="cellNum" visible-if="item.idx != dsx.variable.curIdx"
+                color="{{ gridLocked ? ink2() : ink() }}"/>
+          <hstack spacing="2" alignItems="flex-end" visible-if="item.idx == dsx.variable.curIdx" a11yHidden="true">
+            <stack class="eqBar" height="10"/>
+            <stack class="eqBar" height="16"/>
+            <stack class="eqBar" height="12"/>
+          </hstack>
+          <image icon="lock.fill" iconSize="10" color="{{ ink3() }}" visible-if="gridLocked" a11yHidden="true"
+                 style="position: absolute; top: 3px; right: 4px"/>
+        </vstack>
+      </grid>
+      <text value="No episodes yet." class="emptyTxt" visible-if="dsx.variable.total == 0"/>
+    </vstack>
+  </vstack>
+
+  <!-- ── DETAILS ── -->
+  <vstack class="detailsWrap" visible-if="dsx.variable.pane == 'details'">
+    <text value="{{ dsx.variable.synopsis }}" class="synopsisTxt"/>
+    <vstack spacing="16" alignItems="stretch" visible-if="dsx.variable.relatedRows.length > 0">
+      <text value="More Like This" class="moreHead"/>
+      <grid bind="dsx.variable.relatedRows" key="id" columns="3" spacing="7" scroll="false">
+        <vstack class="card" on:tap="dsx.action.openShow({ id: item.id })"
+                a11yGroup="true" a11yTrait="button" a11yLabel="{{ item.title }}, {{ item.genre }}">
+          <image src="{{ item.cover == null ? item.poster : item.cover }}" contentFit="cover" a11yHidden="true"
+                 aspectRatio="0.6667" radius="6" style="width: 100%; aspect-ratio: 2/3; border-radius: 6px; object-fit: cover"/>
+          <text value="{{ item.title }}" class="cardTitle"
+                style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+          <text value="{{ item.genre }}" class="cardGenre"/>
+        </vstack>
+      </grid>
+    </vstack>
+  </vstack>
+</vstack>
