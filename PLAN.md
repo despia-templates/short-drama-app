@@ -3819,3 +3819,52 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      MountedLifecycleConformanceTest's copy of the arm seeds the same. Measured after on
      DSX_API36_Phone_Final: the ring paints the thin arc of the true fraction on the first
      and the second mount (`and3-final-watch*.png`).
+
+179. **AN UNSTEERED iOS COLUMN STRETCHED EVERY CHILD — the web and Android hug** (found
+     2026-09-02 on the flagship probe: a bare 17pt run painted 369.7pt wide on iOS against the
+     browser's 59.5; fixed upstream, dev@07d0e9a4 with the fit-content half on the main
+     checkout's ZStack.swift + the Layout half 480b2890/129528f8 pending the Stack.swift merge).
+
+     `Conformance/layout/flex-semantics.json` says `crossStretch({}) == false`: the web sheet
+     rests at `.dsx-stack { align-items: start }`, so a column stretches a child only under an
+     authored `alignItems="stretch"`, and Android's `LayoutSemantics.crossStretch` already
+     reads it that way. iOS's `StackFlexGrow.stretchesCross` stretched everything ("CSS default
+     cross-axis stretch" — the wrong reading); `resolved` now takes the parent's word. Two
+     riders measured on the way: (1) with no synthetic frame a wrapped text run in a
+     height-bounded row took its single-line ideal height (the show header's title on ONE
+     truncated line where the web wraps two), because SwiftUI's probes hand a bare Text its
+     infinite-width answer — CSS sizes such a run FIT-CONTENT (min(ideal, available)) and
+     wraps there, so the column resolver wraps an unsized, non-growing run in
+     `DSXGrownFrame(fit:)`, width = min(ideal, proposal), height = its lines at that width
+     (probe: 243×52 on both lanes). (2) The `textAlign="center"` drift the old stretch masked
+     is gone on both lanes at once. Probe rows D/E/F: 369.7 / 89.3 / 59.3 on iOS against
+     370 / 89.5 / 59.5 in the browser.
+
+180. **A TEXT RUN IN AN iOS ROW TRUNCATED TO THE LEFTOVER WIDTH — the web's `.dsx-text` is
+     `flex: none` and never shrinks** (found 2026-09-02 on the player title; fixed upstream,
+     dev@07d0e9a4; the flagship's title carries the truncation idiom now, 7fe49ab).
+
+     A run that does not grow keeps its ideal width on the web, so a row too narrow for it
+     overflows — no wrap, no ellipsis (probe A: 289.9pt in a 286pt row). SwiftUI's HStack
+     proposed the leftover width and the Text truncated to it (265pt with "…"), which HID the
+     overflow the browser shows. A non-growing, unsized text child of an hstack is now
+     `fixedSize(horizontal:)`; a run that wants to fit says `flex: 1` / `grow="width"` and takes
+     the fill branch — the idiom AGENTS.md already states, which the player title lacked (the
+     web painted the full title past its padding; every lane truncates it now).
+     Named, not changed: a paragraph in a row WITHOUT `flex: 1` is a one-line overflow on the
+     web, and therefore on iOS from this commit on; the linter does not warn yet.
+
+181. **AN iOS GROWN FRAME REPORTED ITS CHILD'S IDEAL WIDTH — CSS gives a flex container the box
+     it was proposed** (found 2026-09-02 the moment 180 landed: a `width: 100%` column holding a
+     307.7pt row in a 402pt screen reported 423.7pt, the route frame centred it and every element
+     on the probe shifted 10.85pt left; fixed upstream, 480b2890 on the integration worktree
+     `/tmp/wt-final`, pending the Stack.swift merge the Taffy session's uncommitted file blocks).
+
+     SwiftUI's `.frame(maxWidth: .infinity)` is at least its child's size. `DSXGrownFrame`
+     (a Layout) returns the clamped proposal on a grown WIDTH, hugs the child under it, and
+     anchors it at the CSS start so an oversized child runs past the trailing edge as the
+     browser paints it. Height keeps SwiftUI's flexible frame on purpose: a row's cross size
+     and a column's flow height are content-driven in CSS — clamping them to the proposal
+     shrank the show header to its poster's height and a rail card to its caption (measured,
+     both, and reverted the same hour). After: probe rows A–G within 0.3pt of the browser and
+     the page back at x = 16; the player's rail 8pt from the web, the CTA identical.
