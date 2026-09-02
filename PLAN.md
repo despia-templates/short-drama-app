@@ -3173,3 +3173,17 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      value, so the three tiers read one truth. TEMPLATE RULE, unchanged: a part reacts to its
      attributes through a `<watch>` over ONE computed key — that idiom was right; the engine was
      not.
+
+158. **THREE ENGINE GAPS THE VAULT AUDIT FILED ARE CLOSED** (2026-09-02; upstream dev@8248d08d ·
+     d56b72c5 · e6665076). (1) A simulator build with no team linked an entitlements file carrying
+     only module keys, so the Keychain refused every vault write (`store_refused`); the iOS export
+     now writes a simulator twin of the entitlements (`application-identifier` +
+     `keychain-access-groups` = `$(AppIdentifierPrefix)$(CFBundleIdentifier)` beside the folded
+     packages' keys) wired as `CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]` — measured after:
+     `plane=keychain_synced durability=synced` on the simulator with a plain xcodebuild. (2)
+     `dsx.module.<x>.context.*` read null on EVERY lane: no `JSE.lookup` had a `module` plane, the
+     read fell into the surface store; all three lookups now fold `module.<alias>.context|state.*`
+     to the primary scheme's app-store row (two rows in `reserved-planes.json`, executors on web,
+     Kotlin and the Swift record lane). (3) `web.boot`: 101 of 108 modules with a `web/index.js`
+     never loaded because the "lazy default" described a loader that did not exist; a discovered
+     web lane boots unless `boot: false`, chunks load in parallel and a failing chunk is named.
