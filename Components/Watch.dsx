@@ -402,7 +402,10 @@
     <action as="syncUrl">
       dsx.module.route.replace({ path: '/watch/' + dsx.variable.showId + '/' + dsx.variable.cur })
     </action>
-    <action as="go" to="target">
+    <!-- keepDrawer: an AUTO-advance must not yank a sheet the viewer opened (measured on iOS:
+         the clip ended with the episodes drawer up and the drawer dismissed itself, reason=
+         programmatic). A tap on a grid cell or arrow closes it; the clock does not. -->
+    <action as="go" to="target" keepDrawer="keepDrawer">
       if (dsx.variable.detailView == null) { return }
       const n = Number(target)
       if (n < 1 || n > dsx.variable.detailView.episodes.length) { return }
@@ -410,7 +413,7 @@
       dsx.variable.page = n - 1;
       dsx.variable.pos = 0;
       dsx.variable.paused = false;
-      dsx.variable.drawer = false;
+      if (keepDrawer != true) { dsx.variable.drawer = false }
       dsx.action.syncUrl()
     </action>
     <!-- the pager rested on a new episode: the swipe IS the navigation -->
@@ -434,7 +437,7 @@
         dsx.action.syncUrl()
         await dsx.action.unlockNow()
       } else {
-        dsx.action.go({ target: n })
+        dsx.action.go({ target: n, keepDrawer: true })
       }
     </action>
     <!-- THE FUNNEL, AT THE EPISODE BOUNDARY: one event per (episode, wall) pair -->
