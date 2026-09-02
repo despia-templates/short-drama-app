@@ -3282,3 +3282,93 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      not pin: a scalar row's KEY under `key="index"` — the web keys it by its string value,
      Android by position — so a scalar-bound list that reorders will animate differently
      until that is settled upstream. Nothing in `Components/` binds a scalar array today.
+
+163. **AN ANDROID COMPONENT ROOT PAINTED NONE OF ITS OWN HEAD'S CLASSES, AND `<hstack>` NEVER
+     READ `flex-wrap`** (found 2026-09-02 on the Membership page; fixed upstream dev@59d8bfc5).
+     The measured shape: every PlanCard body and the BuyButton block rendered empty (later, with
+     content but no card fill, radius or padding, the selection outline hugging the text) while
+     plain markup beside them painted — `scratchpad/android-store-membership.png` (05:08) and
+     `f-out/B-membership.png` (09:12) are the two befores. Two engine rules, neither the
+     template's. (1) `<style as="card">` inside a component's `<head>` was registered where the
+     element arm met it — INSIDE the root's children — while a component ROOT resolves its cascade
+     before its children compose, so `<vstack class="card">` as a root (PlanCard.dsx, BuyButton.dsx)
+     saw an empty class table; the same class on a child painted. iOS hoists the head at instance
+     birth and the web compiles named styles statically, so only this lane missed. Now
+     `ComponentBoundary.headStyles` (:core, pure, document order, later wins, `as`/`id` dropped as
+     the element arm drops them) seeds the instance store BEFORE the root resolves. Pinned:
+     `Conformance/layout/component-boundary.json` `headStyles` (5 rows) and :render
+     `ComponentRootHeadClassesTest` — the real `resolvedAttrs` on the root, red on a bare store
+     (no fill, no padding), green after the hoist. (2) The footer's `<hstack style="justify-content:
+     center; flex-wrap: wrap">` overflowed and wrapped "Terms" letter by letter: the bridge hands
+     `flexWrap` to every element, only the generic `<stack>` arm read it. `LayoutSemantics.wrapsRows`
+     is now the one table both arms ask (`flex-semantics.json` `wrapsRows`, 9 rows); the wrapping
+     flow takes the row's own justify-content. After, on the emulator: `g-out/A2f-membership.png`
+     and `g-out/B-membership.png` — cards to spec §6, the CTA full width, the footer in one row.
+
+164. **THE "SHORT POSTER AT THE FOLD" WAS A PAGE THAT COULD NOT SCROLL: A CLAIM-LESS ANDROID ROUTE
+     FRAME SWALLOWED EVERY VERTICAL DRAG** (found 2026-09-02; fixed upstream dev@054e359e). The
+     report (Home → New, the third New Titles row under the tab bar, `shots-android/android-home-new.png`)
+     read "the poster renders short — NEW and the flame count on one line". Measured, both halves
+     are something else. The poster is not short: the row pitch is 375px = 127 + 16 dp on the
+     1080×2424 phone, the art paints down to the tab bar's hairline (y 2213), and once the page
+     scrolls the row measures 81×127 with "▶ ORIGINAL" at the bottom-left
+     (`g-out/A2g-row3-zoom.png`). The count sits TOP-LEFT next to NEW because the markup puts it
+     there for an ORIGINAL title (App.dsx `countRow` `left: 5px; top: 5px` — "the corner the NEW
+     badge leaves free"; `amnesia` is `original: true, isNew: true, 388_000` views): on an 81pt
+     poster a ~47pt count and a ~44pt badge overlap by ~10pt, on every lane. That is the template's
+     own overlay rule, NOT an engine defect, and it is left as filed here for the design pass. What
+     WAS the engine: nothing in the app scrolled vertically under a swipe — Hot, New, every tab
+     (probe builds A2–A8, `g-out/*-sysout.logcat`): presses reached the page's LazyColumn,
+     `DragInteraction.Start` fired, every Move was consumed at the LazyColumn's own chain, its nearest
+     nested-scroll parent saw pre `(0,0)` and post `(0,0)`, `firstVisibleItemIndex` never changed,
+     a plain `scrollable` placed at the same node received `delta=0.0` per move, and the non-lazy
+     `Column.verticalScroll` path failed identically; taps, horizontal rails and programmatic
+     `scrollBy` all worked. The cause is in `RouterChromeHost`: it put
+     `exitUntilCollapsedScrollBehavior().nestedScrollConnection` on the frame column whether or not
+     a bar composed. That behavior is born with `heightOffsetLimit = -Float.MAX_VALUE`, only the M3
+     TopAppBar ever sets the limit, and its connection is the OUTERMOST nested-scroll parent —
+     asked first — so with no bar it read every upward delta as "still collapsing" and consumed all
+     of it. Every screen without a chrome claim (all of this app) and the whole custom-design lane
+     (spec §−1; its bar never feeds the behavior) were dead. Now the frame lends the connection only
+     while a Material bar composes (`RouterChromeScrollPolicy.barOwnsNestedScroll`), pinned by
+     `RouterChromeTest` and `RouterChromeScrollInstrumentedTest` (a claim-less frame's LazyColumn
+     under a real swipe: red at that HEAD, `first=0 offset=0`; green with the gate). After:
+     `g-out/A2f-hot-scrolled.png`, `g-out/A2g-new-scrolled.png` (the third row at y 1601 → 1130
+     over two swipes). Every earlier Android capture of this template was taken at the fold.
+
+165. **`has()` NOW ANSWERS FOR A SCHEME THAT ANSWERS, AND A HOLLOW MODULE IS SAID OUT LOUD** (found
+     2026-09-02; fixed upstream dev@f0e078de on all three registries; web pins in dev@d6972f42).
+     Every registry routed a module the moment it registered and `isAvailable` read that table —
+     `routes.keys.contains(scheme)` — so a module whose setup registered NOTHING (a licence
+     decision, a swallowed error, a surface deferred to a hook) answered `has(scheme) == true`
+     while every call into it was `unknown_action`, and nothing logged why. BuyButton picks its
+     lane from that answer. THE LAW: a scheme is available when its registration ANSWERS — an
+     action on the table that scheme dispatches through, a pre-filter, an in-process action, a
+     hydration, a ready block, a hook — or when the module registered a component under the
+     scheme's name (Kotlin via the `JSE.componentAvailable` seam, Swift `StackComponents.has`, the
+     web's `moduleAnswers`). A hollow registration reads false and logs ONE line at registration
+     naming the module and scheme; the boot line appends `hollow (…)`; a Kotlin `setup()` that
+     throws is refused by name instead of taking boot down. The contract row is
+     `Conformance/errors/errors.json` `a-scheme-nobody-answers-is-not-a-capability` — red at HEAD
+     on all three executors (TS errors-conformance, Kotlin ErrorsConformanceTest, the Swift
+     jse-record errors host: `schemeAvailable errfx.hollow != false`), green now (31 cases each).
+     On device with Store, RevenueCat and Stripe folded: `Bootstrapped 13 plugin(s): […, revenuecat,
+     …, store, stripe]` with no hollow suffix, and Membership takes the IAP lane ("Purchases are not
+     available yet on this deployment." — `has('store')` true, the server's REVENUECAT_KEY absent),
+     where the premium-less build says "In-app purchases are not available in this build."
+     (`g-out/B-membership.png` vs `g-out/A2f-membership.png`). The template changes nothing.
+
+166. **THE STRIPE PACKAGE'S ANDROID LANE COMPILES AGAIN, SO AN EXPORT WITH STRIPE IN `packages`
+     BUILDS** (found 2026-09-02, §6.123's "refused by name"; fixed upstream dev@efc4e369). Folding
+     Core/Payments/Stripe failed at `compileDebugKotlin` with 26 errors and took the whole app
+     (`scratchpad/f-build-B-red.log`): `FinancialConnectionsSheet` / `FinancialConnectionsSheetResult`
+     live in `com.stripe:financial-connections`, which `stripe-android` does not pull transitively
+     (its pom lists payments-core and paymentsheet only) — dsx.json now declares the coordinate at
+     the same 23.17.0 pin, the way the iOS lane declares StripeFinancialConnections beside
+     StripePaymentSheet — and `CollectBankAccountResult` moved to `payments.bankaccount.navigation`;
+     `MandateDataParams.Type.Online(inferFromClient:)` is an INTERNAL constructor, `Online.DEFAULT`
+     is the public spelling of the same value; `InlineBinding` read its constructor parameter from a
+     member. Green: `scratchpad/f-build-B-green.log`, then from the committed HEAD an export with
+     Stripe + Store + RevenueCat under a local `despia-entitlement.json` (`g-build-B.log` exit 0,
+     40 MB apk) that boots with `stripe` in the registry (`g-out/B-sysout.logcat`). Still upstream
+     and NOT this pass: the iOS pod pin `StripePaymentSheet 26.7.0` that trunk cannot resolve.
