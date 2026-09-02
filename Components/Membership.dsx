@@ -159,7 +159,10 @@
     <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
     <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
     <!-- a purchase column, capped like a form: the plan cards are a decision, not a grid -->
-    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 560)</variable>
+    <!-- 720, not 560: the shell pads its gutters INSIDE the cap (86px each on desktop), and a
+         560 cap left the plan cards 388px — the price and its period wrapped. 720 gives the
+         single column 548px at desktop and binds nowhere on a phone. -->
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 720)</variable>
 
     <!-- the price a row displays: the store's localized string when the build asked one,
          else the server's list price. Read by BARE NAME inside the repeater (AGENTS.md). -->

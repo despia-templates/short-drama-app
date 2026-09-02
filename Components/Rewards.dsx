@@ -112,7 +112,14 @@
     <variable as="bp" computed="true">return bpOf(dsx.screen.width)</variable>
     <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
     <!-- the content column: the reference's 16pt inset on a phone, a capped centred column wide -->
-    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 640)</variable>
+    <variable as="shellMax" computed="true">return 640</variable>
+    <variable as="shell" computed="true">return shellOf(dsx.variable.bp, dsx.variable.shellMax)</variable>
+    <!-- THE RULES PILL HANGS OFF THE COLUMN, NOT THE WINDOW. It is absolutely positioned in the
+         full-width pager wrapper, so `right: -16px` is the screen edge on a phone and the WINDOW
+         edge on a desktop — measured at 1440: the column sat at 400..1040 and the pill at 1392.
+         The inset is the column's own margin, derived from the same cap the shell uses, so on a
+         phone it is still -16 and byte-identical on every lane. -->
+    <variable as="rulesRight" computed="true">return Math.max(0, Math.round((dsx.screen.width - dsx.variable.shellMax) / 2)) - 16</variable>
     <!-- ONE computed list for the column that pulls up under the hero wash: a `{{ chunk }}`
          beside other declarations is discarded (AGENTS.md) -->
     <variable as="shellPull" computed="true">return dsx.variable.shell + '; margin-top: -132px'</variable>
@@ -875,7 +882,7 @@
       <!-- the Rules pill (9.0): over the first tab only, hugging the right screen edge -->
       <hstack class="rulesPill" visible-if="dsx.variable.tab == 0" on:tap="dsx.action.openRules()"
               a11yTrait="button" a11yLabel="Rules"
-              style="position: absolute; right: -16px; top: 4px; border-radius: 16px">
+              style="position: absolute; right: {{ dsx.variable.rulesRight }}px; top: 4px; border-radius: 16px">
         <text value="Rules" class="rulesTxt"/>
       </hstack>
     </zstack>
