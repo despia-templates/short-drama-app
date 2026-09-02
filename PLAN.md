@@ -4284,3 +4284,14 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      law with two twins — route an `.svg` image source through a rasteriser that carries linear
      and radial gradients (first-stop fallback, never a dropped image), `stop-opacity`, group
      transforms and arcs — and it did not fit the hour.
+
+     RIDER (parent session, the same afternoon, on the MERGED build): the hero's absence on both
+     natives had a NEARER cause than the decoder. The origin negotiates art per client
+     (`scripts/serve.mjs`: a UA without "Mozilla" receives the pre-rasterised PNG twin), and the
+     twins for the two Rewards SVGs had never been generated — `scripts/rasterize-art.mjs` was
+     not re-run after the art landed, and the origin warned `no PNG twin … serving SVG (blank on
+     native)` to a log nobody read. Generated (94 twins), the hero and the success coin paint on
+     iOS and Android from the same markup — proof in the closing sheets. The bisect above stands
+     for the DIRECT `.svg` path and stays the engine's item. Two changes so no deploy can skip
+     the step again: `npm run art:raster` exists and `predeploy` runs it, and `npm run verify`
+     now fails on any SVG under `public/{posters,assets}` without a twin.

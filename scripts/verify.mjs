@@ -32,7 +32,7 @@
 //
 import { spawn } from "node:child_process";
 import { createHmac, randomUUID } from "node:crypto";
-import { existsSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, mkdtempSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { resolve, dirname, join } from "node:path";
@@ -741,6 +741,23 @@ console.log("\nthe store lane's contract");
   const { catalogueRows, storekitDocument, STOREKIT_FILE } = await import("./storekit.mjs");
   const skPath = resolve(root, STOREKIT_FILE);
   check("the StoreKit configuration file ships at the app root", existsSync(skPath), `${STOREKIT_FILE} missing — run node scripts/storekit.mjs`);
+  // Every SVG under public/{posters,assets} needs its PNG twin: the origin hands native clients
+  // the twin (scripts/serve.mjs art negotiation) and a missing one degrades to a blank image
+  // on iOS and Android with only a console warning. The Rewards hero shipped that way on
+  // 2026-09-02 — the art landed, rasterize-art.mjs was never re-run — so the gate reads the
+  // directories rather than trusting the checklist (PLAN.md §6.194 rider).
+  {
+    const missing = [];
+    for (const dir of ["posters", "assets"]) {
+      const abs = resolve(root, "public", dir);
+      if (!existsSync(abs)) continue;
+      for (const f of readdirSync(abs)) {
+        if (f.endsWith(".svg") && !existsSync(resolve(abs, f.replace(/\.svg$/, ".png")))) missing.push(`${dir}/${f}`);
+      }
+    }
+    check("every SVG art asset has its PNG twin for the native lanes", missing.length === 0,
+      `${missing.length} without a twin (${missing.slice(0, 4).join(", ")}) — run npm run art:raster`);
+  }
   if (existsSync(skPath)) {
     const sk = JSON.parse(readFileSync(skPath, "utf8"));
     const skIds = sk.products.map((p) => p.productID).sort();
