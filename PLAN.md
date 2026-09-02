@@ -3012,3 +3012,38 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      `IllegalStateException` from a media factory is the platform saying "module missing", which
      `on:error` should carry rather than the process dying — filed as the follow-up for
      MediaElements.kt (catch the factory's reflection failure and report it as a media error).
+152. **THE CUSTOM-DESIGN LANE IS AN ENGINE LAW NOW, ON ALL THREE RENDERERS** (2026-09-02, the
+     custom-design audit — framework dev@f2f77c96 → 4b8d05d5 and following). `design: "custom"`
+     used to be read by one thing on any lane: the text field's well. Everything else kept the
+     platform's look — iOS drew UISwitch, the `.menu` picker, UISegmentedControl, UISlider, the
+     system sheet grabber + material + dim and `.alert`; Android drew the M3 Switch, Checkbox,
+     DropdownMenu, SegmentedButtonRow, Slider, ModalBottomSheet handle + scrim, AlertDialog and a
+     TopAppBar over a wallpaper-tinted `surface` backdrop; the web painted its own skin at its own
+     metrics (a 63×28 toggle, a 36×5 grabber over a 32% scrim). The contract is
+     `OpenSource/Conformance/design/custom-controls.json`: sixteen colour ROLES (the app's
+     `--dsx-*` tokens — theme.css re-pins over the web skin's literals; native lanes never resolve
+     a UIColor slot or an M3 role under custom) and the geometry of every control part with each
+     colour named by role (toggle 51×31/27, checkbox 20 r5 with a 1.5 outline, slider 4/14, sheet
+     r20 with a 36×4 grabber 8 below the edge over a 60% scrim, alert 300 r16 with 48 hairline
+     rows, segmented 17/600 under a 2 underline, selection rows 52 with a 16 check, toast r10,
+     sheet chrome 20/700 with a 34 fill circle and 12/16/16/16 insets, the route bar 48). Kernel
+     tables `CustomDesign.swift` / `CustomDesign.kt` + `custom-design.ts`; runners on every lane
+     (sheet + engine legs on web, tables + instrumented render on Android, the record lane on
+     iOS). WHAT THIS TEMPLATE DOES NOW: declare the palette in `theme.css` beside App.json and
+     list it in `dsx.json web.styles` (the native export compiles the sheets that list names;
+     the root-file tier is web-only until compile_project_css.rb reads it) — spec §0's tones map
+     onto `--dsx-accent`, `--dsx-background`, `--dsx-grouped-background` (panel),
+     `--dsx-secondary-grouped-background` (card), `--dsx-fill` (chip / toggle off), `--dsx-separator`
+     (hairline), `--dsx-label` / `--dsx-secondary-label` / `--dsx-tertiary-label` (ink ·2 ·3),
+     `--dsx-control-outline` (#48484A), `--dsx-scrim`; a members-only gold toggle is `color=` on the
+     element. §6.147's three leaks are closed in the engine: the web nested-sheet title takes the
+     scheme its literal `background` implies (`derivedSheetScheme`), Android's sheet chrome paints
+     the app's ink in a fill circle with the web's 12/16/16/16 insets on both arms, and the iOS
+     `content` detent presents edge-attached (`presentationSizing(.page)`). NAMED, NOT HIDDEN: the
+     web `<picker>` keeps the browser's `<select>` popup for its OPEN list (closed box custom); the
+     iOS long-press `<contextmenu>` stays UIKit's platter; UIKit derives caret and selection from
+     one tint, so the iOS selection reads label-tinted where web/Android draw accent@40%; the
+     iOS sheet dim is the app's own scrim over an undimmed system sheet (detents/drag/cascade stay
+     UIKit's); StoreKit / Play sheets, the keyboard and the date wheels are platform-owned. Every
+     `design: "system"` app is byte-identical to before.
+
