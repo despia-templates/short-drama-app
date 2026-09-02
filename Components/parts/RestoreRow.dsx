@@ -63,9 +63,13 @@
      "Sign in" and performed a restore anyway, so the label and the action disagreed. -->
 <vstack spacing="0" alignItems="stretch">
   <head>
-    <attribute as="variant" default="'row'"/>   <!-- row | compact | link -->
+    <attribute as="variant" default="'row'"/>   <!-- row | compact | link | pill | ceiling -->
 
     <event as="restored" payload="coins"/>
+    <!-- the PILL keeps no result line of its own (a nav-row control has nowhere to print one),
+         so every outcome is also raised as an event and the host toasts it where its other
+         messages land -->
+    <event as="noted" payload="message"/>
 
     <api as="restoreCall" url="/store/restore" method="POST" auto="false" headers="global.auth.headers"/>
     <!-- the NATIVE sweep. Same trust shape, different question — server/store.dsx
@@ -113,6 +117,12 @@
     <variable as="btnLabel" computed="true">
       if (dsx.variable.busy) { return 'Checking…' }
       return dsx.variable.signedIn ? 'Restore' : 'Sign in'
+    </variable>
+    <!-- the pill's word, through localize() so the table reaches a computed (scripts/strings.mjs) -->
+    <variable as="pillLabel" computed="true">
+      if (dsx.variable.busy) { return localize('Checking…') }
+      if (dsx.variable.signedIn) { return localize('Restore') }
+      return localize('Sign in')
     </variable>
 
     <!-- THE EMIT SHELL (Components/parts/Analytics.dsx). Four lines, and they are copied
@@ -192,6 +202,7 @@
       // first, then say what could not be checked — the opposite order loses the money.
       if (restored == 0 && failure != '') {
         dsx.variable.result = failure
+        dsx.event('noted', { message: failure })
         return
       }
       dsx.action.track({ name: 'restore', props: { phase: 'done', lane: dsx.variable.lane, checked: checked, restored: restored } })
@@ -201,6 +212,7 @@
         } else {
           dsx.variable.result = 'Checked ' + checked + ' pending purchase(s): none had completed payment, so nothing was applied.'
         }
+        dsx.event('noted', { message: dsx.variable.result })
         return
       }
       let got = ''
@@ -214,6 +226,7 @@
       if (more) { said = said + ' More are still waiting — tap Restore again to finish.' }
       if (failure != '') { said = said + ' One lane could not be checked: ' + failure }
       dsx.variable.result = said
+      dsx.event('noted', { message: said })
       dsx.event('restored', { coins: coins })
     </action>
 
@@ -228,7 +241,22 @@
     <style as="linkTxt" fontSize="12" fontWeight="semibold" color="#8E8E93" minHeight="32"/>
     <style as="linkNote" fontSize="12" color="#8E8E93" textAlign="center" lineSpacing="4"/>
     <style as="compactBtn" background="rgba(255,255,255,0.08)" radius="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
+    <!-- the nav-row PILL (spec §10: "Restore" top-right on /vip and /membership — 15pt on
+         rgba(255,255,255,0.12), radius 8). The 44pt hit area is the wrapper; the pill is the
+         visible part inside it, so the control meets the tap floor without a chunky chrome. -->
+    <style as="pillWrap" minHeight="44" alignItems="center" spacing="0"/>
+    <style as="pillTxt" background="rgba(255,255,255,0.12)" radius="8" paddingH="12" paddingV="7" fontSize="15" fontWeight="medium" color="#FFFFFF"/>
   </head>
+
+  <!-- PILL — the nav-row control; outcomes go out as `noted`, the host prints them -->
+  <hstack class="pillWrap" visible-if="dsx.attribute.variant == 'pill'" on:tap="dsx.action.tapped()"
+          a11yGroup="true" a11yTrait="button" a11yLabel="Restore purchases made on this account">
+    <text value="{{ dsx.variable.pillLabel }}" class="pillTxt"/>
+  </hstack>
+
+  <!-- CEILING — the disclosure alone, for a page whose control is the pill above: what this
+       lane cannot reach is still said where the reader is (Article 7) -->
+  <text value="{{ dsx.variable.ceiling }}" class="note" visible-if="dsx.attribute.variant == 'ceiling'"/>
 
   <!-- LINK — the footer spelling: one word beside Terms and Privacy (Membership) -->
   <vstack class="linkWrap" visible-if="dsx.attribute.variant == 'link'">
@@ -238,7 +266,7 @@
   </vstack>
 
   <!-- ROW — the disclosure spelling, under a benefit list -->
-  <hstack class="row" visible-if="dsx.attribute.variant != 'compact' &amp;&amp; dsx.attribute.variant != 'link'">
+  <hstack class="row" visible-if="dsx.attribute.variant != 'compact' &amp;&amp; dsx.attribute.variant != 'link' &amp;&amp; dsx.attribute.variant != 'pill' &amp;&amp; dsx.attribute.variant != 'ceiling'">
     <image icon="arrow.clockwise" iconSize="15" color="rgba(255,255,255,0.45)" a11yHidden="true"/>
     <vstack spacing="3" style="flex: 1; min-width: 0" alignItems="stretch">
       <text value="Restore purchases" class="label"/>

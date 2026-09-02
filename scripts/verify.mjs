@@ -243,6 +243,15 @@ check("browse and search never offer a coming-soon title", await (async () => {
   const found = await fetch(`${base}/catalog/search`, { method: "POST", headers: anon, body: JSON.stringify({ q: soon.title.slice(0, 12) }) }).then((r) => r.json());
   return !all.items.some((i) => i.id === soon.id) && !found.items.some((i) => i.id === soon.id);
 })(), "a coming-soon show is reachable through browse or search, which lands on an empty grid");
+check("browse sorts by the query it was asked for, and every row carries the Hot flag", await (async () => {
+  const g = browse.genres[0].name;
+  const latest = await fetch(`${base}/catalog/browse/${encodeURIComponent(g)}?sort=latest`).then((r) => r.json());
+  const trending = await fetch(`${base}/catalog/browse/${encodeURIComponent(g)}?sort=trending`).then((r) => r.json());
+  const hotFirst = (items) => { let seenCold = false; for (const i of items) { if (i.hot) { if (seenCold) return false; } else seenCold = true; } return true; };
+  return latest.sort === "latest" && trending.sort === "trending" && latest.total === trending.total
+    && latest.items.every((i) => typeof i.hot === "boolean") && hotFirst(trending.items)
+    && (browse.sort === "trending");
+})(), "the genre page's Trending | Latest chips ask the server for an order it did not honour");
 check("browse offers tag chips beside the genres",
   Array.isArray(browse.tags) && browse.tags.length > 0 && browse.tags.every((t) => t.count > 1),
   `${JSON.stringify(browse.tags ?? null).slice(0, 120)} — a chip that narrows to one title is a dead end`);
@@ -739,12 +748,35 @@ console.log("\nthe store lane's contract");
     check("the StoreKit configuration sells exactly the products the origin sells",
       JSON.stringify(skIds) === JSON.stringify(liveIds),
       `storekit ${JSON.stringify(skIds)} vs origin ${JSON.stringify(liveIds)} — run node scripts/storekit.mjs`);
+    // THE SHELF CARRIES THE LIST PRICE. A live offer (server/store.dsx, the `offer` entity)
+    // lowers a tier's charged `cents` for its window and reports the table price beside it as
+    // `listCents`; the StoreKit file is generated from the table, so it is the list price the
+    // simulator sells at — an offer's native twin is a separate store product (the row's
+    // `product_id`), never a rewrite of this file.
     check("...at the prices the table charges, every one a consumable",
       sk.products.every((p) => {
         const row = rows.find((r) => r.productId === p.productID);
-        return row !== undefined && Number(p.displayPrice) === row.cents / 100 && p.type === "Consumable";
+        return row !== undefined && Number(p.displayPrice) === (row.listCents ?? row.cents) / 100 && p.type === "Consumable";
       }),
       JSON.stringify(sk.products.map((p) => [p.productID, p.displayPrice, p.type])));
+
+    // ── THE LIMITED OFFER IS A ROW THE PRICE LIST CARRIES, OR NOTHING ─────────────────
+    // Every tier names `offerEndsAt` (an ISO end or empty) and `listCents`; a live offer lowers
+    // `cents` below the list and sends the coupon (`offer`) naming the same tier, at the same
+    // price, so the card, the coupon and the Stripe charge cannot disagree. No offer is not a
+    // failure — the seed writes one six hours ahead and a run after that is a plain shelf.
+    check("every tier carries the offer clock slot and its list price",
+      tiers.every((t) => typeof t.offerEndsAt === "string" && Number.isFinite(t.listCents) && t.listCents >= t.cents),
+      JSON.stringify(tiers.map((t) => [t.id, t.cents, t.listCents, t.offerEndsAt])));
+    const live = tiers.filter((t) => t.offerEndsAt !== "" && new Date(t.offerEndsAt).getTime() > Date.now());
+    const discounted = live.filter((t) => t.cents < t.listCents);
+    check("a discounted live offer is the coupon the origin sends, and a coupon names a discounted live tier",
+      (discounted.length === 0) === (cat.offer === null || cat.offer === undefined)
+      && (cat.offer == null || (discounted.some((t) => t.id === cat.offer.sku && t.price === cat.offer.price && t.listPrice === cat.offer.regular && t.offerEndsAt === cat.offer.endsAt))),
+      `offer=${JSON.stringify(cat.offer)} live=${JSON.stringify(live.map((t) => [t.id, t.cents, t.listCents]))}`);
+    check("/store/plans is the same table under the name the design spec uses",
+      JSON.stringify(await fetch(`${base}/store/plans`).then((r) => r.json())) === JSON.stringify(cat),
+      "/store/plans and /store/catalog answered differently — they are one action behind two paths");
     check("...and the file is current against server/store.dsx",
       JSON.stringify(storekitDocument(catalogueRows()), null, 2) + "\n" === readFileSync(skPath, "utf8"),
       "the price table changed after the file was generated — run node scripts/storekit.mjs");

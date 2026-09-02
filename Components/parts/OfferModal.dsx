@@ -1,0 +1,110 @@
+<!-- OfferModal — the "Surprise — Limited Time Offer" coupon (docs/design/reference-ui-spec.md
+     §10), the category's centred card: 300 wide, radius 16, panel fill, over a 60% dim — the
+     app's own alert geometry (spec −1), never a system alert on any lane.
+
+     SERVER-DRIVEN OR ABSENT. This surface renders only when the price list carries an `offer`
+     (server/store.dsx: an operator's row with a real offer price and an end), and every number
+     on it is that row's — the plan name, the offer price, the struck regular price, the clock.
+     It sells nothing itself: "Claim this offer" raises `claim` and the owner SELECTS that plan,
+     so the purchase still goes through the one control (<BuyButton>) on the one lane the build
+     can use. The owner also decides how often it shows (once per session, `global.offerSeen`).
+
+     THE COPY SAYS WHAT THE PRODUCT IS. The reference card reads "{intro} for the 1st week, then
+     {price} per week" — a subscription sentence, and this backend sells dated passes with no
+     renewal (the price table header). So the lines under the coupon say one charge, nothing
+     renews, and that the list price returns when the timer ends. Every line is a bare literal
+     at a display point, so the string seam reaches it; the numbers stay numbers in their own
+     nodes. Gradient: the CSS run for web, the catalog's gradient words for native (AGENTS.md).
+
+     THE OVERLAY IS THE SECOND LAYER OF THE OWNER'S ZSTACK (Membership.dsx / Store.dsx "band"):
+     greedy on both axes so it covers the band natively, absolute edge insets for the web, a
+     zIndex above the sticky foot and the toast. It is NOT a vstack child: measured on iOS, an
+     absolute layer inside a column took a stack slot in flow, the scroll shrank to what was
+     left and the foot sat mid-screen — the absolute plane is honoured inside a zstack (the
+     CoverCard law). There is no scrim tap-to-dismiss on purpose: the close control and "Maybe
+     later" are the two exits, and both are 44pt targets. -->
+<vstack class="scrim" visible-if="dsx.variable.shown" zIndex="40" grow="true" align="center" alignItems="center"
+        style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; z-index: 1000; background: rgba(0,0,0,0.6); justify-content: center; align-items: center"
+        a11yGroup="true" a11yLabel="Limited time offer">
+  <head>
+    <attribute as="present" default="false"/>
+    <attribute as="sku" default="''"/>        <!-- the plan the coupon names, echoed on claim -->
+    <attribute as="label" default="''"/>      <!-- the plan name (server copy) -->
+    <attribute as="price" default="''"/>      <!-- the offer price the OWNER resolved -->
+    <attribute as="regular" default="''"/>    <!-- the list price it beats -->
+    <attribute as="period" default="''"/>     <!-- "30 days" -->
+    <attribute as="endsAt" default="''"/>     <!-- ISO end of the window -->
+    <attribute as="now" default="0"/>         <!-- the owner's ticking clock (ms) -->
+
+    <event as="claim" payload="sku"/>
+    <event as="dismiss" payload="reason"/>
+
+    <variable as="shown" computed="true">
+      const p = dsx.attribute.present
+      return p === true || p === 'true'
+    </variable>
+    <variable as="countdown" computed="true">return countdownText(dsx.attribute.endsAt, Number(dsx.attribute.now))</variable>
+
+    <action as="claim">dsx.event('claim', { sku: dsx.attribute.sku })</action>
+    <action as="dismiss">dsx.event('dismiss', { reason: 'later' })</action>
+
+    <!-- spacing 0: one child, and a component root pays one `spacing` slot for its own <head> on
+         iOS (PLAN.md §6.185b) — the default 8 would sit the card 4pt below centre -->
+    <style as="scrim" background="rgba(0,0,0,0.6)" paddingH="24" spacing="0"/>
+    <style as="card" background="#141414" radius="16" width="300" maxWidth="300" paddingH="20" paddingV="20" spacing="12" alignItems="stretch"/>
+    <style as="headRow" alignItems="flex-start" spacing="10"/>
+    <style as="eyebrow" fontSize="13" fontWeight="semibold" color="#F6B63D" tracking="0.6" textCase="uppercase"/>
+    <style as="title" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
+    <style as="closeBtn" width="32" height="32" radius="16" background="rgba(255,255,255,0.1)" alignItems="center"/>
+    <!-- the coupon: the VIP gold run, ink on gold -->
+    <style as="coupon" gradient="#F7E3AE|#E8C77A|#DDB35E" gradientDir="vertical" radius="12" paddingH="16" paddingV="14" spacing="6" alignItems="stretch"/>
+    <style as="couponLabel" fontSize="15" fontWeight="semibold" color="#3A2A08"/>
+    <style as="couponPrice" fontSize="32" fontWeight="bold" color="#2A1D04"/>
+    <style as="couponPeriod" fontSize="15" color="#3A2A08" paddingBottom="6"/>
+    <style as="couponStruck" fontSize="15" color="#3A2A08" strikethrough="true" paddingBottom="6"/>
+    <style as="endsRow" spacing="5" alignItems="center"/>
+    <style as="endsTxt" fontSize="13" fontWeight="semibold" color="#3A2A08"/>
+    <style as="body" fontSize="13" color="#C7C7CC" lineSpacing="4"/>
+    <style as="cta" background="#FF2C55" radius="24" minHeight="48" fontSize="17" fontWeight="bold" color="#FFFFFF"/>
+    <style as="later" fontSize="15" fontWeight="medium" color="#8E8E93" textAlign="center" minHeight="44"/>
+  </head>
+
+  <Theme/>
+  <vstack class="card" style="align-self: center; width: 300px; max-width: 100%">
+    <hstack class="headRow">
+      <vstack spacing="2" grow="width" style="flex: 1; min-width: 0" alignItems="stretch">
+        <text value="Surprise" class="eyebrow"/>
+        <text value="Limited Time Offer" class="title"/>
+      </vstack>
+      <vstack class="closeBtn" style="justify-content: center" on:tap="dsx.action.dismiss()"
+              a11yTrait="button" a11yLabel="Close the offer">
+        <image icon="xmark" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
+      </vstack>
+    </hstack>
+
+    <vstack class="coupon" style="background: linear-gradient(160deg, #F7E3AE 0%, #E8C77A 55%, #DDB35E 100%)">
+      <text value="{{ dsx.attribute.label }}" class="couponLabel"/>
+      <hstack spacing="8" alignItems="flex-end" style="flex-wrap: wrap">
+        <text value="{{ dsx.attribute.price }}" class="couponPrice"/>
+        <hstack spacing="0" alignItems="center" class="couponPeriod">
+          <text value="/" class="couponPeriod" paddingBottom="0"/>
+          <text value="{{ dsx.attribute.period }}" class="couponPeriod" paddingBottom="0"/>
+        </hstack>
+        <text value="{{ dsx.attribute.regular }}" class="couponStruck" style="text-decoration: line-through"/>
+      </hstack>
+      <hstack class="endsRow">
+        <image icon="timer" iconSize="13" color="#3A2A08" a11yHidden="true"/>
+        <text value="Ends in" class="endsTxt"/>
+        <text value="{{ dsx.variable.countdown }}" class="endsTxt"/>
+      </hstack>
+    </vstack>
+
+    <text value="One charge for the whole pass. Nothing renews and there is nothing to cancel." class="body"/>
+    <text value="The list price applies again once the timer runs out." class="body"/>
+
+    <button label="Claim this offer" class="cta" on:tap="dsx.action.claim()"
+            a11yLabel="Claim this offer and select the plan"/>
+    <text value="Maybe later" class="later" on:tap="dsx.action.dismiss()"
+          a11yTrait="button" a11yLabel="Close the offer for now" style="line-height: 44px"/>
+  </vstack>
+</vstack>

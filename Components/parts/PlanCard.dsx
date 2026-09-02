@@ -1,36 +1,49 @@
-<!-- PlanCard — one plan on the Membership page (docs/design/reference-ui-spec.md §6), drawn
-     to the measured geometry: card fill, radius 12, padding 16; a 1.5pt select-green outline
-     on the SELECTED card; the title 13 semibold gold; the price 22 bold beside its period 13
-     and — when the plan is cheaper than the shortest pass would be over the same days — the
-     struck reference price; the tier note 13; a 40pt gold crown; and the "% OFF" badge
-     overhanging the top-right corner by 4pt.
+<!-- PlanCard — one membership plan, drawn to the category's card (docs/design/reference-ui-spec.md
+     §10, NetShort + iDrama): card fill, radius 12, 20 padding; the plan name 20 semibold gold;
+     the price 32 bold gold beside its period 17 ink-3 and — when the row is cheaper than the
+     shortest pass over the same days — the struck reference price and the "% OFF" pill; the
+     server's one-line term ("One charge for 30 days. No auto-renewal."); then the 2×2 BENEFITS
+     GRID (an 18pt catalog glyph beside a 15pt word). The SELECTED card wears a 1.5pt gold
+     border. Two corner badges, both data: a live countdown ("05:59:59", 13 semibold white on
+     the accent) at the top-right while the server's `offerEndsAt` is ahead of the clock, and
+     "Good Bargain" (accent → orange) at the top-left on the row the server flags `best`.
 
-     A ROW TEMPLATE, NOT A SCREEN. Membership binds a <list> to the store catalogue and
-     mounts this file as the row, so every fact arrives as an attribute from `item.*` and the
-     ONE thing the card does back is say it was tapped (`pick`). It owns no money code and
+     A ROW TEMPLATE, NOT A SCREEN. Membership and Store bind a <list> to the store catalogue
+     and mount this file as the row, so every fact arrives as an attribute from `item.*` and
+     the ONE thing the card does back is say it was tapped (`pick`). It owns no money code and
      fetches nothing: the price it prints is whatever its owner resolved — the server's list
      price on the web, the store's localized price on a device (Membership `planPrice`).
 
      EVERY NUMBER IS DATA. `off` and `refPrice` are computed by the SERVER from the row's own
-     cents (server/store.dsx storeCatalog), so the badge cannot claim a percentage the price
-     does not support; a row whose `off` is 0 has no badge and no struck price.
+     cents (server/store.dsx storeCatalog), so the pill cannot claim a percentage the price does
+     not support; `offerEndsAt` is an operator's row and the clock reads it against a `now` the
+     OWNER ticks (one interval per screen, not one per card — the attribute is what re-renders
+     the badge every second); `best` is the row's own flag. The benefits are `vipBenefits()`
+     (Components/parts/Theme.dsx) — the one paid promise, never a second copy — read as the
+     grid's `short` word here and as the row form on the /vip page.
 
      THE OUTLINE IS SPELLED TWICE ON PURPOSE (AGENTS.md: add the attribute, keep the CSS):
      `borderWidth`/`borderColor` are the cross-platform twins the native bridges read, and the
-     `border:` declaration is what the web sheet reads. `position: absolute` on the badge is
-     bridged on both native lanes now (edge insets), so the overhang is one spelling. -->
+     `border:` declaration is what the web sheet reads. The badges are `position: absolute` +
+     edge insets, bridged on both native lanes; the web adds a per-corner radius (the outer
+     corner follows the card, the inner corner is 8) that the catalog's single `radius` cannot
+     spell — native draws the badge at a uniform 8, the one named ± on this card. -->
 <vstack class="card" style="{{ dsx.variable.cardFx }}" borderWidth="1.5" borderColor="{{ dsx.variable.ring }}"
+        paddingTop="{{ dsx.variable.padTop }}"
         on:tap="dsx.event('pick', { id: dsx.attribute.id })"
         a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.attribute.label }}, {{ dsx.attribute.price }}">
   <head>
     <attribute as="id" default="''"/>          <!-- the catalogue id, echoed back on pick -->
     <attribute as="label" default="''"/>       <!-- the plan name the server sent -->
     <attribute as="price" default="''"/>       <!-- the price the OWNER resolved (localized on a device) -->
-    <attribute as="period" default="''"/>      <!-- "7 days" — the server's word for the term -->
+    <attribute as="period" default="''"/>      <!-- "30 days" — the server's word for the term -->
     <attribute as="refPrice" default="''"/>    <!-- the struck reference price, or empty -->
-    <attribute as="off" default="0"/>          <!-- whole-percent saving, 0 = no badge -->
+    <attribute as="off" default="0"/>          <!-- whole-percent saving, 0 = no pill -->
     <attribute as="note" default="''"/>        <!-- the tier note: what one charge buys -->
     <attribute as="selected" default="false"/>
+    <attribute as="best" default="false"/>     <!-- the server's best-value flag: the Good Bargain badge -->
+    <attribute as="offerEndsAt" default="''"/> <!-- ISO end of a live offer, or empty -->
+    <attribute as="now" default="0"/>          <!-- the owner's ticking clock (ms) -->
 
     <event as="pick" payload="id"/>
 
@@ -40,50 +53,85 @@
       const s = dsx.attribute.selected
       return s === true || s === 'true'
     </variable>
-    <variable as="hasOff" computed="true">return Number(dsx.attribute.off) > 0</variable>
-    <variable as="ring" computed="true">return dsx.variable.isSelected ? planSelected() : 'rgba(0,0,0,0)'</variable>
-    <variable as="cardFx" computed="true">
-      return 'position: relative; border: 1.5px solid ' + dsx.variable.ring + '; transition: border-color 0.15s ease'
+    <variable as="bestOn" computed="true">
+      const b = dsx.attribute.best
+      return b === true || b === 'true'
     </variable>
+    <variable as="hasOff" computed="true">return Number(dsx.attribute.off) > 0</variable>
+    <variable as="live" computed="true">return offerLive(dsx.attribute.offerEndsAt, Number(dsx.attribute.now))</variable>
+    <variable as="countdown" computed="true">return countdownText(dsx.attribute.offerEndsAt, Number(dsx.attribute.now))</variable>
+    <variable as="ring" computed="true">return dsx.variable.isSelected ? gold() : 'rgba(0,0,0,0)'</variable>
+    <variable as="cardFx" computed="true">
+      return 'position: relative; overflow: hidden; border: 1.5px solid ' + dsx.variable.ring + '; transition: border-color 0.15s ease'
+    </variable>
+    <!-- the Good Bargain badge sits INSIDE the top-left corner, over the title's line, so the
+         card pads its top by the badge's height on that row (one value, both lanes). THE TOP
+         EDGE IS DECLARED HERE AND NOWHERE ELSE: the `card` class below spells H and BOTTOM only,
+         because iOS ADDS a `paddingTop` attribute to a class `paddingV` instead of overriding it
+         (measured +20pt on every card; the web overrides — PLAN.md §6.185). One declaration per
+         edge is the same pixels on both lanes and needs no fix to land. -->
+    <variable as="padTop" computed="true">return dsx.variable.bestOn ? 42 : 20</variable>
+    <!-- the 2×2 grid's rows: the one paid promise (Theme.dsx), never copied -->
+    <variable as="benefits" computed="true">return vipBenefits()</variable>
 
-    <style as="card" background="#1C1C1E" radius="12" paddingH="16" paddingV="16" spacing="0" alignItems="stretch"/>
-    <style as="body" spacing="12" alignItems="center"/>
-    <style as="col" spacing="6" alignItems="stretch"/>
-    <style as="title" fontSize="13" fontWeight="semibold" color="#F6B63D"/>
+    <!-- spacing 0 ON THE ROOT, the rhythm on `body`: a component root pays one `spacing` slot for
+         its own <head> on iOS (PLAN.md §6.185b — measured +spacing at the top of every mounted
+         card, +0 inline), so the root declares none and the inner column declares the 10 -->
+    <style as="card" background="#1C1C1E" radius="12" paddingH="20" paddingBottom="20" spacing="0" alignItems="stretch"/>
+    <style as="body" spacing="10" alignItems="stretch"/>
+    <style as="title" fontSize="20" fontWeight="semibold" color="#F6B63D"/>
     <style as="priceRow" spacing="6" alignItems="flex-end"/>
-    <style as="price" fontSize="22" fontWeight="bold" color="#FFFFFF"/>
-    <style as="period" fontSize="13" color="#8E8E93"/>
-    <style as="struck" fontSize="13" color="#8E8E93" strikethrough="true"/>
-    <style as="note" fontSize="13" color="#8E8E93" lineSpacing="5"/>
-    <style as="badge" background="#F6B63D" radius="6" paddingH="6" paddingV="2" spacing="3" alignItems="center"/>
-    <style as="badgeTxt" fontSize="11" fontWeight="bold" color="#000000"/>
+    <style as="price" fontSize="32" fontWeight="bold" color="#F6B63D"/>
+    <style as="period" fontSize="17" color="#8E8E93"/>
+    <style as="periodRow" spacing="0" alignItems="center" paddingBottom="6"/>
+    <style as="struck" fontSize="15" color="#8E8E93" strikethrough="true" paddingBottom="7"/>
+    <style as="offPill" background="#F6B63D" radius="6" paddingH="6" paddingV="2" spacing="3" alignItems="center"/>
+    <style as="offTxt" fontSize="11" fontWeight="bold" color="#000000"/>
+    <style as="note" fontSize="15" color="#8E8E93" lineSpacing="4"/>
+    <style as="cell" spacing="8" alignItems="center" minHeight="24"/>
+    <style as="cellTxt" fontSize="15" color="#FFFFFF" lineLimit="2"/>
+    <!-- the two corner badges: 13 semibold white, the countdown on the accent, the bargain on
+         the accent → orange run (the catalog's gradient words are the native twin of the CSS) -->
+    <style as="timer" background="#FF2C55" radius="8" paddingH="10" paddingV="5" fontSize="13" fontWeight="semibold" color="#FFFFFF" zIndex="2"/>
+    <style as="bargain" gradient="#FF2C55|#FF6A3D" gradientDir="horizontal" radius="8" paddingH="10" paddingV="5" fontSize="13" fontWeight="semibold" color="#FFFFFF" zIndex="2"/>
   </head>
 
   <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
        Theme.dsx), and a caller must not have to remember to register it first. -->
   <Theme/>
-  <hstack class="body">
-    <vstack class="col" grow="width" style="flex: 1; min-width: 0">
-      <text value="{{ dsx.attribute.label }}" class="title"/>
-      <hstack class="priceRow" style="flex-wrap: wrap">
-        <text value="{{ dsx.attribute.price }}" class="price"/>
-        <hstack spacing="0" alignItems="flex-end" paddingBottom="3">
-          <text value="/" class="period"/>
-          <text value="{{ dsx.attribute.period }}" class="period"/>
-        </hstack>
-        <text value="{{ dsx.attribute.refPrice }}" class="struck" paddingBottom="3"
-              style="text-decoration: line-through" visible-if="dsx.variable.hasOff"/>
-      </hstack>
-      <text value="{{ dsx.attribute.note }}" class="note"/>
-    </vstack>
-    <image icon="crown.fill" iconSize="40" color="{{ gold() }}" a11yHidden="true"/>
+  <vstack class="body">
+  <text value="{{ dsx.attribute.label }}" class="title"/>
+  <hstack class="priceRow" style="flex-wrap: wrap">
+    <text value="{{ dsx.attribute.price }}" class="price"/>
+    <hstack class="periodRow">
+      <text value="/" class="period"/>
+      <text value="{{ dsx.attribute.period }}" class="period"/>
+    </hstack>
+    <text value="{{ dsx.attribute.refPrice }}" class="struck" visible-if="dsx.variable.hasOff"
+          style="text-decoration: line-through"/>
+    <!-- two texts, not one composite, so "OFF" is a word the string table can translate
+         while the number stays a number -->
+    <hstack class="offPill" visible-if="dsx.variable.hasOff" style="margin-bottom: 9px">
+      <text value="{{ dsx.attribute.off }}%" class="offTxt"/>
+      <text value="OFF" class="offTxt"/>
+    </hstack>
   </hstack>
+  <text value="{{ dsx.attribute.note }}" class="note"/>
 
-  <!-- the badge: two texts, not one composite, so "OFF" is a word the string table can
-       translate while the number stays a number -->
-  <hstack class="badge" visible-if="dsx.variable.hasOff" zIndex="1"
-          style="position: absolute; top: -4px; right: -4px; z-index: 1">
-    <text value="{{ dsx.attribute.off }}%" class="badgeTxt"/>
-    <text value="OFF" class="badgeTxt"/>
-  </hstack>
+  <!-- the 2×2 benefits grid: a grid sizes its DIRECT children, so the cell is the row -->
+  <grid bind="dsx.variable.benefits" key="id" columns="2" spacing="10" scroll="false" paddingTop="4">
+    <hstack class="cell" a11yGroup="true" a11yLabel="{{ item.label }}">
+      <image icon="{{ item.icon }}" iconSize="18" color="#FFFFFF" a11yHidden="true"/>
+      <text value="{{ item.short }}" class="cellTxt" grow="width" style="flex: 1; min-width: 0"/>
+    </hstack>
+  </grid>
+  </vstack>
+
+  <!-- the countdown, top-right, only while the server's offer is ahead of the clock -->
+  <text value="{{ dsx.variable.countdown }}" class="timer" visible-if="dsx.variable.live"
+        a11yLabel="Offer ends in {{ dsx.variable.countdown }}"
+        style="position: absolute; top: 0; right: 0; border-radius: 0 12px 0 8px"/>
+  <!-- the best-value flag, top-left -->
+  <text value="Good Bargain" class="bargain" visible-if="dsx.variable.bestOn"
+        style="position: absolute; top: 0; left: 0; border-radius: 12px 0 8px 0; background: linear-gradient(90deg, #FF2C55 0%, #FF6A3D 100%)"/>
 </vstack>

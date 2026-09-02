@@ -226,6 +226,7 @@
       function rankBronze() { return '#CE8B5C' }
       function gemLift() { return '#FF7BAA' }         /* the VIP gem gradient, top stop */
       function gemDeep() { return '#B3103A' }         /* ... and its end stop */
+      function bargainEnd() { return '#FF6A3D' }      /* the "Good Bargain" corner badge: accent → this (spec §10) */
 
 
       /* ── THE VIP PROMISE, SAID ONCE ───────────────────────────────────────────────
@@ -246,15 +247,62 @@
          Three rows and not four. "1080p" and "Offline downloads" were deleted in an
          earlier pass because nothing in this app delivers either; padding the list back
          to four would re-create the defect that removal fixed. */
+      /* FOUR ROWS NOW, and the fourth is still a server fact rather than a fill: the
+         membership cards wear the category`s 2×2 benefits grid (spec §10), whose reference
+         cells read "Unlimited viewing · Ad-Free · 1080P quality · Download" — and the last
+         two are exactly the rows this list deleted, for the reasons above. So the fourth cell
+         is the one claim `unlockEpisode` makes that b1 only implied: the pass has NO
+         catalogue exceptions, so a series added tomorrow is unlocked the moment it lands.
+         `short` is the grid cell`s word (15pt beside an 18pt glyph in a 160pt cell); `label`
+         and `note` are the row form the /vip page, the Membership rewards list and the plans
+         sheet`s detail level print. */
+      /* THROUGH localize(): a data row in a <functions> block is not a display point, so
+         these words never reached the tables and rendered English inside every locale
+         (found while adding the grid). The kernel`s own JSE verb resolves them here, the
+         extractor reads the literal as a key (scripts/strings.mjs localizeCallKeys), and
+         the languageRows() device row two functions down is the precedent. */
       function vipBenefits() {
         return [
-          { id: 'b1', icon: 'lock.open.fill',         label: 'Every episode unlocked',
-            note: 'Paid episodes open at 0 coins, on every series in the catalogue — including the ones added while your pass runs' },
-          { id: 'b2', icon: 'dollarsign.circle.fill', label: 'Your coins stay yours',
-            note: 'A VIP unlock debits nothing, so the balance you bought is still there when the pass ends' },
-          { id: 'b3', icon: 'bolt.fill',              label: 'No ads',
-            note: 'The one rewarded ad this app shows is switched off while your pass is active' }
+          { id: 'b1', icon: 'lock.open.fill',         short: localize('Unlimited viewing'),   label: localize('Every episode unlocked'),
+            note: localize('Paid episodes open at 0 coins, on every series in the catalogue') },
+          { id: 'b2', icon: 'bolt.fill',              short: localize('Ad-free'),             label: localize('No ads'),
+            note: localize('The one rewarded ad this app shows is switched off while your pass is active') },
+          { id: 'b3', icon: 'dollarsign.circle.fill', short: localize('Coins untouched'),     label: localize('Your coins stay yours'),
+            note: localize('A VIP unlock debits nothing, so the balance you bought is still there when the pass ends') },
+          { id: 'b4', icon: 'sparkles',               short: localize('New series included'), label: localize('New series included'),
+            note: localize('A pass has no catalogue exceptions, so a series added while it runs is unlocked the moment it lands') }
         ]
+      }
+
+      /* ── THE LIMITED OFFER CLOCK (spec §10) ─────────────────────────────────────────
+         The price list carries `offerEndsAt` on a tier while an operator`s offer row is in
+         the future (server/store.dsx); the card wears a countdown badge until then. Both
+         halves read the SAME two facts — the ISO end and a ticking `now` the screen keeps —
+         so a card cannot show a clock the server did not send. The digits are grown from a
+         non-numeric anchor because JSE `+` is total arithmetic: `'0' + 5` is the number 5,
+         `'x0' + 5` is the string x05, and the anchor is sliced off (AGENTS.md). No `<` and
+         no `&&` in this block (the body caveat above). */
+      function offerLive(endsAt, now) {
+        if (endsAt == null) { return false }
+        if (endsAt == '') { return false }
+        return new Date(endsAt).getTime() - now >= 1000
+      }
+      function twoDigits(n) {
+        let out = 'x'
+        if (n >= 10) { out = out + n } else { out = out + '0'; out = out + n }
+        return out.slice(1)
+      }
+      function countdownText(endsAt, now) {
+        if (offerLive(endsAt, now) != true) { return '' }
+        const left = Math.floor((new Date(endsAt).getTime() - now) / 1000)
+        const h = Math.floor(left / 3600)
+        const m = Math.floor((left - h * 3600) / 60)
+        const s = left - h * 3600 - m * 60
+        let out = twoDigits(h) + ':'
+        out = out + twoDigits(m)
+        out = out + ':'
+        out = out + twoDigits(s)
+        return out
       }
 
       /* ── THE CLAIMABLE TOTAL, ONE ARITHMETIC ────────────────────────────────────────

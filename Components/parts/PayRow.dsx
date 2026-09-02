@@ -1,0 +1,46 @@
+<!-- PayRow — the payment method above the sticky CTA (docs/design/reference-ui-spec.md §10):
+     ONE outlined pill (1pt accent border, radius 12, 48 tall) naming the lane that will take the
+     money, with a filled check at its trailing edge because it is the only option and it is
+     already chosen. The category draws a radio list here; this app has exactly one legal
+     method per lane, so the list is one row and says so.
+
+     THE LANE IS THE SAME PICK <BuyButton> MAKES, in the house form (AGENTS.md, the <AdGate>
+     precedent): CAPABILITY FIRST — a build with the store module sells through the platform
+     store wherever it runs, and only then does `os` decide which store's words to use;
+     `os == 'web'` is Stripe. A native build shipped WITHOUT the module still names its
+     platform's store here, because that is the only method App Store 3.1.1 / Play Payments
+     allow it — <BuyButton> refuses the purchase on its own line in that case, and this row
+     never claims a method a browser lane could use on a phone.
+
+     It renders no price and buys nothing; it is the label of a fact the control below acts on. -->
+<vstack alignItems="stretch" spacing="0">
+  <head>
+    <variable as="lane" computed="true">
+      if (has('store')) { return os == 'android' ? 'play' : 'apple' }
+      if (os == 'web') { return 'card' }
+      return os == 'android' ? 'play' : 'apple'
+    </variable>
+    <variable as="laneLabel" computed="true">
+      if (dsx.variable.lane == 'apple') { return 'Pay with Apple, through the App Store' }
+      if (dsx.variable.lane == 'play') { return 'Pay with Google Play' }
+      return 'Pay by card, through Stripe'
+    </variable>
+
+    <style as="pill" radius="12" minHeight="48" paddingH="16" spacing="10" alignItems="center" borderWidth="1" borderColor="#FF2C55"/>
+    <style as="pillTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
+  </head>
+
+  <Theme/>
+  <hstack class="pill" style="border: 1px solid #FF2C55" a11yGroup="true" a11yLabel="{{ dsx.variable.laneLabel }}">
+    <image icon="apple.logo" iconSize="18" color="#FFFFFF" a11yHidden="true" visible-if="dsx.variable.lane == 'apple'"/>
+    <image icon="play.fill" iconSize="16" color="#FFFFFF" a11yHidden="true" visible-if="dsx.variable.lane == 'play'"/>
+    <image icon="lock.shield" iconSize="18" color="#FFFFFF" a11yHidden="true" visible-if="dsx.variable.lane == 'card'"/>
+    <!-- three literals rather than one nested ternary: the string seam reads a ternary whose
+         arms are BARE literals, and a nested one is not (scripts/strings.mjs) -->
+    <text value="Apple" class="pillTxt" visible-if="dsx.variable.lane == 'apple'"/>
+    <text value="Google Play" class="pillTxt" visible-if="dsx.variable.lane == 'play'"/>
+    <text value="Card (Stripe)" class="pillTxt" visible-if="dsx.variable.lane == 'card'"/>
+    <spacer/>
+    <image icon="checkmark.circle.fill" iconSize="20" color="{{ brand() }}" a11yHidden="true"/>
+  </hstack>
+</vstack>

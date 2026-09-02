@@ -2,16 +2,22 @@
      (and a modal the player can raise mid-paywall), separate from /rewards which is the
      EARN lane. Two lanes, two surfaces: this is how the category ships it.
 
-     THE MONEY IS ONE CONTROL, ON EVERY LANE. Tapping a pack SELECTS it; <BuyButton>
-     (Components/parts/BuyButton.dsx) buys the selection — Core/Store through the RevenueCat
-     provider inside an iOS or Android build (App Store 3.1.1: coins are an in-app-purchase
-     product), the Stripe sheet on the web storefront — and the server grants on both lanes
-     (server/store.dsx). On a device the price shown is the STORE's localized string for the
-     pack's product id (`store.catalog`); the server's list price is the web's answer. This
-     screen owns no checkout, no settle, no recovery card and no refusal of its own any more:
-     the control carries all four, once, for the coin store and the Membership page alike.
-     The VIP section is a door to that page (Components/Membership.dsx). -->
-<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px">
+     THE MONEY IS ONE CONTROL, ON EVERY LANE. Tapping a plan or a pack SELECTS it — one
+     selection across both groups, the way the category's store page works — and <BuyButton>
+     (Components/parts/BuyButton.dsx) buys the selection from a STICKY FOOT outside the scroll:
+     Core/Store through the RevenueCat provider inside an iOS or Android build (App Store
+     3.1.1: coins and passes are in-app-purchase products), the Stripe sheet on the web
+     storefront — and the server grants on both lanes (server/store.dsx). On a device the
+     price shown is the STORE's localized string for the row's product id (`store.catalog`);
+     the server's list price is the web's answer. This screen owns no checkout, no settle, no
+     recovery card and no refusal of its own: the control carries all four, once, for the coin
+     store and the Membership page alike.
+
+     THE PAGE IS THE CATEGORY'S (docs/design/reference-ui-spec.md §10): the membership cards
+     first (the same <PlanCard> the Membership page draws, the countdown badge while the
+     server's offer is live), then the coin packs two across, the "Tips:" block, restore, the
+     door to the EARN lane; the payment method and the CTA pinned at the foot. -->
+<vstack class="screen" style:web="min-height: {{ dsx.screen.height }}px" on:appear="dsx.action.armTick()">
   <head>
     <expects variable="nav"/>
 
@@ -21,9 +27,10 @@
     <api as="wallet" url="/wallet/state" ssr="false" auto="global.auth.ok == true" headers="global.auth.headers" on:success="global.cacheWallet = global.auth.ok == true ? wallet.data : null"/>
 
     <variable as="toast">return ''</variable>
-    <variable as="sel">return ''</variable>        <!-- the tapped pack; empty = the first row -->
+    <variable as="sel">return ''</variable>        <!-- the tapped plan or pack; empty = the first pack -->
     <variable as="prices">return {}</variable>     <!-- productId -> localized price, from the store -->
     <variable as="hovId">return ''</variable>
+    <variable as="now">return Date.now()</variable> <!-- the offer clock, ticked by armTick -->
 
     <!-- signed in is the seam, not the presence of a fetched JSON file (docs/auth.md) -->
     <variable as="signedIn" computed="true">return global.auth.ok == true</variable>
@@ -31,14 +38,10 @@
     <variable as="signedOut" computed="true">
       return dsx.variable.authKnown &amp;&amp; dsx.variable.signedIn == false
     </variable>
-    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
-         last good payload lives in the app-wide store and is the FIRST PAINT while the
-         refetch runs. Read catalogView, never catalog.data, or the blank frame returns. -->
-    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the
-         last good payload lives in the app-wide store and is the FIRST PAINT while the
-         refetch runs. Read walletView, never wallet.data, or the blank frame returns. -->
-    <!-- viewer-scoped stash: a signed-out frame must not read the last balance out of
-         the app-wide store (docs/auth.md) -->
+    <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the last good
+         payload lives in the app-wide store and is the FIRST PAINT while the refetch runs.
+         Read catalogView / walletView, never the block, or the blank frame returns. A
+         signed-out frame must not read the last balance out of the app-wide store. -->
     <variable as="walletView" computed="true">
       if (dsx.variable.signedIn == false) { return null }
       if (wallet.data != null) { return wallet.data }
@@ -52,11 +55,8 @@
     <variable as="wide" computed="true">return isWide(dsx.variable.bp)</variable>
     <variable as="gutter" computed="true">return gutterOf(dsx.variable.bp)</variable>
     <variable as="vipCols" computed="true">return dsx.variable.bp == 'phone' ? 1 : 3</variable>
-    <variable as="packCols" computed="true">
-      if (dsx.variable.bp == 'desktop') { return 3 }
-      if (dsx.variable.bp == 'tablet') { return 3 }
-      return 2
-    </variable>
+    <!-- two across on a phone (spec §10), three where the column can hold them -->
+    <variable as="packCols" computed="true">return dsx.variable.bp == 'phone' ? 2 : 3</variable>
     <variable as="shell" computed="true">return shellOf(dsx.variable.bp, 1100)</variable>
     <variable as="balance" computed="true">
       if (dsx.variable.walletView == null) { return 0 }
@@ -66,67 +66,130 @@
       if (dsx.variable.walletView == null) { return false }
       return dsx.variable.walletView.vip === true
     </variable>
-    <!-- one phase per data source: the catalogue is the screen's content -->
+    <!-- one phase per data source: the catalogue is the screen's content; an error branch
+         must also test the view is empty (AGENTS.md) -->
     <variable as="phase" computed="true">
-      if (catalog.error != null) { return 'error' }
+      if (catalog.error != null &amp;&amp; dsx.variable.catalogView == null) { return 'error' }
       if (dsx.variable.catalogView == null) { return 'loading' }
       return 'content'
     </variable>
-    <!-- ── the selection ── the first pack is selected until a tap says otherwise, exactly
-         as the Membership page treats its plans -->
     <variable as="packs" computed="true">
       const c = dsx.variable.catalogView
       if (c == null || c.packs == null) { return [] }
       return c.packs
     </variable>
+    <variable as="tiers" computed="true">
+      const c = dsx.variable.catalogView
+      if (c == null || c.vip == null) { return [] }
+      return c.vip
+    </variable>
+    <!-- ── THE SELECTION, one across plans and packs ── the first pack is selected until a
+         tap says otherwise: this is the coin store, and a viewer sent here by a paywall wants
+         coins first; the plans above are the same cards the Membership page sells -->
     <variable as="selId" computed="true">
       if (dsx.variable.sel != '') { return dsx.variable.sel }
       const p = dsx.variable.packs
-      if (p.length == 0) { return '' }
-      return p[0].id
+      if (p.length > 0) { return p[0].id }
+      const t = dsx.variable.tiers
+      if (t.length > 0) { return t[0].id }
+      return ''
+    </variable>
+    <variable as="selTier" computed="true">
+      for (const t of dsx.variable.tiers) { if (t.id == dsx.variable.selId) { return t } }
+      return null
     </variable>
     <variable as="selPack" computed="true">
       for (const p of dsx.variable.packs) { if (p.id == dsx.variable.selId) { return p } }
       return null
     </variable>
+    <variable as="selKind" computed="true">return dsx.variable.selTier != null ? 'vip' : 'coins'</variable>
+    <variable as="selRow" computed="true">
+      if (dsx.variable.selTier != null) { return dsx.variable.selTier }
+      return dsx.variable.selPack
+    </variable>
     <variable as="selProductId" computed="true">
-      const p = dsx.variable.selPack
-      if (p == null) { return '' }
-      return p.productId == null ? p.id : p.productId
+      const r = dsx.variable.selRow
+      if (r == null) { return '' }
+      return r.productId == null ? r.id : r.productId
     </variable>
     <variable as="selPrice" computed="true">
-      const p = dsx.variable.selPack
-      if (p == null) { return '' }
+      const r = dsx.variable.selRow
+      if (r == null) { return '' }
       const m = dsx.variable.prices
-      const pid = p.productId == null ? p.id : p.productId
+      const pid = r.productId == null ? r.id : r.productId
       if (m != null &amp;&amp; m[pid] != null) { return m[pid] }
-      return p.price
+      return r.price
+    </variable>
+    <variable as="selLabel" computed="true">
+      const t = dsx.variable.selTier
+      return t == null ? '' : t.label
+    </variable>
+    <variable as="selNote" computed="true">
+      const t = dsx.variable.selTier
+      return t == null ? '' : t.note
+    </variable>
+    <!-- the row's billing shape (server/store.dsx `renews`): the subscription copy for a renewing
+         row, the pass note otherwise — Membership.dsx carries the same branch and the reasoning -->
+    <variable as="selRenews" computed="true">
+      const t = dsx.variable.selTier
+      if (t == null) { return false }
+      return t.renews === true
     </variable>
     <!-- the verb goes through localize() so the string table reaches a component attribute -->
-    <variable as="ctaLabel" computed="true">return localize('Buy for')</variable>
-    <!-- the cheapest pass the catalogue sent, for the door to the Membership page -->
-    <variable as="fromPrice" computed="true">
+    <variable as="ctaLabel" computed="true">
+      if (dsx.variable.selRenews) { return localize('Subscribe now') }
+      return localize('Pay now')
+    </variable>
+    <!-- THE COUPON, or null (server/store.dsx storeCatalog `offer`), shown once per session -->
+    <variable as="offerView" computed="true">
       const c = dsx.variable.catalogView
-      if (c == null || c.vip == null || c.vip.length == 0) { return '' }
-      let low = c.vip[0]
-      for (const t of c.vip) { if (t.cents < low.cents) { low = t } }
-      return low.price
+      if (c == null) { return null }
+      if (c.offer == null) { return null }
+      return c.offer
+    </variable>
+    <variable as="offerLiveNow" computed="true">
+      const o = dsx.variable.offerView
+      if (o == null) { return false }
+      return offerLive(o.endsAt, dsx.variable.now)
+    </variable>
+    <!-- answered once per OFFER WINDOW: a page load is not a session on the web, so the answer
+         rides the cookie jar keyed by the window's end (the one declared cross-platform place —
+         Theme.dsx restoreLocale has the whole argument); the in-memory flag covers the route
+         changes in between -->
+    <variable as="offerShown" computed="true">
+      if (dsx.variable.offerLiveNow == false) { return false }
+      if (global.offerSeen == true) { return false }
+      const seen = dsx.cookie.offerSeen
+      if (seen == null) { return true }
+      return seen != dsx.variable.offerView.endsAt
+    </variable>
+    <variable as="offerPrice" computed="true">
+      const o = dsx.variable.offerView
+      if (o == null) { return '' }
+      const m = dsx.variable.prices
+      if (m != null &amp;&amp; o.productId != null &amp;&amp; m[o.productId] != null) { return m[o.productId] }
+      return o.price
     </variable>
 
-    <!-- the card's whole look is ONE computed string (a bare {{ }} fragment beside other
-         declarations is discarded — AGENTS.md); the SELECTED pack wears the select-green ring
-         the Membership page's cards wear, and a pointer device gets the hover lift -->
+    <!-- the pack card's whole look is ONE computed string (a bare {{ }} fragment beside other
+         declarations is discarded — AGENTS.md); the SELECTED pack wears the same 1.5 gold ring
+         the plan cards wear, and a pointer device gets the hover lift -->
     <formula as="packCardFx" id="item.id">
       const lift = dsx.variable.hovId == ('p-' + id) ? 'translateY(-2px)' : 'none'
-      const ring = dsx.variable.selId == id ? planSelected() : 'rgba(0,0,0,0)'
+      const ring = dsx.variable.selId == id ? gold() : 'rgba(0,0,0,0)'
       return 'border: 1.5px solid ' + ring + '; transform: ' + lift + '; transition: transform 0.18s ease, border-color 0.15s ease'
     </formula>
     <formula as="packRing" id="item.id">
-      return dsx.variable.selId == id ? planSelected() : 'rgba(0,0,0,0)'
+      return dsx.variable.selId == id ? gold() : 'rgba(0,0,0,0)'
     </formula>
-    <!-- the price a pack displays: the store's localized string when the build asked one,
+    <!-- the price a row displays: the store's localized string when the build asked one,
          else the server's list price (read by BARE NAME inside the repeater) -->
     <formula as="packPrice" pid="item.productId" listed="item.price">
+      const m = dsx.variable.prices
+      if (m != null &amp;&amp; pid != null &amp;&amp; m[pid] != null) { return m[pid] }
+      return listed
+    </formula>
+    <formula as="planPrice" pid="item.productId" listed="item.price">
       const m = dsx.variable.prices
       if (m != null &amp;&amp; pid != null &amp;&amp; m[pid] != null) { return m[pid] }
       return listed
@@ -141,17 +204,18 @@
       dsx.variable.sel = id
     </action>
     <!-- the catalogue landed: stash it app-wide (one key per ENDPOINT), then ask the store
-         for the localized prices of the packs it names -->
+         for the localized prices of every product it names, and arm the offer clock -->
     <action as="catalogLanded">
       global.cacheCatalog = catalog.data
       dsx.action.loadPrices()
+      dsx.action.armTick()
     </action>
     <action as="loadPrices">
       if (!has('store')) { return }
-      const packs = dsx.variable.packs
-      if (packs.length == 0) { return }
       const ids = []
-      for (const row of packs) { ids.push(row.productId == null ? row.id : row.productId) }
+      for (const row of dsx.variable.tiers) { ids.push(row.productId == null ? row.id : row.productId) }
+      for (const row of dsx.variable.packs) { ids.push(row.productId == null ? row.id : row.productId) }
+      if (ids.length == 0) { return }
       const r = await dsx.module.store.catalog({ provider: 'revenuecat', product: ids })
       if (r == null || r.ok === false || r.products == null) { return }
       const map = {}
@@ -160,26 +224,53 @@
       }
       dsx.variable.prices = map
     </action>
+    <!-- THE OFFER CLOCK: one keyed interval while any tier is counting down (Membership.dsx
+         carries the same three lines and the same reasoning) -->
+    <action as="armTick">
+      let live = false
+      for (const row of dsx.variable.tiers) { if (offerLive(row.offerEndsAt, Date.now())) { live = true } }
+      if (live == false) { clearInterval('offerTick'); return }
+      dsx.variable.now = Date.now()
+      setInterval(() => { dsx.action.tick() }, 1000, 'offerTick')
+    </action>
+    <action as="tick">
+      dsx.variable.now = Date.now()
+      let live = false
+      for (const row of dsx.variable.tiers) { if (offerLive(row.offerEndsAt, dsx.variable.now)) { live = true } }
+      if (live == false) { clearInterval('offerTick') }
+    </action>
     <!-- the grant landed (server-side, on either lane): the wallet re-reads and the toast
-         names the coins — a number the SERVER answered with, never the row's promise -->
+         names what the SERVER answered with, never the row's promise -->
     <action as="bought" kind="kind" coins="coins" days="days">
       wallet.refresh()
+      if (kind == 'vip') { dsx.variable.toast = 'VIP is active. Every episode is unlocked.'; return }
       if (coins != null) { dsx.variable.toast = 'Added ' + coins + ' coins' }
       else { dsx.variable.toast = 'This purchase was already applied.' }
     </action>
     <action as="buyFailed" message="message">
       dsx.variable.toast = message
     </action>
+    <action as="noted" message="message">
+      dsx.variable.toast = message
+    </action>
+    <action as="claimOffer" sku="sku">
+      global.offerSeen = true
+      dsx.cookie.offerSeen = dsx.variable.offerView == null ? '' : dsx.variable.offerView.endsAt
+      if (sku != null &amp;&amp; sku != '') { dsx.variable.sel = sku }
+    </action>
+    <action as="dismissOffer" reason="reason">
+      global.offerSeen = true
+      dsx.cookie.offerSeen = dsx.variable.offerView == null ? '' : dsx.variable.offerView.endsAt
+    </action>
 
     <style as="screen" background="#000000" alignItems="stretch" grow="true" spacing="0"/>
+    <style as="band" alignItems="stretch"/>
+    <style as="pageCol" alignItems="stretch" spacing="0"/>
     <style as="scroller" alignItems="stretch"/>
     <!-- NO paddingTop on `page`: <TopNav> is the first child, so a padded page pushes the
-         GLOBAL BAR down — measured at 16px here against 0 everywhere else, which made the
-         bar visibly drop when a route change crossfaded Home into Store. The spacing the
-         page wanted belongs BELOW the bar, on the content (12 + 16 = 28), which leaves the
-         phone lane — where no bar renders — pixel-identical. -->
-    <style as="page" spacing="0" paddingBottom="32" alignItems="stretch"/>
-    <style as="section" spacing="14" alignItems="stretch" paddingTop="32"/>
+         GLOBAL BAR down (measured, PLAN.md §6.26); the spacing belongs BELOW the bar -->
+    <style as="page" spacing="0" paddingBottom="24" alignItems="stretch"/>
+    <style as="section" spacing="14" alignItems="stretch" paddingTop="28"/>
 
     <style as="head" alignItems="center" spacing="12"/>
     <style as="h1" fontSize="20" fontWeight="bold" color="#FFFFFF" tracking="-0.3"/>
@@ -189,27 +280,29 @@
     <style as="toastRow" background="rgba(246,182,61,0.12)" radius="10" paddingH="12" paddingV="10" spacing="10" alignItems="center"/>
     <style as="toastLine" fontSize="14" fontWeight="medium" color="#F6B63D" lineSpacing="4"/>
     <style as="sectionTitle" fontSize="24" fontWeight="bold" color="rgba(255,255,255,0.8)" tracking="-0.3"/>
-    <style as="sectionNote" fontSize="13" color="rgba(255,255,255,0.45)"/>
+    <style as="sectionNote" fontSize="13" color="rgba(255,255,255,0.45)" lineSpacing="3"/>
 
-    <style as="packCard" background="#141419" radius="12" paddingH="16" paddingV="16" spacing="8" alignItems="flex-start"/>
-    <style as="packCoins" fontSize="20" fontWeight="bold" color="#FFFFFF"/>
-    <style as="packLine" fontSize="12" color="rgba(255,255,255,0.5)"/>
-    <style as="packPrice" fontSize="15" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="packBonus" background="#FF2C55" radius="4" paddingH="6" paddingV="2" fontSize="11" fontWeight="bold" color="#FFFFFF"/>
-    <style as="coinRow" spacing="6" alignItems="center"/>
+    <!-- the coin pack (spec §10): the coin glyph and the count 24 bold, "+bonus" 17 ink-3
+         beside it, the price 17 ink-3 under; radius 12 -->
+    <style as="packCard" background="#1C1C1E" radius="12" paddingH="16" paddingV="16" spacing="8" alignItems="flex-start"/>
+    <style as="coinRow" spacing="6" alignItems="flex-end"/>
+    <style as="packCoins" fontSize="24" fontWeight="bold" color="#FFFFFF"/>
+    <style as="bonusRow" spacing="0" alignItems="center" paddingBottom="3"/>
+    <style as="packBonus" fontSize="17" color="#8E8E93"/>
+    <style as="packPrice" fontSize="17" color="#8E8E93"/>
 
     <style as="retryBtn" background="#FF2C55" radius="20" paddingH="20" paddingV="12" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
-
     <style as="errCard" background="#141419" radius="14" spacing="10" paddingH="16" paddingV="20" alignItems="center"/>
 
     <style as="earnCard" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="12" alignItems="stretch"/>
     <style as="earnTitle" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
     <style as="earnNote" fontSize="13" color="rgba(255,255,255,0.5)" lineSpacing="3"/>
     <style as="earnCta" background="rgba(255,255,255,0.1)" radius="24" paddingV="14" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
-    <!-- the door to the plans: the membership CTA's own gold (spec 6), 52 tall, radius 14 -->
-    <style as="planDoor" background="#F5D33D" radius="14" minHeight="52" paddingH="16" paddingV="12" spacing="12" alignItems="center"/>
-    <style as="planDoorTitle" fontSize="17" fontWeight="bold" color="#000000"/>
-    <style as="planDoorNote" fontSize="13" color="#3A2A08"/>
+    <!-- THE STICKY FOOT: a sibling of the scroll, pinned on every renderer with no positioning -->
+    <style as="foot" background="#000000" paddingTop="10" paddingBottom="10" alignItems="stretch" spacing="0"/>
+    <style as="footCol" spacing="10" alignItems="stretch"/>
+    <style as="footLine" fontSize="13" color="#8E8E93" textAlign="center" lineSpacing="4"/>
+    <style as="footRow" spacing="4" alignItems="center"/>
   </head>
 
   <!-- the design vocabulary (breakpoints, gutters, shells, palette) registers here.
@@ -219,7 +312,13 @@
   <!-- the funnel (Components/parts/Analytics.dsx). The mount is what fires app_open,
        once per session however many screens mount it. -->
   <Analytics/>
-  <scroll class="scroller" style="flex: 1; min-height: 0">
+  <!-- THE BAND: one zstack that fills the root, with the page column as its first layer and
+       the coupon as its second. An absolute overlay is honoured natively only inside a zstack
+       (the CoverCard law; measured here first: as a vstack child the coupon took a stack slot
+       in flow, the scroll shrank to what was left and the foot sat mid-screen on iOS). -->
+  <zstack class="band" grow="true" alignItems="stretch" style="flex: 1; min-height: 0; position: relative; display: grid; grid-template-rows: minmax(0, 1fr)">
+  <vstack class="pageCol" grow="true" style="min-height: 0; height: 100%">
+  <scroll class="scroller" grow="true" style="flex: 1; min-height: 0">
     <vstack class="page">
       <TopNav active="store" visible-if="dsx.variable.wide"/>
 
@@ -238,27 +337,14 @@
             <text value="{{ dsx.variable.balance }}" class="balanceNum"/>
           </hstack>
         </hstack>
-
-        <!-- a toast the viewer can dismiss; a new action overwrites it -->
-
-        <!-- A GUEST STILL SEES THE PRICES — hiding the shop from someone who has not signed
-             in is the fastest way to lose them — but the screen says what buying needs, once,
-             before they tap. The card is the same one every screen uses. -->
-        <!-- purchases work for a device (a subject, not a login); linking keeps the coins on an
-             account so they follow the viewer to another device -->
-        <LinkPrompt style="margin-top: 12px"
-                    icon="dollarsign.circle.fill"
-                    title="Keep your coins on your account"
-                    note="Browse the packs and plans freely. Signing in is what gives coins and VIP somewhere to live, so they are still yours on your next device."/>
-
       </vstack>
 
       <!-- loading: the shapes the content will land in, so arrival is a repaint -->
       <vstack class="section" visible-if="dsx.variable.phase == 'loading'">
         <vstack style="{{ dsx.variable.shell }}" spacing="14" alignItems="stretch">
           <Skeleton height="28" radius="8"/>
-          <Skeleton height="132" radius="14"/>
-          <Skeleton height="132" radius="14"/>
+          <Skeleton height="220" radius="12"/>
+          <Skeleton height="132" radius="12"/>
         </vstack>
       </vstack>
 
@@ -272,58 +358,66 @@
         </vstack>
       </vstack>
 
-      <!-- VIP — the plans live on the Membership page (Components/Membership.dsx, spec 6),
-           at the destination every crown in the app reads from Theme.dsx membershipPath() -->
+      <!-- MEMBERSHIP — the same cards the Membership page sells (Components/parts/PlanCard.dsx),
+           priced from the same catalogue row the purchase is granted from -->
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
-          <text value="VIP — unlock every series" class="sectionTitle"/>
-          <text value="Unlimited viewing for the length of the pass. One charge, no auto-renewal." class="sectionNote"/>
+          <text value="Membership" class="sectionTitle"/>
+          <text value="A dated pass: every episode at 0 coins for as long as it runs. One charge, no auto-renewal." class="sectionNote"/>
         </vstack>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <hstack class="planDoor" on:tap="dsx.module.route.push({ path: membershipPath() })"
-                  a11yGroup="true" a11yTrait="button" a11yLabel="See the membership plans">
-            <image icon="crown.fill" iconSize="22" color="#000000" a11yHidden="true"/>
-            <vstack spacing="2" grow="width" style="flex: 1; min-width: 0" alignItems="stretch">
-              <text value="{{ dsx.variable.isVip ? 'Add days to your pass' : 'See the plans' }}" class="planDoorTitle"/>
-              <hstack spacing="4" alignItems="center" visible-if="dsx.variable.fromPrice != ''">
-                <text value="From" class="planDoorNote"/>
-                <text value="{{ dsx.variable.fromPrice }}" class="planDoorNote"/>
-              </hstack>
-            </vstack>
-            <image icon="chevron.forward" iconSize="14" color="#000000" a11yHidden="true"/>
-          </hstack>
+          <grid bind="dsx.variable.tiers" key="id" columns="{{ dsx.variable.vipCols }}" spacing="12" scroll="false">
+            <PlanCard id="{{ item.id }}" label="{{ item.label }}" price="{{ planPrice }}" period="{{ item.period }}"
+                      refPrice="{{ item.refPrice }}" off="{{ item.off }}" note="{{ item.note }}"
+                      best="{{ item.best }}" offerEndsAt="{{ item.offerEndsAt }}" now="{{ dsx.variable.now }}"
+                      selected="{{ item.id == dsx.variable.selId }}" on:pick="dsx.action.pick()"/>
+          </grid>
         </vstack>
       </vstack>
 
-      <!-- coin packs -->
+      <!-- COIN PACKS, two across (spec §10) -->
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" spacing="4" alignItems="flex-start">
           <text value="Top up coins" class="sectionTitle"/>
           <text value="Coins unlock individual episodes. Bonus coins are spent first." class="sectionNote"/>
         </vstack>
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
-          <grid bind="dsx.variable.catalogView.packs" key="id" columns="{{ dsx.variable.packCols }}" spacing="12" scroll="false">
+          <grid bind="dsx.variable.packs" key="id" columns="{{ dsx.variable.packCols }}" spacing="12" scroll="false">
             <vstack class="packCard" on:tap="dsx.action.pick()" a11yGroup="true" a11yTrait="button"
                     on:hoverStart="dsx.variable.hovId = 'p-' + item.id" on:hoverEnd="dsx.variable.hovId = ''"
                     borderWidth="1.5" borderColor="{{ packRing }}"
                     a11yLabel="Select {{ item.coins }} coins plus {{ item.free }} bonus, {{ item.price }}"
                     style="{{ packCardFx }}">
-              <hstack spacing="8" alignItems="center" style="width: 100%">
-                <hstack class="coinRow">
-                  <image icon="dollarsign.circle.fill" iconSize="17" color="{{ gold() }}" a11yHidden="true"/>
-                  <text value="{{ item.coins + item.free }}" class="packCoins"/>
+              <hstack class="coinRow" style="flex-wrap: wrap">
+                <image icon="dollarsign.circle.fill" iconSize="22" color="{{ gold() }}" a11yHidden="true" style="margin-bottom: 3px"/>
+                <text value="{{ item.coins }}" class="packCoins"/>
+                <!-- "+300": the sign and the number in two nodes, so nothing here is a word -->
+                <hstack class="bonusRow">
+                  <text value="+" class="packBonus"/>
+                  <text value="{{ item.free }}" class="packBonus"/>
                 </hstack>
-                <spacer/>
-                <text value="{{ item.bonus }}" class="packBonus"/>
               </hstack>
-              <text value="{{ item.coins }} coins + {{ item.free }} bonus" class="packLine"/>
               <text value="{{ packPrice }}" class="packPrice"/>
             </vstack>
           </grid>
-          <!-- THE PURCHASE: one control, both lanes, the server grants (BuyButton.dsx) -->
-          <BuyButton sku="{{ dsx.variable.selId }}" productId="{{ dsx.variable.selProductId }}" kind="coins"
-                     label="{{ dsx.variable.ctaLabel }}" price="{{ dsx.variable.selPrice }}" variant="brand" surface="store"
-                     on:purchased="dsx.action.bought()" on:failed="dsx.action.buyFailed()"/>
+        </vstack>
+      </vstack>
+
+      <!-- purchases work for a device (a subject, not a login); linking keeps the coins on an
+           account so they follow the viewer to another device — an invitation, under the
+           prices rather than in front of them -->
+      <vstack class="section">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <LinkPrompt icon="dollarsign.circle.fill"
+                      title="Keep your coins on your account"
+                      note="Browse the packs and plans freely. Signing in is what gives coins and VIP somewhere to live, so they are still yours on your next device."/>
+        </vstack>
+      </vstack>
+
+      <!-- the rules before the payment sheet, per lane (Components/parts/StoreTips.dsx) -->
+      <vstack class="section" visible-if="dsx.variable.phase == 'content'">
+        <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
+          <StoreTips/>
         </vstack>
       </vstack>
 
@@ -331,9 +425,9 @@
            <RestoreRow> calls the real routes: POST /store/restore walks this account's
            unsettled Stripe orders and grants the ones that were actually paid, and on a
            build with the store module POST /store/restore/native asks RevenueCat the same
-           question about the platform store. That is the money a viewer cannot otherwise
-           reach — charged while the app was closed between the payment sheet and the settle
-           call. Neither route asks who the caller is; both need a subject, not a login. -->
+           question about the platform store. Neither route asks who the caller is; both need
+           a subject, not a login. The row form here, because this page has the room for the
+           disclosure; the Membership page and /vip carry the pill. -->
       <vstack class="section" visible-if="dsx.variable.phase == 'content'">
         <vstack style="{{ dsx.variable.shell }}" alignItems="stretch">
           <vstack class="earnCard">
@@ -357,28 +451,48 @@
 
     </vstack>
   </scroll>
-  <!-- NO TAB BAR: /store is a PUSHED route, and on the phone lane a push TRANSFORMS the
-       whole frame — global chrome inside it would slide in with the page, which is exactly
-       what a global bar must never do. A pushed screen is therefore full-bleed with a back
-       affordance (UIKit calls this hidesBottomBarWhenPushed; every reference short-drama app
-       agrees). The tab roots keep their bar and swap instantly, so it never moves there
-       either. Wide viewports crossfade instead of pushing, so <TopNav> — painted identically
-       by both frames over an opaque under-frame — composites STILL (PLAN.md §6.26). -->
+  <!-- NO TAB BAR: /store is a PUSHED route, full-bleed with a back affordance (PLAN.md §6.29) -->
 
-  <!-- THE TOAST LIVES OUTSIDE THE SCROLL. It used to sit inline near the top of the page, so
-       a viewer who had scrolled down to the pack they wanted and pressed Buy got their answer
-       rendered off-screen above them — measured on /store at 1440, where the refusal
-       "Payments are not configured on this deployment" landed 200px out of view. A status
-       message has to reach the person who caused it.
-       As a SIBLING of the scroll it pins to the bottom of the screen on every renderer with
-       no positioning at all: web and native both lay it out after the scroll and before the
-       tab bar, which is where a snackbar belongs anyway. No `position: absolute`, so nothing
-       to degrade. -->
+  <!-- THE TOAST LIVES OUTSIDE THE SCROLL, above the foot: a status message has to reach the
+       person who caused it, whatever they scrolled to -->
   <hstack class="toastRow" visible-if="dsx.variable.toast != ''">
     <text value="{{ dsx.variable.toast }}" class="toastLine" style="flex: 1"/>
     <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
            a11yLabel="Dismiss message" a11yTrait="button"/>
   </hstack>
+
+  <!-- THE STICKY FOOT (spec §10): the payment method, THE PURCHASE (one control, both lanes,
+       the server grants — BuyButton.dsx), and what the selection is -->
+  <vstack class="foot" visible-if="dsx.variable.phase == 'content'" style="border-top: 1px solid rgba(255,255,255,0.12)">
+    <vstack class="footCol" style="{{ dsx.variable.shell }}">
+      <PayRow/>
+      <BuyButton sku="{{ dsx.variable.selId }}" productId="{{ dsx.variable.selProductId }}" kind="{{ dsx.variable.selKind }}"
+                 label="{{ dsx.variable.ctaLabel }}" price="{{ dsx.variable.selPrice }}" variant="brand" funnel="store"
+                 on:purchased="dsx.action.bought()" on:failed="dsx.action.buyFailed()"/>
+      <!-- the note SHRINKS and wraps inside the row (min-width 0): a flex item keeps its content
+           width by default and ran off both edges of a 402 phone, measured -->
+      <hstack class="footRow" style="justify-content: center; flex-wrap: wrap" visible-if="dsx.variable.selTier != null &amp;&amp; dsx.variable.selRenews == false">
+        <text value="{{ dsx.variable.selLabel }}" class="footLine"/>
+        <text value="·" class="footLine"/>
+        <text value="{{ dsx.variable.selNote }}" class="footLine" style="min-width: 0; flex-shrink: 1"/>
+      </hstack>
+      <text value="Auto-renewal · Cancel anytime" class="footLine" visible-if="dsx.variable.selRenews"/>
+      <text value="Coins land on your balance the moment the store confirms." class="footLine" visible-if="dsx.variable.selTier == null"/>
+    </vstack>
+  </vstack>
+
+  </vstack>
+  <!-- the coupon, server-driven, once per offer window (Components/parts/OfferModal.dsx): the
+       band's second layer -->
+  <OfferModal present="{{ dsx.variable.offerShown }}" sku="{{ dsx.variable.offerView == null ? '' : dsx.variable.offerView.sku }}"
+              label="{{ dsx.variable.offerView == null ? '' : dsx.variable.offerView.label }}"
+              price="{{ dsx.variable.offerPrice }}"
+              regular="{{ dsx.variable.offerView == null ? '' : dsx.variable.offerView.regular }}"
+              period="{{ dsx.variable.offerView == null ? '' : dsx.variable.offerView.period }}"
+              endsAt="{{ dsx.variable.offerView == null ? '' : dsx.variable.offerView.endsAt }}"
+              now="{{ dsx.variable.now }}"
+              on:claim="dsx.action.claimOffer()" on:dismiss="dsx.action.dismissOffer()"/>
+  </zstack>
   <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of
        the layout, so a zero-height child here cannot disturb any chrome. -->
   <AuthSeam/>

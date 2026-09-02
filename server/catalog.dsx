@@ -129,7 +129,11 @@
          /shelf/<name> + /tags/<tag>. One action answers both shapes: the chip row is the
          genres actually present WITH their counts (never a hardcoded list that can drift
          from the catalogue), and `genre` filters the grid. 'all' is the unfiltered view. -->
-    <action as="browseCatalog" inputs="genre">
+    <!-- SORT is a query input (`?sort=latest`; the gateway folds query ⊕ body ⊕ path params
+         into the inputs): `trending` — the HOT titles first, then by play count, the same rule
+         the Hot grid on Home uses — is the default; `latest` is newest first. The genre page
+         (spec §11) renders the two as chips. -->
+    <action as="browseCatalog" inputs="genre, sort">
       const shows = await dsx.module.data.show.list({ filters: { state: 'live' }, limit: 100 })
       // a coming-soon series has nothing to watch yet: it lives on the New tab's rail only, and
       // a chip that counted it would narrow to a grid cell that opens onto nothing
@@ -165,7 +169,13 @@
         const list = row.tags == null || row.tags === '' ? [] : row.tags.split(',').map(t => t.trim())
         return list.includes(want)
       }
-      const picked = want === 'all' ? rows : rows.filter(row => matches(row))
+      const filtered = want === 'all' ? rows : rows.filter(row => matches(row))
+      const order = sort === 'latest' ? 'latest' : 'trending'
+      const viewsOf = (s) => s.views == null ? 0 : s.views
+      const picked = order === 'latest'
+        ? filtered.slice().sort((a, b) => a.created_at < b.created_at ? 1 : -1)
+        : filtered.filter(s => s.hot === true).sort((a, b) => viewsOf(b) - viewsOf(a))
+            .concat(filtered.filter(s => s.hot !== true).sort((a, b) => viewsOf(b) - viewsOf(a)))
       // one bounded episode query per show — the same shape homeShelves uses; a single
       // unbounded read would be clamped at 100 rows without saying so (PLAN.md §6.20)
       const counts = {}
@@ -175,12 +185,14 @@
       }
       return {
         active: want,
+        sort: order,
         genres: genres,
         tags: tags,
         total: picked.length,
         items: picked.map(row => ({
           id: row.id, title: row.title, genre: row.genre, poster: row.poster,
           synopsis: row.synopsis, free_until: row.free_until,
+          hot: row.hot === true,
           views: row.views == null ? 0 : row.views, rating: row.rating == null ? '' : row.rating,
           tags: row.tags == null || row.tags === '' ? [] : row.tags.split(',').map(t => t.trim()).filter(t => t !== ''),
           episodes: counts[row.id] == null ? 0 : counts[row.id]

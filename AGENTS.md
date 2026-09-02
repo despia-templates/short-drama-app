@@ -483,3 +483,19 @@ is the model). `npm run lint` and `npm run review` gate every merge.
   and only on the lanes whose `send` outlives the page: the web facet is a page timer, so a
   premiere days out is never armed there (PLAN.md §6.139). Ask `has('localpush')` first, then
   `os`, and never report a notification you did not arm.
+- **ONE EDGE, ONE DECLARATION: an inline `paddingTop` beside a class `paddingV` is SUMMED on
+  iOS** (PLAN.md §6.185a). Literal, computed and `style="padding-top: …"` all add to the class's
+  vertical padding (+20pt on every plan card); the web overrides. Give the class the edges the
+  element does not write (`paddingH` + `paddingBottom`) and the element the one it does.
+- **A COMPONENT ROOT DECLARES `spacing="0"`; THE RHYTHM GOES ON AN INNER COLUMN.** On iOS the
+  component's own `<head>` takes the root stack's first slot, so a root with `spacing="10"`
+  pays 10pt before its first real child (PLAN.md §6.185b — the instance twin of the screen-root
+  law, §6.50b). Measured +spacing on every mounted card, +0 for the same markup inline.
+- **`surface` IS THE ENGINE'S WORD ON A MOUNT TAG.** `<Comp surface="store"/>` dresses the
+  instance as a system surface on iOS — a 12% white, radius-14 fill behind its root — whatever
+  the component declared (PLAN.md §6.186, measured behind every BuyButton). Name a component
+  attribute anything else (`funnel`); the analytics property may keep the word.
+- **A MOUNT IN A ROW HUGS WITH `width="fit"` ON THE MOUNT TAG.** A component mounted in an
+  `hstack` is greedy on iOS: it takes the free space a `<spacer/>` or `space-between` should
+  and its content sits at the leading edge of that share (the Restore pill beside the back
+  chevron); `grow="false"` does not cancel it, the hug primitive does (PLAN.md §6.187).

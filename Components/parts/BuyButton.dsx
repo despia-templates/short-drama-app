@@ -42,7 +42,11 @@
     <attribute as="label" default="''"/>          <!-- the verb: "Unlock for", already localized by the owner -->
     <attribute as="price" default="''"/>          <!-- the price the owner resolved; empty disables -->
     <attribute as="variant" default="'gold'"/>    <!-- gold (membership) | brand (coins) -->
-    <attribute as="surface" default="'membership'"/>
+    <!-- the FUNNEL name for analytics (which door sold: membership · store · plans). NOT `surface`:
+         on iOS a component declaring an attribute of that name is dressed as a system surface —
+         a 12% white, radius-14 fill behind its root, measured behind every CTA (PLAN.md §6.186).
+         The analytics property keeps the word; only the attribute is renamed. -->
+    <attribute as="funnel" default="'membership'"/>
     <!-- THE SEAM IS THE DEFAULT (<AuthSeam>): every authenticated call carries the session -->
     <attribute as="headers" default="global.auth.headers"/>
 
@@ -128,7 +132,7 @@
       dsx.variable.busy = true
       dsx.variable.toast = ''
       dsx.variable.settleFailed = false
-      dsx.action.track({ name: 'purchase_started', props: { sku: dsx.attribute.sku, lane: dsx.variable.payLane, surface: dsx.attribute.surface } })
+      dsx.action.track({ name: 'purchase_started', props: { sku: dsx.attribute.sku, lane: dsx.variable.payLane, surface: dsx.attribute.funnel } })
       // `await` is a STATEMENT, never a ternary branch (AGENTS.md, PLAN.md 6.31)
       if (dsx.variable.payLane == 'iap') { await dsx.action.buyNative() }
       else { await dsx.action.buyStripe() }
@@ -193,7 +197,7 @@
       if (s.ok) {
         // THE MONEY EVENT IS THE GRANT, NOT THE TAP; a replay reports granted false and is
         // deliberately not counted a second time
-        if (s.data.granted) { dsx.action.track({ name: 'purchase_completed', props: { lane: 'iap', surface: dsx.attribute.surface, coins: s.data.coins, days: s.data.days } }) }
+        if (s.data.granted) { dsx.action.track({ name: 'purchase_completed', props: { lane: 'iap', surface: dsx.attribute.funnel, coins: s.data.coins, days: s.data.days } }) }
         dsx.variable.settleFailed = false
         dsx.variable.txn = ''
         dsx.variable.toast = ''
@@ -236,7 +240,7 @@
     <action as="settleStripe">
       const s = await settleCall.send({ order: dsx.variable.order })
       if (s.ok) {
-        if (s.data.granted) { dsx.action.track({ name: 'purchase_completed', props: { lane: 'stripe', surface: dsx.attribute.surface, coins: s.data.coins, days: s.data.days } }) }
+        if (s.data.granted) { dsx.action.track({ name: 'purchase_completed', props: { lane: 'stripe', surface: dsx.attribute.funnel, coins: s.data.coins, days: s.data.days } }) }
         dsx.variable.settleFailed = false
         dsx.variable.order = ''
         dsx.variable.toast = ''
@@ -256,10 +260,15 @@
       dsx.variable.busy = false
     </action>
 
-    <style as="wrap" spacing="10" alignItems="stretch"/>
+    <!-- spacing 0 on the ROOT, the rhythm on `col`: a component root pays one `spacing` slot for
+         its own <head> on iOS (PLAN.md §6.185b), so the boundary declares none -->
+    <style as="wrap" spacing="0" alignItems="stretch"/>
+    <style as="col" spacing="10" alignItems="stretch"/>
     <style as="ctaGold" background="#F5D33D" radius="14" minHeight="52" paddingH="16" spacing="6" alignItems="center"/>
     <style as="ctaGoldTxt" fontSize="17" fontWeight="bold" color="#000000"/>
-    <style as="ctaBrand" background="#FF2C55" radius="14" minHeight="52" paddingH="16" spacing="6" alignItems="center"/>
+    <!-- the STICKY CTA of the store and the membership page (spec §10): 52 tall, radius 26, the
+         accent — the pill the category's "Pay now" wears -->
+    <style as="ctaBrand" background="#FF2C55" radius="26" minHeight="52" paddingH="16" spacing="6" alignItems="center"/>
     <style as="ctaBrandTxt" fontSize="17" fontWeight="bold" color="#FFFFFF"/>
     <style as="refusal" fontSize="12" color="#8E8E93" textAlign="center" lineSpacing="4"/>
     <style as="retryCard" background="#1E1830" radius="14" paddingH="16" paddingV="16" spacing="10" alignItems="flex-start"/>
@@ -273,6 +282,7 @@
   <!-- SELF-SUFFICIENT: this part calls the shared design vocabulary (Components/parts/
        Theme.dsx), and a caller must not have to remember to register it first. -->
   <Theme/>
+  <vstack class="col">
 
   <!-- THE CTA. An hstack with on:tap rather than a <button>, because a button carries ONE
        label and this one is two words the string table has to reach separately: the verb
@@ -305,4 +315,5 @@
     <image icon="xmark" iconSize="12" color="{{ gold() }}" on:tap="dsx.variable.toast = ''"
            a11yLabel="Dismiss message" a11yTrait="button"/>
   </hstack>
+  </vstack>
 </vstack>

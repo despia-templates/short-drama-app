@@ -1,0 +1,55 @@
+<!-- StoreTips — the "Tips:" block under the price list (docs/design/reference-ui-spec.md §10):
+     17 semibold heading, six numbered 15pt ink-3 lines that say what the money buys and how
+     it is billed. Every reference store carries this block, and it is the one place a reader
+     learns the rules BEFORE the payment sheet rather than from a support reply.
+
+     THE COPY IS PER LANE, AND THE LANE IS THE HOUSE PICK (AGENTS.md, the <AdGate> precedent):
+     `has('store')` first — a build with the store module is billed by the platform store
+     wherever it runs — then `os` for which store's words; `os == 'web'` is the card through
+     Stripe. Lines 4 and 6 differ per lane (where a receipt lives, who refunds); the rest is
+     the same product everywhere and is written once.
+
+     WHAT THE LINES SAY IS WHAT THE SERVER DOES. Line 5 is the one the category writes as
+     "auto-renews unless cancelled 24 hours before the period ends" — and it is not true here:
+     every plan on this backend is a ONE-CHARGE DATED PASS (server/store.dsx, the price table
+     header; no Stripe Subscription, no renewal job, no cancel path), so the line says that, in
+     as many words, on every lane. A tips block that promises a cancel control the app does not
+     have is the exact kind of copy this template exists to not ship.
+
+     Each line is a BARE LITERAL at a display point, so the string seam reaches every one of
+     them; the per-lane pairs are three sibling texts under `visible-if` rather than a nested
+     ternary, because the seam reads a ternary only when its arms are bare literals. -->
+<vstack class="wrap">
+  <head>
+    <variable as="lane" computed="true">
+      if (has('store')) { return os == 'android' ? 'play' : 'apple' }
+      if (os == 'web') { return 'card' }
+      return os == 'android' ? 'play' : 'apple'
+    </variable>
+    <variable as="isApple" computed="true">return dsx.variable.lane == 'apple'</variable>
+    <variable as="isPlay" computed="true">return dsx.variable.lane == 'play'</variable>
+    <variable as="isCard" computed="true">return dsx.variable.lane == 'card'</variable>
+
+    <!-- spacing 0 on the ROOT (PLAN.md §6.185b: a component root pays one `spacing` slot for its
+         own <head> on iOS), the 8pt rhythm on the inner column -->
+    <style as="wrap" spacing="0" alignItems="stretch" paddingTop="8"/>
+    <style as="col" spacing="8" alignItems="stretch"/>
+    <style as="head" fontSize="17" fontWeight="semibold" color="#FFFFFF" paddingBottom="2"/>
+    <style as="line" fontSize="15" color="#8E8E93" lineSpacing="5"/>
+  </head>
+
+  <Theme/>
+  <vstack class="col">
+  <text value="Tips:" class="head"/>
+  <text value="1. Free episodes play for everyone. Paid episodes open with coins or with a VIP pass." class="line"/>
+  <text value="2. Coins and bonus coins unlock one episode at a time, and bonus coins are spent first. Neither is refundable once spent." class="line"/>
+  <text value="3. A VIP pass unlocks every episode at 0 coins for as long as it runs, including series added while it runs. Your coins are not touched." class="line"/>
+  <text value="4. Purchases are billed to your App Store account and land within 24 hours of the receipt. If one has not, check Purchase History in your Apple Account settings, then use Restore." class="line" visible-if="dsx.variable.isApple"/>
+  <text value="4. Purchases are billed to your Google Play account and land within 24 hours of the order confirmation. If one has not, check your Google Play order history, then use Restore." class="line" visible-if="dsx.variable.isPlay"/>
+  <text value="4. Payments are taken by card through Stripe and land within 24 hours of the confirmation. If one has not, Restore re-checks any payment that was taken and never applied." class="line" visible-if="dsx.variable.isCard"/>
+  <text value="5. Every plan is a one-time charge for a dated pass. Nothing renews automatically and there is nothing to cancel. Buying again adds days to the pass you hold." class="line"/>
+  <text value="6. Refunds are handled by Apple: request one from your App Store purchase history." class="line" visible-if="dsx.variable.isApple"/>
+  <text value="6. Refunds are handled by Google Play: request one from your Google Play order history." class="line" visible-if="dsx.variable.isPlay"/>
+  <text value="6. A refund goes back to the card that paid. Contact support with the order id from your receipt." class="line" visible-if="dsx.variable.isCard"/>
+  </vstack>
+</vstack>
