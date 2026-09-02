@@ -1,0 +1,45 @@
+<!-- FollowRow — the "Follow us on …" rows of docs/design/reference-ui-spec.md §9.3 (row 6),
+     the same card recipe as RewardRow with one difference that makes it its own file: the
+     row is a LINK. `href` with an absolute URL is a real anchor on the web and falls to the
+     app's web surface on native (StackReference, the anchor attribute), and an EMPTY href on
+     a tappable element reloads the page on the web — so a row that may or may not carry one
+     cannot share a root with the tap rows, and a host mounts this only when the URL is set.
+
+     NO COINS, DELIBERATELY. A follow cannot be verified by this server (nothing tells it a
+     viewer pressed Follow on another company's site), so the reference's "+20" would be a
+     client-trusted grant — the founder's law forbids exactly that. The row says "Help us
+     grow" and grants nothing (PLAN.md §6.182). -->
+<hstack class="row" href="{{ dsx.attribute.href }}" a11yGroup="true" a11yTrait="link"
+        a11yLabel="Follow us on {{ dsx.attribute.name }} — opens in your browser">
+  <head>
+    <attribute as="net" default="''"/>      <!-- facebook | youtube | tiktok | instagram -->
+    <attribute as="name" default="''"/>     <!-- the network's own name, never translated -->
+    <attribute as="icon" default="'globe'"/>
+    <attribute as="href" default="''"/>
+
+    <style as="row" background="#161616" radius="12" paddingH="16" paddingV="15" spacing="8" alignItems="center" minHeight="74"/>
+    <style as="tile" width="44" height="44" radius="22" background="#2A2A2A" alignItems="center" alignY="center"/>
+    <style as="col" spacing="3" alignItems="stretch"/>
+    <style as="titleRow" spacing="4" alignItems="center"/>
+    <style as="title" fontSize="17" color="#FFFFFF" lineLimit="1"/>
+    <style as="sub" fontSize="15" color="#8E8E93" lineLimit="1"/>
+    <style as="pill" minWidth="75" height="31" radius="8" paddingH="10" background="#FF2C55" alignItems="center" alignY="center"/>
+    <style as="pillTxt" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+  </head>
+
+  <Theme/>
+  <vstack class="tile" style="justify-content: center; flex: none">
+    <image icon="{{ dsx.attribute.icon }}" iconSize="19" color="{{ warmGold() }}" a11yHidden="true"/>
+  </vstack>
+  <vstack class="col" grow="width" style="flex: 1; min-width: 0">
+    <!-- "Follow us on" is the translatable half; the network name is a proper noun -->
+    <hstack class="titleRow">
+      <text value="Follow us on" class="title" style="white-space: nowrap"/>
+      <text value="{{ dsx.attribute.name }}" class="title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+    </hstack>
+    <text value="Help us grow" class="sub" style="white-space: nowrap"/>
+  </vstack>
+  <vstack class="pill" style="flex: none; justify-content: center">
+    <text value="Follow" class="pillTxt" style="white-space: nowrap"/>
+  </vstack>
+</hstack>

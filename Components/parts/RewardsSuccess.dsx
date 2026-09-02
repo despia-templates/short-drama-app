@@ -1,0 +1,71 @@
+<!-- RewardsSuccess — the content of the success modal (docs/design/reference-ui-spec.md
+     §9.5): the coin illustration overlapping the card's top edge, "Success" 22 bold, the
+     "Congratulations on getting n coins" line, and one CTA — "Watch an ad to earn N coins"
+     on an accent→ember gradient where an ad lane can pay (the cap has room and the viewer
+     is not a member), a plain "Done" pill otherwise (Article 7: the lane's absence is a
+     state the card names, never a dead button).
+
+     THE SHEET IS THE HOST'S. `present` is a two-way store key, which an attribute cannot be,
+     so the screen declares `<sheet mode="card">` and mounts this inside it; this part only
+     raises `ad` and `close`. The coin is a real ASSET (scripts/gen-art.mjs rewardsCoin),
+     never an emoji glyph. The count is a message template, so Arabic gets its six forms and
+     German its two from ONE key (scripts/strings.mjs icuKey). -->
+<vstack class="wrap">
+  <head>
+    <attribute as="n" default="0"/>            <!-- the amount just granted -->
+    <attribute as="unit" default="'coins'"/>   <!-- coins | points -->
+    <attribute as="adReward" default="0"/>     <!-- the rewarded ad's grant, a server number -->
+    <attribute as="adAvailable" default="false"/>
+    <event as="ad"/>
+    <event as="close"/>
+
+    <variable as="adOn" computed="true">
+      const v = dsx.attribute.adAvailable
+      return v === true || v === 'true'
+    </variable>
+
+    <style as="wrap" spacing="0" alignItems="center" paddingBottom="4"/>
+    <style as="coin" width="87" height="87"/>
+    <style as="title" fontSize="22" fontWeight="bold" color="#FFFFFF" textAlign="center"/>
+    <style as="line" fontSize="15" color="#FFFFFF" textAlign="center" lineSpacing="5" paddingTop="8"/>
+    <!-- the CTA: 47 tall, fully round, the accent running into ember -->
+    <style as="cta" height="47" radius="24" spacing="8" alignItems="center" alignY="center" gradient="#FF2C55|#FF6A3D" gradientDir="horizontal"/>
+    <style as="ctaTxt" fontSize="17" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+    <style as="adTag" background="rgba(255,255,255,0.22)" radius="4" paddingH="5" paddingV="1" fontSize="11" fontWeight="bold" color="#FFFFFF" tracking="1"/>
+    <style as="done" height="47" radius="24" background="#FF2C55" alignItems="center" alignY="center"/>
+    <style as="closeBtn" width="44" height="44" radius="22" alignItems="center" alignY="center"/>
+    <style as="closeRing" width="28" height="28" radius="14" borderWidth="1.5" borderColor="#8E8E93" alignItems="center" alignY="center"/>
+  </head>
+
+  <Theme/>
+  <!-- the medallion rides 44pt over the card's top edge; the card's own top padding is the
+       sheet's, so the pull is an offset on every lane and the copy below closes the gap -->
+  <image src="/assets/rewards-coin.svg" contentFit="contain" class="coin" a11yHidden="true"
+         offsetY="-44" style="width: 87px; height: 87px; margin-bottom: -40px"/>
+  <text value="Success" class="title" paddingTop="4"/>
+  <text value="{dsx.attribute.n, plural, one {Congratulations on getting # coin} other {Congratulations on getting # coins}}" class="line"
+        visible-if="dsx.attribute.unit != 'points'"/>
+  <text value="{dsx.attribute.n, plural, one {Congratulations on getting # point} other {Congratulations on getting # points}}" class="line"
+        visible-if="dsx.attribute.unit == 'points'"/>
+
+  <vstack alignItems="stretch" style="width: 100%" paddingTop="20" spacing="12">
+    <hstack class="cta" style="width: 100%; justify-content: center; background: linear-gradient(90deg, #FF2C55 0%, #FF6A3D 100%)"
+            visible-if="dsx.variable.adOn" on:tap="dsx.event('ad', {})"
+            a11yGroup="true" a11yTrait="button" a11yLabel="Watch an ad to earn {{ dsx.attribute.adReward }} coins">
+      <text value="AD" class="adTag" a11yHidden="true"/>
+      <text value="{dsx.attribute.adReward, plural, one {Watch an ad to earn # coin} other {Watch an ad to earn # coins}}" class="ctaTxt"/>
+    </hstack>
+    <hstack class="done" style="width: 100%; justify-content: center" visible-if="dsx.variable.adOn == false"
+            on:tap="dsx.event('close', {})" a11yGroup="true" a11yTrait="button" a11yLabel="Done">
+      <text value="Done" class="ctaTxt"/>
+    </hstack>
+  </vstack>
+
+  <!-- the ⊗ under the card: a 28 ring inside a 44 target -->
+  <vstack class="closeBtn" style="justify-content: center" paddingTop="4" on:tap="dsx.event('close', {})"
+          a11yTrait="button" a11yLabel="Close">
+    <vstack class="closeRing" style="justify-content: center; border: 1.5px solid #8E8E93">
+      <image icon="xmark" iconSize="14" color="{{ ink3() }}" a11yHidden="true"/>
+    </vstack>
+  </vstack>
+</vstack>

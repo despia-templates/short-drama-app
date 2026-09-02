@@ -32,29 +32,12 @@
     <api as="continue" url="/viewer/continue" ssr="false"
          auto="global.auth.ok == true" headers="global.auth.headers"
          on:success="global.cacheContinue = global.auth.ok == true ? continue.data : null"/>
-    <!-- the viewer's reminders: what lights "Reminder set" on a coming-soon card. Stashed
-         app-wide like every viewer read (PLAN.md §6.30) and dropped with the token. -->
-    <api as="reminders" url="/viewer/reminders" ssr="false"
-         auto="global.auth.ok == true" headers="global.auth.headers"
-         on:success="global.cacheReminders = global.auth.ok == true ? reminders.data : null"/>
-    <api as="setRemind" url="/viewer/reminders/{{ dsx.variable.soonId }}" method="POST" auto="false" headers="global.auth.headers"/>
-    <api as="clearRemind" url="/viewer/reminders/{{ dsx.variable.soonId }}" method="DELETE" auto="false" headers="global.auth.headers"/>
 
     <variable as="heroPage">return 0</variable>
     <variable as="hovId">return ''</variable>   <!-- the card under the pointer (wide lane) -->
     <!-- the phone home's tab strip: Hot · New · Picks · Ranking (spec §1 row 2) -->
     <variable as="homeTab">return 'hot'</variable>
-    <!-- ── Remind Me state ── -->
-    <variable as="soonOpen">return false</variable>     <!-- the coming-soon sheet (§2a) -->
-    <variable as="permOpen">return false</variable>     <!-- the permission sheet (§2b), nested -->
-    <variable as="soonShow">return null</variable>      <!-- the card the sheet is about -->
-    <variable as="allow">return false</variable>        <!-- the §2b checkbox -->
-    <variable as="remindBusy">return false</variable>
-    <variable as="remindNote">return ''</variable>      <!-- the lane's honest line under the button -->
     <variable as="toast">return ''</variable>
-    <!-- a guest has no account row, so the session remembers what it scheduled locally —
-         rows are DICTS ({ show }), never bare ids (a repeater row is a dict, AGENTS.md) -->
-    <variable as="localReminded">return []</variable>
 
     <!-- stale-then-fresh: the api cache dies with the mount (PLAN.md §6.30), so the last good
          payload lives in the app-wide store and is the FIRST PAINT while the refetch runs. -->
@@ -66,40 +49,6 @@
       if (dsx.variable.signedIn == false) { return null }
       if (continue.data != null) { return continue.data }
       return global.cacheContinue
-    </variable>
-    <variable as="remindersView" computed="true">
-      if (dsx.variable.signedIn == false) { return null }
-      if (reminders.data != null) { return reminders.data }
-      return global.cacheReminders
-    </variable>
-    <!-- the ids a bell is lit for: the account's rows plus what this session set as a guest -->
-    <variable as="remindedIds" computed="true">
-      const v = dsx.variable.remindersView
-      let ids = []
-      if (v != null) { if (v.items != null) { ids = v.items.map(r => r.show) } }
-      for (const r of dsx.variable.localReminded) { ids = ids.concat([r.show]) }
-      return ids
-    </variable>
-    <variable as="soonId" computed="true">
-      const s = dsx.variable.soonShow
-      return s == null ? '' : s.id
-    </variable>
-    <variable as="soonReminded" computed="true">
-      return dsx.variable.remindedIds.indexOf(dsx.variable.soonId) != -1
-    </variable>
-    <variable as="soonTags" computed="true">
-      const s = dsx.variable.soonShow
-      if (s == null) { return [] }
-      if (s.chips == null) { return [] }
-      return s.chips
-    </variable>
-    <!-- Ask the CAPABILITY plane before the platform (AGENTS.md): `has('localpush')` says the
-         scheduler is in this build; `os` then says whether its `send` outlives the page —
-         the web facet is a page timer, and the module has no capability word for that
-         horizon yet (PLAN.md §6, the LocalPush horizon ask). -->
-    <variable as="canSchedule" computed="true">
-      if (has('localpush') == false) { return false }
-      return os != 'web'
     </variable>
 
     <variable as="bp" computed="true">
@@ -231,10 +180,6 @@
       return dsx.variable.homeView.hero.length
     </variable>
 
-    <!-- per-row: is this coming-soon card's bell lit -->
-    <formula as="reminded" id="item.id">
-      return dsx.variable.remindedIds.indexOf(id) != -1
-    </formula>
     <!-- ONE computed list: `style="{{ chunk }}; extras"` discards the chunk (AGENTS.md) -->
     <formula as="posterHover" id="item.id">
       const lift = (dsx.variable.hoverReveal && dsx.variable.hovId == id) ? 1.04 : 1
@@ -271,6 +216,11 @@
 
     <!-- A REAL payload retires the offline-demo degradation (Article 7): the chip drops the
          moment the origin answers. The search hint advances with every landing. -->
+    <!-- the rail's honest line (which halves of Remind Me this lane managed) lands here -->
+    <action as="note" text="text">
+      dsx.variable.toast = text
+    </action>
+
     <action as="homeLanded">
       global.cacheHome = home.data
       global.demoSeeded = false
@@ -291,122 +241,6 @@
       dsx.variable.heroPage = p >= n - 1 ? 0 : p + 1
     </action>
 
-    <!-- ══ REMIND ME ══════════════════════════════════════════════════════════════════
-         Three doors, one confirm. The poster opens the coming-soon sheet; its Remind Me and
-         the rail card's inline Remind Me both go through `askRemind`, which skips the
-         permission level when the OS already granted notifications (a sheet that asks for
-         a permission the viewer gave last week is a nag) and otherwise raises §2b OVER §2a.
-         The child is declared inside the parent's slot, so on iOS it can only present while
-         the parent is up — `openSoon` first, the level after, in the same action. -->
-    <action as="openSoon" inputs="show">
-      dsx.variable.soonShow = show
-      dsx.variable.remindNote = ''
-      dsx.variable.allow = false
-      dsx.variable.soonOpen = true
-    </action>
-    <action as="closeSoon">
-      // one write; the engine cascades the nested permission level with its parent (§6.114)
-      dsx.variable.soonOpen = false
-      dsx.variable.permOpen = false
-    </action>
-    <action as="closePerm">
-      dsx.variable.permOpen = false
-    </action>
-    <!-- the rail card's button: set, or clear when already set -->
-    <action as="remindTap" inputs="show">
-      dsx.variable.soonShow = show
-      dsx.variable.remindNote = ''
-      if (dsx.variable.soonReminded) { dsx.action.cancelRemind(); return }
-      dsx.variable.allow = false
-      dsx.variable.soonOpen = true
-      dsx.action.askRemind()
-    </action>
-    <!-- the sheet's button (and the rail's, once the sheet is up) -->
-    <action as="askRemind">
-      if (dsx.variable.soonReminded) { dsx.action.cancelRemind(); return }
-      let granted = false
-      if (has('notify')) {
-        const st = await dsx.module.notify.status({})
-        if (st.ok) { if (st.data != null) { granted = st.data.status == 'granted' } }
-      }
-      if (granted) {
-        dsx.variable.allow = true
-        dsx.action.confirmRemind()
-        return
-      }
-      dsx.variable.permOpen = true
-    </action>
-    <!-- THE CONFIRM. Order matters and each step is named in `remindNote`:
-           1. the permission — Core/Notify's one ladder, the checkbox is its consent
-           2. the row — server/reminders.dsx, the half that survives a reinstall (account only)
-           3. the schedule — Core/LocalPush `send` at the premiere, on the lanes that can
-         Nothing here claims a notification it did not arm. -->
-    <action as="confirmRemind">
-      if (dsx.variable.allow == false) { return }
-      if (dsx.variable.remindBusy) { return }
-      const s = dsx.variable.soonShow
-      if (s == null) { return }
-      dsx.variable.remindBusy = true
-      // 1 · permission
-      if (has('notify')) {
-        const p = await dsx.module.notify.permission({})
-        let status = 'unknown'
-        if (p.ok) { if (p.data != null) { if (p.data.status != null) { status = p.data.status } } }
-        if (status == 'denied') {
-          dsx.variable.remindBusy = false
-          dsx.variable.remindNote = localize('Notifications are off for this app. Turn them on in Settings, then try again.')
-          return
-        }
-      }
-      // 2 · the durable row, when there is an account to hang it on
-      let saved = false
-      if (dsx.variable.signedIn) {
-        const r = await setRemind.send({})
-        saved = r.ok
-        if (r.ok) { reminders.refresh() }
-      }
-      // 3 · the schedule
-      let armed = false
-      if (dsx.variable.canSchedule) {
-        const at = s.releaseAt == null ? '' : s.releaseAt
-        const seconds = at == '' ? 0 : Math.round((Date.parse(at) - Date.now()) / 1000)
-        if (seconds > 0) {
-          const a = await dsx.module.localpush.send({
-            seconds: seconds,
-            id: 'release-' + s.id,
-            title: s.title,
-            message: localize('Episode 1 is out — start watching now.'),
-            url: '/show/' + s.id
-          })
-          armed = a.ok
-        }
-      }
-      dsx.variable.remindBusy = false
-      if (saved == false) {
-        dsx.variable.localReminded = dsx.variable.localReminded.concat([{ show: s.id }])
-      }
-      // the honest line: which halves this lane managed
-      if (armed && saved) { dsx.variable.toast = localize('Reminder set — we will notify you at the premiere.') }
-      else if (armed) { dsx.variable.toast = localize('Reminder set on this device. Sign in to keep it on your account.') }
-      else if (saved) { dsx.variable.toast = localize('Reminder saved to your account. This browser cannot schedule a notification days ahead.') }
-      else { dsx.variable.toast = localize('Reminder kept for this session only — sign in to keep it, and use the app to be notified.') }
-      dsx.action.closeSoon()
-    </action>
-    <action as="cancelRemind">
-      const s = dsx.variable.soonShow
-      if (s == null) { return }
-      if (dsx.variable.remindBusy) { return }
-      dsx.variable.remindBusy = true
-      if (dsx.variable.signedIn) {
-        const r = await clearRemind.send({})
-        if (r.ok) { reminders.refresh() }
-      }
-      if (has('localpush')) { await dsx.module.localpush.unschedule({ id: 'release-' + s.id }) }
-      dsx.variable.localReminded = dsx.variable.localReminded.filter(r => r.show != s.id)
-      dsx.variable.remindBusy = false
-      dsx.variable.toast = localize('Reminder removed.')
-      dsx.action.closeSoon()
-    </action>
 
     <!-- THE ROOT CARRIES ITS SIZE AS ATTRIBUTES, not CSS: `grow` is the cross-platform twin
          of the web's flex fill (PLAN.md §6.43). -->
@@ -428,14 +262,6 @@
     <style as="h2" fontSize="22" fontWeight="bold" color="#FFFFFF" tracking="-0.3" paddingLeading="14" paddingTrailing="14"/>
     <style as="gridWrap" paddingLeading="14" paddingTrailing="14" alignItems="stretch"/>
     <style as="railTrack" spacing="8" alignItems="flex-start"/>
-    <style as="soonCard" background="#141414" radius="12" width="113" spacing="0" alignItems="stretch"/>
-    <style as="soonMeta" paddingLeading="8" paddingTrailing="8" paddingTop="8" paddingBottom="8" spacing="2" alignItems="stretch"/>
-    <style as="soonTitle" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
-    <style as="soonGenre" fontSize="13" color="#8E8E93" lineLimit="1"/>
-    <style as="soonBtnWrap" paddingLeading="8" paddingTrailing="8" paddingBottom="8" alignItems="stretch"/>
-    <!-- paddingH 0: the label is 15 semibold in a 97pt button, and the control's default side
-         padding wrapped "Remind Me" onto two lines (measured on the web lane) -->
-    <style as="remindInline" background="#2C2C2E" radius="8" height="32" paddingH="0" fontSize="15" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
     <style as="footRow" spacing="4" alignItems="center" zIndex="2"/>
     <style as="markRow" spacing="2" alignItems="center"/>
     <!-- 10pt: the spec's measure for the ORIGINAL mini badge (§1), the one size under the
@@ -459,21 +285,6 @@
     <style as="rankMeta" fontSize="13" color="#8E8E93"/>
     <style as="rankPlay" background="#2C2C2E" radius="8" paddingH="14" paddingV="8" fontSize="13" fontWeight="semibold" color="#FFFFFF"/>
     <style as="emptyTab" fontSize="15" color="#8E8E93" textAlign="center" paddingV="40"/>
-    <!-- the sheets (§2a, §2b): 16pt gutter, everything centred -->
-    <style as="soonBody" paddingLeading="16" paddingTrailing="16" paddingTop="8" paddingBottom="24" spacing="14" alignItems="center"/>
-    <style as="sheetTitle" fontSize="20" fontWeight="bold" color="#FFFFFF" textAlign="center" lineLimit="2" tracking="-0.3"/>
-    <style as="sheetSyn" fontSize="15" color="#C7C7CC" textAlign="center" lineLimit="4" lineSpacing="7"/>
-    <style as="remindBtn" background="#FFFFFF" radius="12" height="48" spacing="8" alignItems="center" alignY="center"/>
-    <style as="remindLabel" fontSize="17" fontWeight="semibold" color="#000000"/>
-    <style as="sheetNote" fontSize="13" color="#8E8E93" textAlign="center" lineSpacing="4"/>
-    <style as="permBody" paddingLeading="16" paddingTrailing="16" paddingTop="12" paddingBottom="20" spacing="14" alignItems="center"/>
-    <style as="permSub" fontSize="15" color="#8E8E93" textAlign="center" lineSpacing="5"/>
-    <style as="permCard" background="#1C1C1E" radius="12" paddingH="16" paddingV="16" spacing="12" alignItems="center"/>
-    <style as="checkOff" width="20" height="20" radius="5" borderWidth="1.5" borderColor="#48484A" background="#1C1C1E" alignItems="center" alignY="center"/>
-    <style as="checkOn" width="20" height="20" radius="5" background="#FF2C55" alignItems="center" alignY="center"/>
-    <style as="permLabel" fontSize="15" color="#FFFFFF"/>
-    <style as="required" fontSize="15" color="#FF2C55"/>
-    <style as="maybe" fontSize="15" color="#8E8E93" textAlign="center" paddingTop="2"/>
     <!-- the toast: card fill, radius 10, 13 ink, padding 10×14 (spec −1) -->
     <style as="toastRow" background="#1C1C1E" radius="10" paddingH="14" paddingV="10" spacing="10" alignItems="center"/>
     <style as="toastLine" fontSize="13" color="#FFFFFF" lineSpacing="3"/>
@@ -620,36 +431,9 @@
       <!-- ══════════════════════════ PHONE · NEW (spec §2) ═══════════════════════════════ -->
       <vstack class="block" visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide == false &amp;&amp; dsx.variable.homeTab == 'new' &amp;&amp; dsx.variable.soonRows.length > 0">
         <text value="Coming soon" class="h2"/>
-        <scroll axis="horizontal" indicators="false">
-          <hstack class="railTrack" style="width: max-content; padding-left: 14px; padding-right: 14px">
-            <list bind="dsx.variable.soonRows" key="id" axis="horizontal" scroll="false" spacing="8">
-              <vstack class="soonCard" style="overflow: hidden">
-                <!-- the poster opens the sheet; the cover is 113×170 (2:3) at radius 8 -->
-                <zstack style="width: 113px; height: 170px; position: relative; border-radius: 8px; overflow: hidden"
-                        on:tap="dsx.action.openSoon({ show: item })" a11yTrait="button"
-                        a11yLabel="{{ item.title }}, coming soon">
-                  <image src="{{ item.cover }}" contentFit="cover" a11yHidden="true" width="113" height="170" radius="8"
-                         style="width: 113px; height: 170px; object-fit: cover"/>
-                  <stack class="scrim" a11yHidden="true"
-                         style="position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%); pointer-events: none"/>
-                  <hstack class="markRow" visible-if="item.original" a11yHidden="true" style="position: absolute; left: 6px; bottom: 6px">
-                    <image icon="play.fill" iconSize="10" color="#FFFFFF" a11yHidden="true"/>
-                    <text value="ORIGINAL" class="markTxt"/>
-                  </hstack>
-                </zstack>
-                <vstack class="soonMeta">
-                  <text value="{{ item.title }}" class="soonTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
-                  <text value="{{ item.genre }}" class="soonGenre" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
-                </vstack>
-                <vstack class="soonBtnWrap">
-                  <button label="{{ reminded ? 'Reminder set' : 'Remind Me' }}" class="remindInline"
-                          style="white-space: nowrap; padding-left: 0; padding-right: 0"
-                          on:tap="dsx.action.remindTap({ show: item })"/>
-                </vstack>
-              </vstack>
-            </list>
-          </hstack>
-        </scroll>
+        <!-- the rail and its two sheets are ONE part, shared with the Member Points tab
+             (Components/parts/ComingSoonRail.dsx); the toast it raises is this screen's -->
+        <ComingSoonRail rows="{{ dsx.variable.soonRows }}" variant="home" gutter="14" on:note="dsx.action.note()"/>
       </vstack>
 
       <vstack class="block" visible-if="dsx.variable.phase == 'ready' &amp;&amp; dsx.variable.wide == false &amp;&amp; dsx.variable.homeTab == 'new'">
@@ -999,93 +783,6 @@ One source. Native on iOS, Android, web and desktop." class="footCopy"/>
     <image icon="xmark" iconSize="12" color="{{ ink3() }}" on:tap="dsx.variable.toast = ''"
            a11yLabel="Dismiss message" a11yTrait="button"/>
   </hstack>
-
-  <!-- ══════════ THE COMING-SOON SHEET (spec §2a) ══════════════════════════════════════
-       `half,full` over the panel fill, content centred; `on:dismiss` runs closeSoon so a
-       swipe-dismiss and the button agree on one path. No `title=`: the reference draws its
-       own heading in the slot, so the panel's accessible name is `a11yLabel` (the universal
-       attribute; the web lane names the panel with it since dev@this-pass, the native lanes
-       are filed — PLAN.md §6). -->
-  <sheet present="dsx.variable.soonOpen" detents="half,full" background="#141414"
-         a11yLabel="{{ dsx.variable.soonShow == null ? 'Coming soon' : dsx.variable.soonShow.title }}"
-         on:dismiss="dsx.action.closeSoon()">
-    <scroll style="flex: 1; min-height: 0">
-      <vstack class="soonBody">
-        <zstack style="width: 110px; height: 165px; position: relative; border-radius: 8px; overflow: hidden">
-          <image src="{{ dsx.variable.soonShow == null ? '' : dsx.variable.soonShow.cover }}" contentFit="cover" a11yHidden="true"
-                 width="110" height="165" radius="8" style="width: 110px; height: 165px; object-fit: cover"/>
-          <stack class="scrim" a11yHidden="true"
-                 style="position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%); pointer-events: none"/>
-          <hstack class="markRow" visible-if="dsx.variable.soonShow != null &amp;&amp; dsx.variable.soonShow.original" a11yHidden="true"
-                  style="position: absolute; left: 6px; bottom: 6px">
-            <image icon="play.fill" iconSize="10" color="#FFFFFF" a11yHidden="true"/>
-            <text value="ORIGINAL" class="markTxt"/>
-          </hstack>
-        </zstack>
-        <text value="{{ dsx.variable.soonShow == null ? '' : dsx.variable.soonShow.title }}" class="sheetTitle"
-              style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
-        <hstack class="chipRow" style="justify-content: center; flex-wrap: wrap" visible-if="dsx.variable.soonTags.length > 0">
-          <list bind="dsx.variable.soonTags" key="name" axis="horizontal" scroll="false" spacing="6">
-            <text value="{{ item.name }}" class="chip" style="white-space: nowrap"/>
-          </list>
-        </hstack>
-        <text value="{{ dsx.variable.soonShow == null ? '' : dsx.variable.soonShow.synopsis }}" class="sheetSyn"
-              style="display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden"/>
-        <!-- icon + text is an hstack with on:tap, never a `button` (which carries icon OR label) -->
-        <hstack class="remindBtn" style="width: 100%; justify-content: center" a11yGroup="true" a11yTrait="button"
-                a11yLabel="{{ dsx.variable.soonReminded ? 'Reminder set, tap to remove it' : 'Remind me when it is out' }}"
-                on:tap="dsx.action.askRemind()">
-          <image icon="{{ dsx.variable.soonReminded ? 'checkmark' : 'bell.fill' }}" iconSize="16" color="#000000" a11yHidden="true"/>
-          <text value="{{ dsx.variable.soonReminded ? 'Reminder set' : 'Remind Me' }}" class="remindLabel"/>
-        </hstack>
-        <text value="{{ dsx.variable.remindNote }}" class="sheetNote" visible-if="dsx.variable.remindNote != ''"/>
-
-        <!-- ══════ LEVEL 2 — the permission sheet (spec §2b) ════════════════════════════
-             DECLARED INSIDE ITS PARENT'S SLOT, which is what makes it a stack (on iOS the slot
-             is an escaping closure, so this anchor exists only while the parent is up), and
-             the LAST child so its zero-size anchor pays no visible gap. `content` detent: it
-             hugs the card. The engine cascades it when the parent closes (§6.114). -->
-        <sheet present="dsx.variable.permOpen" detents="content" background="#141414"
-               a11yLabel="Turn on notifications"
-               on:dismiss="dsx.variable.permOpen = false">
-          <vstack class="permBody">
-            <!-- a REAL asset, not a glyph (AGENTS.md): scripts/gen-art.mjs draws it -->
-            <image src="/assets/bell.svg" contentFit="contain" a11yHidden="true" width="64" height="64"
-                   style="width: 64px; height: 64px"/>
-            <vstack spacing="2" alignItems="center">
-              <text value="‘{{ dsx.variable.soonShow == null ? '' : dsx.variable.soonShow.title }}’" class="sheetTitle"
-                    style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
-              <text value="Don't miss the release!" class="sheetTitle"/>
-            </vstack>
-            <text value="To receive notifications, turn on the settings below." class="permSub"/>
-            <!-- the checkbox is DRAWN (spec −1, the custom-UI law): 20×20 radius 5, teal fill
-                 with a 12pt check when on, a 1.5pt #48484A outline on the card fill when off —
-                 never a platform control. The whole card is the target. -->
-            <hstack class="permCard" style="width: 100%" on:tap="dsx.variable.allow = !dsx.variable.allow"
-                    a11yGroup="true" a11yTrait="button"
-                    a11yLabel="Allow notifications, required{{ dsx.variable.allow ? ', on' : ', off' }}">
-              <vstack class="checkOn" visible-if="dsx.variable.allow">
-                <image icon="checkmark" iconSize="12" color="#FFFFFF" a11yHidden="true"/>
-              </vstack>
-              <vstack class="checkOff" visible-if="dsx.variable.allow == false" style="border: 1.5px solid #48484A"/>
-              <text value="Allow notifications" class="permLabel"/>
-              <text value="(Required)" class="required"/>
-              <spacer/>
-            </hstack>
-            <hstack class="remindBtn" style="width: 100%; justify-content: center; opacity: {{ dsx.variable.allow ? 1 : 0.4 }}"
-                    opacity="{{ dsx.variable.allow ? 1 : 0.4 }}" a11yGroup="true" a11yTrait="button"
-                    a11yLabel="{{ dsx.variable.allow ? 'Remind me' : 'Remind me — tick Allow notifications first' }}"
-                    on:tap="dsx.action.confirmRemind()">
-              <image icon="bell.fill" iconSize="16" color="#000000" a11yHidden="true"/>
-              <text value="{{ dsx.variable.remindBusy ? 'One moment…' : 'Remind Me' }}" class="remindLabel"/>
-            </hstack>
-            <text value="{{ dsx.variable.remindNote }}" class="sheetNote" visible-if="dsx.variable.remindNote != ''"/>
-            <text value="Maybe next time" class="maybe" a11yTrait="button" on:tap="dsx.action.closePerm()"/>
-          </vstack>
-        </sheet>
-      </vstack>
-    </scroll>
-  </sheet>
 
   <TabBar active="home" visible-if="dsx.variable.wide == false"/>
   <!-- THE SEAM. One mount per screen, at the foot of the root; its sheet portals out of

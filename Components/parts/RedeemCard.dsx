@@ -1,0 +1,69 @@
+<!-- RedeemCard — one Redeem Points card (docs/design/reference-ui-spec.md §9.4): a 72
+     square tile on an accent→plum gradient carrying "+n" over a small gem, "n-Day Membership
+     Extension" 20 ink, "⚡ 500" 15 gold, and a trailing 108×40 "Redeem" pill — accent with
+     white ink when the balance covers it, the tile grey with ink-3 otherwise.
+
+     THE CARD IS THE SERVER'S ROW (server/engage.dsx pointsState `cards`: id · days · points ·
+     affordable · redeemedToday) and the tap sends only the id; POST /rewards/redeem prices
+     it, debits the points and extends `vip_until`, idempotent per day and card. -->
+<hstack class="card" on:tap="dsx.action.tap()" a11yGroup="true" a11yTrait="button"
+        a11yLabel="{{ dsx.attribute.days }}-day membership extension for {{ dsx.attribute.points }} points{{ dsx.variable.can ? '' : ', not enough points' }}">
+  <head>
+    <attribute as="id" default="''"/>
+    <attribute as="days" default="1"/>
+    <attribute as="points" default="500"/>
+    <attribute as="affordable" default="false"/>
+    <attribute as="redeemed" default="false"/>
+    <attribute as="busy" default="false"/>
+    <event as="redeem" payload="id"/>
+
+    <variable as="can" computed="true">
+      const v = dsx.attribute.affordable
+      const r = dsx.attribute.redeemed
+      const b = dsx.attribute.busy
+      if (r === true || r === 'true') { return false }
+      if (b === true || b === 'true') { return false }
+      return v === true || v === 'true'
+    </variable>
+    <variable as="wasRedeemed" computed="true">
+      const r = dsx.attribute.redeemed
+      return r === true || r === 'true'
+    </variable>
+
+    <action as="tap">
+      if (dsx.variable.can == false) { return }
+      dsx.event('redeem', { id: dsx.attribute.id })
+    </action>
+
+    <!-- 16 padding and a 96 pill where the reference measures 20 and 108: "1-Day Membership
+         Extension" at the spec's 20pt does not fit two lines beside a 72 tile on a 402 screen,
+         so the title is 17 over up to three lines and the row gives the words the width -->
+    <style as="card" background="#1A1A1A" radius="16" paddingH="16" paddingV="18" spacing="12" alignItems="center"/>
+    <style as="tile" width="72" height="72" radius="14" gradient="#FF2C55|#7A2A50" gradientDir="diagonal" alignItems="center" alignY="center" spacing="2"/>
+    <style as="tileNum" fontSize="28" fontWeight="bold" color="#FFFFFF" lineLimit="1"/>
+    <style as="col" spacing="6" alignItems="stretch"/>
+    <style as="title" fontSize="17" color="#FFFFFF" lineLimit="3" lineSpacing="3"/>
+    <style as="costRow" spacing="4" alignItems="center"/>
+    <style as="cost" fontSize="15" fontWeight="semibold" color="#F6B63D" lineLimit="1"/>
+    <style as="pill" width="96" height="40" radius="8" alignItems="center" alignY="center"/>
+    <style as="pillTxt" fontSize="15" fontWeight="semibold" lineLimit="1"/>
+  </head>
+
+  <Theme/>
+  <vstack class="tile" style="justify-content: center; flex: none; background: linear-gradient(135deg, #FF2C55 0%, #7A2A50 100%)" a11yHidden="true">
+    <text value="+{{ dsx.attribute.days }}" class="tileNum"/>
+    <image icon="bolt.fill" iconSize="14" color="#FFFFFF" a11yHidden="true"/>
+  </vstack>
+  <vstack class="col" grow="width" style="flex: 1; min-width: 0">
+    <text value="{dsx.attribute.days, plural, other {#-Day Membership Extension}}" class="title"
+          style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden"/>
+    <hstack class="costRow">
+      <image icon="bolt.fill" iconSize="15" color="{{ gold() }}" a11yHidden="true"/>
+      <text value="{{ dsx.attribute.points }}" class="cost"/>
+    </hstack>
+  </vstack>
+  <vstack class="pill" style="flex: none; justify-content: center"
+          background="{{ dsx.variable.can ? accent() : rewardsTile() }}">
+    <text value="{{ dsx.variable.wasRedeemed ? 'Redeemed' : 'Redeem' }}" class="pillTxt" color="{{ dsx.variable.can ? ink() : ink3() }}"/>
+  </vstack>
+</hstack>

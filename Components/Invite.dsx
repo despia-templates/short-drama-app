@@ -1,0 +1,23 @@
+<!-- Invite — the landing for an invite link, `/invite/:code` (docs/design/reference-ui-spec.md
+     §9.3 row 5). A friend's share carries this URL; the screen keeps the code in the
+     `sd_ref` cookie (the one declared cross-platform place — PLAN.md §6.33) and replaces
+     itself with Home, where <ReferralSeam> attaches the code to this device's identity once
+     the auth seam has minted one. Nothing is granted here, to anybody: the inviter's coins
+     land when this device records its first server-verified watch minute. -->
+<vstack class="screen" on:appear="dsx.action.land()" style:web="min-height: {{ dsx.screen.height }}px">
+  <head>
+    <action as="land">
+      const c = vars.code
+      if (c != null &amp;&amp; c != '') { dsx.cookie.sd_ref = String(c) }
+      dsx.module.route.replace({ path: '/' })
+    </action>
+
+    <style as="screen" background="#000000" alignItems="center" grow="true" spacing="0"/>
+    <style as="line" fontSize="15" color="#8E8E93" textAlign="center"/>
+  </head>
+
+  <Theme/>
+  <vstack grow="true" alignItems="center" style="justify-content: center; flex: 1">
+    <text value="Opening your invitation…" class="line"/>
+  </vstack>
+</vstack>

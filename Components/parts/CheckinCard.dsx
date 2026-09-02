@@ -1,0 +1,88 @@
+<!-- CheckinCard — the daily check-in (docs/design/reference-ui-spec.md §9.2): the streak
+     sentence with the number in gold, SEVEN CELLS in one row (the amount, the coin glyph,
+     "Today" / "Day n"), and the accent CHECK-IN button. Claimed cells dim to 40% and wear a
+     check in ink-3 where the coin was; the current cell carries a 1pt accent outline and its
+     amount in gold.
+
+     EVERY NUMBER ARRIVES: `days` is the server's seven rows (server/engage.dsx rewardsState —
+     id · n · reward · state · claimed · today) and the curve is the server's own. The button
+     only ASKS: it raises `checkin` and the screen posts /rewards/checkin, where the unique
+     (owner, day) marker is the lock; a second tap the same day is refused there, not here.
+
+     A `<grid>` sizes its DIRECT children (AGENTS.md), so the cell is the grid's direct child
+     and the seven share the card's width at a 5pt gap. -->
+<vstack class="card">
+  <head>
+    <attribute as="days" default="[]"/>
+    <attribute as="streak" default="0"/>
+    <attribute as="checked" default="false"/>
+    <attribute as="busy" default="false"/>
+    <event as="checkin"/>
+
+    <variable as="isChecked" computed="true">
+      const v = dsx.attribute.checked
+      return v === true || v === 'true'
+    </variable>
+    <variable as="isBusy" computed="true">
+      const v = dsx.attribute.busy
+      return v === true || v === 'true'
+    </variable>
+    <variable as="canTap" computed="true">
+      return dsx.variable.isChecked == false &amp;&amp; dsx.variable.isBusy == false
+    </variable>
+    <variable as="n" computed="true">return Number(dsx.attribute.streak)</variable>
+
+    <!-- per cell: the outline, the dim and the amount ink follow the server's three states -->
+    <formula as="cellBorder" t="item.today">
+      return t ? 1 : 0
+    </formula>
+    <formula as="cellDim" c="item.claimed">
+      return c ? 0.4 : 1
+    </formula>
+
+    <action as="tap">
+      if (dsx.variable.canTap == false) { return }
+      dsx.event('checkin', {})
+    </action>
+
+    <style as="card" background="#1A1A1A" radius="16" paddingH="16" paddingV="16" spacing="16" alignItems="stretch"/>
+    <style as="titleRow" spacing="4" alignItems="center"/>
+    <style as="title" fontSize="17" color="#FFFFFF" lineLimit="1"/>
+    <style as="titleN" fontSize="17" fontWeight="semibold" color="#F6B63D" lineLimit="1"/>
+    <style as="cell" radius="8" background="#262626" height="82" spacing="5" alignItems="center" alignY="center"/>
+    <style as="amt" fontSize="15" fontWeight="bold" lineLimit="1"/>
+    <style as="dayLbl" fontSize="13" color="#8E8E93" lineLimit="1"/>
+    <style as="btn" radius="8" height="47" alignItems="center" alignY="center" spacing="6"/>
+    <style as="btnTxt" fontSize="20" fontWeight="semibold" color="#FFFFFF" lineLimit="1"/>
+  </head>
+
+  <Theme/>
+  <hstack class="titleRow" a11yGroup="true" a11yLabel="Checked in for {{ dsx.variable.n }} days">
+    <text value="You have checked in for" class="title" style="white-space: nowrap"/>
+    <text value="{{ dsx.variable.n }}" class="titleN"/>
+    <text value="{{ dsx.variable.n == 1 ? 'day!' : 'days!' }}" class="title"/>
+  </hstack>
+
+  <grid bind="dsx.attribute.days" key="id" columns="7" spacing="5" scroll="false">
+    <vstack class="cell" style="justify-content: center; border: {{ cellBorder }}px solid {{ accent() }}; box-sizing: border-box"
+            borderWidth="{{ cellBorder }}" borderColor="{{ accent() }}" opacity="{{ cellDim }}"
+            a11yGroup="true" a11yLabel="Day {{ item.n }}, {{ item.reward }} coins{{ item.claimed ? ', claimed' : '' }}">
+      <text value="+{{ item.reward }}" class="amt" color="{{ item.today ? gold() : ink() }}"/>
+      <image icon="dollarsign.circle.fill" iconSize="19" color="{{ gold() }}" a11yHidden="true" visible-if="item.claimed == false"/>
+      <image icon="checkmark" iconSize="17" color="{{ ink3() }}" a11yHidden="true" visible-if="item.claimed"/>
+      <text value="{{ item.today ? 'Today' : 'Day' }}" class="dayLbl" visible-if="item.today"/>
+      <text value="{item.n, plural, other {Day #}}" class="dayLbl" visible-if="item.today == false"/>
+    </vstack>
+  </grid>
+
+  <!-- disabled means DISABLED: the guard is in the action, the wash is just its face -->
+  <hstack class="btn" style="width: 100%; justify-content: center"
+          background="{{ dsx.variable.canTap ? accent() : 'rgba(255,44,85,0.35)' }}"
+          on:tap="dsx.action.tap()" a11yGroup="true" a11yTrait="button"
+          a11yLabel="{{ dsx.variable.isChecked ? 'Checked in today' : 'Check in' }}">
+    <text value="One moment…" class="btnTxt" visible-if="dsx.variable.isBusy"/>
+    <text value="Checked in" class="btnTxt" visible-if="dsx.variable.isBusy == false &amp;&amp; dsx.variable.isChecked"/>
+    <text value="Check in" class="btnTxt" visible-if="dsx.variable.isBusy == false &amp;&amp; dsx.variable.isChecked == false"/>
+    <image icon="checkmark" iconSize="18" color="{{ ink() }}" a11yHidden="true" visible-if="dsx.variable.isChecked"/>
+  </hstack>
+</vstack>

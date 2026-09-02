@@ -106,6 +106,12 @@
          remember which one it wanted, and the cost of getting this wrong is showing ads to
          someone who paid not to see them. -->
     <attribute as="vip" default="false"/>
+    <!-- THE OPEN NONCE: a host that wants to start the ad from somewhere other than this
+         row (the success modal's "Watch an ad to earn N coins" CTA, spec 9.5) bumps a
+         number; the watch below plays on change. A component has no imperative face, so a
+         changing value is the one seam a parent can pull — and `play` still refuses through
+         `canPlay`, so a bump can never show a member an ad or beat the cap. -->
+    <attribute as="open" default="0"/>
 
     <event as="granted" payload="reward left"/>
     <event as="failed" payload="message"/>
@@ -148,15 +154,6 @@
       if (dsx.variable.lane == 'metaads') { return 'Meta Audience Network' }
       return 'Sponsored · house ad'
     </variable>
-    <variable as="laneNote" computed="true">
-      if (dsx.variable.lane != 'house' && dsx.variable.networkReady == false) {
-        return dsx.variable.laneLabel + ' is in this build, but its rewarded face is still a legacy registry alias with no declared action (PLAN.md §6.24) — this app plays its own creative rather than guessing a module call. The cap and the ledger are unaffected.'
-      }
-      if (os == 'web') {
-        return 'The web has no rewarded-video SDK to compile in, so this placement is served by the app itself: a real clip, a watch requirement, and a server-recorded impression. Native builds take the mediation lane instead.'
-      }
-      return 'Served by ' + dsx.variable.laneLabel + '. The server verifies the view before a coin is granted.'
-    </variable>
 
     <!-- BOTH SPELLINGS, on purpose (see the attribute). `vip="{{ x }}"` interpolates a real
          boolean; `vip="true"` is four characters of string. Accepting one and silently
@@ -179,11 +176,6 @@
       if (dsx.variable.isVip) { return false }
       if (dsx.variable.optedOut) { return false }
       return Number(dsx.attribute.left) > 0 && dsx.variable.playing == false
-    </variable>
-    <variable as="btnLabel" computed="true">
-      if (dsx.variable.optedOut) { return 'Ads off — you reported this one' }
-      if (Number(dsx.attribute.left) <= 0) { return 'Daily ad limit reached' }
-      return 'Watch an ad  ·  +' + dsx.attribute.reward
     </variable>
     <!-- 15s is the category's rewarded length; a shorter clip completes on `on:ended` -->
     <variable as="secsLeft" computed="true">
@@ -214,20 +206,24 @@
 
     <!-- THE CARD'S HEADLINE, which is a different sentence for each of the three states this
          placement can be in. A member must never read "Watch ads, earn coins". -->
+    <variable as="adFace" computed="true">
+      if (dsx.variable.isVip) { return false }
+      return dsx.variable.optedOut == false
+    </variable>
+    <variable as="optFace" computed="true">
+      if (dsx.variable.isVip) { return false }
+      return dsx.variable.optedOut
+    </variable>
+    <variable as="spent" computed="true">return Number(dsx.attribute.left) <= 0</variable>
+    <variable as="rowA11y" computed="true">
+      if (dsx.variable.isVip) { return 'Ads are off — included with VIP' }
+      if (dsx.variable.optedOut) { return 'Ads are off — you reported this one' }
+      return 'Earn rewards: watch a video to earn ' + dsx.attribute.reward + ' coins, ' + dsx.attribute.today + ' of ' + dsx.attribute.cap + ' today'
+    </variable>
     <variable as="cardTitle" computed="true">
       if (dsx.variable.isVip) { return 'Ads are off' }
       if (dsx.variable.optedOut) { return 'Ads are off' }
-      return 'Watch ads, earn coins'
-    </variable>
-    <!-- What VIP actually buys here, said precisely. The other three earn lanes are named
-         because switching the ad off must not read as "your earning stopped". -->
-    <variable as="memberNote" computed="true">
-      return 'Your VIP pass covers the one ad this app shows — the rewarded clip that normally sits here. Check-in, the wheel and tasks still pay, and none of them show an ad.'
-    </variable>
-    <!-- Article 7, named where the viewer reads it: the half that works and the half that
-         does not, in that order, with the seam pointed at. -->
-    <variable as="optedOutNote" computed="true">
-      return 'Thanks — this creative will not play again for the rest of this session on this device, and it goes to the moderation queue. The consumer decides: this card raises a `reported` event carrying the lane and creative, and the screen that mounts it files the report.'
+      return 'Earn rewards'
     </variable>
 
     <!-- ── the lanes ───────────────────────────────────────────────────────────────── -->
@@ -342,15 +338,22 @@
     </action>
 
     <watch value="dsx.variable.paused" on:change="dsx.action.resume()"/>
+    <watch value="dsx.attribute.open" on:change="dsx.action.play()"/>
 
-    <style as="card" background="#141419" radius="14" paddingH="16" paddingV="16" spacing="12" alignItems="stretch"/>
-    <style as="cardHead" alignItems="center"/>
-    <style as="h2" fontSize="16" fontWeight="bold" color="#FFFFFF"/>
-    <style as="meta" fontSize="12" color="rgba(255,255,255,0.5)"/>
+    <!-- THE RESTING FACE IS A ROW CARD (docs/design/reference-ui-spec.md 9.3 row 3): the
+         44 tile, "Earn rewards (n/N)", "Watch a video to earn N coins", the Watch pill — the
+         same recipe every other Earn Rewards row wears (Components/parts/RewardRow.dsx), so
+         the ad lane sits in the list as one row of it. -->
+    <style as="row" background="#161616" radius="12" paddingH="16" paddingV="15" spacing="8" alignItems="center" minHeight="74"/>
+    <style as="tile" width="44" height="44" radius="22" background="#2A2A2A" alignItems="center" alignY="center"/>
+    <style as="col" spacing="3" alignItems="stretch"/>
+    <style as="titleRow" spacing="6" alignItems="center"/>
+    <style as="title" fontSize="17" color="#FFFFFF" lineLimit="1"/>
+    <style as="count" fontSize="15" color="#8E8E93" lineLimit="1"/>
+    <style as="sub" fontSize="15" color="#8E8E93" lineLimit="2" lineSpacing="2"/>
+    <style as="pill" minWidth="75" height="31" radius="8" paddingH="10" alignItems="center" alignY="center"/>
+    <style as="pillTxt" fontSize="15" fontWeight="semibold" lineLimit="1"/>
     <style as="lanePill" background="rgba(255,255,255,0.08)" radius="10" paddingH="9" paddingV="4" fontSize="11" fontWeight="semibold" color="rgba(255,255,255,0.72)"/>
-    <style as="cta" radius="24" paddingV="14" fontSize="14" fontWeight="semibold" color="#FFFFFF"/>
-    <style as="note" fontSize="12" color="rgba(255,255,255,0.45)" lineSpacing="3"/>
-
     <style as="vipPill" background="rgba(246,182,61,0.16)" radius="10" paddingH="9" paddingV="4" spacing="5" alignItems="center"/>
     <style as="vipPillTxt" fontSize="11" fontWeight="bold" color="#F6B63D"/>
 
@@ -375,43 +378,41 @@
        Theme.dsx), and a caller must not have to remember to register it first. The
        block is app-wide and last-write-wins, so a second mount costs a 0x0 stack. -->
   <Theme/>
-  <vstack class="card">
-    <hstack class="cardHead">
-      <text value="{{ dsx.variable.cardTitle }}" class="h2"/>
-      <spacer/>
-      <!-- the daily counter is a fact about an ad lane the member does not have; showing
-           "0/10 today" to a VIP would re-introduce the thing the pass removed -->
-      <text value="{{ dsx.attribute.today }}/{{ dsx.attribute.cap }} today" class="meta"
-            visible-if="dsx.variable.isVip == false"/>
-      <hstack class="vipPill" visible-if="dsx.variable.isVip" a11yGroup="true" a11yLabel="Included with VIP">
-        <image icon="crown.fill" iconSize="11" color="{{ gold() }}" a11yHidden="true"/>
-        <text value="VIP" class="vipPillTxt"/>
+  <!-- the row: the whole card is the target (the reference's 31pt pill is under the 44
+       floor), and `play` refuses in the action for a member, an opt-out or a spent cap -->
+  <hstack class="row" on:tap="dsx.action.play()" a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.variable.rowA11y }}">
+    <vstack class="tile" style="justify-content: center; flex: none">
+      <image icon="{{ dsx.variable.isVip ? 'crown.fill' : 'play.rectangle.fill' }}" iconSize="19" color="{{ warmGold() }}" a11yHidden="true"/>
+    </vstack>
+    <vstack class="col" grow="width" style="flex: 1; min-width: 0">
+      <hstack class="titleRow">
+        <text value="{{ dsx.variable.cardTitle }}" class="title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"/>
+        <!-- the daily counter is a fact about an ad lane the member does not have; showing
+             "0/15" to a VIP would re-introduce the thing the pass removed -->
+        <text value="({{ dsx.attribute.today }}/{{ dsx.attribute.cap }})" class="count" style="white-space: nowrap"
+              visible-if="dsx.variable.adFace"/>
       </hstack>
+      <text value="{dsx.attribute.reward, plural, one {Watch a video to earn # coin} other {Watch a video to earn # coins}}" class="sub"
+            visible-if="dsx.variable.adFace" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+      <!-- THE MEMBER FACE. Not blank: a benefit someone paid for should be visible at the
+           place it takes effect, and this is that place. -->
+      <text value="Your VIP pass switches the rewarded clip off. Check-in, the wheel and the tasks still pay." class="sub" visible-if="dsx.variable.isVip"
+            style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+      <!-- Article 7, named where the viewer reads it -->
+      <text value="This creative will not play again this session; the report goes to the moderation queue." class="sub" visible-if="dsx.variable.optFace"
+            style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden"/>
+    </vstack>
+    <hstack class="vipPill" visible-if="dsx.variable.isVip" a11yHidden="true" style="flex: none">
+      <image icon="crown.fill" iconSize="11" color="{{ gold() }}" a11yHidden="true"/>
+      <text value="VIP" class="vipPillTxt"/>
     </hstack>
-
-    <!-- ── THE MEMBER FACE. Not blank: a benefit someone paid for should be visible at the
-             place it takes effect, and this is that place. ───────────────────────────── -->
-    <text value="{{ dsx.variable.memberNote }}" class="note" visible-if="dsx.variable.isVip"/>
-
-    <!-- ── THE AD FACE ─────────────────────────────────────────────────────────────── -->
-    <!-- the lane pill describes the creative that is about to play, so it goes with it: a
-         viewer who has switched the placement off has no lane to be told about -->
-    <hstack spacing="8" alignItems="center"
-            visible-if="dsx.variable.isVip == false && dsx.variable.optedOut == false">
-      <text value="{{ dsx.variable.laneLabel }}" class="lanePill"/>
-      <spacer/>
-    </hstack>
-
-    <button label="{{ dsx.variable.btnLabel }}" class="cta"
-            background="{{ dsx.variable.canPlay ? brand() : '#26262C' }}"
-            on:tap="dsx.action.play()"
-            visible-if="dsx.variable.isVip == false"/>
-
-    <text value="{{ dsx.variable.laneNote }}" class="note"
-          visible-if="dsx.variable.isVip == false && dsx.variable.optedOut == false"/>
-    <text value="{{ dsx.variable.optedOutNote }}" class="note"
-          visible-if="dsx.variable.isVip == false && dsx.variable.optedOut"/>
-  </vstack>
+    <vstack class="pill" style="flex: none; justify-content: center" visible-if="dsx.variable.isVip == false"
+            background="{{ dsx.variable.canPlay ? brand() : 'rgba(255,44,85,0.2)' }}">
+      <text value="Off" class="pillTxt" visible-if="dsx.variable.optedOut" color="{{ accent() }}" style="white-space: nowrap"/>
+      <text value="Done" class="pillTxt" visible-if="dsx.variable.optedOut == false &amp;&amp; dsx.variable.spent" color="{{ accent() }}" style="white-space: nowrap"/>
+      <text value="Watch" class="pillTxt" visible-if="dsx.variable.optedOut == false &amp;&amp; dsx.variable.spent == false" color="{{ ink() }}" style="white-space: nowrap"/>
+    </vstack>
+  </hstack>
 
   <!-- the creative. `mode="cover"` is a full-screen modal on every renderer, which is what a
        rewarded placement is on all three.
@@ -443,6 +444,10 @@
              early-close branch in `close` permanently unreachable. -->
         <hstack spacing="8" style="padding: 16px; align-items: center; pointer-events: auto">
           <text value="AD" class="adTag"/>
+          <!-- WHICH LANE is playing, said on the creative itself (the lane paragraph that
+               used to sit under the button has no room in a 74pt row — Article 7 keeps the
+               name where the viewer is looking) -->
+          <text value="{{ dsx.variable.laneLabel }}" class="lanePill" visible-if="dsx.variable.lane == 'house'"/>
           <hstack class="reportBtn" on:tap="dsx.action.report()"
                   a11yGroup="true" a11yTrait="button"
                   a11yLabel="Report this ad as inappropriate. It closes with no reward.">
