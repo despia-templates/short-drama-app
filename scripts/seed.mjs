@@ -99,7 +99,13 @@ for (const s of SHOWS) {
       show: showId,
       idx: i,
       title: epTitle(i),
-      videoUrl: `${CDN}/${s.media}.mp4`,
+      // THE HLS MASTER, never the flat MP4: the player's Subtitles and Quality sheets render
+      // the tracks and the rendition ladder the STREAM carries (`<video tracks=/variants=>`),
+      // and only HLS carries both on every lane. scripts/gen-hls.mjs writes the ladder
+      // (360p · 240p · 144p, honest to the 360p demo masters) and ten WebVTT renditions
+      // beside each source clip; the origin gates the whole directory as one episode and
+      // tokenizes every playlist it serves (scripts/serve.mjs tokenizedPlaylist).
+      videoUrl: `${CDN}/${s.media}/master.m3u8`,
       poster: `/posters/${s.slug}-poster.svg`,
       duration: 60 + ((i * 7) % 45), // 60–104s: a vertical drama episode, varied per index
       price: s.price,

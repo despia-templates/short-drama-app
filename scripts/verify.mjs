@@ -98,6 +98,28 @@ const sql = async (text, params) => {
   return pool.query(text, params);
 };
 
+/** THE BYTES BEHIND A SOURCE. A progressive MP4 is its own bytes; an HLS master (.m3u8) is a
+ *  text playlist the origin TOKENIZES (every child URI inherits `?ep&ticket`), and the bytes a
+ *  player seeks in are the init and media segments two hops down — so a Range assertion
+ *  follows the playlist to its first rung's init segment. A playlist that fails to parse
+ *  returns null and the caller's check fails loudly. */
+const isPlaylist = (url) => { try { return /\.m3u8$/i.test(new URL(url, base).pathname); } catch { return false; } };
+async function bytesUrlFor(src) {
+  const abs = new URL(src, base).href;
+  if (!isPlaylist(abs)) return abs;
+  const master = await fetch(abs);
+  if (!master.ok) return null;
+  const firstUri = (text) => text.split("\n").map((l) => l.trim()).find((l) => l.length > 0 && !l.startsWith("#"));
+  const rung = firstUri(await master.text());
+  if (rung === undefined) return null;
+  const rungUrl = new URL(rung, abs).href;
+  const media = await fetch(rungUrl);
+  if (!media.ok) return null;
+  const text = await media.text();
+  const init = /#EXT-X-MAP:URI="([^"]+)"/.exec(text)?.[1] ?? firstUri(text);
+  return init === undefined ? null : new URL(init, rungUrl).href;
+}
+
 /** the page's visible text, script tags stripped — what a reader actually gets */
 const bodyText = (html) => {
   const i = html.indexOf("<body");
@@ -361,11 +383,31 @@ console.log("\nreminders");
   const bare = await fetch(`${base}${mediaPath}`);
   check("bare media is refused", bare.status === 403,
     `GET ${mediaPath} answered ${bare.status} with no episode named — public/media was an open bucket`);
-  const asFree = await fetch(`${base}${sampleFree.video}`, { headers: { range: "bytes=0-1023" } });
+  const freeBytes = await bytesUrlFor(sampleFree.video);
+  check("a free episode's source resolves to bytes", freeBytes !== null,
+    `${sampleFree.video} did not lead to a media segment — the playlist is missing or untokenized (run node scripts/gen-hls.mjs)`);
+  const asFree = freeBytes === null ? { status: 0 } : await fetch(freeBytes, { headers: { range: "bytes=0-1023" } });
   check("a free episode's own source plays", asFree.status === 206 || asFree.status === 200,
     `the free source answered ${asFree.status} — the gate closed on the funnel's hook`);
   check("ranged playback survives the gate", asFree.status === 206,
     "the gate answered 200 to a Range request — AVFoundation treats that as unseekable and native playback breaks (site-node.ts)");
+  // THE HLS PLANE, pinned where it is enforced: the master is served as a playlist whose every
+  // child URI carries the grant, and a child asked for WITHOUT the grant is refused — the
+  // directory is one episode (scripts/serve.mjs mediaOwned / tokenizedPlaylist).
+  if (isPlaylist(sampleFree.video)) {
+    const master = await fetch(`${base}${sampleFree.video}`);
+    const body = master.ok ? await master.text() : "";
+    const children = body.split("\n").map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith("#"));
+    check("the master playlist is served as a playlist", master.status === 200 && /mpegurl/.test(master.headers.get("content-type") ?? ""),
+      `${master.status} ${master.headers.get("content-type")} — AVPlayer and ExoPlayer refuse an octet-stream playlist`);
+    check("every child URI of the playlist carries the grant", children.length > 0 && children.every((u) => /[?&]ep=/.test(u)),
+      `${children.slice(0, 3).join(" | ")} — a native player carries no query onto playlist children, so an untokenized playlist stalls at the first segment`);
+    check("subtitle renditions are declared and tokenized", /#EXT-X-MEDIA:TYPE=SUBTITLES[^\n]*URI="[^"]*[?&]ep=/.test(body),
+      "no tokenized #EXT-X-MEDIA subtitle rendition in the master — the Subtitles sheet would read empty");
+    const bare = await fetch((freeBytes ?? "").split("?")[0]);
+    check("a segment asked for without the grant is refused", bare.status === 403,
+      `${(freeBytes ?? "").split("?")[0]} answered ${bare.status} — the directory gate is open`);
+  }
   const asLocked = await fetch(`${base}${mediaPath}?ep=${sampleLocked.id}`);
   check("a locked episode's media is refused without a ticket", asLocked.status === 403,
     `answered ${asLocked.status} — knowing a paid episode's id must not be enough to play it`);
@@ -398,7 +440,8 @@ console.log("\nreminders");
   // the class this file exists for, so the agreement is asserted rather than assumed.
   let disagreed = 0;
   for (const e of sampleShow.episodes) {
-    const path = `/media/${sampleShow.episodes[0].video.split("/").pop().split("?")[0]}`;
+    // the PATH of the show's media (a file, or an HLS master under the show's directory)
+    const path = new URL(sampleShow.episodes[0].video, base).pathname;
     const r = await fetch(`${base}${path}?ep=${e.id}`, { method: "HEAD" });
     const originSaysFree = r.status !== 403;
     if (originSaysFree !== e.free) disagreed += 1;
@@ -493,7 +536,8 @@ console.log("\nconcurrency");
     // THE TICKET IS A CAPABILITY, tested where it matters: on a PAID episode, where it is
     // the only thing between the request and the bytes. (On a free episode there is no
     // ticket to forge — the origin serves it on the episode id alone.)
-    check("the entitled source plays", (await fetch(`${base}${paidPlay.body.source}`, { headers: { range: "bytes=0-1023" } })).status === 206,
+    const paidBytes = await bytesUrlFor(paidPlay.body.source);
+    check("the entitled source plays", paidBytes !== null && (await fetch(paidBytes, { headers: { range: "bytes=0-1023" } })).status === 206,
       "an entitled viewer's own ticketed source did not stream");
     const forged = await fetch(`${base}${paidPlay.body.source.replace(/ticket=[0-9a-f-]+/, `ticket=${randomUUID()}`)}`);
     check("a forged ticket on a PAID episode is refused", forged.status === 403,
@@ -1260,6 +1304,70 @@ const other = { authorization: `Bearer ${mint({ sub: otherSub })}`, "content-typ
     "one account's deletion removed another account's data");
 }
 
+// ── THE WATCH MISSION: no coin grant originates from the client ────────────────────────
+// server/engage.dsx watchTick counts WALL-CLOCK time between two accepted heartbeats, capped
+// at one heartbeat, and grants through the ledger under a partial unique index. Every
+// property below is the founder's law restated as an assertion; the fixtures reach into the
+// day row the way the wallet fixtures reach into the ledger — a test harness past the API,
+// which nothing in the app can do.
+console.log("\nwatch mission");
+{
+  // any live episode will do for the heartbeat: the server counts the clock, not the episode
+  const freeEp = detail.episodes.find((e) => e.free) ?? detail.episodes[0];
+  const anonTick = await fetch(`${base}/engage/watch/tick`, { method: "POST", headers: anon, body: "{}" });
+  check("a heartbeat is refused without a session", anonTick.status === 401,
+    `POST /engage/watch/tick answered ${anonTick.status} to an anonymous caller`);
+  const opened = await asJson(await GET("/engage/watch/state", viewer));
+  check("the mission state answers the shape the ring binds to",
+    opened.status === 200 && ["watchedSeconds", "nextMilestoneSeconds", "grantedToday", "capReached", "dailyCap", "milestones"].every((k) => opened.body?.[k] !== undefined),
+    `${opened.status} ${JSON.stringify(opened.body).slice(0, 160)}`);
+  check("the milestones sum to the daily cap", opened.status === 200
+    && opened.body.milestones.reduce((a, m) => a + m.coins, 0) === opened.body.dailyCap,
+    `${JSON.stringify(opened.body?.milestones)} against a cap of ${opened.body?.dailyCap} — "up to 70 coins daily" would be copy, not arithmetic`);
+  const first = await asJson(await POST("/engage/watch/tick", viewer, { episode: freeEp.id }));
+  check("the first heartbeat of a day opens the day and credits nothing", first.status === 200 && first.body?.credited === 0 && first.body?.watchedSeconds === 0,
+    `${first.status} ${JSON.stringify(first.body).slice(0, 160)} — there is no previous tick to measure from`);
+  const replay = await asJson(await POST("/engage/watch/tick", viewer, { episode: freeEp.id }));
+  check("a replayed heartbeat credits (almost) nothing", replay.status === 200 && replay.body?.credited <= 1,
+    `a second tick a moment later credited ${replay.body?.credited}s — the guard is the wall clock, and it did not move`);
+  if (pool !== null) {
+    // one second short of the first milestone, with the last heartbeat an hour ago: the tick
+    // must credit ONE CAP (60 s), never the hour, and that is enough to cross 300
+    await sql("update dsx_watchday set seconds = 299, last_at = now() - interval '1 hour' where owner_id = $1", [viewerSub]);
+    const cross = await asJson(await POST("/engage/watch/tick", viewer, { episode: freeEp.id }));
+    check("a heartbeat after a long gap credits one cap, not the gap", cross.status === 200 && cross.body?.credited === 60,
+      `credited ${cross.body?.credited}s after an hour away — a pause must not pay out`);
+    check("crossing 5 minutes grants the first milestone (10 coins)", cross.status === 200 && cross.body?.granted === 10 && cross.body?.grantedToday === 10,
+      `${JSON.stringify(cross.body).slice(0, 200)}`);
+    const again = await asJson(await POST("/engage/watch/tick", viewer, { episode: freeEp.id }));
+    check("the milestone is paid once: the next heartbeat grants nothing", again.status === 200 && again.body?.granted === 0 && again.body?.grantedToday === 10,
+      `${JSON.stringify(again.body).slice(0, 200)}`);
+    const led = await sql("select count(*)::int as n, coalesce(sum(amount),0)::int as coins from dsx_ledger where owner_id = $1 and source = 'watch'", [viewerSub]);
+    check("the ledger holds exactly one watch row for it", led?.rows[0].n === 1 && led?.rows[0].coins === 10, JSON.stringify(led?.rows[0]));
+    const w = await asJson(await GET("/wallet/state", viewer));
+    check("the wallet fold moved by the grant", w.status === 200 && w.body.bonus >= 10, `bonus ${w.body?.bonus}`);
+    // THE LOCK, not the loop: a second row for the same (owner, day, milestone) is refused by
+    // dsx_ledger_watch_once, so two heartbeats racing across one boundary cannot pay twice
+    let dup = false;
+    try {
+      await sql("insert into dsx_ledger (owner_id, kind, amount, source, ref) values ($1,'bonus',10,'watch',$2)", [viewerSub, `${cross.body.day}:5`]);
+      dup = true;
+    } catch { /* refused, as it must be */ }
+    check("a second grant row for the same milestone is refused by the index", dup === false,
+      "dsx_ledger_watch_once in server/policies.local.sql is missing — a race across a milestone would pay twice");
+    // THE DAY CAP: far past every milestone, the remaining three pay out to exactly 70 and
+    // then nothing, however many heartbeats follow
+    await sql("update dsx_watchday set seconds = 100000, last_at = now() - interval '1 hour' where owner_id = $1", [viewerSub]);
+    const rest = await asJson(await POST("/engage/watch/tick", viewer, { episode: freeEp.id }));
+    const after = await asJson(await POST("/engage/watch/tick", viewer, { episode: freeEp.id }));
+    check("the day caps at 70 coins and says so", rest.status === 200 && rest.body?.grantedToday === 70 && rest.body?.capReached === true
+      && after.body?.granted === 0 && after.body?.grantedToday === 70,
+      `${JSON.stringify(rest.body).slice(0, 160)} then ${JSON.stringify(after.body).slice(0, 120)}`);
+    const total = await sql("select coalesce(sum(amount),0)::int as coins from dsx_ledger where owner_id = $1 and source = 'watch'", [viewerSub]);
+    check("...and the ledger agrees: 70, from four rows", total?.rows[0].coins === 70, JSON.stringify(total?.rows[0]));
+  }
+}
+
 if (pool !== null) {
   // leave nothing behind: this run's throwaway identity, and nothing else
   await sql("delete from dsx_report where owner_id = $1 or owner_id = $2", [viewerSub, otherSub]);
@@ -1270,6 +1378,7 @@ if (pool !== null) {
   await sql("delete from dsx_playticket where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_favorite where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_checkin where owner_id = $1", [viewerSub]);
+  await sql("delete from dsx_watchday where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_spin where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_order where owner_id = $1", [viewerSub]);
   await sql("delete from dsx_wallet where owner_id = $1", [viewerSub]);

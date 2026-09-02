@@ -571,6 +571,41 @@ async function ticketOk(id, episode) {
   return row.episode === episode && expiresMs > Date.now();
 }
 
+/** does the episode whose media lives at `owned` (its video_url pathname) own the request path? */
+const mediaOwned = (owned, path) => {
+  if (owned === null || owned === undefined) return false;
+  if (owned === path) return true;
+  if (!owned.endsWith(".m3u8")) return false;
+  const dir = owned.slice(0, owned.lastIndexOf("/") + 1);
+  return path.startsWith(dir) && !path.slice(dir.length).includes("..");
+};
+
+// ══ THE TOKENIZED PLAYLIST — what a CDN does with signed cookies, done here in the open ══
+// An HLS player fetches a master, then rung playlists, then dozens of segments — and NONE of
+// the native players (AVPlayer, ExoPlayer) carries the master URL's query string onto the
+// child URIs it reads out of the playlist. The grant (`?ep=…&ticket=…`) would die at the
+// first segment and the clip would stall at 0:00 with a 403 in the log. So the origin
+// rewrites every URI in a playlist it serves — the plain URI lines and the `URI="…"`
+// attributes of #EXT-X-MEDIA / #EXT-X-MAP — to carry the same query the master was asked
+// with. A production edge does exactly this (CloudFront signed cookies, Cloudflare Stream
+// signed tokens, Mux playback tokens): the token is minted once and rides every child
+// request. The web renderer's own HLS lane inherits the query itself and is unaffected.
+const MEDIA_ROOT = resolve(SITE, "..", "public");
+function tokenizedPlaylist(path, url) {
+  let text;
+  try { text = readFileSync(resolve(MEDIA_ROOT, path.slice(1)), "utf8"); } catch { return null; }
+  const grant = new URLSearchParams();
+  for (const k of ["ep", "ticket"]) { const v = url.searchParams.get(k); if (v !== null) grant.set(k, v); }
+  const q = grant.toString();
+  if (q === "") return text;
+  const carry = (uri) => (uri.includes("?") ? `${uri}&${q}` : `${uri}?${q}`);
+  return text.split("\n").map((line) => {
+    if (line.startsWith("#")) return line.replace(/URI="([^"]+)"/g, (_, uri) => `URI="${carry(uri)}"`);
+    const t = line.trim();
+    return t === "" ? line : carry(t);
+  }).join("\n");
+}
+
 /** null ⇒ serve it; a Response ⇒ refuse, with the reason a developer needs. */
 async function refuseMedia(path, url) {
   const ep = url.searchParams.get("ep") ?? "";
@@ -588,8 +623,12 @@ async function refuseMedia(path, url) {
   }
   const facts = await episodeFacts(ep);
   // The episode must actually be the one this file belongs to — otherwise one free
-  // episode's id would be a master key to the whole bucket.
-  if (facts.path !== path) return no("that episode does not play this file");
+  // episode's id would be a master key to the whole bucket. A progressive episode owns ONE
+  // file; an HLS episode (`video_url` ending .m3u8) owns its whole DIRECTORY — the master,
+  // the rung playlists, the init and media segments and the WebVTT renditions all live
+  // under it (scripts/gen-hls.mjs), and every one of them is a separate request from the
+  // player that must carry the same grant.
+  if (!mediaOwned(facts.path, path)) return no("that episode does not play this file");
   if (facts.free) return null;
   if (!UUID_RE.test(ticket)) return no("this episode is locked — unlock it, then ask GET /wallet/play/:episode");
   if (!(await ticketOk(ticket, ep))) return no("that playback ticket is expired or not yours — ask GET /wallet/play/:episode again");
@@ -690,6 +729,18 @@ const server = createServer((req, res) => {
       // pass so ranged playback keeps working; answers 403 with a usable message on a fail.
       const refused = await refuseMedia(path, reqUrl);
       if (refused !== null) { await writeWebResponse(refused, res); return; }
+      if (path.endsWith(".m3u8")) {
+        // a playlist is REWRITTEN, never served flat: every child URI inherits the grant
+        const body = tokenizedPlaylist(path, reqUrl);
+        if (body === null) {
+          res.writeHead(404, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+          res.end(JSON.stringify({ reason: "not_found", message: `no playlist at ${path} — run \`node scripts/gen-hls.mjs\`` }));
+          return;
+        }
+        res.writeHead(200, { "content-type": "application/vnd.apple.mpegurl", "cache-control": "no-store" });
+        res.end(body);
+        return;
+      }
     }
     // THE LOCAL LANE HAS NO SERVICE WORKER (PLAN.md §6.13a). `despia build` emits a
     // precaching SW; against a rebuilt origin it replays a stale bundle whose style
