@@ -2808,3 +2808,65 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      the pinned case keeps its span. Same corpus ask as §6.137: the absolute plane's SIZING has no
      row on any lane, and the two divergences found in one day (iOS over-wide when pinned, Android
      under-wide when free) are exactly what an `absolute-insets.json` would have caught.
+
+142. **THE ANDROID PLAYER BAND SAT AT THE TOP AND THE KEY ART HUGGED ITS OWN WIDTH — three Android
+     engine rules, none of them the template** (found 2026-09-02; fixed upstream dev@248cee0e).
+     (1) A depth stack now ADOPTS its grown frame: step 4 relaxed every element to a hug at the
+     top-leading anchor, SwiftUI's answer for stacks and text, but iOS's CoverZStackLayout adopts the
+     proposal on its grow axes and centres its layers and the web zstack is a centred grid cell — so
+     the band hugged the page top. Same for an image with pixels (`width: 100%` is the img box).
+     (2) A pager PAGE proposes its box: `Pager.swift` frames every page to the viewport; Compose's
+     pager handed the content a maximum only; each page now composes in a filled, centre-aligned box.
+     (3) The declaration-list door opens on an interpolation hole: Stack.swift's gate has opened on
+     `:` OR `{{ }}` since dev@4526ef24; Android's opened on a literal `:` only, so
+     `style="{{ stageArtFx }}"` was silently inert and the art never received `width: 100%` — the
+     Android twin of §6.6's "compound style lists are one computed value". Measured on the 1080×2424
+     emulator: band 455×606 leading → 1080×606 at y 870 (the iOS reference's centring); art
+     grow null → width. Pinned: `main-axis-anchor.json` `adopts` (10 rows), `named-styles.json`
+     case 7, and a real-layout instrumented test 4/4 (red 0.0 vs 250.0). NAMED DELTA LEFT: a
+     NON-growing page root is centred on iOS and Android but sits top-left on web (`.dsx-paged-page`
+     is a block) — the web ask is to centre a page's root the way the native lanes do.
+143. **ONE DECLARATION, THREE LANES — the native exports fold the configured `packages` now**
+     (§6.115's ask; landed upstream dev@772ddf58). Every `dsx.config.json packages` path folds as a
+     module on iOS and Android with its transitive `dependencies`, its scheme/alias rows, config,
+     `context`, Info.plist keys, entitlements, SPM/pods, Gradle resources, activity initialisers and
+     manifest blocks; a package with no lane for the target is REFUSED BY NAME in the export log
+     (which also un-silences `Modules/` entries that were always dropped), and a manifest that
+     declares the lane absent is a printed degradation line. Measured on the reference app with
+     IdentityVault and Core/Store configured: Android `Bootstrapped 11 plugin(s)` incl.
+     identityvault, posthog, consent, biometric; iOS `Bootstrapped 6` incl. the same four —
+     `has('posthog')` and `has('identityvault')` answer true on device for the first time. Refused
+     by name today, each an UPSTREAM defect in the package, not in this app: Stripe (its pod
+     `StripePaymentSheet 26.7.0` is unresolvable on trunk; the Kotlin lane references an
+     undeclared `financial-connections` artifact), SocialShare (needs the premium mandatory
+     ContentServer, which no export folds), and Core/Store (`Store.swift:979 RefundRequestError has
+     no member 'ineligible'`; `Store.kt:481` a zero-arg lambda for a two-arg callback) — so the
+     in-app-purchase lane is now blocked by two compile errors in the module, fixed in the IAP
+     pass. TWO FACTS FOR ADOPTERS: (a) the licence gate bites once packages fold — a premium package
+     (Stripe, PostHog, IdentityVault, Store) needs a `despia-entitlement.json` beside the project or
+     the export refuses (D5); local development uses an unsigned local entitlement, documented in
+     docs/monetization.md; (b) a `route.push` to a `tabRoot` path is a lint error by design (a tab
+     is entered laterally, §6.29).
+144. **THE DEVICE CREDENTIAL'S HOME, MEASURED ON EVERY LANE** (2026-09-02; module fixes upstream
+     dev@93a96b5f). `Core/IdentityVault` is the store the founder asked for — Keychain
+     (`kSecAttrSynchronizable`, iCloud Keychain) on iOS, Google Block Store + sealed prefs on
+     Android, AES-GCM IndexedDB on the web — and it now answers `durability()` honestly on each:
+     iPhone simulator with no iCloud account → `keychain_synced / synced / restorable:true /
+     proven:false`; a build with no keychain entitlement → `plane:"none", reason:"store_refused"`
+     (writes fail `-34018`); API 36 emulator without a screen lock → `blockstore_local / device /
+     restorable:false / sync_unavailable`; a browser tab → `indexeddb / session / evictable`. On
+     every lane `locked:false` raised zero prompts and a missing key answers `not_found` without
+     throwing. Three defects fixed in the module: turning `cloud_sync` on over an existing record
+     made every write fail `-36` and every read return the stale twin (one query per plane now,
+     configured plane first, other-plane records migrated on read); the complete web facet was
+     never imported (`web.boot` missing — 40 of 108 modules with a `web/index.js` share that gap);
+     the Android mirror is re-issued once per record when the deployment roams. `cloud_sync` is
+     ON by default now. THE SURVIVAL TABLE, cited not remembered: same-device delete/reinstall is
+     "never been part of the API contract" on iOS (Apple staff, thread 72271 — do not design on it),
+     documented-with-backup on Android, gone with site data on the web; NEW device, same account:
+     documented on iOS with sync on, Block Store on Android 12+ with a screen lock, never on the web
+     — which is why the web mirrors the credential in a 400-day cookie and pushes account linking.
+     Two engine gaps filed with it: a simulator build with no team has EMPTY entitlements, so the
+     vault refuses on every simulator until the export carries `keychain-access-groups` through the
+     linker sections; and a module's `dsx.module.<x>.context.*` facts read EMPTY on the web (the bus
+     proxy is a function target the JSE dict walk skips) — bind `global.<x>.*` there until fixed.
