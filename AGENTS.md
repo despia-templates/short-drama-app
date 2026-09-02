@@ -446,3 +446,24 @@ This template is AI training data and the reference for thousands to come. A fra
 limitation is NEVER worked around silently: file it (PLAN.md §6), bridge it loudly in
 place, or degrade per Article 7 with the degradation named in the UI (the Rewards ads card
 is the model). `npm run lint` and `npm run review` gate every merge.
+
+- **A COLUMN INSIDE A HORIZONTAL ROW HUGS WITH `width="fit"`.** A `vstack` of label + rule
+  inside an `hstack` inside a horizontal `<scroll>` was proposed a SHARE of the viewport on iOS
+  and truncated its label ("Pic…", "Ra…") while the web's `width: max-content` track let it
+  hug; `width="fit"` (the catalog's hug primitive) sizes the column to its content on every
+  lane. Measured on the Home tab strip, iPhone 17 Pro.
+- **AN OVERLAY ROW THAT MUST NOT COLLIDE IS ONE ROW WITH `justify-content: space-between`,
+  never two absolutely-positioned siblings.** Two corner overlays on a 116pt cell ("ORIGINAL"
+  bottom-left, the play count bottom-right) overlapped; one `left: 6px; right: 6px` row that
+  distributes cannot. Both native absolute planes had a sizing divergence for exactly that
+  spelling (PLAN.md §6.137, §6.141) — fixed upstream, so the spelling is now the same pixels
+  on three lanes.
+- **A CHROME-LESS `<sheet>` NAMES ITSELF WITH `a11yLabel=`.** A sheet that draws its own heading
+  (no `title=`) had no accessible name on the web; the universal attribute now names the panel
+  (dev@4fd3b2a7). The native halves are filed (PLAN.md §6.138) — declare it anyway, so the day
+  they land nothing in the template changes.
+- **REMIND ME IS THREE HALVES AND THE TOAST SAYS WHICH ONES LANDED.** Core/Notify asks the
+  permission, server/reminders.dsx keeps the row, Core/LocalPush `send` schedules the one-shot —
+  and only on the lanes whose `send` outlives the page: the web facet is a page timer, so a
+  premiere days out is never armed there (PLAN.md §6.139). Ask `has('localpush')` first, then
+  `os`, and never report a notification you did not arm.
