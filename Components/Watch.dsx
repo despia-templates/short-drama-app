@@ -792,8 +792,8 @@
           <vstack class="meta" paddingTop="36" paddingBottom="4" style="pointer-events: {{ dsx.variable.holding ? 'none' : 'auto' }}">
             <hstack spacing="4" alignItems="center" on:tap="dsx.action.goShow({ id: dsx.variable.showId })"
                     a11yGroup="true" a11yTrait="button" a11yLabel="{{ dsx.variable.showTitle }}, open the series page">
-              <text value="{{ dsx.variable.showTitle }}" class="metaTitle" lineLimit="1"
-                    style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0"/>
+              <text value="{{ dsx.variable.showTitle }}" class="metaTitle" lineLimit="1" grow="width"
+                    style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0"/>
               <image icon="chevron.forward" iconSize="14" color="{{ ink3() }}" a11yHidden="true"/>
             </hstack>
             <hstack spacing="0" alignItems="flex-end" visible-if="dsx.variable.showSynopsis != ''">
