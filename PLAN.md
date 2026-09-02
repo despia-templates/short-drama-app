@@ -3819,3 +3819,92 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      MountedLifecycleConformanceTest's copy of the arm seeds the same. Measured after on
      DSX_API36_Phone_Final: the ring paints the thin arc of the true fraction on the first
      and the second mount (`and3-final-watch*.png`).
+
+185. **THE TOP EDGE OF A MOUNTED CARD IS 30pt FOR A DECLARED 20 ON iOS — two mechanisms,
+     measured apart: (a) an inline `paddingTop` is ADDED to a class `paddingV` instead of
+     overriding it, and (b) a component root pays one `spacing` slot for its own `<head>`**
+     (found 2026-09-02 on the Membership and Store cards, iPhone 17 Pro simulator at the
+     wt-land kernel dc987952; the web paints the declared 20; neither fixed upstream —
+     both bridged in the template by declaring each edge once and by putting a component
+     root's rhythm on an inner column, PlanCard / BuyButton / StoreTips / OfferModal).
+
+     (a) THE SUM.
+
+     Measured: PlanCard's `card` class declared `paddingV="20"` and the element
+     `paddingTop="{{ padTop }}"` (20, or 42 under the Good Bargain badge). Web: the title's
+     cap sits 28pt below the card's top edge; iOS: 57.7pt, on every card. The one-element
+     probes ran INSIDE the real Membership frame (the plans list swapped for probe cards;
+     `T2/probe/probeM.png`, `probeN.png`): T1 class only → a 70pt card; T2 + a COMPUTED
+     `paddingTop` of 20 → 90pt; T3 + a LITERAL `paddingTop="20"` → 89pt; T8 + `style=
+     "padding-top: {{ n }}px"` → 87pt; T9 a class spelling `paddingH` + `paddingBottom` only,
+     the computed attribute on the element → 70pt. So every inline top-padding spelling is
+     SUMMED with the class's vertical padding on iOS; only a class that does not name the
+     edge is immune. Innocent in the same probe, each 70pt: a hidden `position: absolute`
+     badge as the last child, a visible one, `<Theme/>` as the first child, `borderWidth`/
+     `borderColor` beside a css border. Template: `card` is `paddingH="20" paddingBottom="20"`
+     and the top edge is written on the element alone — the same pixels the web already
+     painted. Upstream ask: an inline padding attribute overrides the class edge it names
+     (a cascade, as the web sheet does), never adds to it; corpus row: class `paddingV="20"`
+     + element `paddingTop="20"` → 20pt of top padding.
+
+     (b) THE HEAD SLOT. With (a) bridged the real card still sat 37.7pt from top to title
+     against 27.7 for the identical markup written INLINE — and the ten was the root's own
+     `spacing`. Probed as component files mounted on the same frame (`T2/probe/probeY.png`,
+     `probeZ.png`): a root with class `paddingV="20"` and no attribute → 37.7 (PCc); the
+     same root at `spacing="4"` → 31.7 (PCf); at `spacing="0"` → 27.7 (PCg); root spacing 0
+     with the rhythm on an inner column → 27.7 (PCh); and a component with NO `<head>` at
+     all, root spacing 10 → 27.7 (PCi). So the `<head>` node occupies the first slot of a
+     component root's stack on iOS and the root pays one inter-child gap before its first
+     real child — the instance-level twin of §6.50(b), where a 0×0 seed child cost a screen
+     root two gaps (that fix covered a MOUNT child; this is the component's own head).
+     `<Theme/>` is innocent here (PCd, no Theme: 37.7). The cost is every component root
+     that declares a spacing: 10pt on each plan card, 10pt above the purchase control,
+     8pt above the Tips block, and a default-8 slot that sat the coupon card 4pt below
+     centre. Template: those four roots declare `spacing="0"` and an inner column carries
+     the rhythm — the same pixels on the web, which never paid the slot. Upstream ask: the
+     head registers and takes no layout slot, as a registration-only mount already does;
+     corpus row: a component root `spacing="10"` with a `<head>` and one child → the child
+     at the padding edge. After both bridges the 7-day card measures 27.7pt top-to-title
+     on iOS against 28.0 on the web, and 254.7pt tall against 252.
+
+186. **A MOUNT TAG CARRYING `surface=` IS DRESSED AS A SYSTEM SURFACE ON iOS — a 12% white,
+     radius-14 fill behind every BuyButton** (found 2026-09-02 behind the sticky CTA on
+     /membership, /store and the plans sheet; sampled #1F1F1F, which is exactly
+     rgba(255,255,255,0.12) over black; the web paints nothing there; not fixed upstream —
+     bridged by renaming the attribute, BuyButton.dsx `funnel`).
+
+     The bisection ran on the real Membership frame (`T2/probe/probeP.png` … `probeW.png`).
+     The box needs the COMPONENT BOUNDARY: the inline replica of the same body (the earlier
+     ProbeA) had none; a component with BuyButton's eight attributes and a static body has
+     it (PBf), with or without a class on its root (PBg), with or without `<Theme/>` (PBn
+     vs PBm), with or without an opacity on the CTA (PBr). One attribute at a time → only
+     `surface` (PBv; `kind`, `variant`, `sku`+`productId`+`price`, `label`, `headers` are
+     clean). And it is the MOUNT that matters, not the declaration: a component declaring
+     `surface` mounted with nothing passed is clean (PBz1); a component declaring only
+     `kind`, mounted with `surface="probe"`, wears the box (PBz2); the renamed `funnel` is
+     clean (PBz3). So the iOS instance host reads `surface` off the mount tag as its own
+     word — App.json `entry.surfaces` is the engine's surface plane — before the component's
+     attribute fold ever sees it, and decorates the instance the way a system surface is.
+     Template: the funnel attribute is `funnel` on BuyButton and its four callers; the
+     analytics property keeps the word `surface`. Upstream ask: a mount attribute the
+     component declares belongs to the component; if `surface` is reserved, the linter
+     refuses the declaration rather than the renderer decorating the instance — and under
+     `design: "custom"` no instance wears system chrome at all (the spec's −1).
+
+187. **A COMPONENT MOUNTED IN A ROW IS GREEDY ON iOS — it beats a `<spacer/>` and
+     `justify-content: space-between`, so the Restore pill sat beside the back chevron**
+     (found 2026-09-02 on /vip; on /membership the same pill sat mid-row rather than
+     trailing; not fixed upstream — bridged with the catalog's hug primitive on the mount).
+
+     Probe rows on the real Membership frame (`T2/probe/probeN.png`, `probeQ.png`,
+     `probeR.png`): [navBtn][spacer][inline pill] → trailing (B4); [navBtn][spacer]
+     [`<RestoreRow variant="pill"/>`] → beside the chevron (B5); the row as `justify-content:
+     space-between` with no spacer → the same (B7); `grow="false"` on the mount → the same
+     (B10); `width="fit"` on the mount → trailing (B9). Reading: the boundary carries the
+     fill (dev@bff4c16d's synthetic default) and a mount in a ROW receives a width grow it
+     never wrote — it takes the free space a spacer or a growing sibling should, and its
+     content sits at the leading edge of that share; the hug primitive reaches the template
+     root and cancels it, `grow="false"` does not. Template: `width="fit"` on both pill
+     mounts (Vip.dsx, Membership.dsx). Upstream ask: the synthetic grow on a mount is the
+     mount's RESOLVED grow — none when none is written — as on the web; corpus row: an
+     hstack of [fixed][spacer][mount] lands the mount hugging at the trailing edge.
