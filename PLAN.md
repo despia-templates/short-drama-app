@@ -4295,3 +4295,22 @@ standard (rfcs/0001), the governance model (rfcs/0002) and the licensing/self-ho
      for the DIRECT `.svg` path and stays the engine's item. Two changes so no deploy can skip
      the step again: `npm run art:raster` exists and `predeploy` runs it, and `npm run verify`
      now fails on any SVG under `public/{posters,assets}` without a twin.
+     Two more findings from the same closing pass. (a) The iOS `<image>` REMEMBERS the origin's
+     answer: a simulator that had received the SVG before the twin existed stayed blank through
+     a rebuild and an upgrade install, and only an uninstall cleared it — the origin's SVG
+     fallback for a native client is `no-store` now (2d4359d), so a device re-asks at its next
+     launch. (b) ANDROID, OPEN: on the scratch build (premium modules stripped, so no device
+     identity after `pm clear` — the app runs SIGNED OUT, a state the web and iOS lanes never
+     show because their device identity always registers) the Membership header renders its
+     title one letter per line and the VIP header's Sign-in pill sits against the back chevron
+     with the spacer starved, on kernel 563ae7f6 AND on b3acbf37. The Android row-hug twin from
+     67ea7f26 was withdrawn on suspicion (563ae7f6) and the collapse survived the withdrawal, so
+     the branch was not the cause (the framework comment says so: the branch stays out because
+     it is unmeasured, not because it was proven guilty). What is known: the row is
+     `chevron · <text grow="width" style="flex: 1; min-width: 0"> · <RestoreRow variant="pill"
+     width="fit">`, the weighted title measures ~0, so the mount beside it is being measured
+     at the row's full width on this lane in this state. Next: a one-row probe on a device
+     with the pill signed in and signed out, before touching either the engine or the row.
+     Home, Rewards, Store, VIP body, Browse and the Coming Soon rail render on Android on the
+     new kernel (sheets), and every Android capture in this pass came off an emulator with
+     ~575 MB free — a cold start took 30 s+, so a fast screenshot shows the splash, not a bug.
