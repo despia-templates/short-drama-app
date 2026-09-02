@@ -140,6 +140,16 @@ create unique index if not exists dsx_order_intent_uniq
 create unique index if not exists dsx_ledger_grant_once
   on dsx_ledger (owner_id, kind, source, ref) where source in ('pack', 'vip');
 
+-- THE WATCH MISSION (engage.dsx watchTick): one day row per viewer per day — the first tick
+-- of a day is a create, and two first ticks arriving together must not open two days.
+create unique index if not exists dsx_watchday_owner_day_uniq on dsx_watchday (owner_id, day);
+
+-- ...and its milestone grants EXACTLY ONCE, through the same lock settleOrder uses: the
+-- ledger row (`ref` = "<day>:<minutes>") is written before the wallet moves, so two ticks
+-- racing across the 5-minute boundary pay once. Partial, so it constrains only the mission.
+create unique index if not exists dsx_ledger_watch_once
+  on dsx_ledger (owner_id, source, ref) where source = 'watch';
+
 -- one block per viewer per subject. The unblock path reads the row and deletes it, so a
 -- duplicate would make a block un-clearable the same way a duplicate favorite made the heart
 -- un-clearable; and `blockAuthor` relies on the refused insert to answer "already blocked".

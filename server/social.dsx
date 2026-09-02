@@ -78,7 +78,7 @@
          creative path), which is the seam `Components/parts/AdGate.dsx` emits its `reported`
          event for under guideline 2.5.18. -->
     <entity as="report" ownership="public-read">
-      <field as="kind" type="text"/>        <!-- comment | ad -->
+      <field as="kind" type="text"/>        <!-- comment | ad | episode -->
       <field as="target" type="uuid"/>      <!-- the reported comment row, when kind is comment -->
       <field as="subject" type="text"/>     <!-- a target with no row of its own: an ad creative -->
       <field as="episode" type="uuid"/>
@@ -294,6 +294,29 @@
          today only acknowledges the viewer, because no route existed. This is that route.
          HAND-OFF, one line, in a file this document does not own: `adReported` in
          Rewards.dsx should POST { lane, creative } here and report what the server said. -->
+    <!-- REPORT AN EPISODE — the player's own "Report" row (docs/design/reference-ui-spec.md §3a).
+         Same seam, third kind: `subject` carries the episode id as text (the report table's
+         `episode` column is set too, so the operator queue can join it), `target` stays empty
+         because there is no comment row. One report per (reporter, episode) through the same
+         partial unique index the ad report rides (coalesce(target::text, subject)). -->
+    <action as="reportEpisode" inputs="episode, show, reason, note">
+      if (episode == null || episode === '') { throw { reason: 'invalid', message: 'an episode is required' } }
+      const reasons = ['spam', 'harassment', 'sexual', 'violence', 'other']
+      const why = reason == null || reason === '' ? 'other' : String(reason)
+      if (!reasons.includes(why)) { throw { reason: 'invalid', message: 'unknown report reason' } }
+      const named = String(episode).slice(0, 300)
+      const values = {
+        kind: 'episode', subject: named, reason: why, episode: episode,
+        snapshot: 'episode reported from the player',
+        note: note == null ? '' : String(note).trim().slice(0, 300)
+      }
+      if (show != null) { values.show = show }
+      const made = await dsx.module.data.report.create(values)
+      if (made.ok) { return { filed: true, duplicate: false } }
+      const already = await dsx.module.data.report.list({ filters: { subject: named }, limit: 1 })
+      if (already.ok && already.data.length > 0) { return { filed: true, duplicate: true } }
+      throw { reason: 'unavailable', message: 'The report could not be filed. If this is a fresh deployment, apply server/policies.local.sql — dsx_report needs its owner-insert policy.' }
+    </action>
     <action as="reportAd" inputs="lane, creative, note">
       const what = creative == null || creative === '' ? String(lane == null ? '' : lane) : String(creative)
       if (what === '') { throw { reason: 'invalid', message: 'a creative is required' } }
@@ -424,6 +447,7 @@
   <route method="POST" path="/social/comment/delete"    action="deleteComment" auth="required" rate="20/m"/>
   <route method="POST" path="/social/report"            action="reportComment" auth="required" rate="20/m"/>
   <route method="POST" path="/social/report/ad"         action="reportAd"      auth="required" rate="20/m"/>
+  <route method="POST" path="/social/report/episode"    action="reportEpisode" auth="required" rate="20/m"/>
   <route method="POST" path="/social/block"             action="blockAuthor"   auth="required" rate="20/m"/>
   <route method="POST" path="/social/unblock"           action="unblockAuthor" auth="required" rate="20/m"/>
   <route method="POST" path="/social/reports"           action="listReports"   auth="required" reach="" rate="600/m"/>

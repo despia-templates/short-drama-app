@@ -70,6 +70,142 @@
       <index on="day"/>
     </entity>
 
+    <!-- ══ THE WATCH MISSION — coins for minutes watched, counted HERE and nowhere else ═══
+         The founder's law for every grant in this document, restated for the one lane where
+         the temptation is greatest: NO COIN GRANT ORIGINATES FROM THE CLIENT. A player could
+         trivially report "I watched 30 minutes"; so it reports nothing of the kind. It sends a
+         HEARTBEAT — "still watching" — and the server counts WALL-CLOCK TIME between two
+         accepted heartbeats, capped at one heartbeat interval (TICK_CAP_SECONDS). Three
+         properties fall out of that, and each is asserted in scripts/verify.mjs:
+           · MONOTONIC. A replayed tick arrives with ~0 s of wall clock since the last one and
+             credits ~0. Ten ticks in one second credit at most one second, total.
+           · BOUNDED. No tick can credit more than TICK_CAP_SECONDS however long the gap — a
+             viewer who pauses for an hour and resumes gets one cap, not sixty minutes. The
+             first tick of a day credits nothing: it only opens the day (there is no previous
+             tick to measure from).
+           · SERVER-PRICED. The milestones (5 · 10 · 20 · 30 minutes), their coins and the
+             daily ceiling live in this action. The four grants sum to exactly the cap, so
+             "up to 70 coins daily" in the sheet is arithmetic, not copy.
+         EXACTLY-ONCE GRANTS through the ledger, the same lock settleOrder uses: a milestone
+         writes its ledger row FIRST with `ref = day:minutes` under a partial unique index
+         (policies.local.sql dsx_ledger_watch_once), and only a row that actually landed moves
+         the wallet. Two ticks racing across the same boundary cannot pay twice. The seconds
+         counter itself has no such lock — a race there over-counts by at most one cap and
+         changes no coin, which is why it is left to the day row rather than a second table.
+         BOUNDED UNDER THE 64-CALL BUDGET: one read, one write, and per milestone crossed one
+         ledger write + one wallet read + one wallet write. A tick credits at most 60 s and the
+         milestones are 300 s apart, so at most one boundary is crossed per tick — worst case
+         six module calls. `done` is always true; there is nothing to resume. -->
+    <entity as="watchday" ownership="owner">
+      <field as="day" type="text"/>            <!-- YYYY-MM-DD (UTC), like every daily marker here -->
+      <field as="seconds" type="integer"/>     <!-- wall-clock seconds credited today -->
+      <field as="granted" type="integer"/>     <!-- coins paid today, the sum of the ledger rows -->
+      <field as="reached" type="text"/>        <!-- comma-joined milestone minutes already paid, e.g. "5,10" -->
+      <field as="last_at" type="timestamptz"/> <!-- the previous accepted heartbeat -->
+      <index on="day"/>
+    </entity>
+
+    <action as="watchTick" inputs="episode">
+      const today = new Date().toISOString().slice(0, 10)
+      const now = Date.now()
+      const TICK_CAP_SECONDS = 60
+      // minutes → coins: 10 + 15 + 20 + 25 = 70, the daily ceiling by construction
+      const MILESTONES = [{ minutes: 5, coins: 10 }, { minutes: 10, coins: 15 }, { minutes: 20, coins: 20 }, { minutes: 30, coins: 25 }]
+      const DAILY_CAP = 70
+      const rows = await dsx.module.data.watchday.list({ filters: { day: today }, limit: 1 })
+      let day = rows.ok && rows.data.length > 0 ? rows.data[0] : null
+      let credited = 0
+      if (day == null) {
+        // THE MARKER IS THE LOCK — `unique (owner_id, day)` on dsx_watchday. The loser of a
+        // first-tick race re-reads the winner's row instead of opening a second day.
+        const made = await dsx.module.data.watchday.create({ day: today, seconds: 0, granted: 0, reached: '', last_at: new Date(now).toISOString() })
+        if (made.ok) { day = made.data } else {
+          const again = await dsx.module.data.watchday.list({ filters: { day: today }, limit: 1 })
+          day = again.ok && again.data.length > 0 ? again.data[0] : null
+        }
+        if (day == null) { throw { reason: 'unavailable', message: 'the watch mission is unavailable right now' } }
+      } else {
+        const last = day.last_at == null ? now : new Date(day.last_at).getTime()
+        const elapsed = Math.floor((now - last) / 1000)
+        credited = Math.max(0, Math.min(TICK_CAP_SECONDS, elapsed))
+        if (credited > 0 || day.last_at == null) {
+          const moved = await dsx.module.data.watchday.update({ id: day.id, values: { seconds: day.seconds + credited, last_at: new Date(now).toISOString() } })
+          if (moved.ok) { day = moved.data }
+        }
+      }
+      const seconds = Number(day.seconds)
+      let granted = Number(day.granted)
+      let reached = day.reached == null ? '' : String(day.reached)
+      let paidNow = 0
+      let i = 0
+      while (i < MILESTONES.length) {
+        const m = MILESTONES[i]
+        i = i + 1
+        if (seconds < m.minutes * 60) { continue }
+        if ((',' + reached + ',').indexOf(',' + m.minutes + ',') >= 0) { continue }
+        if (granted + m.coins > DAILY_CAP) { continue }
+        // THE LEDGER ROW IS THE LOCK: `unique (owner_id, source, ref) where source = 'watch'`.
+        // A refused insert means another tick already paid this milestone today.
+        const led = await dsx.module.data.ledger.create({ kind: 'bonus', amount: m.coins, source: 'watch', ref: today + ':' + m.minutes })
+        if (!led.ok) { continue }
+        const mine = await dsx.module.data.wallet.list({ limit: 1 })
+        let w = mine.ok && mine.data.length > 0 ? mine.data[0] : null
+        if (w == null) {
+          const madeW = await dsx.module.data.wallet.create({ coins: 0, bonus: 0 })
+          if (madeW.ok) { w = madeW.data } else {
+            const againW = await dsx.module.data.wallet.list({ limit: 1 })
+            w = againW.ok && againW.data.length > 0 ? againW.data[0] : null
+          }
+        }
+        if (w == null) { throw { reason: 'unavailable', message: 'wallet unavailable' } }
+        const paid = await dsx.module.data.wallet.update({ id: w.id, values: { bonus: w.bonus + m.coins } })
+        if (!paid.ok) { throw { reason: 'unavailable', message: 'wallet could not be updated' } }
+        granted = granted + m.coins
+        paidNow = paidNow + m.coins
+        reached = reached == '' ? String(m.minutes) : reached + ',' + m.minutes
+      }
+      if (paidNow > 0) {
+        await dsx.module.data.watchday.update({ id: day.id, values: { granted: granted, reached: reached } })
+      }
+      let nextMilestoneSeconds = 0
+      let j = 0
+      while (j < MILESTONES.length) {
+        if (nextMilestoneSeconds == 0 && (',' + reached + ',').indexOf(',' + MILESTONES[j].minutes + ',') < 0) { nextMilestoneSeconds = MILESTONES[j].minutes * 60 }
+        j = j + 1
+      }
+      return {
+        day: today, watchedSeconds: seconds, credited: credited, granted: paidNow, grantedToday: granted,
+        nextMilestoneSeconds: nextMilestoneSeconds, capReached: granted >= DAILY_CAP, dailyCap: DAILY_CAP,
+        milestones: MILESTONES.map(m => ({ id: 'm' + m.minutes, minutes: m.minutes, coins: m.coins, reached: (',' + reached + ',').indexOf(',' + m.minutes + ',') >= 0 })),
+        done: true
+      }
+    </action>
+
+    <!-- the read the ring binds to BEFORE the first heartbeat of a session — no tick, no
+         write, no credit; the same shape as a tick's answer so one computed serves both -->
+    <action as="watchState">
+      const today = new Date().toISOString().slice(0, 10)
+      const MILESTONES = [{ minutes: 5, coins: 10 }, { minutes: 10, coins: 15 }, { minutes: 20, coins: 20 }, { minutes: 30, coins: 25 }]
+      const DAILY_CAP = 70
+      const rows = await dsx.module.data.watchday.list({ filters: { day: today }, limit: 1 })
+      const day = rows.ok && rows.data.length > 0 ? rows.data[0] : null
+      const seconds = day == null ? 0 : Number(day.seconds)
+      const granted = day == null ? 0 : Number(day.granted)
+      const reached = day == null || day.reached == null ? '' : String(day.reached)
+      let nextMilestoneSeconds = 0
+      let j = 0
+      while (j < MILESTONES.length) {
+        if (nextMilestoneSeconds == 0 && (',' + reached + ',').indexOf(',' + MILESTONES[j].minutes + ',') < 0) { nextMilestoneSeconds = MILESTONES[j].minutes * 60 }
+        j = j + 1
+      }
+      return {
+        day: today, watchedSeconds: seconds, credited: 0, granted: 0, grantedToday: granted,
+        nextMilestoneSeconds: nextMilestoneSeconds, capReached: granted >= DAILY_CAP, dailyCap: DAILY_CAP,
+        milestones: MILESTONES.map(m => ({ id: 'm' + m.minutes, minutes: m.minutes, coins: m.coins, reached: (',' + reached + ',').indexOf(',' + m.minutes + ',') >= 0 })),
+        done: true
+      }
+    </action>
+
     <action as="rewardsState">
       const today = new Date().toISOString().slice(0, 10)
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
@@ -286,4 +422,9 @@
   <route method="POST" path="/rewards/spin"    action="spinWheel"    auth="required" rate="10/h"/>
   <route method="POST" path="/rewards/task"    action="claimTask"    auth="required" rate="20/h"/>
   <route method="POST" path="/rewards/ad"      action="grantAdReward" auth="required" rate="20/h"/>
+  <!-- THE WATCH MISSION. The heartbeat is sized to a 30 s client cadence with room for a
+       retry and a second device (6/m), and the read the ring opens on is as cheap as
+       /rewards/state. Neither route takes a number from the client — see watchTick. -->
+  <route method="POST" path="/engage/watch/tick"  action="watchTick"  auth="required" rate="6/m"/>
+  <route method="GET"  path="/engage/watch/state" action="watchState" auth="required" rate="120/m"/>
 </server>
